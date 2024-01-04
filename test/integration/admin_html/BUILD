@@ -32,12 +32,12 @@ envoy_sh_test(
     size = "large",
     srcs = envoy_select_admin_html(["test_server_test.sh"]),
     cc_binary = [":test_server"],
-    coverage = False,
     data = [
         ":test_server_files",
         "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility.sh",
     ],
+    tags = ["nocoverage"],
 
     # This test fails on windows trying to poll the server for the admin
     # address. Failure is:
