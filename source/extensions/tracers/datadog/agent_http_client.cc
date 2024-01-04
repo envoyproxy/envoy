@@ -52,8 +52,21 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   set_headers(writer);
 
   message->body().add(body);
+
   auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
       deadline - time_source_.monotonicTime());
+  if (timeout.count() <= 0) {
+    std::string message = "request deadline expired already";
+    if (timeout.count() < 0) {
+      message += ' ';
+      message += std::to_string(-timeout.count());
+      message += " milliseconds ago";
+    }
+    stats_.reports_dropped_.inc();
+    return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
+                                   std::move(message)};
+  }
+
   ENVOY_LOG(debug, "submitting data to {} with payload size {} and {} ms timeout", url.path,
             body.size(), timeout.count());
 
