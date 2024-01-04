@@ -47,9 +47,14 @@ public:
   // To be called right after construction.
   virtual void initialize() PURE;
 
+  // Returns the ALPN list to negotiate during the handshake.
+  const std::vector<absl::string_view>& supportedAlpnProtocols() const { return supported_alpns_; }
+
 protected:
   virtual void onSecretUpdated() PURE;
   QuicTransportSocketFactoryStats stats_;
+  // Populated during initialization.
+  std::vector<absl::string_view> supported_alpns_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client

@@ -117,7 +117,6 @@ public:
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
         .WillOnce(testing::SaveArg<0>(&update_callback_));
     factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
-    factory_->initialize();
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
@@ -128,7 +127,15 @@ public:
   std::function<void()> update_callback_;
 };
 
+TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {
+  context_config_->alpn_ = "h3,h3-draft29";
+  factory_->initialize();
+  EXPECT_THAT(factory_->supportedAlpnProtocols(), testing::ElementsAre("h3", "h3-draft29"));
+}
+
 TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
+  factory_->initialize();
+  EXPECT_TRUE(factory_->supportedAlpnProtocols().empty());
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
 
   Ssl::ClientContextSharedPtr ssl_context1{new Ssl::MockClientContext()};

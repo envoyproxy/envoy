@@ -35,6 +35,13 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
       fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
           std::move(config), factory_context.sslContextManager(), factory_context.statsScope())) {}
 
+void QuicClientTransportSocketFactory::initialize() {
+  if (!fallback_factory_->clientContextConfig()->alpnProtocols().empty()) {
+    supported_alpns_ =
+        absl::StrSplit(fallback_factory_->clientContextConfig()->alpnProtocols(), ',');
+  }
+}
+
 ProtobufTypes::MessagePtr QuicClientTransportSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>();
 }
