@@ -364,6 +364,9 @@ new_features:
 - area: access_log
   change: |
     Added support for ``%CONNECTION_ID%`` command operator for UDP session access log.
+- area: rbac filter
+  change: |
+    allow listed ``HttpAttributesCelMatchInput`` to be used with the xDS matcher in the RBAC filter.
 
 deprecated:
 - area: wasm
