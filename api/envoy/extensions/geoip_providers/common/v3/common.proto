@@ -39,26 +39,31 @@ message CommonGeoipProviderConfig {
 
     // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g. VPN, public proxy etc)
     // and header will be populated with the check result. Header value will be set to either "true" or "false" depending on the check result.
+    // If target IP is not found in the anonymous database, header value will be set to "false".
     string is_anon = 5
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a VPN and header will be populated with the check result.
     // Header value will be set to either "true" or "false" depending on the check result.
+    // If target IP is not found in the anonymous database, header value will be set to "false".
     string anon_vpn = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a hosting provider and header will be populated with the check result.
     // Header value will be set to either "true" or "false" depending on the check result.
+    // If target IP is not found in the anonymous database, header value will be set to "false".
     string anon_hosting = 7
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a TOR exit node and header will be populated with the check result.
     // Header value will be set to either "true" or "false" depending on the check result.
+    // If target IP is not found in the anonymous database, header value will be set to "false".
     string anon_tor = 8
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the IP address will be checked if it belongs to a public proxy and header will be populated with the check result.
     // Header value will be set to either "true" or "false" depending on the check result.
+    // If target IP is not found in the anonymous database, header value will be set to "false".
     string anon_proxy = 9
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }

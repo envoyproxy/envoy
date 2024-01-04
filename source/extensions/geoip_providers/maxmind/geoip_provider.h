@@ -77,6 +77,22 @@ private:
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 
 using MaxmindDbPtr = std::unique_ptr<MMDB_s>;
+
+struct GeoDbLookupResult {
+  MMDB_lookup_result_s& mmdb_lookup_result_;
+  absl::flat_hash_map<std::string, std::string>& lookup_result_;
+  bool is_anon_lookup_;
+  bool any_hit_;
+
+  GeoDbLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
+                    absl::flat_hash_map<std::string, std::string>& lookup_result,
+                    bool is_anon_lookup)
+      : mmdb_lookup_result_(mmdb_lookup_result), lookup_result_(lookup_result),
+        is_anon_lookup_(is_anon_lookup), any_hit_(false){};
+
+  void markHit() { any_hit_ = true; }
+};
+
 class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
@@ -108,8 +124,7 @@ private:
   void lookupInAnonDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   template <typename... Params>
-  void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
-                               absl::flat_hash_map<std::string, std::string>& lookup_result,
+  void populateGeoLookupResult(GeoDbLookupResult& geo_db_lookup_result,
                                const std::string& result_key, Params... lookup_params) const;
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;

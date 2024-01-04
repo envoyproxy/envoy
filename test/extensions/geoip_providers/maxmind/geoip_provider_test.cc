@@ -231,7 +231,9 @@ TEST_F(GeoipProviderTest, ValidConfigEmptyLookupResult) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(0, captured_lookup_response_.size());
+  EXPECT_EQ(1, captured_lookup_response_.size());
+  const auto& anon_it = captured_lookup_response_.find("x-geo-anon");
+  EXPECT_EQ("false", anon_it->second);
   expectStats("anon_db", 1, 0);
 }
 
