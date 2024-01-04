@@ -85,7 +85,7 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "androidx.test:rules:1.4.0",
             "androidx.test:runner:1.4.0",
             "androidx.test:monitor:1.5.0",
-            "androidx.test.ext:junit:1.1.3",
+            "androidx.test.ext:junit:1.1.5",
             "org.robolectric:robolectric:4.8.2",
             "org.hamcrest:hamcrest:2.2",
             "com.google.truth:truth:1.1.3",
