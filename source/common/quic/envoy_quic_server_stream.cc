@@ -195,6 +195,10 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     buffer_memory_account_->clearDownstream();
   }
 
+  if (http_datagram_handler_) {
+    UnregisterHttp3DatagramVisitor();
+  }
+
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
     // of propagating original reset reason. In QUICHE if a stream stops reading
@@ -579,6 +583,7 @@ void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   ASSERT(request_decoder_ != nullptr);
   http_datagram_handler_->setStreamDecoder(request_decoder_);
+  RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
 
