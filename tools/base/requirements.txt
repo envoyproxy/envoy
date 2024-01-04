@@ -36,9 +36,9 @@ aio-api-nist==0.0.4 \
     --hash=sha256:1f2909d60ed4fdb3a3ffc37ad6012666f34078b71648394be91f5e67bbf8b6ca \
     --hash=sha256:c948ee597b9e7cda7982e17bc4aca509b8aa68510899b42e2d382c10fb0d6f89
     # via envoy-dependency-check
-aio-core==0.10.0 \
-    --hash=sha256:57e2d8dd8ee8779b0ebc2e2447492c0db8d7ed782e9ad1bb2662593740751acb \
-    --hash=sha256:cb00d530b1e16228b36174c23d446c66e3f2a50ef91aa527c0e58a654316f635
+aio-core==0.10.1 \
+    --hash=sha256:608cd1e5dbea8492bd7cc426ad0e280693c3ec2520da99e8545eff23f52fad0c \
+    --hash=sha256:f442fdbb811cad093f8a89019b5ea768e38396f21393c5fe241eb63a2e2914a3
     # via
     #   aio-api-bazel
     #   aio-api-github
@@ -449,9 +449,9 @@ cryptography==41.0.7 \
     #   pyjwt
     #   pyopenssl
     #   service-identity
-dependatool==0.2.2 \
-    --hash=sha256:8e66850c79e37325735efa67ce06e2d5a939c0dab758f37b9bd3d09d0fb1f9a4 \
-    --hash=sha256:dff28853a7252d6a5d670c2519165506902c0d4746cbbdac99d2ad63ed96d82d
+dependatool==0.2.3 \
+    --hash=sha256:04bf88d01302eec697a69e8301d14668a89d676dbd2a3914e91c610a531e9db7 \
+    --hash=sha256:113a6641889d3dae7c81cb0a0483c31a2657f179474e11f4731b285963475ade
     # via -r requirements.in
 deprecated==1.2.14 \
     --hash=sha256:6fac8b097794a90302bdbb17b9b815e732d3c4720583ff1b198499d78470466c \

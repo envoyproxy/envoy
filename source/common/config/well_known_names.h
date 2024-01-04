@@ -121,6 +121,8 @@ public:
   const std::string DNS_FILTER_PREFIX = "envoy.dns_filter_prefix";
   // Stats prefix for the Connection limit filter
   const std::string CONNECTION_LIMIT_PREFIX = "envoy.connection_limit_prefix";
+  // Stats prefix for the RBAC network filter
+  const std::string RBAC_PREFIX = "envoy.rbac_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter
