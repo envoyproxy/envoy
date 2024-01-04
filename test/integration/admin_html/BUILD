@@ -37,7 +37,6 @@ envoy_sh_test(
         "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility.sh",
     ],
-    tags = ["nocoverage"],
 
     # This test fails on windows trying to poll the server for the admin
     # address. Failure is:
@@ -46,7 +45,10 @@ envoy_sh_test(
     #    curl: (3) URL using bad/illegal format or missing URL
     #
     # This seems fixable, if someone is so inclined.
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocoverage",
+        "skip_on_windows",
+    ],
 )
 
 filegroup(
