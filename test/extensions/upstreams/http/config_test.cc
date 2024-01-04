@@ -191,15 +191,15 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfig) {
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
-#ifdef ENVOY_ENABLE_UHV
   ProtocolOptionsConfigImpl config(options_, server_context_);
+#ifdef ENVOY_ENABLE_UHV
   EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
-  // config is rejected
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  // If UHV is disabled with the default value of envoy.reloadable_features.enable_universal_header_validator
+  // config is accepted and UHV factory is nullptr
+  EXPECT_EQ(nullptr, config.header_validator_factory_);
 #endif
 }
 
