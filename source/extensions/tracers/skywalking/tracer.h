@@ -6,6 +6,7 @@
 
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
+#include "source/common/tracing/trace_context_impl.h"
 #include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "cpp2sky/tracing_context.h"
@@ -19,7 +20,7 @@ namespace SkyWalking {
 using cpp2sky::TracingContextPtr;
 using cpp2sky::TracingSpanPtr;
 
-const Http::LowerCaseString& skywalkingPropagationHeaderKey();
+const Tracing::TraceContextHandler& skywalkingPropagationHeaderKey();
 
 class Tracer {
 public:

@@ -87,8 +87,7 @@ public:
     if (!tls->isShutdown()) {
       tls->runOnAllThreads([](OptRef<ThreadLocalConfig> tls) { tls->config_ = {}; },
                            // Extend the lifetime of TLS by capturing main_config_, because
-                           // otherwise, the callback to clear TLS worker content is not
-                           // executed.
+                           // otherwise, the callback to clear TLS worker content is not executed.
                            [main_config = main_config_]() {
                              // Explicitly delete TLS on the main thread.
                              main_config->tls_.reset();
@@ -179,12 +178,20 @@ private:
   const ProtobufTypes::MessagePtr default_configuration_;
 };
 
+// Struct of canonical filter name and HTTP stream filter factory callback.
+struct NamedHttpFilterFactoryCb {
+  // Canonical filter name.
+  std::string name;
+  // Factory function used to create filter instances.
+  Http::FilterFactoryCb factory_cb;
+};
+
 // Implementation of a HTTP dynamic filter config provider.
 // NeutralHttpFilterConfigFactory can either be a NamedHttpFilterConfigFactory
 // or an UpstreamHttpFilterConfigFactory.
 template <class FactoryCtx, class NeutralHttpFilterConfigFactory>
 class HttpDynamicFilterConfigProviderImpl
-    : public DynamicFilterConfigProviderImpl<Http::NamedHttpFilterFactoryCb> {
+    : public DynamicFilterConfigProviderImpl<NamedHttpFilterFactoryCb> {
 public:
   HttpDynamicFilterConfigProviderImpl(
       FilterConfigSubscriptionSharedPtr& subscription,
@@ -208,7 +215,7 @@ public:
   }
 
 private:
-  Http::NamedHttpFilterFactoryCb
+  NamedHttpFilterFactoryCb
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
@@ -641,7 +648,7 @@ protected:
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedHttpFilterConfigFactory, Http::NamedHttpFilterFactoryCb,
+          Server::Configuration::NamedHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
           Server::Configuration::FactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::FactoryContext,
@@ -668,7 +675,7 @@ protected:
 // HTTP filter
 class UpstreamHttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::UpstreamHttpFilterConfigFactory, Http::NamedHttpFilterFactoryCb,
+          Server::Configuration::UpstreamHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
           Server::Configuration::UpstreamFactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::UpstreamFactoryContext,

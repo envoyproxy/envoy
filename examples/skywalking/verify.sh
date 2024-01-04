@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 export NAME=skywalking
-export PORT_PROXY="${SKYWALKING_PORT_PROXY:-12600}"
-export PORT_UI="${SKYWALKING_PORT_UI:-12601}"
+export PORT_PROXY="${SKYWALKING_PORT_PROXY:-11910}"
+export PORT_UI="${SKYWALKING_PORT_UI:-11911}"
 
 # NB: This allows ES to run in a low-resource environment,
 #   dont do this in a production environment.

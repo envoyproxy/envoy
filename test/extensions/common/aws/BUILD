@@ -24,12 +24,26 @@ envoy_cc_mock(
 )
 
 envoy_cc_test(
-    name = "signer_impl_test",
-    srcs = ["signer_impl_test.cc"],
+    name = "sigv4_signer_impl_test",
+    srcs = ["sigv4_signer_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
-        "//source/extensions/common/aws:signer_impl_lib",
+        "//source/extensions/common/aws:sigv4_signer_impl_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "sigv4a_signer_impl_test",
+    srcs = ["sigv4a_signer_impl_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:message_lib",
+        "//source/extensions/common/aws:sigv4a_key_derivation_lib",
+        "//source/extensions/common/aws:sigv4a_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",

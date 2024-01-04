@@ -104,9 +104,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      std::move(route_metadata_context), check_request_, config_->maxRequestBytes(),
-      config_->packAsBytes(), config_->includePeerCertificate(), config_->includeTLSSession(),
-      config_->destinationLabels(), config_->requestHeaderMatchers());
+      std::move(route_metadata_context), check_request_, max_request_bytes_, config_->packAsBytes(),
+      config_->includePeerCertificate(), config_->includeTLSSession(), config_->destinationLabels(),
+      config_->requestHeaderMatchers());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   // Store start time of ext_authz filter call
@@ -155,16 +155,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *decoder_callbacks_);
 
-    const auto allow_partial_message =
-        check_settings.has_with_request_body()
-            ? check_settings.with_request_body().allow_partial_message()
-            : config_->allowPartialMessage();
-    const auto max_request_bytes = check_settings.has_with_request_body()
-                                       ? check_settings.with_request_body().max_request_bytes()
-                                       : config_->maxRequestBytes();
+    allow_partial_message_ = check_settings.has_with_request_body()
+                                 ? check_settings.with_request_body().allow_partial_message()
+                                 : config_->allowPartialMessage();
+    max_request_bytes_ = check_settings.has_with_request_body()
+                             ? check_settings.with_request_body().max_request_bytes()
+                             : config_->maxRequestBytes();
 
-    if (!allow_partial_message) {
-      decoder_callbacks_->setDecoderBufferLimit(max_request_bytes);
+    if (!allow_partial_message_) {
+      decoder_callbacks_->setDecoderBufferLimit(max_request_bytes_);
     }
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -479,7 +478,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 }
 
 bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
-  if (!config_->allowPartialMessage()) {
+  if (!allow_partial_message_) {
     return false;
   }
 
@@ -489,7 +488,7 @@ bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
     num_bytes_buffered += buffer->length();
   }
 
-  return num_bytes_buffered >= config_->maxRequestBytes();
+  return num_bytes_buffered >= max_request_bytes_;
 }
 
 void Filter::continueDecoding() {

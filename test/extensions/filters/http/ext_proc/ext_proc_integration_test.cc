@@ -110,7 +110,7 @@ protected:
       }
       // Construct a configuration proto for our filter and then re-write it
       // to JSON so that we can add it to the overall config
-      envoy::config::listener::v3::Filter ext_proc_filter;
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
       ext_proc_filter.set_name(ext_proc_filter_name);
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
@@ -123,7 +123,7 @@ protected:
         test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
         logging_filter_config.set_upstream_cluster_name(valid_grpc_cluster_name);
-        envoy::config::listener::v3::Filter logging_filter;
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging-test-filter");
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
 
@@ -2474,7 +2474,7 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
       test::integration::filters::LoggingTestFilterConfig logging_filter_config;
       logging_filter_config.set_logging_id("envoy.filters.http.ext_proc");
       logging_filter_config.set_upstream_cluster_name("ext_proc_server_1");
-      envoy::config::listener::v3::Filter logging_filter;
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
       logging_filter.set_name("logging-test-filter");
       logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
 
