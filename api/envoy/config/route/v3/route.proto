@@ -83,7 +83,7 @@ message RouteConfiguration {
   ];
 
   // Headers mutations at all levels are evaluated, if specified. By default, the order is from most
-  // specific (i.e. route configuration level) to least specific (i.e. route entry level). Later header
+  // specific (i.e. route entry level) to least specific (i.e. route configuration level). Later header
   // mutations may override earlier mutations.
   // This order can be reversed by setting this field to true. In other words, most specific level mutation
   // is evaluated last.
