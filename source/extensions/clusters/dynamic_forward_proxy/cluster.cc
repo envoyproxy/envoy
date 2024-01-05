@@ -234,8 +234,10 @@ bool Cluster::ClusterInfo::checkIdle() {
 void Cluster::addOrUpdateHost(
     absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
-  Upstream::LogicalHostSharedPtr emplaced_host;
-  bool host_found = false;
+  Upstream::HostVector hosts_added, hosts_removed;
+  Upstream::LogicalHostSharedPtr new_host = std::make_shared<Upstream::LogicalHost>(
+      info(), std::string{host}, host_info->address(), host_info->addressList(),
+      dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr, time_source_);
   {
     absl::WriterMutexLock lock{&host_map_lock_};
 
@@ -247,7 +249,6 @@ void Cluster::addOrUpdateHost(
     // future.
     const auto host_map_it = host_map_.find(host);
     if (host_map_it != host_map_.end()) {
-      // If we only have an address change, we can do that swap inline without any other updates.
       // The appropriate R/W locking is in place to allow this. The details of this locking are:
       //  - Hosts are not thread local, they are global.
       //  - We take a read lock when reading the address and a write lock when changing it.
@@ -263,38 +264,24 @@ void Cluster::addOrUpdateHost(
       //                     semantics, meaning the cache would expose multiple addresses and the
       //                     cluster would create multiple logical hosts based on those addresses.
       //                     We will leave this is a follow up depending on need.
-      ASSERT(host_info == host_map_it->second.shared_host_info_);
       ASSERT(host_map_it->second.shared_host_info_->address() !=
              host_map_it->second.logical_host_->address());
 
-      ENVOY_LOG(debug, "found existing dfproxy cluster host '{}'", host);
-      emplaced_host = host_map_it->second.logical_host_;
-      host_found = true;
+      // remove the old host
+      hosts_removed.emplace_back(host_map_it->second.logical_host_);
+      ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
+      host_map_.emplace(std::piecewise_construct, std::forward_as_tuple(host),
+                        std::forward_as_tuple(host_info, new_host));
+
     } else {
       ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
-      emplaced_host = host_map_
-                          .try_emplace(host, host_info,
-                                       std::make_shared<Upstream::LogicalHost>(
-                                           info(), std::string{host}, host_info->address(),
-                                           host_info->addressList(), dummy_locality_lb_endpoint_,
-                                           dummy_lb_endpoint_, nullptr, time_source_))
-                          .first->second.logical_host_;
+      host_map_.try_emplace(host, host_info, new_host);
     }
+    hosts_added.emplace_back(new_host);
   }
 
-  ASSERT(emplaced_host);
-  Upstream::HostVector hosts;
-  hosts.emplace_back(emplaced_host);
-
-  if (host_found) {
-    // removing host from priorityState first, with the old address.
-    updatePriorityState({}, hosts);
-    ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-    emplaced_host->setNewAddresses(host_info->address(), host_info->addressList(),
-                                   dummy_lb_endpoint_);
-    // will add host into priorityState again, with the new address.
-  }
-  updatePriorityState(hosts, {});
+  ASSERT(hosts_added.size() > 0);
+  updatePriorityState(hosts_added, hosts_removed);
 }
 
 void Cluster::onDnsHostAddOrUpdate(
