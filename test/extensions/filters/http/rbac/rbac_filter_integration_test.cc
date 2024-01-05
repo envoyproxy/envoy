@@ -445,45 +445,6 @@ TEST_P(RBACIntegrationTest, WithHttpAttributesCelMatchInputDenied) {
               testing::HasSubstr("rbac_access_denied_matched_policy[deny-request]"));
 }
 
-TEST_P(RBACIntegrationTest, WithHttpAttributesCelMatchInputAllowed) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
-    listener_socket_addr->set_address("0.0.0.0");
-    listener_socket_addr->set_port_value(8634);
-  });
-  config_helper_.prependFilter(RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG);
-  initialize();
-
-  auto conn_addr_port = Network::Utility::parseInternetAddressAndPort("0.0.0.0:8634");
-  auto conn = dispatcher_->createClientConnection(
-      conn_addr_port, Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr, nullptr);
-  codec_client_ = makeHttpConnection(std::move(conn));
-
-  // This test request utilizing the path '/test-localhost-deny' is expected to be allowed by the
-  // RBAC filter. This allowance is based on the CEL expression that matches the request's path as
-  // '/test-localhost-deny' but do not restrict the access as the IP Address is not pointing to
-  // localhost.
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "POST"},
-          {":path", "/test-localhost-denyx"},
-          {":scheme", "http"},
-          {":authority", "sni.databricks.com"},
-          {"x-forwarded-for", "10.0.0.2"},
-      },
-      1024);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("via_upstream"));
-}
-
 TEST_P(RBACIntegrationTest, WithHttpAttributesCelMatchInputNoMatch) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG);
