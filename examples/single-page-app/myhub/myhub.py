@@ -2,6 +2,13 @@
 
 # Dummy Github-like repository website with OAuth
 
+# NOTE: This is a partial and insecure implementation for testing only
+
+# This is an implementation of a dummy OAuth provider for testing purposes only.
+# Authorization is automatic on request - no real authorization or authentication
+# is done.
+
+
 import logging
 import os
 import pathlib
@@ -18,14 +25,10 @@ DEMOUSER = "envoydemo"
 logger = logging.getLogger(__name__)
 
 # TODO: add to app
+# Note: You should not persist data in this way for any production system!
 token_storage = TokenStorage(pathlib.Path(os.environ["TOKEN_STORAGE_PATH"]))
 
 
-# This is an implementation of a dummy OAuth provider for testing purposes only.
-# Authorization is automatic on request - no real authorization or authentication
-# is done.
-
-# Note: This is a partial and insecure implementation for testing only
 async def authorize(request):
     debug_request(request, "authorization")
     # Generate a random authorization code

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# Dummy Github-like API with OAuth
+
+# NOTE: This is a partial and insecure implementation for testing only
+
 import json
 import logging
 import os
@@ -15,6 +19,8 @@ from shared import Data, debug_request, TokenStorage
 
 MYHUB_URL = os.environ.get("MYHUB_URL") or "http://localhost:7000"
 
+# TODO: add to app
+# Note: You should not persist data in this way for any production system!
 token_storage = TokenStorage(pathlib.Path(os.environ["TOKEN_STORAGE_PATH"]))
 
 
