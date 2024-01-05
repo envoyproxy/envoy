@@ -1299,11 +1299,11 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jobjectArray runtime_guards,
-    jstring /*rtds_resource_name*/, jlong /*rtds_timeout_seconds*/, jstring xds_address,
-    jlong /*xds_port*/, jobjectArray /*xds_grpc_initial_metadata*/, jstring /*xds_root_certs*/,
-    jstring node_id, jstring node_region, jstring node_zone, jstring node_sub_zone,
-    jbyteArray serialized_node_metadata, jstring /*cds_resources_locator*/,
-    jlong /*cds_timeout_seconds*/, jboolean /*enable_cds*/) {
+    jstring rtds_resource_name, jlong rtds_timeout_seconds, jstring xds_address, jlong xds_port,
+    jobjectArray xds_grpc_initial_metadata, jstring xds_root_certs, jstring node_id,
+    jstring node_region, jstring node_zone, jstring node_sub_zone,
+    jbyteArray serialized_node_metadata, jstring cds_resources_locator, jlong cds_timeout_seconds,
+    jboolean enable_cds) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
