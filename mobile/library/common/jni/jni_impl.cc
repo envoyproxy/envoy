@@ -102,7 +102,7 @@ static void jvm_on_track(envoy_map events, const void* context) {
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* env, jclass, jint level) {
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jclass, jint level) {
   Envoy::Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(level));
   return 0;
 }
@@ -160,7 +160,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 }
 
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_terminateEngine(
-    JNIEnv* env, jclass, jlong engine_handle) {
+    JNIEnv* /*env*/, jclass, jlong engine_handle) {
   terminate_engine(static_cast<envoy_engine_t>(engine_handle), /* release */ false);
 }
 
@@ -248,9 +248,9 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
       Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
-  Envoy::JNI::LocalRefUniquePtr<jobject> result =
-      jni_helper.callObjectMethod(j_context, jmid_onHeaders, (jlong)headers.get().length,
-                                  end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel.get());
+  Envoy::JNI::LocalRefUniquePtr<jobject> result = jni_helper.callObjectMethod(
+      j_context, jmid_onHeaders, static_cast<jlong>(headers.get().length),
+      end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel.get());
   // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
   // the JNI exception better.
   bool exception_cleared = Envoy::JNI::Exception::checkAndClear(method);
@@ -1029,7 +1029,7 @@ Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callResetIdle
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callReleaseCallbacks(
-    JNIEnv* env, jclass, jlong callback_handle) {
+    JNIEnv* /*env*/, jclass, jlong callback_handle) {
   jni_log("[Envoy]", "callReleaseCallbacks");
   envoy_http_filter_callbacks* callbacks =
       reinterpret_cast<envoy_http_filter_callbacks*>(callback_handle);
@@ -1040,7 +1040,7 @@ Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callReleaseCa
 // EnvoyHTTPStream
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_readData(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jlong byte_count) {
+    JNIEnv* /*env*/, jclass, jlong engine_handle, jlong stream_handle, jlong byte_count) {
   return read_data(static_cast<envoy_engine_t>(engine_handle),
                    static_cast<envoy_stream_t>(stream_handle), byte_count);
 }
@@ -1097,7 +1097,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetStream(
-    JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle) {
+    JNIEnv* /*env*/, jclass, jlong engine_handle, jlong stream_handle) {
   return reset_stream(static_cast<envoy_engine_t>(engine_handle),
                       static_cast<envoy_stream_t>(stream_handle));
 }
@@ -1114,7 +1114,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   jobject retained_context = env->NewGlobalRef(j_context);
 
   envoy_string_accessor* string_accessor =
-      (envoy_string_accessor*)safe_malloc(sizeof(envoy_string_accessor));
+      static_cast<envoy_string_accessor*>(safe_malloc(sizeof(envoy_string_accessor)));
   string_accessor->get_string = jvm_get_string;
   string_accessor->context = retained_context;
 
@@ -1356,7 +1356,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetConnectivityState(JNIEnv* env,
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetConnectivityState(JNIEnv* /*env*/,
                                                                         jclass, // class
                                                                         jlong engine) {
   jni_log("[Envoy]", "resetConnectivityState");
@@ -1364,7 +1364,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetConnectivityState(JNIEnv* 
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* env,
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*env*/,
                                                                      jclass, // class
                                                                      jlong engine, jint network) {
   jni_log("[Envoy]", "setting preferred network");
