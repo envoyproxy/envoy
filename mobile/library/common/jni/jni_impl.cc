@@ -1284,6 +1284,11 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.setNodeMetadata(node_metadata);
 }
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
     JNIEnv* env, jclass, jlong connect_timeout_seconds, jlong dns_refresh_seconds,
     jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
@@ -1354,6 +1359,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetConnectivityState(JNIEnv* /*env*/,
