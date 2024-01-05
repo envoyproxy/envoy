@@ -108,7 +108,8 @@ void DatadogTracerNamingTest::serviceNameTest(const std::string& config_yaml,
                 DatadogTracerFactory::makeConfig(config_proto),
                 cluster_manager_,
                 *store_.rootScope(),
-                thread_local_slot_allocator_};
+                thread_local_slot_allocator_,
+                time_};
 
   // Any values will do for the sake of this test. What we care about is the
   // `expected_service_name`.
@@ -175,7 +176,8 @@ TEST_F(DatadogTracerNamingTest, OperationNameAndResourceName) {
                 DatadogTracerFactory::makeConfig(config_proto),
                 cluster_manager_,
                 *store_.rootScope(),
-                thread_local_slot_allocator_};
+                thread_local_slot_allocator_,
+                time_};
 
   // Any values will do for the sake of this test. What we care about are the
   // operation names and the resource names.
