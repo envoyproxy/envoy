@@ -78,7 +78,9 @@ public:
 
   std::uint64_t span_id() const override { return id_; }
 
-  datadog::tracing::TraceID trace_id() const override { return datadog::tracing::TraceID{id_}; }
+  datadog::tracing::TraceID trace_id(const datadog::tracing::TimePoint&) const override {
+    return datadog::tracing::TraceID{id_};
+  }
 };
 
 class DatadogTracerSpanTest : public testing::Test {
@@ -88,8 +90,7 @@ public:
         tracer_(
             // Override the tracer's ID generator so that all trace IDs and span
             // IDs are 0xcafebabe.
-            *datadog::tracing::finalize_config(config_), std::make_shared<MockIDGenerator>(id_),
-            datadog::tracing::default_clock),
+            *datadog::tracing::finalize_config(config_), std::make_shared<MockIDGenerator>(id_)),
         span_(tracer_.create_span()) {}
 
 private:
