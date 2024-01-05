@@ -45,7 +45,7 @@ public:
   GrpcMuxFailover(GrpcStreamCreator primary_stream_creator,
                   OptRef<GrpcStreamCreator> failover_stream_creator,
                   GrpcStreamCallbacks<ResponseType>& grpc_mux_callbacks)
-      : currently_used_service_(ServiceOptions::None), grpc_mux_callbacks_(grpc_mux_callbacks),
+      : grpc_mux_callbacks_(grpc_mux_callbacks),
         primary_callbacks_(*this),
         primary_grpc_stream_(std::move(primary_stream_creator(&primary_callbacks_))) {
     ASSERT(primary_grpc_stream_ != nullptr);
@@ -98,22 +98,10 @@ public:
   };
 
 private:
-  // The different states the GrpcMuxFailover can be in. Note that the following
-  // are not mutually exclusive, and therefor bitwise value is used. The GrpcMuxFailover
-  // may be connecting to both the primary and failover sources, or connected to
-  // the failover source and connecting to the primary source simultaneously
-  struct ServiceOptions {
-    static constexpr uint32_t None = 0;
-    static constexpr uint32_t ConnectingToPrimary = 0x1;
-    static constexpr uint32_t Primary = 0x2;
-    static constexpr uint32_t ConnectingToFailover = 0x4;
-    static constexpr uint32_t Failover = 0x8;
-  };
-
   // A helper class that proxies the callbacks of GrpcStreamCallbacks for the primary service.
-  class PrimaryGrpcStreamCallbacksWrapper : public GrpcStreamCallbacks<ResponseType> {
+  class PrimaryGrpcStreamCallbacks : public GrpcStreamCallbacks<ResponseType> {
   public:
-    PrimaryGrpcStreamCallbacksWrapper(GrpcMuxFailover& parent) : parent_(parent) {}
+    PrimaryGrpcStreamCallbacks(GrpcMuxFailover& parent) : parent_(parent) {}
 
     virtual void onStreamEstablished() override {
       // TODO(adisuissa): At the moment this is a pass-through method. Once the
@@ -144,12 +132,19 @@ private:
     GrpcMuxFailover& parent_;
   };
 
-  uint32_t currently_used_service_;
+  // Flags to keep track of the state of connections to primary/failover.
+  // All initialized to false, as there is no connection process during
+  // initialization.
+  bool connecting_to_primary_: 1;
+  bool connected_to_primary_: 1;
+  bool connecting_to_failover_: 1;
+  bool connected_to_failover_: 1;
+
   // The stream callbacks that will be invoked on the GrpcMux object, to notify
   // about the state of the underlying primary/failover stream.
   GrpcStreamCallbacks<ResponseType>& grpc_mux_callbacks_;
   // The callbacks that will be invoked by the primary stream.
-  PrimaryGrpcStreamCallbacksWrapper primary_callbacks_;
+  PrimaryGrpcStreamCallbacks primary_callbacks_;
   // The stream to the primary source.
   GrpcStreamInterfacePtr<RequestType, ResponseType> primary_grpc_stream_;
 };
