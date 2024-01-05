@@ -36,6 +36,16 @@ ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyCon
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>();
 }
 
+void QuicServerTransportSocketFactory::initialize() {
+  config_->setSecretUpdateCallback([this]() {
+    // The callback also updates config_ with the new secret.
+    onSecretUpdated();
+  });
+  if (!config_->alpnProtocols().empty()) {
+    supported_alpns_ = absl::StrSplit(config_->alpnProtocols(), ',');
+  }
+}
+
 REGISTER_FACTORY(QuicServerTransportSocketConfigFactory,
                  Server::Configuration::DownstreamTransportSocketConfigFactory);
 

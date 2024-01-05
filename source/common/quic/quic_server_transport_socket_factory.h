@@ -29,12 +29,7 @@ public:
   }
   bool implementsSecureTransport() const override { return true; }
 
-  void initialize() override {
-    config_->setSecretUpdateCallback([this]() {
-      // The callback also updates config_ with the new secret.
-      onSecretUpdated();
-    });
-  }
+  void initialize() override;
 
   // Return TLS certificates if the context config is ready.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>

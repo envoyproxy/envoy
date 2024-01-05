@@ -444,6 +444,12 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   connection_limit_prefix.value_ = "my_connection_limit_prefix";
   regex_tester.testRegex("connection_limit.my_connection_limit_prefix.limited_connections",
                          "connection_limit.limited_connections", {connection_limit_prefix});
+
+  // RBAC Filter Prefix
+  Tag rbac_prefix;
+  rbac_prefix.name_ = tag_names.RBAC_PREFIX;
+  rbac_prefix.value_ = "my_rbac_prefix";
+  regex_tester.testRegex("my_rbac_prefix.rbac.allowed", "rbac.allowed", {rbac_prefix});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
