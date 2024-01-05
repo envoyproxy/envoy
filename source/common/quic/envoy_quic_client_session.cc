@@ -50,7 +50,8 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
     QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
     Stats::Scope& scope,
-    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+    OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory)
     : QuicFilterManagerConnectionImpl(
           *connection, connection->connection_id(), dispatcher, send_buffer_limit,
           std::make_shared<QuicSslConnectionInfo>(*this),
@@ -61,8 +62,19 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                   crypto_config.get()),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
       quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope),
-      transport_socket_options_(transport_socket_options) {
+      transport_socket_options_(transport_socket_options),
+      transport_socket_factory_(makeOptRefFromPtr(
+          dynamic_cast<QuicClientTransportSocketFactory*>(transport_socket_factory.ptr()))) {
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  if (transport_socket_options_ != nullptr &&
+      !transport_socket_options_->applicationProtocolListOverride().empty()) {
+    configured_alpns_ = transport_socket_options_->applicationProtocolListOverride();
+  } else if (transport_socket_factory_.has_value() &&
+             !transport_socket_factory_->supportedAlpnProtocols().empty()) {
+    configured_alpns_ =
+        std::vector<std::string>(transport_socket_factory_->supportedAlpnProtocols().begin(),
+                                 transport_socket_factory_->supportedAlpnProtocols().end());
+  }
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
@@ -195,7 +207,6 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
-  // TODO(danzh) pass around transport_socket_options_ via context.
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this,
       std::make_unique<EnvoyQuicProofVerifyContextImpl>(dispatcher_, /*is_server=*/false,
@@ -257,6 +268,11 @@ void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
     const quic::QuicSocketAddress& server_preferred_address) {
   static_cast<EnvoyQuicClientConnection*>(connection())
       ->probeAndMigrateToServerPreferredAddress(server_preferred_address);
+}
+
+std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
+  return configured_alpns_.empty() ? quic::QuicSpdyClientSession::GetAlpnsToOffer()
+                                   : configured_alpns_;
 }
 
 } // namespace Quic

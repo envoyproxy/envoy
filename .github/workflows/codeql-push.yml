@@ -1,4 +1,4 @@
-name: CodeQL
+name: CodeQL/push
 
 permissions:
   contents: read
@@ -15,20 +15,18 @@ concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
 
+env:
+  SEARCH_FOLDER: //source/common/...
+
 
 jobs:
   CodeQL-Build:
-
     permissions:
-      security-events: write  # for github/codeql-action/analyze to upload SARIF results
+      # for github/codeql-action/analyze to upload SARIF results
+      security-events: write
       pull-requests: read
-    strategy:
-      fail-fast: false
-
-    # CodeQL runs on ubuntu-20.04
     runs-on: ubuntu-20.04
     if: github.repository == 'envoyproxy/envoy'
-
     steps:
     - name: Pre-cleanup
       uses: envoyproxy/toolshed/gh-actions/diskspace@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
@@ -41,19 +39,33 @@ jobs:
 
     - name: Get build targets
       run: |
-       . .github/workflows/get_build_targets.sh
-       echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
-       echo $BUILD_TARGETS_LOCAL >> $GITHUB_ENV
-       echo 'EOF' >> $GITHUB_ENV
+        # TODO(phlax): Shift this to an action
+        compare_head () {
+            while IFS= read -r line; do
+                bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
+            done < <(git diff --name-only HEAD FETCH_HEAD -- source/* include/*)
+        }
+        if [[ "$GIT_EVENT" == "pull_request" ]]; then
+            git fetch https://github.com/envoyproxy/envoy.git main 2> /dev/null
+            TO_OTHER=FETCH_HEAD
+        else
+            TO_OTHER=HEAD^1
+        fi
+        BUILD_TARGETS="$(compare_head "$TO_OTHER" | grep -v '\.cc\|\.h' | sort -u | head -n 3)"
+        echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
+        echo "$BUILD_TARGETS" >> $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      env:
+        GIT_EVENT: ${{ github.event_name }}
 
-    # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
+      if: ${{ env.BUILD_TARGETS != '' }}
       uses: github/codeql-action/init@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4
-      # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
 
     - name: Install deps
+      if: ${{ env.BUILD_TARGETS != '' }}
       shell: bash
       run: |
        sudo apt-get update --error-on=any
@@ -69,16 +81,25 @@ jobs:
        export PATH=bin/clang14/bin:$PATH
 
     - name: Build
+      if: ${{ env.BUILD_TARGETS != '' }}
       run: |
        bazel/setup_clang.sh bin/clang14
-       bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
+       bazel shutdown
+       bazel build \
+           -c fastbuild \
+           --spawn_strategy=local \
+           --discard_analysis_cache \
+           --nouse_action_cache \
+           --config clang \
+           --config libc++ \
+           $BUILD_TARGETS
        echo -e "Built targets...\n$BUILD_TARGETS"
 
     - name: Clean Artifacts
+      if: ${{ env.BUILD_TARGETS != '' }}
       run: |
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      if: env.BUILD_TARGETS != ''
+      if: ${{ env.BUILD_TARGETS != '' }}
       uses: github/codeql-action/analyze@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4

@@ -146,7 +146,6 @@ paths:
     - source/common/router/scoped_config_impl.cc
     - source/common/router/router_ratelimit.cc
     - source/common/router/vhds.cc
-    - source/common/router/config_utility.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc

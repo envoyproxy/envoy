@@ -12,7 +12,7 @@ public:
       Ssl::ClientContextConfigPtr config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
 
-  void initialize() override {}
+  void initialize() override;
   bool implementsSecureTransport() const override { return true; }
   bool supportsAlpn() const override { return true; }
   absl::string_view defaultServerNameIndication() const override {

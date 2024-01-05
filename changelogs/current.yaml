@@ -75,6 +75,10 @@ minor_behavior_changes:
     Added config name of filter sending a local reply in filter state with key
     ``envoy.filters.network.http_connection_manager.local_reply_owner``.
     See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
+- area: composite filter
+  change: |
+    Added composite filter's matched action name to filter state with key
+    ``envoy.extensions.filters.http.composite.matched_actions``.
 - area: http2
   change: |
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
