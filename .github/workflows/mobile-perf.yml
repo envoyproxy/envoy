@@ -47,10 +47,10 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       source: ${{ matrix.source }}
       container-output: |
-        "bazel-bin/test/performance/test_binary_size": /tmp/mobile/bazel-bin/test/performance/test_binary_size/${{ matrix.target }}
+        "bazel-bin/test/performance/test_binary_size": test_binary_size/${{ matrix.target }}
       target: ${{ matrix.target }}
       upload-name: ${{ matrix.target }}
-      upload-path: /tmp/mobile/bazel-bin/test/performance/test_binary_size
+      upload-path: /tmp/container-output/test_binary_size
       timeout-minutes: 90
     strategy:
       matrix:

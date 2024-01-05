@@ -132,6 +132,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {

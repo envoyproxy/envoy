@@ -523,9 +523,6 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                         route.match().dynamic_metadata().end()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)),
-      direct_response_body_(ConfigUtility::parseDirectResponseBody(
-          route, factory_context.api(),
-          vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), factory_context, validator),
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -539,6 +536,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
+  auto body_or_error = ConfigUtility::parseDirectResponseBody(
+      route, factory_context.api(), vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+  THROW_IF_STATUS_NOT_OK(body_or_error, throw);
+  direct_response_body_ = body_or_error.value();
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =
         HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
