@@ -386,6 +386,10 @@ private:
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
 
+  // This is used to hold the final configs after we merge them with per-route configs.
+  bool allow_partial_message_{};
+  uint32_t max_request_bytes_;
+
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
   bool buffer_data_{};
