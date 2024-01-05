@@ -45,8 +45,7 @@ public:
   GrpcMuxFailover(GrpcStreamCreator primary_stream_creator,
                   OptRef<GrpcStreamCreator> failover_stream_creator,
                   GrpcStreamCallbacks<ResponseType>& grpc_mux_callbacks)
-      : grpc_mux_callbacks_(grpc_mux_callbacks),
-        primary_callbacks_(*this),
+      : grpc_mux_callbacks_(grpc_mux_callbacks), primary_callbacks_(*this),
         primary_grpc_stream_(std::move(primary_stream_creator(&primary_callbacks_))) {
     ASSERT(primary_grpc_stream_ != nullptr);
     // At the moment failover isn't implemented.
@@ -135,10 +134,10 @@ private:
   // Flags to keep track of the state of connections to primary/failover.
   // All initialized to false, as there is no connection process during
   // initialization.
-  bool connecting_to_primary_: 1;
-  bool connected_to_primary_: 1;
-  bool connecting_to_failover_: 1;
-  bool connected_to_failover_: 1;
+  bool connecting_to_primary_ : 1;
+  bool connected_to_primary_ : 1;
+  bool connecting_to_failover_ : 1;
+  bool connected_to_failover_ : 1;
 
   // The stream callbacks that will be invoked on the GrpcMux object, to notify
   // about the state of the underlying primary/failover stream.
