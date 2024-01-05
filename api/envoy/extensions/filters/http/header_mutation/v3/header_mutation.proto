@@ -33,7 +33,7 @@ message HeaderMutationPerRoute {
 message HeaderMutation {
   Mutations mutations = 1;
 
-  // If per route config (`HeaderMutationPerRoute`) is configured at multiple levels, header mutations
+  // If per route HeaderMutationPerRoute config is configured at multiple route levels, header mutations
   // at all specified levels are evaluated. By default, the order is from most specific (i.e. route entry level)
   // to least specific (i.e. route configuration level). Later header mutations may override earlier mutations.
   //
