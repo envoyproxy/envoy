@@ -158,9 +158,7 @@ public:
 };
 
 TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
-
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
-
   const auto credentials = provider_.getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
@@ -168,7 +166,6 @@ TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
-
   TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
   auto temp = TestEnvironment::temporaryDirectory();
   std::filesystem::create_directory(temp + "/.aws");
