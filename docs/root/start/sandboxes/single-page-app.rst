@@ -155,7 +155,7 @@ This redirects the user to the OAuth provider for authorization/authentication w
    :caption: :download:`envoy.yml <_include/single-page-app/envoy.yml>`
 
 On successful authorization/authentication the user is redirected back via this link to the app with the necessary OAuth
-`authorization code <oauth-code_>`__ to proceed:
+`authorization code <oauth-auth-code_>`__ to proceed:
 
 .. literalinclude:: _include/single-page-app/envoy.yml
    :language: yaml
