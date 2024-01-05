@@ -569,6 +569,9 @@ You can now log in and use the `Github APIs <github-api_>`__.:
    :ref:`Envoy OAuth filter API <envoy_v3_api_file_envoy/extensions/filters/http/oauth2/v3/oauth.proto>`
       API reference for Envoy's OAuth filter.
 
+   `OAuth2 specification <oauth-spec_>`__
+      OAuth 2.0 is the industry-standard protocol for authorization.
+
    `React <react_>`__
       The library for web and native user interfaces.
 
@@ -593,7 +596,8 @@ You can now log in and use the `Github APIs <github-api_>`__.:
 .. _github-oauth: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
 .. _github-oauth-credentials: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#2-users-are-redirected-back-to-your-site-by-github
 .. _github-user-settings: https://github.com/settings/developers
-.. _oauth: https://oauth.net/2/grant-types/authorization-code/
+.. _oauth-auth-code: https://oauth.net/2/grant-types/authorization-code/
+.. _oauth-spec: https://oauth.net/2/
 .. _react: https://react.dev/
 .. _vite: https://vitejs.dev/
 .. _yarn: https://yarnpkg.com/
