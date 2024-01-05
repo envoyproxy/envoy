@@ -23,7 +23,7 @@ using Envoy::Platform::EngineBuilder;
 
 // NOLINT(namespace-envoy)
 
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
   const auto result = Envoy::JNI::JavaVirtualMachine::initialize(vm);
   if (result != JNI_OK) {
     return result;
@@ -449,8 +449,8 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
                                     /*pending_headers*/ pending_headers};
 }
 
-static void* jvm_on_metadata(envoy_headers metadata, envoy_stream_intel stream_intel,
-                             void* context) {
+static void* jvm_on_metadata(envoy_headers metadata, envoy_stream_intel /*stream_intel*/,
+                             void* /*context*/) {
   jni_log("[Envoy]", "jvm_on_metadata");
   jni_log("[Envoy]", std::to_string(metadata.length).c_str());
   return nullptr;
@@ -474,8 +474,8 @@ static void* jvm_on_trailers(const char* method, envoy_headers trailers,
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
   jobject result = jni_helper
-                       .callObjectMethod(j_context, jmid_onTrailers, (jlong)trailers.length,
-                                         j_stream_intel.get())
+                       .callObjectMethod(j_context, jmid_onTrailers,
+                                         static_cast<jlong>(trailers.length), j_stream_intel.get())
                        .release();
 
   return result;
@@ -624,7 +624,7 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jlong headers_length = -1;
   if (headers) {
-    headers_length = (jlong)headers->length;
+    headers_length = static_cast<jlong>(headers->length);
     passHeaders("passHeader", *headers, j_context);
   }
   Envoy::JNI::LocalRefUniquePtr<jbyteArray> j_in_data = Envoy::JNI::LocalRefUniquePtr<jbyteArray>(
@@ -634,7 +634,7 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   }
   jlong trailers_length = -1;
   if (trailers) {
-    trailers_length = (jlong)trailers->length;
+    trailers_length = static_cast<jlong>(trailers->length);
     passHeaders("passTrailer", *trailers, j_context);
   }
   Envoy::JNI::LocalRefUniquePtr<jlongArray> j_stream_intel =
@@ -914,7 +914,7 @@ static envoy_data jvm_get_string(const void* context) {
 // EnvoyHTTPStream
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initStream(
-    JNIEnv* env, jclass, jlong engine_handle) {
+    JNIEnv* /*env*/, jclass, jlong engine_handle) {
 
   return init_stream(static_cast<envoy_engine_t>(engine_handle));
 }
@@ -956,7 +956,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerKeyValueStore(JNIEnv* e
   jni_log_fmt("[Envoy]", "j_context: %p", j_context);
   jobject retained_context = env->NewGlobalRef(j_context);
   jni_log_fmt("[Envoy]", "retained_context: %p", retained_context);
-  envoy_kv_store* api = (envoy_kv_store*)safe_malloc(sizeof(envoy_kv_store));
+  envoy_kv_store* api = static_cast<envoy_kv_store*>(safe_malloc(sizeof(envoy_kv_store)));
   api->save = jvm_kv_store_save;
   api->read = jvm_kv_store_read;
   api->remove = jvm_kv_store_remove;
@@ -979,7 +979,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
   jni_log_fmt("[Envoy]", "j_context: %p", j_context);
   jobject retained_context = env->NewGlobalRef(j_context);
   jni_log_fmt("[Envoy]", "retained_context: %p", retained_context);
-  envoy_http_filter* api = (envoy_http_filter*)safe_malloc(sizeof(envoy_http_filter));
+  envoy_http_filter* api = static_cast<envoy_http_filter*>(safe_malloc(sizeof(envoy_http_filter)));
   api->init_filter = jvm_http_filter_init;
   api->on_request_headers = jvm_http_filter_on_request_headers;
   api->on_request_data = jvm_http_filter_on_request_data;
