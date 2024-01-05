@@ -1149,6 +1149,9 @@ typed_config:
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setExpectedPeerAddress(fmt::format(
+          "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
   // pending.
   quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(500);
