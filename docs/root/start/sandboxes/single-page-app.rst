@@ -154,7 +154,8 @@ This redirects the user to the OAuth provider for authorization/authentication w
    :emphasize-lines: 3-4
    :caption: :download:`envoy.yml <_include/single-page-app/envoy.yml>`
 
-On successful authorization/authentication the user is redirected back via this link to the app with the necessary OAuth code to proceed:
+On successful authorization/authentication the user is redirected back via this link to the app with the necessary OAuth
+`authorization code <oauth-code_>`__ to proceed:
 
 .. literalinclude:: _include/single-page-app/envoy.yml
    :language: yaml
@@ -164,7 +165,7 @@ On successful authorization/authentication the user is redirected back via this 
    :emphasize-lines: 3-5
    :caption: :download:`envoy.yml <_include/single-page-app/envoy.yml>`
 
-Envoy then uses this code with its client secret to generate an access token for the user, which Envoy then retains:
+Envoy then uses this authorization code with its client secret to generate an access token for the user, which Envoy then retains:
 
 .. literalinclude:: _include/single-page-app/envoy.yml
    :language: yaml
@@ -592,6 +593,7 @@ You can now log in and use the `Github APIs <github-api_>`__.:
 .. _github-oauth: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
 .. _github-oauth-credentials: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#2-users-are-redirected-back-to-your-site-by-github
 .. _github-user-settings: https://github.com/settings/developers
+.. _oauth: https://oauth.net/2/grant-types/authorization-code/
 .. _react: https://react.dev/
 .. _vite: https://vitejs.dev/
 .. _yarn: https://yarnpkg.com/
