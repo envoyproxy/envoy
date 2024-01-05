@@ -8,7 +8,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 #include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 
@@ -50,12 +50,12 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
           server_context.api(), makeOptRef(server_context), region,
           Extensions::Common::Aws::Utility::fetchMetadata);
 
-  auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
+  auto signer = std::make_shared<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider),
       server_context.mainThreadDispatcher().timeSource(),
       // TODO: extend API to allow specifying header exclusion. ref:
       // https://github.com/envoyproxy/envoy/pull/18998
-      Extensions::Common::Aws::AwsSigV4HeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
   FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
                                  proto_config.payload_passthrough()};

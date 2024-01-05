@@ -8,6 +8,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
+#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
@@ -112,7 +113,7 @@ void ValidationInstance::initialize(const Options& options,
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   Configuration::InitialImpl initial_config(bootstrap_);
-  AdminFactoryContext factory_context(*this);
+  AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(

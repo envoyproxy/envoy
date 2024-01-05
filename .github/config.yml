@@ -2,11 +2,11 @@ agent-ubuntu: ubuntu-22.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
-  sha: d117d6139f3af1eede6bb1606ad05ffccb766eef3262b336dd31bcf02a81a669
-  mobile-sha: 82a79f368aa7da9a3ed904352deb24e6e52c5eae156fdc5ca2fb3fca6650ed6d
+  sha: 1386a26f687826850ba488d66a6cd5337c5941b3b8793d08cfa6f9df12aa2fcf
+  mobile-sha: 1db9bac6578115179fe686cd0e58ee340e2cb3737d19d9136a264d5d94351961
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: 56466807485ba97d3ae79b4fa54cf9723bd9eb327783917d4bdc736483e5d72a
-  tag: 6eba113ee1a0ef8e4f71830e90b6aedbbeb7360c
+  gcr-sha: b0c0e07c97337fdd56423ddd6749a4250adaea9f66f85763a8d9cec36162c972
+  tag: fd9ec000fdd72d5c5e4e4ef16db4f9103058779e
 
 config:
   envoy:
@@ -325,6 +325,8 @@ run:
     - .bazelversion
     - .github/config.yml
     - .github/dependabot.yml
+    - bazel/BUILD
+    - tools/dependency/*
     - "**/*.bzl"
     - "**/requirements.txt"
     - "**/go.mod"

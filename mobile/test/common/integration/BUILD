@@ -26,9 +26,11 @@ envoy_cc_test(
         "@envoy//source/common/quic:active_quic_listener_lib",
         "@envoy//source/common/quic:client_connection_factory_lib",
         "@envoy//source/common/quic:quic_server_factory_lib",
+        "@envoy//source/common/quic:quic_server_transport_socket_factory_lib",
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/quic:udp_gso_batch_writer_lib",
         "@envoy//source/extensions/udp_packet_writer/gso:config",
+        "@envoy//test/test_common:test_random_generator_lib",
     ],
 )
 
@@ -52,6 +54,7 @@ envoy_cc_test(
     deps = [
         ":xds_integration_test_lib",
         "@envoy//test/test_common:environment_lib",
+        "@envoy//test/test_common:test_runtime_lib",
         "@envoy//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",

@@ -226,7 +226,8 @@ build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],
 build:coverage --remote_download_minimal
 build:coverage --define=tcmalloc=gperftools
 build:coverage --define=no_debug_info=1
-build:coverage --linkopt=-Wl,-s
+# `--no-relax` is required for coverage to not err with `relocation R_X86_64_REX_GOTPCRELX`
+build:coverage --linkopt=-Wl,-s,--no-relax
 build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:test-coverage --test_arg="-l trace"
@@ -357,7 +358,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:6eba113ee1a0ef8e4f71830e90b6aedbbeb7360c@sha256:d117d6139f3af1eede6bb1606ad05ffccb766eef3262b336dd31bcf02a81a669
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:fd9ec000fdd72d5c5e4e4ef16db4f9103058779e@sha256:1386a26f687826850ba488d66a6cd5337c5941b3b8793d08cfa6f9df12aa2fcf
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -518,7 +519,7 @@ build:rbe-envoy-engflow --grpc_keepalive_time=30s
 build:rbe-envoy-engflow --remote_timeout=3600s
 build:rbe-envoy-engflow --bes_timeout=3600s
 build:rbe-envoy-engflow --bes_upload_mode=fully_async
-build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:6eba113ee1a0ef8e4f71830e90b6aedbbeb7360c@sha256:d117d6139f3af1eede6bb1606ad05ffccb766eef3262b336dd31bcf02a81a669
+build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:fd9ec000fdd72d5c5e4e4ef16db4f9103058779e@sha256:1386a26f687826850ba488d66a6cd5337c5941b3b8793d08cfa6f9df12aa2fcf
 
 #############################################################################
 # debug: Various Bazel debugging flags

@@ -177,9 +177,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // asterisk-form  = "*"
   //
   // TODO(#23887) - potentially separate path normalization into multiple independent operations.
-  const auto original_path = header_map.path();
+  const auto original_path = header_map.getPathValue();
   if (original_path == "*" &&
-      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Options) {
+      header_map.getMethodValue() == ::Envoy::Http::Headers::get().MethodValues.Options) {
     // asterisk-form, only valid for OPTIONS request
     return PathNormalizationResult::success();
   }

@@ -112,6 +112,7 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 
 } // namespace
 
+// TODO(nbaws) Implement Sigv4a support
 Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
                const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer)
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}

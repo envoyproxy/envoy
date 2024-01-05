@@ -22,11 +22,9 @@ public:
   absl::string_view path() const override;
   absl::string_view method() const override;
   void forEach(IterateCallback callback) const override;
-  absl::optional<absl::string_view> getByKey(absl::string_view key) const override;
-  void setByKey(absl::string_view key, absl::string_view val) override;
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override;
-  void setByReference(absl::string_view key, absl::string_view val) override;
-  void removeByKey(absl::string_view key) override;
+  absl::optional<absl::string_view> get(absl::string_view key) const override;
+  void set(absl::string_view key, absl::string_view val) override;
+  void remove(absl::string_view key) override;
 
 private:
   StreamRequest& request_;

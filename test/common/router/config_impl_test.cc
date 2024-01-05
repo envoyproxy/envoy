@@ -138,8 +138,8 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
   }
 
   if (random_value_pair.has_value()) {
-    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
-                  random_value_pair.value().second);
+    hdrs.setCopy(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                 random_value_pair.value().second);
   }
   return hdrs;
 }
@@ -2204,7 +2204,7 @@ most_specific_header_mutations_wins: true
 
 // Validate that we can't add :-prefixed or Host request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoHostOrPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
@@ -2230,7 +2230,7 @@ virtual_hosts:
 
 // Validate that we can't remove :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
@@ -7567,39 +7567,41 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   constexpr uint64_t MaxResponseBodySizeBytes = 4096;
   envoy::config::route::v3::Route route;
   EXPECT_EQ(EMPTY_STRING,
-            ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes));
+            ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).value());
 
   route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).IgnoreError(),
       EnvoyException, "file missing_file does not exist");
 
   // The default max body size in bytes is 4096 (MaxResponseBodySizeBytes).
   const std::string body(MaxResponseBodySizeBytes + 1, '*');
   std::string expected_message("response body size is 4097 bytes; maximum is 4096");
   route.mutable_direct_response()->mutable_body()->set_inline_string(body);
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
-      EnvoyException, expected_message);
+  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
+                .status()
+                .message(),
+            expected_message);
 
   // Change the max body size to 2048 (MaxResponseBodySizeBytes/2) bytes.
   auto filename = TestEnvironment::writeStringToFileForTest("body", body);
   route.mutable_direct_response()->mutable_body()->set_filename(filename);
   expected_message = "file " + filename + " size is 4097 bytes; maximum is 2048";
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2),
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2)
+          .IgnoreError(),
       EnvoyException, expected_message);
 
   // Update the max body size to 4098 bytes (MaxResponseBodySizeBytes + 2), hence the parsing is
   // successful.
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
   route.mutable_direct_response()->mutable_body()->set_filename(EMPTY_STRING);
   route.mutable_direct_response()->mutable_body()->set_inline_bytes(body);
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
 }
 
 TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
@@ -7614,12 +7616,13 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
 
   std::string expected_message("response body size is 4097 bytes; maximum is 4096");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
-      EnvoyException, expected_message);
+  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
+                .status()
+                .message(),
+            expected_message);
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
 }
 
 TEST_F(RouteConfigurationV2, RedirectCode) {

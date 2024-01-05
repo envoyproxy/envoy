@@ -157,7 +157,9 @@ The following command operators are supported:
 
   .. code-block:: none
 
-    %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%
+    %START_TIME(%Y/%m/%dT%H:%M:%S%z)%
+
+    %START_TIME(%s)%
 
     # To include millisecond fraction of the second (.000 ... .999). E.g. 1527590590.528.
     %START_TIME(%s.%3f)%

@@ -67,30 +67,53 @@ public:
    * This is a helper on top of get() that casts the object stored to the specified type. Since the
    * manager only stores pointers to the base interface, dynamic_cast provides some level of
    * protection via RTTI.
+   * @param name the unique name of the singleton instance. This should be provided by the macro
+   * SINGLETON_MANAGER_REGISTERED_NAME.
+   * @param cb supplies the singleton creation callback. This will only be called if the singleton
+   * does not already exist.
+   * @param pin supplies whether the singleton should be pinned. By default, the manager only stores
+   * a weak pointer. This allows a singleton to be cleaned up if it is not needed any more. All code
+   * that uses singletons must store the shared_ptr for as long as the singleton is needed. But if
+   * the pin is set to true, the singleton will be stored as a shared_ptr. This is useful if the
+   * users want to keep the singleton around for the lifetime of the server even if it is not used
+   * for a while.
+   * @return InstancePtr the singleton cast to the specified type. nullptr if the singleton does not
+   * exist.
    */
-  template <class T> std::shared_ptr<T> getTyped(const std::string& name, SingletonFactoryCb cb) {
-    return std::dynamic_pointer_cast<T>(get(name, cb));
+  template <class T>
+  std::shared_ptr<T> getTyped(const std::string& name, SingletonFactoryCb cb, bool pin = false) {
+    return std::dynamic_pointer_cast<T>(get(name, cb, pin));
   }
 
   /**
    * This is a non-constructing getter. Use when the caller can deal with instances where
    * the singleton being accessed may not have been constructed previously.
-   * @return InstancePtr the singleton. nullptr if the singleton does not exist.
+   * @param name the unique name of singleton instance. This should be provided by the macro
+   * SINGLETON_MANAGER_REGISTERED_NAME.
+   * @return InstancePtr the singleton cast to the specified type. nullptr if the singleton does not
+   * exist.
    */
   template <class T> std::shared_ptr<T> getTyped(const std::string& name) {
-    return std::dynamic_pointer_cast<T>(get(name, [] { return nullptr; }));
+    return std::dynamic_pointer_cast<T>(get(
+        name, [] { return nullptr; }, false));
   }
 
   /**
    * Get a singleton and create it if it does not exist.
-   * @param name supplies the singleton name. Must be registered via RegistrationImpl.
-   * @param singleton supplies the singleton creation callback. This will only be called if the
-   *        singleton does not already exist. NOTE: The manager only stores a weak pointer. This
-   *        allows a singleton to be cleaned up if it is not needed any more. All code that uses
-   *        singletons must store the shared_ptr for as long as the singleton is needed.
-   * @return InstancePtr the singleton.
+   * @param name the unique name of the singleton instance. This should be provided by the macro
+   * SINGLETON_MANAGER_REGISTERED_NAME.
+   * @param cb supplies the singleton creation callback. This will only be called if the singleton
+   * does not already exist.
+   * @param pin supplies whether the singleton should be pinned. By default, the manager only stores
+   * a weak pointer. This allows a singleton to be cleaned up if it is not needed any more. All code
+   * that uses singletons must store the shared_ptr for as long as the singleton is needed. But if
+   * the pin is set to true, the singleton will be stored as a shared_ptr. This is useful if the
+   * users want to keep the singleton around for the lifetime of the server even if it is not used
+   * for a while.
+   * @return InstancePtr the singleton cast to the specified type. nullptr if the singleton does not
+   * exist.
    */
-  virtual InstanceSharedPtr get(const std::string& name, SingletonFactoryCb) PURE;
+  virtual InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb, bool pin) PURE;
 };
 
 using ManagerPtr = std::unique_ptr<Manager>;

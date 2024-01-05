@@ -1,4 +1,4 @@
-FROM alpine:3.16
+FROM alpine:3.16@sha256:e4cdb7d47b06ba0a062ad2a97a7d154967c8f83934594d9f2bd3efa89292996b
 
 RUN mkdir /opt/app
 WORKDIR /opt/app
