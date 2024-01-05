@@ -8,7 +8,6 @@
 # Authorization is automatic on request - no real authorization or authentication
 # is done.
 
-
 import logging
 import os
 import pathlib
