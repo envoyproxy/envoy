@@ -9,6 +9,7 @@ envoy_cc_library(
     srcs = [
         "jni_import.h",
     ],
+    repository = "@envoy",
     deps = select({
         "@envoy//bazel:linux": ["//bazel:jni"],
         "@envoy//bazel:apple": ["//bazel:jni"],
