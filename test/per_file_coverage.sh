@@ -22,7 +22,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tcp:94.5"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:91.4"
+"source/exe:78.8" # Binary with extensions fails to link due to the size, and main() lacks coverage.
 "source/extensions/access_loggers/wasm:93.5"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
