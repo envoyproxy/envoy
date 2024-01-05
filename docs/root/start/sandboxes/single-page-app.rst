@@ -420,7 +420,7 @@ Unlike the development endpoint the production endpoint is configured with:
 
 - TLS (self-signed)
 - Gzip compression
-- Statically.served assets
+- Statically served assets
 
 .. _install_sandboxes_single_page_app_step_github_oauth:
 
