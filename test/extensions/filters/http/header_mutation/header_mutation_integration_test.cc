@@ -136,8 +136,8 @@ public:
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
         http_mutation_filter;
     http_mutation_filter.set_name("downstream-header-mutation");
-    if (!most_specific_header_mutations_wins) {
-      header_mutation.mutable_most_specific_header_mutations_wins()->set_value(false);
+    if (most_specific_header_mutations_wins) {
+      header_mutation.set_most_specific_header_mutations_wins(true);
     }
     http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
 
@@ -173,8 +173,8 @@ public:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
           http_mutation_filter;
       http_mutation_filter.set_name("upstream-header-mutation");
-      if (!most_specific_header_mutations_wins) {
-        header_mutation.mutable_most_specific_header_mutations_wins()->set_value(false);
+      if (most_specific_header_mutations_wins) {
+        header_mutation.set_most_specific_header_mutations_wins(true);
       }
       http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
       config_helper_.prependFilter(

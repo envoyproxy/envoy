@@ -29,8 +29,7 @@ PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config
 
 HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config)
     : mutations_(config.mutations()),
-      most_specific_header_mutations_wins_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, most_specific_header_mutations_wins, true)) {}
+      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {}
 
 Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   Formatter::HttpFormatterContext ctx{&headers};
