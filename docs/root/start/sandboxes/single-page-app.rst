@@ -194,7 +194,7 @@ Once logged in, you should be able to make queries to the API using the OAuth cr
 
    The sandbox example does this by inverting the
    :ref:`pass_through_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.pass_through_matcher>`
-   to only match on the required Oauth paths.
+   to only match on the required OAuth paths.
 
 .. tip::
    The Myhub OAuth provider does not provide an expiry for issued credentials. Likewise Github may or may
