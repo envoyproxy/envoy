@@ -533,6 +533,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.2";
@@ -589,6 +590,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.1";
@@ -645,6 +647,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1";
@@ -701,6 +704,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.4";
