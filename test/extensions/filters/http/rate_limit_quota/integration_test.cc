@@ -400,7 +400,8 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   // Trigger the report periodically, 10 times.
   for (int i = 0; i < 10; ++i) {
     // Advance the time by report_interval.
-    // TODO(tyxia) Make interval configurable. It is currently 60s in ValidMatcherConfig.
+    // TODO(tyxia) Make interval configurable in the test. It is currently 60s in
+    // ValidMatcherConfig.
     simTime().advanceTimeWait(std::chrono::milliseconds(60000));
     // Checks that the rate limit server has received the periodical reports.
     ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
