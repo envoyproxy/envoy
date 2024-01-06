@@ -163,13 +163,13 @@ The generic proxy provides some statistics to help users understand the generic 
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   ``downstream_rq_total``, Counter, Total requests.
-   ``downstream_rq_error``, Counter, Total requests that with non-OK response status.
-   ``downstream_rq_reset``, Counter, Total requests that are reset before response.
-   ``downstream_rq_local``, Counter, Total requests that with local response.
-   ``downstream_rq_decoding_error``, Counter, Total codec decoding errors.
-   ``downstream_rq_active``, Gauge, Current active requests.
-   ``downstream_rq_time``, Histogram, Request time in milliseconds. The time is measured from when the request is received from downstream to when the response is sent to downstream.
-   ``downstream_rq_tx_time``, Histogram, Request time in microseconds. The time is measured from when the request is received from downstream to the request is sent to upstream.
-   ``downstream_rq_code_XXX``, Counter, Total requests that with response status code XXX. The XXX is the response status code. For example, ``downstream_rq_code_200`` is the total requests that with response status code 200. Note only response code between 0 and 999 are supported.
-   ``downstream_rq_flag_XXX``, Counter, Total requests that with response flag XXX. The XXX is the response flag. For example, ``downstream_rq_flag_UF`` is the total requests that with response flag UF.
+   ``downstream_rq_total``, Counter, Total requests
+   ``downstream_rq_error``, Counter, Total requests that with non-OK response status
+   ``downstream_rq_reset``, Counter, Total requests that are reset before response
+   ``downstream_rq_local``, Counter, Total requests that with local response
+   ``downstream_rq_decoding_error``, Counter, Total codec decoding errors
+   ``downstream_rq_active``, Gauge, Current active requests
+   ``downstream_rq_time``, Histogram, Request time in milliseconds. The time is measured from when the request is received from downstream to when the response is sent to downstream
+   ``downstream_rq_tx_time``, Histogram, Request time in microseconds. The time is measured from when the request is received from downstream to the request is sent to upstream
+   ``downstream_rq_code_XXX``, Counter, Total requests that with response status code XXX. The XXX is the response status code. For example the ``downstream_rq_code_200`` is the total requests that with response status code 200. Note only response code between 0 and 999 are supported
+   ``downstream_rq_flag_XXX``, Counter, Total requests that with response flag XXX. The XXX is the response flag. For example the ``downstream_rq_flag_UF`` is the total requests that with response flag UF
