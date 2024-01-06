@@ -159,6 +159,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   ASSERT(client_.send_reports_timer != nullptr);
   // Set the reporting interval and enable the timer.
   const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
+  client_.report_interval_ms = reporting_interval;
   client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
 
   initiating_call_ = false;
