@@ -8,6 +8,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/common/rbac/glob/glob.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "test/mocks/network/mocks.h"
@@ -516,32 +517,6 @@ TEST(PathMatcher, ValidPathInHeader) {
   checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
 }
 
-TEST(GlobTemplateMatcher, SingleLevelWildcard) {
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig config;
-  config.set_path_template("/test/*/path");
-
-  headers.setPath("/test/foo/path");
-  checkMatcher(GlobTemplateMatcher(config), true, Envoy::Network::MockConnection(), headers);
-  headers.setPath("/test/path");
-  checkMatcher(GlobTemplateMatcher(config), false, Envoy::Network::MockConnection(), headers);
-  headers.setPath("/test/foo#path");
-  checkMatcher(GlobTemplateMatcher(config), false, Envoy::Network::MockConnection(), headers);
-}
-
-TEST(GlobTemplateMatcher, MultiLevelWildcard) {
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig config;
-  config.set_path_template("/test/**/path");
-
-  headers.setPath("/test/foo/path");
-  checkMatcher(GlobTemplateMatcher(config), true, Envoy::Network::MockConnection(), headers);
-  headers.setPath("/test/foo/bar/path");
-  checkMatcher(GlobTemplateMatcher(config), true, Envoy::Network::MockConnection(), headers);
-  headers.setPath("/test/path");
-  checkMatcher(GlobTemplateMatcher(config), false, Envoy::Network::MockConnection(), headers);
-}
-
 class TestObject : public StreamInfo::FilterState::Object {
 public:
   absl::optional<std::string> serializeAsString() const override { return "test.value"; }
@@ -562,6 +537,29 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   filter_state.setData("test.key", std::make_shared<TestObject>(),
                        StreamInfo::FilterState::StateType::ReadOnly);
   checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
+}
+
+TEST(GlobMatcherFactory, glob) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.rbac.matchers.glob_matcher
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+        path_template: "/bar/{lang}/{country}"
+)EOF";
+
+  envoy::config::core::v3::TypedExtensionConfig config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  const auto& factory =
+      &Envoy::Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(config);
+
+  EXPECT_NE(nullptr, factory);
+  EXPECT_EQ(factory->name(), "envoy.rbac.matchers.glob_matcher");
+
+  auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
+
+  EXPECT_NE(nullptr, message);
 }
 
 } // namespace

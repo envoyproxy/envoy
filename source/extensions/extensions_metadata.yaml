@@ -1372,6 +1372,13 @@ envoy.rbac.matchers.upstream_ip_port:
   status: alpha
   type_urls:
   - envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+envoy.rbac.matchers.glob_matcher:
+  categories:
+  - envoy.rbac.matchers
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
 envoy.http.stateful_session.cookie:
   categories:
   - envoy.http.stateful_session
