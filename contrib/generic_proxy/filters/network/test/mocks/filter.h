@@ -93,7 +93,6 @@ template <class Base> class MockStreamFilterCallbacks : public Base {
 public:
   MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(const CodecFactory&, downstreamCodec, ());
-  MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
@@ -107,7 +106,7 @@ class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilter
 public:
   MockDecoderFilterCallback();
 
-  MOCK_METHOD(void, sendLocalReply, (Status, ResponseUpdateFunction&&));
+  MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction));
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, onResponseStart, (StreamResponsePtr response));
   MOCK_METHOD(void, onResponseFrame, (StreamFramePtr frame));

@@ -13,7 +13,7 @@ RouterFactory::createFilterFactoryFromProto(const Protobuf::Message& config, con
                                             Server::Configuration::FactoryContext& context) {
   const auto& typed_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::network::generic_proxy::router::v3::Router&>(
-      config, context.serverFactoryContext().messageValidationVisitor());
+      config, context.messageValidationVisitor());
 
   auto router_config = std::make_shared<RouterConfig>(typed_config);
 
