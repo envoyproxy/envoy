@@ -811,7 +811,7 @@ TEST_F(RouterTest, DropOverloadDropped) {
   EXPECT_CALL(random_, random())
       .WillRepeatedly(Return(0.2 * float(std::numeric_limits<uint64_t>::max())));
 
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"},
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "502"},
                                                    {"content-length", "13"},
                                                    {"content-type", "text/plain"},
                                                    {"x-envoy-drop-overload", "true"}};

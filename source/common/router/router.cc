@@ -2032,9 +2032,9 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
     if (config_.random_.bernoulli(cluster.dropOverload())) {
       ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DropOverLoad);
-      chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
+      chargeUpstreamCode(Http::Code::BadGateway, nullptr, true);
       callbacks_->sendLocalReply(
-          Http::Code::ServiceUnavailable, "drop overload",
+          Http::Code::BadGateway, "drop overload",
           [modify_headers, this](Http::ResponseHeaderMap& headers) {
             if (!config_.suppress_envoy_headers_) {
               headers.addReference(Http::Headers::get().EnvoyDropOverload,
