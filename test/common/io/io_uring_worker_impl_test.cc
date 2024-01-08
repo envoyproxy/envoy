@@ -669,7 +669,7 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
       0, worker, [](uint32_t) {}, 0, false);
 
   auto addr = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-  EXPECT_CALL(mock_io_uring, submit()).Times(1);
+  EXPECT_CALL(mock_io_uring, submit());
   void* connect_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareConnect(socket.fd(), _, _))
       .WillOnce(DoAll(SaveArg<2>(&connect_req), Return<IoUringResult>(IoUringResult::Ok)));
