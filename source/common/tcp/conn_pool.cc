@@ -52,6 +52,21 @@ ActiveTcpClient::~ActiveTcpClient() {
   }
 }
 
+// Undo the readDisable done in onEvent(Connected) - now that there is an associated connection,
+// drain any data.
+void ActiveTcpClient::readEnableIfNew() {
+  // It is expected for Envoy use of ActiveTcpClient this function only be
+  // called once. Other users of the TcpConnPool may recycle Tcp connections,
+  // and this safeguards them against read-enabling too many times.
+  if (!associated_before_) {
+    associated_before_ = true;
+    connection_->readDisable(false);
+    // Also while we're at it, make sure the connection will proxy all TCP
+    // data before picking up a FIN.
+    connection_->detectEarlyCloseWhenReadDisabled(false);
+  }
+}
+
 void ActiveTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
 void ActiveTcpClient::clearCallbacks() {
@@ -115,6 +130,75 @@ void ActiveTcpClient::setIdleTimer() {
 
     idle_timer_->enableTimer(idle_timeout_.value());
   }
+}
+
+void ConnPoolImpl::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
+  drainConnectionsImpl(drain_behavior);
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+    return;
+  }
+  // Legacy behavior for the TCP connection pool marks all connecting clients
+  // as draining.
+  for (auto& connecting_client : connecting_clients_) {
+    if (connecting_client->remaining_streams_ > 1) {
+      uint64_t old_limit = connecting_client->effectiveConcurrentStreamLimit();
+      connecting_client->remaining_streams_ = 1;
+      if (connecting_client->effectiveConcurrentStreamLimit() < old_limit) {
+        decrConnectingAndConnectedStreamCapacity(
+            old_limit - connecting_client->effectiveConcurrentStreamLimit(), *connecting_client);
+      }
+    }
+  }
+}
+
+void ConnPoolImpl::closeConnections() {
+  for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_}) {
+    while (!list->empty()) {
+      list->front()->close();
+    }
+  }
+}
+ConnectionPool::Cancellable*
+ConnPoolImpl::newConnection(Tcp::ConnectionPool::Callbacks& callbacks) {
+  TcpAttachContext context(&callbacks);
+  // TLS early data over TCP is not supported yet.
+  return newStreamImpl(context, /*can_send_early_data=*/false);
+}
+
+ConnectionPool::Cancellable*
+ConnPoolImpl::newPendingStream(Envoy::ConnectionPool::AttachContext& context,
+                               bool can_send_early_data) {
+  Envoy::ConnectionPool::PendingStreamPtr pending_stream = std::make_unique<TcpPendingStream>(
+      *this, can_send_early_data, typedContext<TcpAttachContext>(context));
+  return addPendingStream(std::move(pending_stream));
+}
+
+Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+  return std::make_unique<ActiveTcpClient>(*this, Envoy::ConnectionPool::ConnPoolImplBase::host(),
+                                           1, idle_timeout_);
+}
+
+void ConnPoolImpl::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
+                               Envoy::ConnectionPool::AttachContext& context) {
+  ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
+  tcp_client->readEnableIfNew();
+  auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
+  std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
+      std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
+  callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
+
+  // The tcp client is taken over. Stop the idle timer.
+  if (!connection_data) {
+    tcp_client->disableIdleTimer();
+  }
+}
+
+void ConnPoolImpl::onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
+                                 absl::string_view failure_reason,
+                                 ConnectionPool::PoolFailureReason reason,
+                                 Envoy::ConnectionPool::AttachContext& context) {
+  auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
+  callbacks->onPoolFailure(reason, failure_reason, host_description);
 }
 
 } // namespace Tcp

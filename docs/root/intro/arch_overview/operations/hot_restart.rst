@@ -26,8 +26,9 @@ following general architecture:
 * Envoy’s hot restart support was designed so that it will work correctly even if the new Envoy
   process and the old Envoy process are running inside different containers. Communication between
   the processes takes place only using unix domain sockets.
-* An example restarter/parent process written in Python is included in the source distribution. This
-  parent process is usable with standard process control utilities such as monit/runit/etc.
+* An example restarter/parent process written in Python is included in the source distribution at
+  :repo:`restarter/hot-restarter.py <restarter/hot-restarter.py>`.
+  This parent process is usable with standard process control utilities such as monit/runit/etc.
 
 Envoy's default command line options assume that only a single set of Envoy processes is running on
 a given host: an active Envoy server process and, potentially, a draining Envoy server process that

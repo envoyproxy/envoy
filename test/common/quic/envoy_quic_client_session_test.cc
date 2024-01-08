@@ -375,6 +375,41 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContext) {
   EXPECT_FALSE(verify_context.isServer());
   EXPECT_EQ(transport_socket_options_.get(), verify_context.transportSocketOptions().get());
   EXPECT_EQ(dispatcher_.get(), &verify_context.dispatcher());
+  EXPECT_EQ(peer_addr_->asString(), verify_context.extraValidationContext()
+                                        .callbacks->connection()
+                                        .connectionInfoSetter()
+                                        .remoteAddress()
+                                        ->asString());
+  EXPECT_TRUE(verify_context.extraValidationContext().callbacks->ioHandle().isOpen());
+}
+
+TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnRaiseEvent) {
+  auto& verify_context =
+      dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
+  EXPECT_DEATH(verify_context.extraValidationContext().callbacks->raiseEvent(
+                   Network::ConnectionEvent::Connected),
+               "unexpectedly reached");
+}
+
+TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnShouldDrainReadBuffer) {
+  auto& verify_context =
+      dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
+  EXPECT_DEATH(verify_context.extraValidationContext().callbacks->shouldDrainReadBuffer(),
+               "unexpectedly reached");
+}
+
+TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnSetTransportSocketIsReadable) {
+  auto& verify_context =
+      dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
+  EXPECT_DEATH(verify_context.extraValidationContext().callbacks->setTransportSocketIsReadable(),
+               "unexpectedly reached");
+}
+
+TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnFlushWriteBuffer) {
+  auto& verify_context =
+      dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
+  EXPECT_DEATH(verify_context.extraValidationContext().callbacks->flushWriteBuffer(),
+               "unexpectedly reached");
 }
 
 } // namespace Quic
