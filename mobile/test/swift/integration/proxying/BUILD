@@ -15,6 +15,7 @@ envoy_mobile_swift_test(
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
         "//test/swift/integration:test_extensions",
     ],
 )

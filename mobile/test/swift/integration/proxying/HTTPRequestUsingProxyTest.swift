@@ -1,5 +1,6 @@
 import Envoy
 import EnvoyEngine
+import EnvoyTestServer
 import Foundation
 import TestExtensions
 import XCTest
@@ -12,7 +13,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
   func testHTTRequestUsingProxy() throws {
     EnvoyTestServer.startHttpProxyServer()
-    let port = EnvoyTestServer.getEnvoyPort()
+    // let port = EnvoyTestServer.getEnvoyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
     let responseExpectation = self.expectation(description: "Successful response received")
