@@ -44,7 +44,6 @@ private:
   void OnTrailerInput(absl::string_view input) override;
   void OnTrailers(std::unique_ptr<quiche::BalsaHeaders> trailers) override;
   void ProcessHeaders(const quiche::BalsaHeaders& headers) override;
-  void ProcessTrailers(const quiche::BalsaHeaders& /*trailer*/) override{};
   void OnRequestFirstLineInput(absl::string_view line_input, absl::string_view method_input,
                                absl::string_view request_uri,
                                absl::string_view version_input) override;

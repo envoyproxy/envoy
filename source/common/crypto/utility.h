@@ -41,7 +41,7 @@ public:
   /**
    * Computes the SHA-256 HMAC for a given key and message.
    * @param key the HMAC function key.
-   * @param message message data for the HMAC function.
+   * @param message string_view message data for the HMAC function.
    * @return a vector of bytes for the computed HMAC.
    */
   virtual std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key,

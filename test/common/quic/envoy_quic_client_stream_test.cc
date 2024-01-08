@@ -349,7 +349,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   size_t i = 0;
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  for (const std::string& status : {"100", "199", "100"}) {
+  for (const std::string status : {"100", "199", "100"}) {
     spdy::Http2HeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);
@@ -755,6 +755,14 @@ TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
   quic_session_.OnMessageReceived(datagram_fragment_);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
+
+TEST_F(EnvoyQuicClientStreamTest, ResetStreamWithHttpDatagramHandler) {
+  setUpCapsuleProtocol(true, false);
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(quic_stream_->rst_sent());
+}
+
 #endif
 
 } // namespace Quic

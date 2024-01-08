@@ -26,6 +26,8 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+NID
+NIST
 bm
 BSON
 BPF
@@ -1239,6 +1241,9 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+sigv
+sigv4
+sigv4a
 siloed
 sim
 sinked

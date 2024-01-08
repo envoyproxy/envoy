@@ -21,6 +21,11 @@ public:
   // If set, the stream will reset when the request is complete, rather than
   // sending a response.
   static const char RESET_AFTER_REQUEST[];
+  // If set, the stream will reset when the response headers are sent.
+  static const char RESET_AFTER_RESPONSE_HEADERS[];
+  // If set, the stream will reset after the first data chunk. Note by default
+  // there is only one data chunk.
+  static const char RESET_AFTER_RESPONSE_DATA[];
   // Prevents upstream from sending trailers.
   static const char NO_TRAILERS[];
   // Prevents upstream from finishing response.
