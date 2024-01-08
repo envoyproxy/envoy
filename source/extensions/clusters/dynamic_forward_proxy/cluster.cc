@@ -270,8 +270,8 @@ void Cluster::addOrUpdateHost(
       // remove the old host
       hosts_removed.emplace_back(host_map_it->second.logical_host_);
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-      host_map_.emplace(std::piecewise_construct, std::forward_as_tuple(host),
-                        std::forward_as_tuple(host_info, new_host));
+      host_map_.erase(host_map_it);
+      host_map_.try_emplace(host, host_info, new_host);
 
     } else {
       ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
@@ -287,7 +287,7 @@ void Cluster::addOrUpdateHost(
 void Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
-  ENVOY_LOG(debug, "Adding host info for {}", host);
+  ENVOY_LOG(debug, "Adding/Updating host info for {}", host);
   addOrUpdateHost(host, host_info);
 }
 
