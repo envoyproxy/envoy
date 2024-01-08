@@ -123,44 +123,6 @@ Specify the log level to be used when running the underlying Envoy engine.
   // Swift
   builder.addLogLevel(.warn)
 
-~~~~~~~~~~~~~~~~~~~~~~
-``addGrpcStatsDomain``
-~~~~~~~~~~~~~~~~~~~~~~
-
-Specify a domain which implements the
-:tree:`stats endpoint <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L139-L145>`
-in order to take advantage of the
-`stats emitted by Envoy <https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cluster_stats>`_
-(and subsequently Envoy Mobile).
-
-Note that only stats specified in the configuration's
-:tree:`inclusion list <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L146-L167>`
-will be emitted.
-
-Passing ``nil``/``null`` disables stats emission, and this is the default value.
-
-**Example**::
-
-  // Kotlin
-  builder.addGrpcStatsDomain("envoy-mobile.envoyproxy.io")
-
-  // Swift
-  builder.addGrpcStatsDomain("envoy-mobile.envoyproxy.io")
-
-~~~~~~~~~~~~~~~~~~~~~~~~
-``addStatsFlushSeconds``
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify the rate at which Envoy Mobile should flush its queued stats.
-
-**Example**::
-
-  // Kotlin
-  builder.addStatsFlushSeconds(5L)
-
-  // Swift
-  builder.addStatsFlushSeconds(5)
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``addStreamIdleTimeoutSeconds``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,7 +162,6 @@ for further information.
 ~~~~~~~~~~~~~~~~~
 
 Specify the version of the app using Envoy Mobile.
-This information is sent as metadata when flushing stats.
 
 **Example**::
 
@@ -215,7 +176,6 @@ This information is sent as metadata when flushing stats.
 ~~~~~~~~~~~~
 
 Specify the version of the app using Envoy Mobile.
-This information is sent as metadata when flushing stats.
 
 **Example**::
 
@@ -634,7 +594,6 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
   val streamClient = AndroidEngineBuilder(baseContext, Yaml(yamlFileString))
     .addLogLevel(LogLevel.WARN)
-    .addStatsFlushSeconds(60)
     ...
     .build()
     .streamClient()
@@ -643,7 +602,6 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
   let streamClient = try EngineBuilder(yaml: yamlFileString)
     .addLogLevel(.warn)
-    .addStatsFlushSeconds(60)
     ...
     .build()
     .streamClient()

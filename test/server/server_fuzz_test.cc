@@ -6,8 +6,8 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/instance_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/server.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"

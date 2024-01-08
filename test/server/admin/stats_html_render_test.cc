@@ -29,7 +29,7 @@ const Admin::UrlHandler handler() {
 
 class StatsHtmlRenderTest : public StatsRenderTestBase {
 protected:
-  Http::Utility::QueryParams query_params_;
+  Http::Utility::QueryParamsMulti query_params_;
 };
 
 TEST_F(StatsHtmlRenderTest, String) {

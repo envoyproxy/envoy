@@ -63,10 +63,9 @@ class TestConfigImpl : public ConfigImpl {
 public:
   TestConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                  Server::Configuration::ServerFactoryContext& factory_context,
-                 bool validate_clusters_default,
-                 const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters())
-      : ConfigImpl(config, optional_http_filters, factory_context,
-                   ProtobufMessage::getNullValidationVisitor(), validate_clusters_default),
+                 bool validate_clusters_default)
+      : ConfigImpl(config, factory_context, ProtobufMessage::getNullValidationVisitor(),
+                   validate_clusters_default),
         config_(config) {}
 
   void setupRouteConfig(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
@@ -139,8 +138,8 @@ genHeaders(const std::string& host, const std::string& path, const std::string& 
   }
 
   if (random_value_pair.has_value()) {
-    hdrs.setByKey(Envoy::Http::LowerCaseString(random_value_pair.value().first),
-                  random_value_pair.value().second);
+    hdrs.setCopy(Envoy::Http::LowerCaseString(random_value_pair.value().first),
+                 random_value_pair.value().second);
   }
   return hdrs;
 }
@@ -2205,7 +2204,7 @@ most_specific_header_mutations_wins: true
 
 // Validate that we can't add :-prefixed or Host request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoHostOrPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
@@ -2231,7 +2230,7 @@ virtual_hosts:
 
 // Validate that we can't remove :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
-  for (const std::string& header :
+  for (const std::string header :
        {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
@@ -7568,39 +7567,41 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   constexpr uint64_t MaxResponseBodySizeBytes = 4096;
   envoy::config::route::v3::Route route;
   EXPECT_EQ(EMPTY_STRING,
-            ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes));
+            ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).value());
 
   route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).IgnoreError(),
       EnvoyException, "file missing_file does not exist");
 
   // The default max body size in bytes is 4096 (MaxResponseBodySizeBytes).
   const std::string body(MaxResponseBodySizeBytes + 1, '*');
   std::string expected_message("response body size is 4097 bytes; maximum is 4096");
   route.mutable_direct_response()->mutable_body()->set_inline_string(body);
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
-      EnvoyException, expected_message);
+  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
+                .status()
+                .message(),
+            expected_message);
 
   // Change the max body size to 2048 (MaxResponseBodySizeBytes/2) bytes.
   auto filename = TestEnvironment::writeStringToFileForTest("body", body);
   route.mutable_direct_response()->mutable_body()->set_filename(filename);
   expected_message = "file " + filename + " size is 4097 bytes; maximum is 2048";
   EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2),
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2)
+          .IgnoreError(),
       EnvoyException, expected_message);
 
   // Update the max body size to 4098 bytes (MaxResponseBodySizeBytes + 2), hence the parsing is
   // successful.
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
   route.mutable_direct_response()->mutable_body()->set_filename(EMPTY_STRING);
   route.mutable_direct_response()->mutable_body()->set_inline_bytes(body);
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
 }
 
 TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
@@ -7615,12 +7616,13 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
 
   std::string expected_message("response body size is 4097 bytes; maximum is 4096");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes),
-      EnvoyException, expected_message);
+  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
+                .status()
+                .message(),
+            expected_message);
   EXPECT_EQ(
       MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2).size());
+      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
 }
 
 TEST_F(RouteConfigurationV2, RedirectCode) {
@@ -10221,6 +10223,7 @@ virtual_hosts:
   EXPECT_EQ(1, internal_redirect_policy.maxInternalRedirects());
   EXPECT_TRUE(internal_redirect_policy.predicates().empty());
   EXPECT_FALSE(internal_redirect_policy.isCrossSchemeRedirectAllowed());
+  EXPECT_TRUE(internal_redirect_policy.responseHeadersToCopy().empty());
 }
 
 TEST_F(RouteConfigurationV2, InternalRedirectPolicyDropsInvalidRedirectCode) {
@@ -10288,6 +10291,31 @@ virtual_hosts:
       internal_redirect_policy.shouldRedirectForResponseCode(static_cast<Http::Code>(200)));
 }
 
+TEST_F(RouteConfigurationV2, InternalRedirectPolicyAcceptsResponseHeadersToPrserve) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+          internal_redirect_policy:
+            response_headers_to_copy: ["x-foo", "x-bar"]
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& internal_redirect_policy =
+      config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
+  EXPECT_TRUE(internal_redirect_policy.enabled());
+  EXPECT_EQ(2, internal_redirect_policy.responseHeadersToCopy().size());
+}
+
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {
 public:
   PerFilterConfigsTest()
@@ -10300,8 +10328,8 @@ public:
   public:
     TestFilterConfig() : EmptyHttpFilterConfig("test.filter") {}
 
-    Http::FilterFactoryCb createFilter(const std::string&,
-                                       Server::Configuration::FactoryContext&) override {
+    absl::StatusOr<Http::FilterFactoryCb>
+    createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
       PANIC("not implemented");
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
@@ -10325,8 +10353,8 @@ public:
   public:
     DefaultTestFilterConfig() : EmptyHttpFilterConfig("test.default.filter") {}
 
-    Http::FilterFactoryCb createFilter(const std::string&,
-                                       Server::Configuration::FactoryContext&) override {
+    absl::StatusOr<Http::FilterFactoryCb>
+    createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
       PANIC("not implemented");
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
@@ -10360,11 +10388,8 @@ public:
         << "config value does not match expected for source: " << source;
   }
 
-  void
-  checkNoPerFilterConfig(const std::string& yaml, const std::string& route_config_name,
-                         const OptionalHttpFilters& optional_http_filters = OptionalHttpFilters()) {
-    const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                                optional_http_filters);
+  void checkNoPerFilterConfig(const std::string& yaml, const std::string& route_config_name) {
+    const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
@@ -10426,31 +10451,6 @@ virtual_hosts:
       "configurations");
 }
 
-TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerVirtualHost) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    typed_per_filter_config:
-      test.default.filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          seconds: 123
-)EOF";
-
-  OptionalHttpFilters optional_http_filters = {"test.default.filter"};
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml, "test.default.filter", optional_http_filters);
-}
-
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerRoute) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10473,31 +10473,6 @@ virtual_hosts:
       "configurations");
 }
 
-TEST_F(PerFilterConfigsTest, OptionalDefaultFilterImplementationAnyWithCheckPerRoute) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        typed_per_filter_config:
-          test.default.filter:
-            "@type": type.googleapis.com/google.protobuf.Struct
-            value:
-              seconds: 123
-)EOF";
-
-  OptionalHttpFilters optional_http_filters = {"test.default.filter"};
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml, "test.default.filter", optional_http_filters);
-}
-
 TEST_F(PerFilterConfigsTest, PerVirtualHostWithUnknownFilter) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10515,30 +10490,6 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.BoolValue'");
-}
-
-TEST_F(PerFilterConfigsTest, PerVirtualHostWithOptionalUnknownFilter) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    typed_per_filter_config:
-      filter.unknown:
-        "@type": type.googleapis.com/google.protobuf.BoolValue
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
-  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithUnknownFilter) {
@@ -10560,30 +10511,6 @@ virtual_hosts:
       "'google.protobuf.BoolValue'");
 }
 
-TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilterLegacy) {
-  // TODO(wbpcode): This test should be removed once the deprecated flag is removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ignore_optional_option_from_hcm_for_route_config", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        typed_per_filter_config:
-          filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.BoolValue
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
-  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
-}
-
 TEST_F(PerFilterConfigsTest, PerRouteWithHcmOptionalUnknownFilter) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10598,13 +10525,9 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     optional_http_filters),
-      EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.BoolValue'");
 }

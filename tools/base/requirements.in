@@ -23,6 +23,7 @@ flake8>=6
 frozendict>=2.3.7
 gitpython
 gsutil
+icalendar
 jinja2
 multidict>=6.0.2
 orjson
@@ -30,13 +31,13 @@ pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<4.22.0
+protobuf<4.26.0
 pygithub
 pyreadline
 pyyaml
 setuptools
 slack_sdk
-sphinx>=7
+sphinx>=7,<7.2
 sphinxcontrib.googleanalytics
 thrift
 verboselogs

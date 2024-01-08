@@ -296,7 +296,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
 }
 
 TEST_F(OptionsImplTest, DefaultParamsNoConstructorArgs) {
-  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>();
+  std::unique_ptr<OptionsImplBase> options = std::make_unique<OptionsImplBase>();
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
@@ -309,22 +309,8 @@ TEST_F(OptionsImplTest, DefaultParamsNoConstructorArgs) {
   EXPECT_FALSE(options->hotRestartDisabled());
   EXPECT_FALSE(options->cpusetThreadsEnabled());
 
-  // Validate that CommandLineOptions is constructed correctly with default params.
-  Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
-
-  EXPECT_EQ(600, command_line_options->drain_time().seconds());
-  EXPECT_EQ(900, command_line_options->parent_shutdown_time().seconds());
-  EXPECT_EQ("", command_line_options->admin_address_path());
-  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::v4,
-            command_line_options->local_address_ip_version());
-  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::Serve, command_line_options->mode());
-  EXPECT_EQ("@envoy_domain_socket", command_line_options->socket_path());
-  EXPECT_EQ(0, command_line_options->socket_mode());
-  EXPECT_FALSE(command_line_options->disable_hot_restart());
-  EXPECT_FALSE(command_line_options->cpuset_threads());
-  EXPECT_FALSE(command_line_options->allow_unknown_static_fields());
-  EXPECT_FALSE(command_line_options->reject_unknown_dynamic_fields());
-  EXPECT_EQ(0, options->statsTags().size());
+  // Not supported for OptionsImplBase
+  EXPECT_EQ(nullptr, options->toCommandLineOptions());
 
   // This is the only difference between this test and DefaultParams above, as
   // the DefaultParams constructor explicitly sets log level to warn.

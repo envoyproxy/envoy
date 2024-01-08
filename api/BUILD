@@ -72,6 +72,7 @@ proto_library(
     name = "v3_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/checksum/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
@@ -81,6 +82,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/client_ssl_auth/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/action/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/kafka/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/router/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg",
@@ -171,6 +173,7 @@ proto_library(
         "//envoy/extensions/filters/http/compressor/v3:pkg",
         "//envoy/extensions/filters/http/connect_grpc_bridge/v3:pkg",
         "//envoy/extensions/filters/http/cors/v3:pkg",
+        "//envoy/extensions/filters/http/credential_injector/v3:pkg",
         "//envoy/extensions/filters/http/csrf/v3:pkg",
         "//envoy/extensions/filters/http/custom_response/v3:pkg",
         "//envoy/extensions/filters/http/decompressor/v3:pkg",
@@ -262,6 +265,8 @@ proto_library(
         "//envoy/extensions/http/original_ip_detection/xff/v3:pkg",
         "//envoy/extensions/http/stateful_session/cookie/v3:pkg",
         "//envoy/extensions/http/stateful_session/header/v3:pkg",
+        "//envoy/extensions/injected_credentials/generic/v3:pkg",
+        "//envoy/extensions/injected_credentials/oauth2/v3:pkg",
         "//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
@@ -304,6 +309,7 @@ proto_library(
         "//envoy/extensions/retry/host/omit_host_metadata/v3:pkg",
         "//envoy/extensions/retry/host/previous_hosts/v3:pkg",
         "//envoy/extensions/retry/priority/previous_priorities/v3:pkg",
+        "//envoy/extensions/router/cluster_specifiers/lua/v3:pkg",
         "//envoy/extensions/stat_sinks/graphite_statsd/v3:pkg",
         "//envoy/extensions/stat_sinks/open_telemetry/v3:pkg",
         "//envoy/extensions/stat_sinks/wasm/v3:pkg",
@@ -363,9 +369,9 @@ proto_library(
     name = "xds_protos",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_cncf_udpa//xds/core/v3:pkg",
-        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
-        "@com_github_cncf_udpa//xds/type/v3:pkg",
+        "@com_github_cncf_xds//xds/core/v3:pkg",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
+        "@com_github_cncf_xds//xds/type/v3:pkg",
     ],
 )
 

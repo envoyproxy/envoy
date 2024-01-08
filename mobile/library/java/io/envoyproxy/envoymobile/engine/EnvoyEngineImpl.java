@@ -35,16 +35,13 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    *
    * @param callbacks The callbacks for the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
-   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
-   *     should be delivered sans end stream.
    * @return A stream that may be used for sending data.
    */
   @Override
-  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
-                                     long minDeliverySize) {
+  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
     long streamHandle = JniLibrary.initStream(engineHandle);
-    EnvoyHTTPStream stream = new EnvoyHTTPStream(engineHandle, streamHandle, callbacks,
-                                                 explicitFlowControl, minDeliverySize);
+    EnvoyHTTPStream stream =
+        new EnvoyHTTPStream(engineHandle, streamHandle, callbacks, explicitFlowControl);
     stream.start();
     return stream;
   }
@@ -52,11 +49,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public void terminate() {
     JniLibrary.terminateEngine(engineHandle);
-  }
-
-  @Override
-  public void flushStats() {
-    JniLibrary.flushStats(engineHandle);
   }
 
   @Override

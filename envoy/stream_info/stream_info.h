@@ -91,8 +91,10 @@ enum ResponseFlag {
   OverloadManager = 0x2000000,
   // DNS resolution failed.
   DnsResolutionFailed = 0x4000000,
+  // Drop certain percentage of overloaded traffic.
+  DropOverLoad = 0x8000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DnsResolutionFailed,
+  LastFlag = DropOverLoad,
 };
 
 /**
@@ -156,6 +158,8 @@ struct ResponseCodeDetailValues {
   const std::string ClusterNotFound = "cluster_not_found";
   // The request was rejected by the router filter because the cluster was in maintenance mode.
   const std::string MaintenanceMode = "maintenance_mode";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
+  const std::string DropOverload = "drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.
@@ -341,6 +345,9 @@ public:
   absl::optional<MonotonicTime> lastDownstreamAckReceived() const {
     return last_downstream_ack_received_;
   }
+  absl::optional<MonotonicTime> lastDownstreamHeaderRxByteReceived() const {
+    return last_downstream_header_rx_byte_received_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -362,6 +369,10 @@ public:
     ASSERT(!last_downstream_ack_received_);
     last_downstream_ack_received_ = time_source.monotonicTime();
   }
+  void onLastDownstreamHeaderRxByteReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_header_rx_byte_received_);
+    last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
+  }
 
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
@@ -375,6 +386,8 @@ private:
   absl::optional<MonotonicTime> downstream_handshake_complete_;
   // The time the final ack was received from the client.
   absl::optional<MonotonicTime> last_downstream_ack_received_;
+  // The time when the last header byte was received.
+  absl::optional<MonotonicTime> last_downstream_header_rx_byte_received_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -692,6 +705,11 @@ public:
    * calculations should be made relative to this value.
    */
   virtual MonotonicTime startTimeMonotonic() const PURE;
+
+  /**
+   * @return returns the time source.
+   */
+  virtual TimeSource& timeSource() const PURE;
 
   /**
    * Sets the upstream information for this stream.

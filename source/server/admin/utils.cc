@@ -25,12 +25,12 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
 }
 
 // Helper method to get the histogram_buckets parameter. Returns an InvalidArgumentError
-// if the histogram_buckets query parameter is set but the value is not one of "cumulative",
-// "disjoint", "detailed", "summary", or "none".
-absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
+// if histogram_buckets query param is found and value is not "cumulative" or "disjoint",
+// Ok otherwise.
+absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params,
                                    HistogramBucketsMode& histogram_buckets_mode) {
   absl::optional<std::string> histogram_buckets_query_param =
-      queryParam(params, "histogram_buckets");
+      params.getFirstValue("histogram_buckets");
   histogram_buckets_mode = HistogramBucketsMode::Unset;
   if (histogram_buckets_query_param.has_value()) {
     if (histogram_buckets_query_param.value() == "cumulative") {
@@ -52,21 +52,8 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
 }
 
 // Helper method to get the format parameter.
-absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
-  return queryParam(params, "format");
-}
-
-// Helper method to get a query parameter.
-absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
-                                       const std::string& key) {
-  const auto iter = params.find(key);
-  if (iter != params.end()) {
-    const std::string& value = iter->second;
-    if (!value.empty()) {
-      return value;
-    }
-  }
-  return absl::nullopt;
+absl::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params) {
+  return params.getFirstValue("format");
 }
 
 } // namespace Utility

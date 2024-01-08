@@ -209,22 +209,22 @@ uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
   const uint32_t buckets_to_clear = std::min<uint32_t>(
       std::floor(pressure * BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) + 1, 8);
 
-  uint32_t last_bucket_to_clear = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_to_clear;
-  ENVOY_LOG_MISC(warn, "resetting streams in buckets >= {}", last_bucket_to_clear);
-
   // Clear buckets, prioritizing the buckets with larger streams.
   uint32_t num_streams_reset = 0;
+  uint32_t num_buckets_reset = 0;
   for (uint32_t buckets_cleared = 0; buckets_cleared < buckets_to_clear; ++buckets_cleared) {
     const uint32_t bucket_to_clear =
         BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_cleared - 1;
-    ENVOY_LOG_MISC(warn, "resetting {} streams in bucket {}.",
-                   size_class_account_sets_[bucket_to_clear].size(), bucket_to_clear);
+    absl::flat_hash_set<BufferMemoryAccountSharedPtr>& bucket =
+        size_class_account_sets_[bucket_to_clear];
 
-    auto it = size_class_account_sets_[bucket_to_clear].begin();
-    while (it != size_class_account_sets_[bucket_to_clear].end()) {
-      if (num_streams_reset >= kMaxNumberOfStreamsToResetPerInvocation) {
-        return num_streams_reset;
-      }
+    if (bucket.empty()) {
+      continue;
+    }
+    ++num_buckets_reset;
+
+    auto it = bucket.begin();
+    while (it != bucket.end() && num_streams_reset < kMaxNumberOfStreamsToResetPerInvocation) {
       auto next = std::next(it);
       // This will trigger an erase, which avoids rehashing and invalidates the
       // iterator *it*. *next* is still valid.
@@ -233,7 +233,10 @@ uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
       ++num_streams_reset;
     }
   }
-
+  if (num_buckets_reset > 0) {
+    ENVOY_LOG_MISC(warn, "resetting {} streams in {} buckets, {} empty buckets", num_streams_reset,
+                   num_buckets_reset, buckets_to_clear - num_buckets_reset);
+  }
   return num_streams_reset;
 }
 

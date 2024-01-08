@@ -36,12 +36,12 @@ namespace Tcp {
 class TcpConnPoolTest : public ::testing::Test {
 public:
   TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
-    NiceMock<Router::MockRouteEntry> route_entry;
+    Upstream::ResourcePriority priority = Upstream::ResourcePriority::Default;
     NiceMock<Upstream::MockClusterManager> cm;
     cm.initializeThreadLocalClusters({"fake_cluster"});
     EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, route_entry, nullptr);
+    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, priority, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;

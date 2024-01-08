@@ -10,12 +10,12 @@ namespace Cookie {
 
 Envoy::Http::SessionStateFactorySharedPtr
 CookieBasedSessionStateFactoryConfig::createSessionStateFactory(
-    const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::GenericFactoryContext& context) {
 
   const auto& proto_config = MessageUtil::downcastAndValidate<const CookieBasedSessionStateProto&>(
       config, context.messageValidationVisitor());
   return std::make_shared<CookieBasedSessionStateFactory>(
-      proto_config, context.mainThreadDispatcher().timeSource());
+      proto_config, context.serverFactoryContext().mainThreadDispatcher().timeSource());
 }
 
 REGISTER_FACTORY(CookieBasedSessionStateFactoryConfig, Envoy::Http::SessionStateFactoryConfig);

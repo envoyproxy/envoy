@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:context_lib",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/ssl:ssl_mocks",

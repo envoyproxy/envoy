@@ -2,7 +2,6 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/engine.h"
-#include "library/common/engine_handle.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
@@ -58,7 +57,7 @@ TEST_F(EngineTest, EarlyExit) {
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  start_stream(handle, 0, {}, false, 0);
+  start_stream(handle, 0, {}, false);
 
   engine_.reset();
 }
@@ -79,21 +78,15 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification getClusterManagerInvoked;
-  // Scheduling on the dispatcher should work, the engine is running.
-  EXPECT_EQ(ENVOY_SUCCESS, EngineHandle::runOnEngineDispatcher(
-                               handle, [&getClusterManagerInvoked](Envoy::Engine& engine) {
-                                 engine.getClusterManager();
-                                 getClusterManagerInvoked.Notify();
-                               }));
-
-  // Validate that we actually invoked the function.
-  EXPECT_TRUE(getClusterManagerInvoked.WaitForNotificationWithTimeout(absl::Seconds(1)));
+  envoy_data stats_data;
+  // Running engine functions should work because the engine is running
+  EXPECT_EQ(ENVOY_SUCCESS, dump_stats(handle, &stats_data));
+  release_envoy_data(stats_data);
 
   engine_->terminate();
 
   // Now that the engine has been shut down, we no longer expect scheduling to work.
-  EXPECT_EQ(ENVOY_FAILURE, EngineHandle::runOnEngineDispatcher(
-                               handle, [](Envoy::Engine& engine) { engine.getClusterManager(); }));
+  EXPECT_EQ(ENVOY_FAILURE, dump_stats(handle, &stats_data));
 
   engine_.reset();
 }

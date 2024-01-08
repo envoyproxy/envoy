@@ -1,0 +1,58 @@
+static_resources:
+  listeners:
+  - name: main
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  inline_cluster_specifier_plugin:
+                    extension:
+                      name: envoy.router.cluster_specifier_plugin.lua
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.router.cluster_specifiers.lua.v3.LuaConfig
+                        source_code:
+                          inline_string: |
+                            function envoy_on_route(route_handle)
+                              local header_value = route_handle:headers():get("header_key")
+                              if header_value == "fake" then
+                                return "fake_service"
+                              end
+                              return "web_service"
+                            end
+                        default_cluster: web_service
+
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: web_service
+    type: STRICT_DNS  # static
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: web_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: httpbin.org
+                port_value: 80

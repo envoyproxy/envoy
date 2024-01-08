@@ -1,15 +1,13 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 load("//bazel:android_debug_info.bzl", "android_debug_info")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
-
-# TODO(jpsim): Migrate these to use `envoy_cc_library`
+envoy_mobile_package()
 
 # Support for JNI, using NDK on Android and Java otherwise, since the JNI APIs
 # differ a bit between the two.
-cc_library(
+envoy_cc_library(
     name = "jni_support_lib",
     srcs = select({
         "@envoy//bazel:android": ["ndk_jni_support.cc"],
@@ -20,13 +18,14 @@ cc_library(
         "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }),
+    repository = "@envoy",
     deps = [
         "//library/common/jni/import:jni_import_lib",
     ],
 )
 
 # Various JNI helper libraries.
-cc_library(
+envoy_cc_library(
     name = "jni_utility_lib",
     srcs = [
         "jni_utility.cc",
@@ -34,7 +33,9 @@ cc_library(
     hdrs = [
         "jni_utility.h",
     ],
+    repository = "@envoy",
     deps = [
+        ":jni_helper_lib",
         ":jni_support_lib",
         "//library/common/jni/import:jni_import_lib",
         "//library/common/jni/types:jni_env_lib",
@@ -47,7 +48,7 @@ cc_library(
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "jni_helper_lib",
     srcs = [
         "jni_helper.cc",
@@ -55,6 +56,7 @@ cc_library(
     hdrs = [
         "jni_helper.h",
     ],
+    repository = "@envoy",
     deps = [
         "//library/common/jni/import:jni_import_lib",
         "@envoy//source/common/common:assert_lib",
@@ -63,15 +65,12 @@ cc_library(
 
 # Implementations of the various "native" Java methods for classes
 # in library/java/io/envoyproxy/envoymobile.
-# TODO(RyanTheOptimist): Is there a better name for this? I'm not sure what
-#     "interface" refers to in this file/lib. Maybe we should have a convention
-#     where the name of the java classes are part of the file name?
-cc_library(
-    name = "jni_interface_lib",
+envoy_cc_library(
+    name = "jni_impl_lib",
     srcs = [
-        "jni_interface.cc",
+        "jni_impl.cc",
     ],
-    defines = envoy_mobile_defines("@envoy"),
+    repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
@@ -90,7 +89,7 @@ cc_library(
 )
 
 # Cert verification related functions which call into AndroidNetworkLibrary.
-cc_library(
+envoy_cc_library(
     name = "android_network_utility_lib",
     srcs = [
         "android_network_utility.cc",
@@ -98,6 +97,7 @@ cc_library(
     hdrs = [
         "android_network_utility.h",
     ],
+    repository = "@envoy",
     deps = [
         ":jni_utility_lib",
         "//library/common/api:c_types",
@@ -112,14 +112,15 @@ cc_library(
 )
 
 # Implementations of the "native" Java methods for AndroidJniLibrary.java
-cc_library(
-    name = "android_jni_interface_lib",
+envoy_cc_library(
+    name = "android_jni_impl_lib",
     srcs = [
-        "android_jni_interface.cc",
+        "android_jni_impl.cc",
     ],
+    repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
-        ":jni_interface_lib",
+        ":jni_impl_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
         "//library/common:envoy_main_interface_lib",
@@ -130,16 +131,17 @@ cc_library(
 )
 
 # Library which contains all the JNI related targets.
-cc_library(
+envoy_cc_library(
     name = "envoy_jni_lib",
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),
+    repository = "@envoy",
     deps = [
-        ":android_jni_interface_lib",
+        ":android_jni_impl_lib",
         ":android_network_utility_lib",
-        ":jni_interface_lib",
+        ":jni_impl_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
     ],
@@ -178,7 +180,7 @@ android_debug_info(
     dep = "libenvoy_jni.so",
 )
 
-cc_library(
+envoy_cc_library(
     name = "android_jni_utility_lib",
     srcs = [
         "android_jni_utility.cc",
@@ -186,6 +188,7 @@ cc_library(
     hdrs = [
         "android_jni_utility.h",
     ],
+    repository = "@envoy",
     deps = [
         "//library/common/types:c_types_lib",
         "@envoy//source/common/common:assert_lib",

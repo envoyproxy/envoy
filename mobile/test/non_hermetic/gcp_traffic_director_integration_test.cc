@@ -10,13 +10,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
-#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
-#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
-#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 #include "source/extensions/health_checkers/http/health_checker_impl.h"
+#include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
@@ -24,9 +21,9 @@
 
 #include "absl/strings/substitute.h"
 #include "absl/synchronization/notification.h"
+#include "extension_registry.h"
 #include "gtest/gtest.h"
 #include "library/common/data/utility.h"
-#include "library/common/engine_handle.h"
 #include "library/common/types/c_types.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
@@ -52,15 +49,13 @@ public:
     // TODO(https://github.com/envoyproxy/envoy/issues/27848): remove these force registrations
     // once the EngineBuilder APIs support conditional force registration.
 
-    // Force register the Google gRPC library.
-    Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
-    // Force register the gRPC mux implementations.
-    Config::forceRegisterGrpcMuxFactory();
-    Config::forceRegisterNewGrpcMuxFactory();
-    Config::forceRegisterAdsConfigSubscriptionFactory();
+    // Register the extensions required for Envoy Mobile.
+    ExtensionRegistry::registerFactories();
+
     // Force register the cluster factories used by the test.
     Upstream::forceRegisterStrictDnsClusterFactory();
     Upstream::forceRegisterHttpHealthCheckerFactory();
+    Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
 
     std::string root_certs(TestEnvironment::readFileToStringForTest(
         TestEnvironment::runfilesPath("test/config/integration/certs/google_root_certs.pem")));
@@ -72,9 +67,9 @@ public:
 
     Platform::XdsBuilder xds_builder(/*xds_server_address=*/std::string(TD_API_ENDPOINT),
                                      /*xds_server_port=*/443);
-    xds_builder.setAuthenticationToken("x-goog-api-key", std::string(api_key));
-    xds_builder.setSslRootCerts(std::move(root_certs));
-    xds_builder.addClusterDiscoveryService();
+    xds_builder.addInitialStreamHeader("x-goog-api-key", std::string(api_key))
+        .setSslRootCerts(std::move(root_certs))
+        .addClusterDiscoveryService();
     builder_.addLogLevel(Platform::LogLevel::trace)
         .setNodeId(absl::Substitute("projects/$0/networks/default/nodes/111222333444", PROJECT_ID))
         .setXds(std::move(xds_builder));

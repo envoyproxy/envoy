@@ -1,8 +1,8 @@
-load(":dev_binding.bzl", "envoy_dev_binding")
+load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
+load(":dev_binding.bzl", "envoy_dev_binding")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -285,10 +285,13 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
+    _com_github_rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
+    _com_github_intel_qatzip()
+    _com_github_lz4_lz4()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
@@ -310,6 +313,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _io_hyperscan()
+    _io_vectorscan()
     _io_opentracing_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
@@ -368,10 +372,8 @@ def envoy_dependencies(skip_targets = []):
         name = "com_google_googleapis_imports",
         cc = True,
         go = True,
+        python = True,
         grpc = True,
-        rules_override = {
-            "py_proto_library": ["@envoy_api//bazel:api_build_system.bzl", ""],
-        },
     )
     native.bind(
         name = "bazel_runfiles",
@@ -557,6 +559,18 @@ def _com_github_intel_qatlib():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
+def _com_github_intel_qatzip():
+    external_http_archive(
+        name = "com_github_intel_qatzip",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_lz4_lz4():
+    external_http_archive(
+        name = "com_github_lz4_lz4",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
@@ -709,6 +723,15 @@ def _io_hyperscan():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:hyperscan.patch"],
+    )
+
+def _io_vectorscan():
+    external_http_archive(
+        name = "io_vectorscan",
+        build_file_content = BUILD_ALL_CONTENT,
+        type = "tar.gz",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:vectorscan.patch"],
     )
 
 def _io_opentracing_cpp():
@@ -884,6 +907,10 @@ def _com_google_absl():
         name = "abseil_stacktrace",
         actual = "@com_google_absl//absl/debugging:stacktrace",
     )
+    native.bind(
+        name = "abseil_statusor",
+        actual = "@com_google_absl//absl/status:statusor",
+    )
 
     # Require abseil_time as an indirect dependency as it is needed by the
     # direct dependency jwt_verify_lib.
@@ -1002,7 +1029,9 @@ def _io_opencensus_cpp():
     )
 
 def _com_github_curl():
-    # Used by OpenCensus Zipkin exporter.
+    # The usage by AWS extensions common utilities is deprecated and will be removed by Q3 2024 after
+    # the deprecation period of 2 releases. Please DO NOT USE curl dependency for any new or existing extensions.
+    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
     external_http_archive(
         name = "com_github_curl",
         build_file_content = BUILD_ALL_CONTENT + """
@@ -1183,6 +1212,9 @@ def _com_github_grpc_grpc():
         name = "upb_generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
         actual = "@upb//:generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
     )
+
+def _com_github_rules_proto_grpc():
+    external_http_archive("com_github_rules_proto_grpc")
 
 def _re2():
     external_http_archive("com_googlesource_code_re2")
@@ -1381,7 +1413,7 @@ filegroup(
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
     external_http_archive(
-        name = "edenhill_librdkafka",
+        name = "confluentinc_librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.

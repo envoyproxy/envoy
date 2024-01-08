@@ -20,12 +20,9 @@
 using Envoy::Extensions::HttpFilters::Common::MockUpstream;
 using testing::_;
 using testing::AllOf;
-using testing::InSequence;
 using testing::Mock;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
-using testing::Throw;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -80,8 +77,10 @@ MATCHER_P(OptionsHasRetryPolicy, policyMatcher, "") {
 class MetadataFetcherTest : public testing::Test {
 public:
   void setupFetcher() {
-    mock_factory_ctx_.cluster_manager_.initializeThreadLocalClusters({"cluster_name"});
-    fetcher_ = MetadataFetcher::create(mock_factory_ctx_.cluster_manager_, "cluster_name");
+    mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"cluster_name"});
+    fetcher_ = MetadataFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
+                                       "cluster_name");
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -95,7 +94,7 @@ TEST_F(MetadataFetcherTest, TestGetSuccess) {
   setupFetcher();
   Http::RequestMessageImpl message;
   std::string body = "not_empty";
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "200", body);
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200", body);
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(std::move(body)));
   EXPECT_CALL(receiver, onMetadataError(_)).Times(0);
@@ -116,12 +115,15 @@ TEST_F(MetadataFetcherTest, TestRequestMatchAndSpanPassedDown) {
   message.headers().setCopy(Http::LowerCaseString(":pseudo-header"), "peudo-header-value");
   message.headers().setCopy(Http::LowerCaseString("X-aws-ec2-metadata-token"), "Token");
 
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "200", "not_empty");
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           "not_empty");
   MockMetadataReceiver receiver;
   Http::MockAsyncClientRequest httpClientRequest(
-      &mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_);
+      &mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+           .async_client_);
 
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
               send_(_, _, _))
       .WillOnce(Invoke(
           [this, &httpClientRequest](
@@ -155,7 +157,8 @@ TEST_F(MetadataFetcherTest, TestGet400) {
   setupFetcher();
   Http::RequestMessageImpl message;
 
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "400", "not_empty");
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "400",
+                           "not_empty");
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
   EXPECT_CALL(receiver, onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network));
@@ -169,7 +172,7 @@ TEST_F(MetadataFetcherTest, TestGet400NoBody) {
   setupFetcher();
   Http::RequestMessageImpl message;
 
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "400", "");
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "400", "");
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
   EXPECT_CALL(receiver, onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network));
@@ -183,7 +186,7 @@ TEST_F(MetadataFetcherTest, TestGetNoBody) {
   setupFetcher();
   Http::RequestMessageImpl message;
 
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "200", "");
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200", "");
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
   EXPECT_CALL(receiver,
@@ -198,7 +201,7 @@ TEST_F(MetadataFetcherTest, TestHttpFailure) {
   setupFetcher();
   Http::RequestMessageImpl message;
 
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_,
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_,
                            Http::AsyncClient::FailureReason::Reset);
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
@@ -210,11 +213,12 @@ TEST_F(MetadataFetcherTest, TestHttpFailure) {
 
 TEST_F(MetadataFetcherTest, TestClusterNotFound) {
   // Setup without thread local cluster
-  fetcher_ = MetadataFetcher::create(mock_factory_ctx_.cluster_manager_, "cluster_name");
+  fetcher_ = MetadataFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
+                                     "cluster_name");
   Http::RequestMessageImpl message;
   MockMetadataReceiver receiver;
 
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_, getThreadLocalCluster(_))
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
   EXPECT_CALL(receiver, onMetadataError(MetadataFetcher::MetadataReceiver::Failure::MissingConfig));
@@ -227,9 +231,9 @@ TEST_F(MetadataFetcherTest, TestCancel) {
   // Setup
   setupFetcher();
   Http::RequestMessageImpl message;
-  Http::MockAsyncClientRequest request(
-      &(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_));
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, &request);
+  Http::MockAsyncClientRequest request(&(mock_factory_ctx_.server_factory_context_.cluster_manager_
+                                             .thread_local_cluster_.async_client_));
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, &request);
   MockMetadataReceiver receiver;
   EXPECT_CALL(request, cancel());
   EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
@@ -250,11 +254,13 @@ TEST_F(MetadataFetcherTest, TestDefaultRetryPolicy) {
   // Setup
   setupFetcher();
   Http::RequestMessageImpl message;
-  MockUpstream mock_result(mock_factory_ctx_.cluster_manager_, "200", "not_empty");
+  MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           "not_empty");
   MockMetadataReceiver receiver;
 
   EXPECT_CALL(
-      mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+      mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+          .async_client_,
       send_(_, _,
             AllOf(OptionsHasBufferBodyForRetry(true),
                   OptionsHasRetryPolicy(AllOf(

@@ -5,6 +5,8 @@
 namespace Envoy {
 namespace JNI {
 
+JNIEnv* JniHelper::getEnv() { return env_; }
+
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
   jmethodID method_id = env_->GetMethodID(clazz, name, signature);
   rethrowException();
@@ -41,7 +43,6 @@ LocalRefUniquePtr<jthrowable> JniHelper::exceptionOccurred() {
 
 GlobalRefUniquePtr<jobject> JniHelper::newGlobalRef(jobject object) {
   GlobalRefUniquePtr<jobject> result(env_->NewGlobalRef(object), GlobalRefDeleter(env_));
-  RELEASE_ASSERT(result != nullptr, "Failed calling NewGlobalRef.");
   return result;
 }
 
@@ -113,25 +114,26 @@ DEFINE_GET_ARRAY_ELEMENTS(Float, jfloatArray, jfloat)
 DEFINE_GET_ARRAY_ELEMENTS(Double, jdoubleArray, jdouble)
 DEFINE_GET_ARRAY_ELEMENTS(Boolean, jbooleanArray, jboolean)
 
-LocalRefUniquePtr<jobject> JniHelper::getObjectArrayElement(jobjectArray array, jsize index) {
-  LocalRefUniquePtr<jobject> result(env_->GetObjectArrayElement(array, index),
-                                    LocalRefDeleter(env_));
-  rethrowException();
-  return result;
-}
-
 void JniHelper::setObjectArrayElement(jobjectArray array, jsize index, jobject value) {
   env_->SetObjectArrayElement(array, index, value);
   rethrowException();
 }
 
-PrimitiveArrayCriticalUniquePtr JniHelper::getPrimitiveArrayCritical(jarray array,
-                                                                     jboolean* is_copy) {
-  PrimitiveArrayCriticalUniquePtr result(env_->GetPrimitiveArrayCritical(array, is_copy),
-                                         PrimitiveArrayCriticalDeleter(env_, array));
-  rethrowException();
-  return result;
-}
+#define DEFINE_SET_ARRAY_REGION(JAVA_TYPE, JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE)                       \
+  void JniHelper::set##JAVA_TYPE##ArrayRegion(JNI_ARRAY_TYPE array, jsize start, jsize length,     \
+                                              const JNI_ELEMENT_TYPE* buffer) {                    \
+    env_->Set##JAVA_TYPE##ArrayRegion(array, start, length, buffer);                               \
+    rethrowException();                                                                            \
+  }
+
+DEFINE_SET_ARRAY_REGION(Byte, jbyteArray, jbyte)
+DEFINE_SET_ARRAY_REGION(Char, jcharArray, jchar)
+DEFINE_SET_ARRAY_REGION(Short, jshortArray, jshort)
+DEFINE_SET_ARRAY_REGION(Int, jintArray, jint)
+DEFINE_SET_ARRAY_REGION(Long, jlongArray, jlong)
+DEFINE_SET_ARRAY_REGION(Float, jfloatArray, jfloat)
+DEFINE_SET_ARRAY_REGION(Double, jdoubleArray, jdouble)
+DEFINE_SET_ARRAY_REGION(Boolean, jbooleanArray, jboolean)
 
 #define DEFINE_CALL_METHOD(JAVA_TYPE, JNI_TYPE)                                                    \
   JNI_TYPE JniHelper::call##JAVA_TYPE##Method(jobject object, jmethodID method_id, ...) {          \
@@ -158,16 +160,6 @@ void JniHelper::callVoidMethod(jobject object, jmethodID method_id, ...) {
   env_->CallVoidMethodV(object, method_id, args);
   va_end(args);
   rethrowException();
-}
-
-LocalRefUniquePtr<jobject> JniHelper::callObjectMethod(jobject object, jmethodID method_id, ...) {
-  va_list args;
-  va_start(args, method_id);
-  LocalRefUniquePtr<jobject> result(env_->CallObjectMethodV(object, method_id, args),
-                                    LocalRefDeleter(env_));
-  va_end(args);
-  rethrowException();
-  return result;
 }
 
 #define DEFINE_CALL_STATIC_METHOD(JAVA_TYPE, JNI_TYPE)                                             \
@@ -197,21 +189,8 @@ void JniHelper::callStaticVoidMethod(jclass clazz, jmethodID method_id, ...) {
   rethrowException();
 }
 
-LocalRefUniquePtr<jobject> JniHelper::callStaticObjectMethod(jclass clazz, jmethodID method_id,
-                                                             ...) {
-  va_list args;
-  va_start(args, method_id);
-  LocalRefUniquePtr<jobject> result(env_->CallStaticObjectMethodV(clazz, method_id, args),
-                                    LocalRefDeleter(env_));
-  va_end(args);
-  rethrowException();
-  return result;
-}
-
 jlong JniHelper::getDirectBufferCapacity(jobject buffer) {
-  jlong result = env_->GetDirectBufferCapacity(buffer);
-  RELEASE_ASSERT(result != -1, "Failed calling GetDirectBufferCapacity.");
-  return result;
+  return env_->GetDirectBufferCapacity(buffer);
 }
 
 void JniHelper::rethrowException() {

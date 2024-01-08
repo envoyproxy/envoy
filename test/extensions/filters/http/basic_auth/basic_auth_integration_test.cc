@@ -72,7 +72,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoCredential) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ("User authentication failed. Missing username and password", response->body());
+  EXPECT_EQ("User authentication failed. Missing username and password.", response->body());
 }
 
 // Request without wrong password
@@ -91,7 +91,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, WrongPasswrod) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ("User authentication failed. Invalid username/password combination", response->body());
+  EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
 }
 
 // Request with none-existed user
@@ -110,7 +110,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ("User authentication failed. Invalid username/password combination", response->body());
+  EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
 }
 } // namespace
 } // namespace BasicAuth

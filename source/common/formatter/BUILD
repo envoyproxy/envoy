@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = [
         "http_specific_formatter.cc",
         "stream_info_formatter.cc",
+        "substitution_formatter.cc",
     ],
     hdrs = [
         "http_specific_formatter.h",
@@ -48,6 +49,7 @@ envoy_cc_library(
         ":substitution_formatter_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

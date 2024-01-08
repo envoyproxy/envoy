@@ -67,8 +67,8 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    auto tls =
-        ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context_.threadLocal());
+    auto tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(
+        context_.server_factory_context_.threadLocal());
     evaluator_ = std::make_shared<MockResponseEvaluator>();
 
     return std::make_shared<TestConfig>(proto, runtime_, random_, scope_, std::move(tls),
