@@ -170,7 +170,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           replaceInvalidHostCharacters(
               stream_info.address().envoy_internal_address().server_listener_name()));
     } else {
-      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address()).value();
     }
   } else {
     address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
@@ -178,6 +178,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   auto upstream_local_address =
       stream_info.has_upstream_local_address()
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
+                .value()
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
   test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =
