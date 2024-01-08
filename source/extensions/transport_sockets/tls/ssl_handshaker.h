@@ -70,9 +70,7 @@ public:
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
   // Reset the reference to async cert validation callback.
-  void onValidateResultCallbackDestroy() {
-    cert_validate_result_callback_.reset();
-  }
+  void onValidateResultCallbackDestroy() { cert_validate_result_callback_.reset(); }
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
