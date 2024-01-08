@@ -511,7 +511,7 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
     if (internal_listener_registry == nullptr) {
       // The internal listener registry may be uninitialized when in Validate mode.
       // Hence we check the configuration directly to ensure the bootstrap extension
-      // "internal_listener" is present.
+      // InternalListener is present.
       if (absl::c_none_of(
               listener_factory_context_->serverFactoryContext().bootstrap().bootstrap_extensions(),
               [=](const auto& extension) {
@@ -519,8 +519,9 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
                        "type.googleapis.com/"
                        "envoy.extensions.bootstrap.internal_listener.v3.InternalListener";
               })) {
-        throw EnvoyException(
-            fmt::format("error adding listener named '{}': internal_listener is mandatory", name_));
+        throw EnvoyException(fmt::format(
+            "error adding listener named '{}': InternalListener bootstrap extension is mandatory",
+            name_));
       }
       internal_listener_config_ = nullptr;
     } else {
