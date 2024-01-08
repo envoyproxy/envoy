@@ -137,7 +137,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicForwardProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(DynamicForwardProxyIntegrationTest, BasicFlow) {
+// TODO(ohadvano) https://github.com/envoyproxy/envoy/issues/31089
+TEST_P(DynamicForwardProxyIntegrationTest, DISABLED_BasicFlow) {
   setup();
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
