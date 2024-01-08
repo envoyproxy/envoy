@@ -1,5 +1,3 @@
-#include <openssl/ssl.h>
-
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/network/transport_socket_options_impl.h"
@@ -22,7 +20,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "quiche/quic/core/crypto/null_decrypter.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
@@ -388,6 +385,7 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContext) {
   EXPECT_EQ(dispatcher_.get(), &verify_context.dispatcher());
 }
 
+// Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.
 TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   quic::QuicNewConnectionIdFrame frame;
   frame.connection_id = quic::test::TestConnectionId(1234);
@@ -397,6 +395,8 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   frame.sequence_number = 1u;
   quic_connection_->OnNewConnectionIdFrame(frame);
   quic_connection_->SetSelfAddress(envoyIpAddressToQuicSocketAddress(self_addr_->ip()));
+
+  // Trigger port migration.
   quic_connection_->OnPathDegradingDetected();
   EXPECT_TRUE(envoy_quic_session_.HasPendingPathValidation());
   auto* path_validation_context =
@@ -420,10 +420,13 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   peer_socket->connect(new_self_address);
   peer_socket->ioHandle().writev(&slice, 1);
 
+  // Receiving the STATELESS_RESET on the probing socket shouldn't close the connection but should
+  // fail the probing.
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
       .Times(0);
   while (envoy_quic_session_.HasPendingPathValidation()) {
-    // Running event loop to receive the STATELESS_RESET.
+    // Running event loop to receive the STATELESS_RESET and following socket reads shouldn't cause
+    // crash.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
