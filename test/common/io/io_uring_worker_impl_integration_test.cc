@@ -123,7 +123,7 @@ protected:
     accept();
   }
 
-  void createListenerAndSocketPairWaitingForConnect() {
+  void createListenerAndSocketPair() {
     // Create the client socket as a blocking socket, so we can observe the client socket's behavior
     // on connecting.
     socket(true, false);
@@ -886,7 +886,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketUpdateFileEventCb) {
 
 TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnect) {
   initialize();
-  createListenerAndSocketPairWaitingForConnect();
+  createListenerAndSocketPair();
 
   absl::optional<int32_t> result = absl::nullopt;
   OptRef<IoUringSocket> socket;
@@ -903,7 +903,7 @@ TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnect) {
   // Waiting for the client socket connect.
   struct sockaddr_in listen_addr = getListenSocketAddress();
   auto addr = std::make_shared<Network::Address::Ipv4Instance>(&listen_addr);
-  io_uring_worker_->submitConnectRequest(*socket, addr);
+  socket->connect(addr);
 
   // Accept through client socket.
   accept();
@@ -922,7 +922,7 @@ TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnect) {
 
 TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnectError) {
   initialize();
-  createListenerAndSocketPairWaitingForConnect();
+  createListenerAndSocketPair();
 
   absl::optional<int32_t> result = absl::nullopt;
   OptRef<IoUringSocket> socket;
@@ -938,7 +938,7 @@ TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnectError) {
 
   // Waiting for the client socket connect.
   auto addr = std::make_shared<Network::Address::Ipv4Instance>(0);
-  io_uring_worker_->submitConnectRequest(*socket, addr);
+  socket->connect(addr);
 
   // The client socket should be writable.
   while (!result.has_value()) {

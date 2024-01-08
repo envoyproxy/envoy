@@ -254,7 +254,7 @@ public:
 
   /**
    * Enable close event. This is used for the case the socket is listening on the file close event.
-   * Then a remote close is found by a read request will delivered as file close event.
+   * Then a remote close is found by a read request will be delivered as a file close event.
    */
   virtual void enableCloseEvent(bool enable) PURE;
 
