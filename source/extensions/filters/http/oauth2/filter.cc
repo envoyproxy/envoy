@@ -196,7 +196,8 @@ FilterConfig::FilterConfig(
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
       cookie_names_(proto_config.credentials().cookie_names()),
       auth_type_(getAuthType(proto_config.auth_type())),
-      use_refresh_token_(proto_config.use_refresh_token().value()) {
+      use_refresh_token_(proto_config.use_refresh_token().value()),
+      default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",

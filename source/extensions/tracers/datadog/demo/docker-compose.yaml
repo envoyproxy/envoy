@@ -18,7 +18,7 @@ services:
       - DD_LOG_LEVEL=ERROR
     ports:
       - 8126:8126
-    image: 'datadog/agent'
+    image: 'datadog/agent@sha256:1d9b8e28704b207626cdeca5386019f673d9f3a9baf817f5094b8e08b1f99fca'
 
   # `http` is an HTTP server that is reverse proxied by `nginx`.
   http:

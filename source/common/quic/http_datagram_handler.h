@@ -23,7 +23,6 @@ public:
   // Does not take ownership of the QuicSpdyStream. "stream" must refer to a valid object
   // that outlives HttpDatagramHandler.
   explicit HttpDatagramHandler(quic::QuicSpdyStream& stream);
-  ~HttpDatagramHandler() override;
 
   // quic::QuicSpdyStream::Http3DatagramVisitor
   void OnHttp3Datagram(quic::QuicStreamId stream_id, absl::string_view payload) override;

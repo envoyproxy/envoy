@@ -29,6 +29,23 @@ public:
                                               }) {}
 };
 
+// Metadata formatter for listener metadata.
+class ListenerMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter {
+public:
+  ListenerMetadataFormatter(const std::string& filter_namespace,
+                            const std::vector<std::string>& path, absl::optional<size_t> max_length)
+      : ::Envoy::Formatter::MetadataFormatter(
+            filter_namespace, path, max_length,
+            [](const StreamInfo::StreamInfo& stream_info)
+                -> const envoy::config::core::v3::Metadata* {
+              const auto listener_info = stream_info.downstreamAddressProvider().listenerInfo();
+              if (listener_info) {
+                return &listener_info->metadata();
+              }
+              return nullptr;
+            }) {}
+};
+
 // Constructor registers all types of supported metadata along with the
 // handlers accessing the required metadata type.
 MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
@@ -54,6 +71,12 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
                                                       absl::optional<size_t> max_length) {
     return std::make_unique<::Envoy::Formatter::UpstreamHostMetadataFormatter>(filter_namespace,
                                                                                path, max_length);
+  };
+
+  metadata_formatter_providers_["LISTENER"] = [](const std::string& filter_namespace,
+                                                 const std::vector<std::string>& path,
+                                                 absl::optional<size_t> max_length) {
+    return std::make_unique<ListenerMetadataFormatter>(filter_namespace, path, max_length);
   };
 }
 

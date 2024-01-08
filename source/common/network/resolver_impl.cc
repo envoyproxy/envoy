@@ -20,7 +20,7 @@ namespace Address {
 class IpResolver : public Resolver {
 
 public:
-  InstanceConstSharedPtr
+  absl::StatusOr<InstanceConstSharedPtr>
   resolve(const envoy::config::core::v3::SocketAddress& socket_address) override {
     switch (socket_address.port_specifier_case()) {
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kPortValue:
@@ -31,8 +31,8 @@ public:
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort:
       break;
     }
-    throwEnvoyExceptionOrPanic(fmt::format("IP resolver can't handle port specifier type {}",
-                                           socket_address.port_specifier_case()));
+    return absl::InvalidArgumentError(fmt::format("IP resolver can't handle port specifier type {}",
+                                                  socket_address.port_specifier_case()));
   }
 
   std::string name() const override { return Config::AddressResolverNames::get().IP; }
@@ -43,7 +43,8 @@ public:
  */
 REGISTER_FACTORY(IpResolver, Resolver);
 
-InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Address& address) {
+absl::StatusOr<InstanceConstSharedPtr>
+resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   switch (address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     throwEnvoyExceptionOrPanic("Address must be set: " + address.DebugString());
@@ -66,7 +67,7 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
   throwEnvoyExceptionOrPanic("Failed to resolve address:" + address.DebugString());
 }
 
-InstanceConstSharedPtr
+absl::StatusOr<InstanceConstSharedPtr>
 resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& socket_address) {
   Resolver* resolver = nullptr;
   const std::string& resolver_name = socket_address.resolver_name();
@@ -79,7 +80,9 @@ resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& socket_a
   if (resolver == nullptr) {
     throwEnvoyExceptionOrPanic(fmt::format("Unknown address resolver: {}", resolver_name));
   }
-  return resolver->resolve(socket_address);
+  auto instance_or_error = resolver->resolve(socket_address);
+  THROW_IF_STATUS_NOT_OK(instance_or_error, throw);
+  return std::move(instance_or_error.value());
 }
 
 } // namespace Address

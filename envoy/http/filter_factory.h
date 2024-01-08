@@ -23,14 +23,6 @@ class FilterChainFactoryCallbacks;
  */
 using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
-// Struct of canonical filter name and HTTP stream filter factory callback.
-struct NamedHttpFilterFactoryCb {
-  // Canonical filter name.
-  std::string name;
-  // Factory function used to create filter instances.
-  Http::FilterFactoryCb factory_cb;
-};
-
 /**
  * Simple struct of additional contextual information of HTTP filter, e.g. filter config name
  * from configuration, canonical filter name, etc.

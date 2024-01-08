@@ -17,14 +17,6 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-class OpenTelemetryConstantValues {
-public:
-  const Http::LowerCaseString TRACE_PARENT{"traceparent"};
-  const Http::LowerCaseString TRACE_STATE{"tracestate"};
-};
-
-using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
-
 /**
  * OpenTelemetry tracing driver.
  */

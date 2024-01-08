@@ -365,7 +365,7 @@ TEST_F(OpenTracingDriverTest, ExtractUsingForeach) {
                      {Tracing::Reason::Sampling, true});
 
   for (const auto& [key, value] : extracted_headers) {
-    EXPECT_EQ(value, request_headers_.getByKey(key));
+    EXPECT_EQ(value, request_headers_.get(key));
   }
 }
 

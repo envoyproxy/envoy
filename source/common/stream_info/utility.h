@@ -26,6 +26,8 @@ public:
 
   using FlagStringsAndEnum = std::pair<const FlagStrings, ResponseFlag>;
 
+  // When adding a new flag, it's required to update the access log docs and the string
+  // mapping below - ``ALL_RESPONSE_STRINGS_FLAGS``.
   constexpr static absl::string_view NONE = "-";
   constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION = "DC";
   constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK = "LH";
@@ -54,6 +56,7 @@ public:
   constexpr static absl::string_view NO_CLUSTER_FOUND = "NC";
   constexpr static absl::string_view OVERLOAD_MANAGER = "OM";
   constexpr static absl::string_view DNS_FAIL = "DF";
+  constexpr static absl::string_view DROP_OVERLOAD = "DO";
 
   constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION_LONG =
       "DownstreamConnectionTermination";
@@ -87,6 +90,8 @@ public:
   constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR_LONG = "UpstreamProtocolError";
   constexpr static absl::string_view NO_CLUSTER_FOUND_LONG = "NoClusterFound";
   constexpr static absl::string_view OVERLOAD_MANAGER_LONG = "OverloadManagerTerminated";
+  constexpr static absl::string_view DNS_FAIL_LONG = "DnsResolutionFailed";
+  constexpr static absl::string_view DROP_OVERLOAD_LONG = "DropOverload";
 
   static constexpr std::array ALL_RESPONSE_STRINGS_FLAGS{
       FlagStringsAndEnum{{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_LONG},
@@ -135,6 +140,8 @@ public:
                          ResponseFlag::UpstreamProtocolError},
       FlagStringsAndEnum{{NO_CLUSTER_FOUND, NO_CLUSTER_FOUND_LONG}, ResponseFlag::NoClusterFound},
       FlagStringsAndEnum{{OVERLOAD_MANAGER, OVERLOAD_MANAGER_LONG}, ResponseFlag::OverloadManager},
+      FlagStringsAndEnum{{DNS_FAIL, DNS_FAIL_LONG}, ResponseFlag::DnsResolutionFailed},
+      FlagStringsAndEnum{{DROP_OVERLOAD, DROP_OVERLOAD_LONG}, ResponseFlag::DropOverLoad},
   };
 
 private:

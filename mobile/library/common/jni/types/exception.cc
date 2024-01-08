@@ -53,7 +53,8 @@ std::string Exception::throwableDescription(jthrowable throwable) const {
     return "Throwable.toString: method not found";
   }
 
-  jstring j_description = (jstring)env_->CallObjectMethod(throwable, mid_throwable_toString);
+  jstring j_description =
+      static_cast<jstring>(env_->CallObjectMethod(throwable, mid_throwable_toString));
   if (exceptionCheck()) {
     return "Throwable.toString: exception was thrown during method call";
   }
@@ -84,7 +85,7 @@ std::string Exception::throwableStacktraceDescription(jthrowable throwable) cons
   }
 
   jobjectArray j_frames =
-      (jobjectArray)env_->CallObjectMethod(throwable, mid_throwable_getStackTrace);
+      static_cast<jobjectArray>(env_->CallObjectMethod(throwable, mid_throwable_getStackTrace));
   if (exceptionCheck()) {
     return "StackTraceElement.getStrackTrace: exception was thrown during method call";
   }
@@ -104,7 +105,8 @@ std::string Exception::throwableStacktraceDescription(jthrowable throwable) cons
       break;
     }
 
-    jstring j_description = (jstring)env_->CallObjectMethod(j_frame, mid_frame_toString);
+    jstring j_description =
+        static_cast<jstring>(env_->CallObjectMethod(j_frame, mid_frame_toString));
     if (exceptionCheck()) {
       lines.push_back("StackTraceElement.toString: exception was thrown during method call");
       break;
@@ -129,7 +131,8 @@ std::string Exception::causedByThrowableDescription() const {
     return "Throwable.getCause: method not found";
   }
 
-  jthrowable j_throwable = (jthrowable)env_->CallObjectMethod(throwable_, mid_throwable_getCause);
+  jthrowable j_throwable =
+      static_cast<jthrowable>(env_->CallObjectMethod(throwable_, mid_throwable_getCause));
   if (exceptionCheck()) {
     return "Throwable.getCause: exception was thrown during method call";
   }
