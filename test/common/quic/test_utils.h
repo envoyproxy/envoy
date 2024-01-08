@@ -162,9 +162,7 @@ public:
                                      proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
-  quic::HandshakeState GetHandshakeState() const override {
-    return quic::HANDSHAKE_CONFIRMED;
-  }
+  quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
 };
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {

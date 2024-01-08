@@ -1,3 +1,5 @@
+#include <openssl/ssl.h>
+
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/network/transport_socket_options_impl.h"
@@ -20,13 +22,12 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <openssl/ssl.h>
+#include "quiche/quic/core/crypto/null_decrypter.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/core/crypto/null_decrypter.h"
 
 using testing::_;
 using testing::Invoke;
@@ -48,10 +49,9 @@ public:
                                   supported_versions, dispatcher, std::move(connection_socket),
                                   generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
-                 std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
-    InstallDecrypter(
-          quic::ENCRYPTION_FORWARD_SECURE,
-          std::make_unique<quic::NullDecrypter>(quic::Perspective::IS_CLIENT));
+                 std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
+    InstallDecrypter(quic::ENCRYPTION_FORWARD_SECURE,
+                     std::make_unique<quic::test::TaggingDecrypter>());
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
@@ -89,9 +89,11 @@ public:
             *store_.rootScope(), transport_socket_options_, {}),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}) {
-    http3_options_.mutable_quic_protocol_options()->mutable_num_timeouts_to_trigger_port_migration()->set_value(1);
-    http_connection_ = std::make_unique<QuicHttpClientConnectionImpl>(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
-                         64 * 1024, 100);
+    http3_options_.mutable_quic_protocol_options()
+        ->mutable_num_timeouts_to_trigger_port_migration()
+        ->set_value(1);
+    http_connection_ = std::make_unique<QuicHttpClientConnectionImpl>(
+        envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100);
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
     EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
@@ -105,7 +107,8 @@ public:
     envoy_quic_session_.Initialize();
     setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     quic::test::QuicConfigPeer::SetReceivedStatelessResetToken(
-        envoy_quic_session_.config(), quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
+        envoy_quic_session_.config(),
+        quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
     envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
     envoy_quic_session_.setConnectionStats(
@@ -387,33 +390,41 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContext) {
 
 TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   quic::QuicNewConnectionIdFrame frame;
- frame.connection_id = quic::test::TestConnectionId(1234);
+  frame.connection_id = quic::test::TestConnectionId(1234);
   ASSERT_NE(frame.connection_id, quic_connection_->connection_id());
   frame.stateless_reset_token = quic::QuicUtils::GenerateStatelessResetToken(frame.connection_id);
- frame.retire_prior_to = 0u;
-      frame.sequence_number = 1u;
+  frame.retire_prior_to = 0u;
+  frame.sequence_number = 1u;
   quic_connection_->OnNewConnectionIdFrame(frame);
   quic_connection_->SetSelfAddress(envoyIpAddressToQuicSocketAddress(self_addr_->ip()));
   quic_connection_->OnPathDegradingDetected();
   EXPECT_TRUE(envoy_quic_session_.HasPendingPathValidation());
-  auto* path_validation_context = dynamic_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(quic_connection_->GetPathValidationContext());
+  auto* path_validation_context =
+      dynamic_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(
+          quic_connection_->GetPathValidationContext());
   Network::ConnectionSocket& probing_socket = path_validation_context->probingSocket();
-  const Network::Address::InstanceConstSharedPtr& new_self_address = probing_socket.connectionInfoProvider().localAddress();
+  const Network::Address::InstanceConstSharedPtr& new_self_address =
+      probing_socket.connectionInfoProvider().localAddress();
   EXPECT_NE(new_self_address->asString(), self_addr_->asString());
 
   // Send a STATELESS_RESET packet to the probing socket.
-  std::unique_ptr<quic::QuicEncryptedPacket> stateless_reset_packet = quic::QuicFramer::BuildIetfStatelessResetPacket(frame.connection_id, /*received_packet_length*/1200, quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
+  std::unique_ptr<quic::QuicEncryptedPacket> stateless_reset_packet =
+      quic::QuicFramer::BuildIetfStatelessResetPacket(
+          frame.connection_id, /*received_packet_length*/ 1200,
+          quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
   Buffer::RawSlice slice;
   slice.mem_ = const_cast<char*>(stateless_reset_packet->data());
   slice.len_ = stateless_reset_packet->length();
-  Network::ConnectionSocketPtr peer_socket = createConnectionSocket(new_self_address, peer_addr_, nullptr);
+  Network::ConnectionSocketPtr peer_socket =
+      createConnectionSocket(new_self_address, peer_addr_, nullptr);
   peer_socket->connect(new_self_address);
   peer_socket->ioHandle().writev(&slice, 1);
 
-  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose)).Times(0);
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .Times(0);
   while (envoy_quic_session_.HasPendingPathValidation()) {
-  // Running event loop to receive the STATELESS_RESET.
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    // Running event loop to receive the STATELESS_RESET.
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
   peer_socket->close();
