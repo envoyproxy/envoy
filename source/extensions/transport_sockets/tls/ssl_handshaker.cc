@@ -29,6 +29,14 @@ void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
   extended_socket_info_->onCertificateValidationCompleted(succeeded, true);
 }
 
+ValidateResultCallbackImpl::~ValidateResultCallbackImpl() {
+  if (extended_socket_info_.has_value()) {
+    // Reset the reference to async cert validation callback when its underlying object is being
+    // destroyed.
+    extended_socket_info_->onValidateResultCallbackDestroy();
+  }
+}
+
 SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
   if (cert_validate_result_callback_.has_value()) {
     cert_validate_result_callback_->onSslHandshakeCancelled();

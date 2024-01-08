@@ -45,6 +45,8 @@ public:
 
   void onSslHandshakeCancelled();
 
+  ~ValidateResultCallbackImpl() override;
+
 private:
   Event::Dispatcher& dispatcher_;
   OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
@@ -66,6 +68,11 @@ public:
   uint8_t certificateValidationAlert() const override { return cert_validation_alert_; }
 
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
+
+  // Reset the reference to async cert validation callback.
+  void onValidateResultCallbackDestroy() {
+    cert_validate_result_callback_.reset();
+  }
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
