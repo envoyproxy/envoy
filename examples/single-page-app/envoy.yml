@@ -41,7 +41,7 @@ static_resources:
                   string_match:
                     safe_regex:
                       regex: >-
-                        ^\/(authorize.*|hub.*|login|logout)$
+                        ^\/(authorize.*|login|logout)$
                   invert_match: true
                 redirect_path_matcher:
                   path:
@@ -75,6 +75,15 @@ static_resources:
             - name: web
               domains: ["*"]
               routes:
+              - match:
+                  prefix: "/other/"
+                route:
+                  regex_rewrite:
+                    pattern:
+                      regex: '^/other/(.*)'
+                    substitution: '/\1'
+                  cluster: other
+
               - match:
                   prefix: "/hub/"
                 route:
@@ -122,7 +131,7 @@ static_resources:
                   string_match:
                     safe_regex:
                       regex: >-
-                        ^\/(authorize.*|hub.*|login|logout)$
+                        ^\/(authorize.*|login|logout)$
                   invert_match: true
                 redirect_path_matcher:
                   path:
@@ -169,6 +178,15 @@ static_resources:
             - name: web
               domains: ["*"]
               routes:
+              - match:
+                  prefix: "/other/"
+                route:
+                  regex_rewrite:
+                    pattern:
+                      regex: '^/other/(.*)'
+                    substitution: '/\1'
+                  cluster: other
+
               - match:
                   prefix: "/hub/"
                 route:
@@ -304,4 +322,17 @@ static_resources:
             address:
               socket_address:
                 address: myhub-api
+                port_value: 7000
+
+  - name: other
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: other
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: other
                 port_value: 7000

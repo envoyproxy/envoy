@@ -28,7 +28,7 @@ services:
       - "-c"
       - /etc/envoy.yaml
       - "--component-log-level"
-      - oauth2:trace  # ,http:debug
+      - oauth2:trace,http:debug
     entrypoint:
       - /bin/bash
       - -c
@@ -69,6 +69,25 @@ services:
     volumes:
     - myhub:/var/lib/myhub
     - ./myhub/api.py:/code/service.py
+    - ./myhub/data.yml:/etc/myhub/data.yml
+    - ./myhub/images:/var/lib/myhub/images
+    - ./myhub/shared.py:/code/shared.py
+    environment:
+      DATA_PATH: /etc/myhub/data.yml
+      MYHUB_URL: "http://localhost:${PORT_MYHUB:-7000}"
+      TOKEN_STORAGE_PATH: /var/lib/myhub/auth.json
+
+  other:
+    build:
+      context: ../shared/python
+      target: aiohttp-service
+      args:
+        SERVICE_PORT: 7000
+    ports:
+    - 17000:7000
+    volumes:
+    - myhub:/var/lib/myhub
+    - ./other.py:/code/service.py
     - ./myhub/data.yml:/etc/myhub/data.yml
     - ./myhub/images:/var/lib/myhub/images
     - ./myhub/shared.py:/code/shared.py
