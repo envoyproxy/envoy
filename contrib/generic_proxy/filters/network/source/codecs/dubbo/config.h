@@ -55,21 +55,21 @@ public:
     ASSERT(inner_metadata_ != nullptr);
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasResponse());
-    refreshGenericStatus();
+    refreshStatus();
   }
 
-  void refreshGenericStatus();
+  void refreshStatus();
 
   // Response.
   absl::string_view protocol() const override { return DubboProtocolName; }
-  Status status() const override { return status_; }
+  StreamStatus status() const override { return status_; }
 
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
 
   FrameFlags stream_frame_flags_;
 
-  Status status_;
+  StreamStatus status_;
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
 };
 
@@ -151,7 +151,7 @@ class DubboServerCodec
 public:
   using DubboDecoderBase::DubboDecoderBase;
 
-  ResponsePtr respond(Status status, absl::string_view short_response_flags,
+  ResponsePtr respond(absl::Status status, absl::string_view short_response_flags,
                       const Request& request) override;
 };
 

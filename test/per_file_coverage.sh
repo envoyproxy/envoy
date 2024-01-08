@@ -6,7 +6,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.2"
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
-"source/common/config:95.3"
+"source/common/config:95.4"
 "source/common/crypto:95.5"
 "source/common/event:95.0" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
@@ -15,15 +15,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/protobuf:96.4"
 "source/common/quic:93.4"
 "source/common/secret:95.1"
 "source/common/signal:87.2" # Death tests don't report LCOV
-"source/common/tcp:94.5"
+"source/common/tcp:94.6"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:91.4"
-"source/extensions/access_loggers/wasm:93.5"
+"source/exe:91.5"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
 "source/extensions/common/tap:94.5"
@@ -31,7 +29,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
-"source/extensions/filters/http/cache:94.0"
+"source/extensions/filters/http/cache:94.9"
 "source/extensions/filters/http/grpc_json_transcoder:93.8" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
@@ -47,9 +45,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/stat_sinks/graphite_statsd:78.6" # Death tests don't report LCOV
 "source/extensions/stat_sinks/statsd:80.8" # Death tests don't report LCOV
 "source/extensions/tracers:96.1"
-"source/extensions/tracers/common:73.8"
-"source/extensions/tracers/common/ot:71.8"
-"source/extensions/tracers/opencensus:93.2"
+"source/extensions/tracers/common:74.8"
+"source/extensions/tracers/common/ot:72.9"
+"source/extensions/tracers/opencensus:94.0"
 "source/extensions/tracers/zipkin:95.8"
 "source/extensions/transport_sockets:95.8"
 "source/extensions/transport_sockets/tls:95.0"

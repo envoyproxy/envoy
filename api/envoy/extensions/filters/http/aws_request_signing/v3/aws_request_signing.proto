@@ -19,10 +19,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_request_signing]
 
 // Top level configuration for the AWS request signing filter.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message AwsRequestSigning {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning";
+
+  enum SigningAlgorithm {
+    // Use SigV4 for signing
+    AWS_SIGV4 = 0;
+
+    // Use SigV4A for signing
+    AWS_SIGV4A = 1;
+  }
 
   // The `service namespace
   // <https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#genref-aws-service-namespaces>`_
@@ -31,10 +39,20 @@ message AwsRequestSigning {
   // Example: s3
   string service_name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ hosting the HTTP
-  // endpoint.
+  // When signing_algorithm is set to ``AWS_SIGV4`` the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
+  // hosting the HTTP endpoint.
   //
   // Example: us-west-2
+  //
+  // When signing_algorithm is set to ``AWS_SIGV4A`` the region is used as a region set.
+  //
+  // A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
+  // or even region strings containing wildcards such as ``us-east-*``
+  //
+  // Example: '*'
+  //
+  // By configuring a region set, a sigv4a signed request can be sent to multiple regions, rather than being
+  // valid for only a single region destination.
   string region = 2 [(validate.rules).string = {min_len: 1}];
 
   // Indicates that before signing headers, the host header will be swapped with
@@ -63,6 +81,9 @@ message AwsRequestSigning {
   // - exact: bar
   // When applied, all headers that start with "x-envoy" and headers "foo" and "bar" will not be signed.
   repeated type.matcher.v3.StringMatcher match_excluded_headers = 5;
+
+  // Optional Signing algorithm specifier, either ``AWS_SIGV4`` or ``AWS_SIGV4A``, defaulting to ``AWS_SIGV4``.
+  SigningAlgorithm signing_algorithm = 6;
 }
 
 message AwsRequestSigningPerRoute {

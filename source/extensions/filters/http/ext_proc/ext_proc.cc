@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -113,56 +115,41 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
+absl::optional<ProcessingMode>
+FilterConfigPerRoute::initProcessingMode(const ExtProcPerRoute& config) {
+  if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
+    return config.overrides().processing_mode();
+  }
+  return absl::nullopt;
+}
+absl::optional<envoy::config::core::v3::GrpcService>
+FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
+  if (config.has_overrides() && config.overrides().has_grpc_service()) {
+    return config.overrides().grpc_service();
+  }
+  return absl::nullopt;
+}
+
+absl::optional<ProcessingMode>
+FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                                          const FilterConfigPerRoute& more_specific) {
+  if (more_specific.disabled()) {
+    return absl::nullopt;
+  }
+  return more_specific.processingMode().has_value() ? more_specific.processingMode()
+                                                    : less_specific.processingMode();
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
-    : disabled_(config.disabled()) {
-  if (!config.has_overrides()) {
-    return;
-  }
+    : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
+      grpc_service_(initGrpcService(config)) {}
 
-  const auto& overrides = config.overrides();
-  if (overrides.has_processing_mode()) {
-    processing_mode_ = config.overrides().processing_mode();
-  }
-  if (overrides.has_grpc_service()) {
-    grpc_service_ = overrides.grpc_service();
-  }
-
-  if (!overrides.has_metadata_options()) {
-    return;
-  }
-
-  const auto& md_opts = overrides.metadata_options();
-  if (md_opts.has_forwarding_namespaces()) {
-    untyped_forwarding_namespaces_ =
-        std::vector<std::string>(md_opts.forwarding_namespaces().untyped().begin(),
-                                 md_opts.forwarding_namespaces().untyped().end());
-    typed_forwarding_namespaces_ =
-        std::vector<std::string>(md_opts.forwarding_namespaces().typed().begin(),
-                                 md_opts.forwarding_namespaces().typed().end());
-  }
-  if (md_opts.has_receiving_namespaces()) {
-    untyped_receiving_namespaces_ =
-        std::vector<std::string>(md_opts.receiving_namespaces().untyped().begin(),
-                                 md_opts.receiving_namespaces().untyped().end());
-  }
-}
-
-void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
-  disabled_ = src.disabled_;
-  processing_mode_ = src.processing_mode_;
-  if (src.grpcService().has_value()) {
-    grpc_service_ = src.grpcService();
-  }
-  if (src.untypedForwardingMetadataNamespaces().has_value()) {
-    untyped_forwarding_namespaces_ = src.untypedForwardingMetadataNamespaces();
-  }
-  if (src.typedForwardingMetadataNamespaces().has_value()) {
-    typed_forwarding_namespaces_ = src.typedForwardingMetadataNamespaces();
-  }
-  if (src.untypedReceivingMetadataNamespaces().has_value()) {
-    untyped_receiving_namespaces_ = src.untypedReceivingMetadataNamespaces();
-  }
-}
+FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                                           const FilterConfigPerRoute& more_specific)
+    : disabled_(more_specific.disabled()),
+      processing_mode_(mergeProcessingMode(less_specific, more_specific)),
+      grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
+                                                            : less_specific.grpcService()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -982,14 +969,30 @@ void Filter::mergePerRouteConfig() {
   if (route_config_merged_.has_value()) {
     return;
   }
-  route_config_merged_ = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-      decoder_callbacks_,
-      [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
 
-  if (!route_config_merged_.has_value()) {
+  route_config_merged_ = true;
+
+  absl::optional<FilterConfigPerRoute> merged_config;
+
+  decoder_callbacks_->traversePerFilterConfig([&merged_config](
+                                                  const Router::RouteSpecificFilterConfig& cfg) {
+    const FilterConfigPerRoute* typed_cfg = dynamic_cast<const FilterConfigPerRoute*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+    if (!merged_config) {
+      merged_config.emplace(*typed_cfg);
+    } else {
+      merged_config.emplace(FilterConfigPerRoute(merged_config.value(), *typed_cfg));
+    }
+  });
+
+  if (!merged_config.has_value()) {
     return;
   }
-  if (route_config_merged_->disabled()) {
+
+  if (merged_config->disabled()) {
     // Rather than introduce yet another flag, use the processing mode
     // structure to disable all the callbacks.
     ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
@@ -998,12 +1001,12 @@ void Filter::mergePerRouteConfig() {
     encoding_state_.setProcessingMode(all_disabled);
     return;
   }
-  if (route_config_merged_->processingMode()) {
+  if (merged_config->processingMode().has_value()) {
     ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
     decoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
     encoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
   }
-  if (route_config_merged_->grpcService()) {
+  if (merged_config->grpcService().has_value()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *route_config_merged_->grpcService();
     config_with_hash_key_.setConfig(*route_config_merged_->grpcService());

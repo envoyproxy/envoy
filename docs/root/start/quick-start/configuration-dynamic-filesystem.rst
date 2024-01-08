@@ -41,8 +41,8 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 .. literalinclude:: _include/envoy-dynamic-filesystem-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 1-5
-    :emphasize-lines: 1-3
+    :lines: 1-7
+    :emphasize-lines: 1-5
     :caption: :download:`envoy-dynamic-filesystem-demo.yaml <_include/envoy-dynamic-filesystem-demo.yaml>`
 
 .. _start_quick_start_dynamic_fs_dynamic_resources:

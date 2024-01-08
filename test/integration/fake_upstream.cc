@@ -952,6 +952,11 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
   return *result;
 }
 
+void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
+  ASSERT(!dispatcher_->isThreadSafe());
+  dispatcher_->post([&]() { cb(); });
+}
+
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
                                    const Network::Address::InstanceConstSharedPtr& peer) {
   dispatcher_->post([this, buffer, peer] {

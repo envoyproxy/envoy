@@ -659,7 +659,7 @@ Client::DirectStreamSharedPtr Client::getStream(envoy_stream_t stream,
   if (direct_stream_pair_it != streams_.end()) {
     return direct_stream_pair_it->second;
   }
-  if (direct_stream_pair_it == streams_.end() && get_stream_filters == ALLOW_FOR_ALL_STREAMS) {
+  if (get_stream_filters == ALLOW_FOR_ALL_STREAMS) {
     direct_stream_pair_it = closed_streams_.find(stream);
     if (direct_stream_pair_it != closed_streams_.end()) {
       return direct_stream_pair_it->second;

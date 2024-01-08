@@ -235,14 +235,18 @@ public:
   explicit FilterConfigPerRoute(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  void merge(const FilterConfigPerRoute& other);
+  // This constructor is used as a way to merge more-specific config into less-specific config in a
+  // clearly defined way (e.g. route config into vh config). All fields on this class must be const
+  // and thus must be initialized in the ctor initialization list.
+  FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                       const FilterConfigPerRoute& more_specific);
 
   bool disabled() const { return disabled_; }
-  const absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
   processingMode() const {
     return processing_mode_;
   }
-  const absl::optional<envoy::config::core::v3::GrpcService>& grpcService() const {
+  const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
 
@@ -257,9 +261,20 @@ public:
   }
 
 private:
-  bool disabled_;
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode> processing_mode_;
-  absl::optional<envoy::config::core::v3::GrpcService> grpc_service_;
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+  initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  absl::optional<envoy::config::core::v3::GrpcService>
+  initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+  mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                      const FilterConfigPerRoute& more_specific);
+
+  const bool disabled_;
+  const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+      processing_mode_;
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
 
   absl::optional<std::vector<std::string>> untyped_forwarding_namespaces_;
   absl::optional<std::vector<std::string>> typed_forwarding_namespaces_;
