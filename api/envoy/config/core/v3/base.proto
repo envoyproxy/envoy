@@ -347,8 +347,10 @@ message HeaderValueOption {
   // Describes the supported actions types for header append action.
   enum HeaderAppendAction {
     // If the header already exists, this action will result in:
-    // - Comma concatenated for predefined inline headers.
-    // - Duplicate header added in the HeaderMap for other headers.
+    //
+    // - Comma-concatenated for predefined inline headers.
+    // - Duplicate header added in the ``HeaderMap`` for other headers.
+    //
     // If the header doesn't exist then this will add new header with specified key and value.
     APPEND_IF_EXISTS_OR_ADD = 0;
 
