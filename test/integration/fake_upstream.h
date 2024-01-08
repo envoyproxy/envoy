@@ -519,6 +519,7 @@ public:
   ABSL_MUST_USE_RESULT AssertionResult postWriteRawData(std::string data);
 
   Http::ServerHeaderValidatorPtr makeHeaderValidator();
+  Http::CodecType type() const { return type_; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

@@ -125,3 +125,51 @@ dubbo codec in the generic proxy with the following configuration:
 .. literalinclude:: _include/generic_proxy_filter.yaml
     :language: yaml
     :linenos:
+
+
+Access logging support
+----------------------
+
+The generic proxy supports access logging. The developers could configure the access log format and access log path in the
+file access log configuration like the HTTP connection manager. Here is an example of the access log configuration:
+
+
+.. literalinclude:: _include/generic_proxy_filter.yaml
+    :language: yaml
+    :linenos:
+    :lineno-start: 55
+    :lines: 55-62
+
+
+All protocol independent fields (like ``%RESPONSE_FLAGS%``, ``%RESPONSE_CODE%``, ``%RESPONSE_CODE_DETAILS%``, ``%DURATION%``, etc.)
+are supported in the access log format. In addition, the generic proxy also supports following generic proxy specific fields:
+
+* ``%METHOD%``: The method of generic request. The meaning of the return value may be different for different application protocols.
+* ``%PATH%``: The path of generic request. The meaning of the return value may be different for different application protocols.
+* ``%HOST%``: The host of generic request. The meaning of the return value may be different for different application protocols.
+* ``%PROTOCOL%``: The application protocol name.
+* ``%REQUEST_PROPERTY(X)%``: The request property of generic request. The ``X`` is the property name. The value value depends on the
+  application codec implementation.
+* ``%RESPONSE_PROPERTY(X)%``: The response property of generic response. The ``X`` is the property name. The value value depends on the
+  application codec implementation.
+
+
+Generic proxy statistics
+------------------------
+
+The generic proxy provides some statistics to help users understand the generic proxy behavior. Here are all the generic proxy statistics:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   ``downstream_rq_total``, Counter, Total requests
+   ``downstream_rq_error``, Counter, Total requests that with non-OK response status
+   ``downstream_rq_reset``, Counter, Total requests that are reset before response
+   ``downstream_rq_local``, Counter, Total requests that with local response
+   ``downstream_rq_decoding_error``, Counter, Total codec decoding errors
+   ``downstream_rq_active``, Gauge, Current active requests
+   ``downstream_rq_time``, Histogram, Request time in milliseconds. The time is measured from when the request is received from downstream to when the response is sent to downstream
+   ``downstream_rq_tx_time``, Histogram, Request time in microseconds. The time is measured from when the request is received from downstream to the request is sent to upstream
+   ``downstream_rq_code_XXX``, Counter, Total requests that with response status code XXX. The XXX is the response status code. For example the ``downstream_rq_code_200`` is the total requests that with response status code 200. Note only response code between 0 and 999 are supported
+   ``downstream_rq_flag_XXX``, Counter, Total requests that with response flag XXX. The XXX is the response flag. For example the ``downstream_rq_flag_UF`` is the total requests that with response flag UF

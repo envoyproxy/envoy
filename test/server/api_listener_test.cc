@@ -53,11 +53,11 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, server_, config.name());
+  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
 
-  ASSERT_EQ("test_api_listener", http_api_listener.name());
-  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  ASSERT_NE(http_api_listener.createHttpApiListener(server_.dispatcher()), nullptr);
+  ASSERT_EQ("test_api_listener", http_api_listener->name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
+  ASSERT_NE(http_api_listener->createHttpApiListener(server_.dispatcher()), nullptr);
 }
 
 TEST_F(ApiListenerTest, MobileApiListener) {
@@ -88,11 +88,11 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, server_, config.name());
+  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
 
-  ASSERT_EQ("test_api_listener", http_api_listener.name());
-  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  ASSERT_NE(http_api_listener.createHttpApiListener(server_.dispatcher()), nullptr);
+  ASSERT_EQ("test_api_listener", http_api_listener->name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
+  ASSERT_NE(http_api_listener->createHttpApiListener(server_.dispatcher()), nullptr);
 }
 
 TEST_F(ApiListenerTest, HttpApiListenerThrowsWithBadConfig) {
@@ -125,7 +125,7 @@ api_listener:
       ->set_path("eds path");
   expected_any_proto.PackFrom(expected_cluster_proto);
   EXPECT_THROW_WITH_MESSAGE(
-      HttpApiListener(config, server_, config.name()), EnvoyException,
+      HttpApiListener::create(config, server_, config.name()).IgnoreError(), EnvoyException,
       fmt::format("Unable to unpack as "
                   "envoy.extensions.filters.network.http_connection_manager.v3."
                   "HttpConnectionManager: {}",
@@ -159,11 +159,11 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, server_, config.name());
+  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
 
-  ASSERT_EQ("test_api_listener", http_api_listener.name());
-  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  auto api_listener = http_api_listener.createHttpApiListener(server_.dispatcher());
+  ASSERT_EQ("test_api_listener", http_api_listener->name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
+  auto api_listener = http_api_listener->createHttpApiListener(server_.dispatcher());
   ASSERT_NE(api_listener, nullptr);
 
   Network::MockConnectionCallbacks network_connection_callbacks;

@@ -52,6 +52,14 @@ static_resources:
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
                           cluster: dubbo
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              path: "/dev/stdout"
+              log_format:
+                text_format_source:
+                  inline_string: "%REQUEST_PROPERTY(key)% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS%"
   clusters:
   - name: dubbo
     connect_timeout: 5s

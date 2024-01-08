@@ -138,10 +138,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "stats_lib",
+    srcs = ["stats.cc"],
     hdrs = ["stats.h"],
     deps = [
+        "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stream_info:utility_lib",
     ],
 )
 
