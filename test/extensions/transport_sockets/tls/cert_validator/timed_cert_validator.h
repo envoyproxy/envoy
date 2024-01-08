@@ -33,6 +33,9 @@ public:
   void setExpectedLocalAddress(absl::string_view expected_local_address) {
     expected_local_address_ = expected_local_address;
   }
+  void setExpectedPeerAddress(absl::string_view expected_peer_address) {
+    expected_peer_address_ = expected_peer_address;
+  }
 
 private:
   Event::TimerPtr validation_timer_;
@@ -41,14 +44,19 @@ private:
   std::vector<std::string> cert_chain_in_str_;
   absl::optional<std::string> expected_host_name_;
   absl::optional<std::string> expected_local_address_;
+  absl::optional<std::string> expected_peer_address_;
 };
 
 class TimedCertValidatorFactory : public CertValidatorFactory {
 public:
   CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                        SslStats& stats, TimeSource& time_source) override {
-    return std::make_unique<TimedCertValidator>(validation_time_out_ms_, config, stats, time_source,
-                                                expected_host_name_);
+    auto validator = std::make_unique<TimedCertValidator>(validation_time_out_ms_, config, stats,
+                                                          time_source, expected_host_name_);
+    if (expected_peer_address_.has_value()) {
+      validator->setExpectedPeerAddress(expected_peer_address_.value());
+    }
+    return validator;
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.timed_cert_validator"; }
@@ -58,15 +66,20 @@ public:
   }
 
   void setExpectedHostName(const std::string host_name) { expected_host_name_ = host_name; }
+  void setExpectedPeerAddress(absl::string_view expected_peer_address) {
+    expected_peer_address_ = expected_peer_address;
+  }
 
   void resetForTest() {
     validation_time_out_ms_ = std::chrono::milliseconds(5);
     expected_host_name_.reset();
+    expected_peer_address_.reset();
   }
 
 private:
   std::chrono::milliseconds validation_time_out_ms_{5};
   absl::optional<std::string> expected_host_name_;
+  absl::optional<std::string> expected_peer_address_;
 };
 
 DECLARE_FACTORY(TimedCertValidatorFactory);

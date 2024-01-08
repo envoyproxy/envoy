@@ -88,7 +88,7 @@ private:
 /**
  * Session read filter interface.
  */
-class ReadFilter : public FilterBase {
+class ReadFilter : public virtual FilterBase {
 public:
   virtual ~ReadFilter() = default;
 
@@ -134,7 +134,7 @@ enum class WriteFilterStatus {
 /**
  * Session write filter interface.
  */
-class WriteFilter : public FilterBase {
+class WriteFilter : public virtual FilterBase {
 public:
   virtual ~WriteFilter() = default;
 

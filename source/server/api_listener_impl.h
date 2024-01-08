@@ -49,7 +49,8 @@ public:
   }
 
 protected:
-  ApiListenerImplBase(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+  ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,
+                      const envoy::config::listener::v3::Listener& config, Server::Instance& server,
                       const std::string& name);
 
   // Synthetic class that acts as a stub Network::ReadFilterCallbacks.
@@ -221,14 +222,18 @@ public:
     Http::ApiListenerPtr http_connection_manager_;
   };
 
-  HttpApiListener(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
-                  const std::string& name);
-
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
   Http::ApiListenerPtr createHttpApiListener(Event::Dispatcher& dispatcher) override;
+  static absl::StatusOr<std::unique_ptr<HttpApiListener>>
+  create(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+         const std::string& name);
 
 private:
+  HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
+                  const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+                  const std::string& name);
+
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
   // route config manager, scoped route config manager.
   std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>

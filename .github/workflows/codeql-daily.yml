@@ -1,3 +1,8 @@
+name: CodeQL/daily
+
+permissions:
+  contents: read
+
 on:
   schedule:
   - cron: '0 12 * * 4'
@@ -6,11 +11,13 @@ concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
 
+
 jobs:
   CodeQL-Build:
 
     permissions:
       security-events: write  # for github/codeql-action/analyze to upload SARIF results
+      pull-requests: read
     strategy:
       fail-fast: false
 

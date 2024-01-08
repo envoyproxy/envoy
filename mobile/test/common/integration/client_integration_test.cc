@@ -1,4 +1,4 @@
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
@@ -223,7 +223,7 @@ void ClientIntegrationTest::basicTest() {
   } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
     ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
   } else {
-    // This verifies the H3 attempt was made due to the quic hints
+    // This verifies the H3 attempt was made due to the quic hints.
     absl::MutexLock l(&engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;

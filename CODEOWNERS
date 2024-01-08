@@ -131,8 +131,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
-/*/extensions/resource_monitors/common @eziskind @htuch
-/*/extensions/resource_monitors/fixed_heap @eziskind @htuch
+/*/extensions/resource_monitors/common @eziskind @htuch @nezdolik
+/*/extensions/resource_monitors/fixed_heap @eziskind @htuch @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
 /*/extensions/retry/priority @alyssawilk @mattklein123
 /*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
@@ -305,13 +305,13 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
 # upstream load balancing policies
-/*/extensions/load_balancing_policies/common @wbpcode @tonya11en
-/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/common @wbpcode @tonya11en @nezdolik
+/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en @nezdolik
 /*/extensions/load_balancing_policies/random @wbpcode @tonya11en
-/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en
-/*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/subset @wbpcode @zuercher
+/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en @nezdolik
+/*/extensions/load_balancing_policies/ring_hash @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/maglev @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
