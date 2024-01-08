@@ -8,7 +8,6 @@
 #include "source/common/http/utility.h"
 
 #include "library/common/bridge/utility.h"
-#include "library/common/buffer/bridge_fragment.h"
 #include "library/common/common/system_helper.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
@@ -28,7 +27,7 @@ namespace Http {
 
 namespace {
 
-constexpr auto SlowCallbackWarningTreshold = std::chrono::seconds(1);
+constexpr auto SlowCallbackWarningThreshold = std::chrono::seconds(1);
 
 } // namespace
 
@@ -87,7 +86,7 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
-  if (elapsed > SlowCallbackWarningTreshold) {
+  if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_headers_cb", std::to_string(elapsed.count()) + "ms");
   }
 
@@ -173,7 +172,7 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
-  if (elapsed > SlowCallbackWarningTreshold) {
+  if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_data_cb", std::to_string(elapsed.count()) + "ms");
   }
 
@@ -214,7 +213,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
-  if (elapsed > SlowCallbackWarningTreshold) {
+  if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_trailers_cb", std::to_string(elapsed.count()) + "ms");
   }
 
@@ -282,7 +281,7 @@ void Client::DirectStreamCallbacks::onComplete() {
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
-  if (elapsed > SlowCallbackWarningTreshold) {
+  if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_complete_cb", std::to_string(elapsed.count()) + "ms");
   }
 }
@@ -339,7 +338,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
-  if (elapsed > SlowCallbackWarningTreshold) {
+  if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_error_cb", std::to_string(elapsed.count()) + "ms");
   }
 }
@@ -366,7 +365,7 @@ void Client::DirectStreamCallbacks::onCancel() {
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
-  if (elapsed > SlowCallbackWarningTreshold) {
+  if (elapsed > SlowCallbackWarningThreshold) {
     ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", std::to_string(elapsed.count()) + "ms");
   }
 }
