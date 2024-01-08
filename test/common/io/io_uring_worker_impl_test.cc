@@ -654,6 +654,35 @@ TEST(IoUringWorkerImplTest, NoOnConnectCallingBackInClosing) {
   delete static_cast<Request*>(close_req);
 }
 
+TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  IoUringClientSocket socket(
+      0, worker, [](uint32_t) {}, 0, false);
+
+  auto addr = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+  EXPECT_CALL(mock_io_uring, submit()).Times(1);
+  void* connect_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareConnect(socket.fd(), _, _))
+      .WillOnce(DoAll(SaveArg<2>(&connect_req), Return<IoUringResult>(IoUringResult::Ok)));
+  socket.connect(addr);
+  // The socket stays in Initialized status if connect failed.
+  EXPECT_CALL(mock_io_uring, injectCompletion(_, _, _));
+  socket.onConnect(nullptr, 1, false);
+  EXPECT_EQ(socket.getStatus(), Initialized);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete static_cast<Request*>(connect_req);
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
