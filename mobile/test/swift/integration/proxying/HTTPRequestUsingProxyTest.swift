@@ -45,5 +45,6 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [responseExpectation], timeout: 10), .completed)
 
     engine.terminate()
+    EnvoyTestServer.shutdownTestServer()
   }
 }

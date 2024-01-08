@@ -77,6 +77,11 @@ build:mobile-dbg-ios --config=ios
 # https://github.com/envoyproxy/envoy/issues/24977
 build:test-android --define=static_extension_registration=enabled
 
+# Default flags for iOS tests.
+build:test-ios --config=ios
+build:test-ios --define=envoy_mobile_listener=enabled
+build:test-ios --define=static_extension_registration=enabled
+
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
 # https://github.com/bazelbuild/bazel/issues/6932
@@ -294,7 +299,7 @@ build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
 build:mobile-remote-ci-macos-kotlin --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-swift --config=ios
+build:mobile-remote-ci-macos-swift --config=test-ios
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --define=signal_trace=disabled
 build:mobile-remote-ci-macos-swift --define=envoy_mobile_request_compression=disabled
@@ -312,7 +317,7 @@ test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 test:mobile-remote-ci-core --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-ios --config=ios
+build:mobile-remote-ci-macos-ios --config=test-ios
 
 build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
 build:mobile-remote-ci-macos-ios-admin --define=admin_functionality=enabled
