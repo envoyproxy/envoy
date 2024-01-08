@@ -88,7 +88,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     // Ideally we'd find a way to do this without slowing down
     // the non-Prometheus implementations.
     Buffer::OwnedImpl response;
-    prometheusFlushAndRender(params, response);
+    Http::Code code = prometheusFlushAndRender(params, response);
     return Admin::makeStaticTextRequest(response, code);
   }
 
