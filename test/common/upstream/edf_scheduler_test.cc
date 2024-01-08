@@ -226,7 +226,7 @@ TEST_F(EdfSchedulerTest, EqualityAfterCreateWithPicks) {
   }
 }
 
-// Emualtes first-pick scenarios for the given number of iterations by creates
+// Emulates first-pick scenarios for the given number of iterations by creates
 // a scheduler with the given weights and a random number of pre-picks, and
 // validates that the next pick of all the weights is close to the given weights.
 void firstPickTest(const std::vector<double> weights) {
