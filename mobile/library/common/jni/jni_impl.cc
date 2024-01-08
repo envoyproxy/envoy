@@ -131,7 +131,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     event_tracker.context = retained_context;
   }
 
-  return init_engine(native_callbacks, logger, event_tracker);
+  return reinterpret_cast<intptr_t>(new Envoy::Engine(native_callbacks, logger, event_tracker));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
@@ -161,7 +161,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_terminateEngine(
     JNIEnv* /*env*/, jclass, jlong engine_handle) {
-  terminate_engine(static_cast<envoy_engine_t>(engine_handle), /* release */ false);
+  reinterpret_cast<Envoy::Engine*>(engine_handle)->terminate();
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
