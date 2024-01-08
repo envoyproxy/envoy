@@ -1,5 +1,7 @@
 #include "source/common/upstream/edf_scheduler.h"
 
+#include "test/test_common/test_random_generator.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -32,7 +34,7 @@ public:
     std::vector<typename EdfScheduler<T>::EdfEntry> contents1 = copyFunc(scheduler1);
     std::vector<typename EdfScheduler<T>::EdfEntry> contents2 = copyFunc(scheduler2);
     for (size_t i = 0; i < contents1.size(); ++i) {
-      EXPECT_NEAR(contents1[i].deadline_, contents2[i].deadline_, 0.0000001)
+      EXPECT_NEAR(contents1[i].deadline_, contents2[i].deadline_, 0.000001)
           << "inequal deadline in element " << i;
       std::shared_ptr<T> entry1 = contents1[i].entry_.lock();
       std::shared_ptr<T> entry2 = contents2[i].entry_.lock();
@@ -222,6 +224,59 @@ TEST_F(EdfSchedulerTest, EqualityAfterCreateWithPicks) {
 
     compareEdfScehdulers(sched1, sched2);
   }
+}
+
+// Emualtes first-pick scenarios for the given number of iterations by creates
+// a scheduler with the given weights and a random number of pre-picks, and
+// validates that the next pick of all the weights is close to the given weights.
+void firstPickTest(const std::vector<double> weights) {
+  TestRandomGenerator rand;
+  // To be able to converge to the expected weights, a decent number of iterations
+  // should be used. If the number of weights is large, the number of iterations
+  // should be larger than 10000.
+  constexpr uint64_t iterations = 100000;
+  // The expected range of the weights is [0,100). If this is no longer the
+  // case, this value may need to be updated.
+  constexpr double tolerance_pct = 1.0;
+
+  // Set up the entries as simple integers.
+  std::vector<std::shared_ptr<size_t>> entries;
+  entries.reserve(weights.size());
+  for (size_t i = 0; i < weights.size(); ++i) {
+    entries.emplace_back(std::make_shared<size_t>(i));
+  }
+
+  absl::flat_hash_map<size_t, int> sched_picks;
+  auto calc_weight = [&weights](const size_t& i) -> double { return weights[i]; };
+
+  for (uint64_t i = 0; i < iterations; ++i) {
+    // Create a scheduler with the given weights with a random number of
+    // emulated pre-picks.
+    uint32_t r = rand.random();
+    auto sched = EdfScheduler<size_t>::createWithPicks(entries, calc_weight, r);
+
+    // Perform a "first-pick" from that scheduler, and increase the counter for
+    // that entry.
+    sched_picks[*sched.pickAndAdd(calc_weight)]++;
+  }
+
+  // Validate that the observed distribution and expected weights are close.
+  ASSERT_EQ(weights.size(), sched_picks.size());
+  for (const auto& it : sched_picks) {
+    const double expected = calc_weight(it.first);
+    const double observed = 100 * static_cast<double>(it.second) / iterations;
+    EXPECT_NEAR(expected, observed, tolerance_pct);
+  }
+}
+
+// Validates that after creating schedulers using the createWithPicks (with random picks)
+// and then performing a "first-pick", the distribution of the "first-picks" is
+// equal to the weights.
+TEST_F(EdfSchedulerTest, CreateWithPicksFirstPickDistribution) {
+  firstPickTest({25.0, 75.0});
+  firstPickTest({1.0, 99.0});
+  firstPickTest({50.0, 50.0});
+  firstPickTest({1.0, 20.0, 79.0});
 }
 
 } // namespace Upstream
