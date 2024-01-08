@@ -115,6 +115,52 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
+absl::optional<std::vector<std::string>>
+FilterConfigPerRoute::initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
+  if (ns.empty()) {
+    return absl::nullopt;
+  }
+
+  std::vector<std::string> namespaces;
+  for (const auto& single_ns : ns) {
+    namespaces.emplace_back(single_ns);
+  }
+  return {namespaces};
+}
+
+absl::optional<std::vector<std::string>>
+FilterConfigPerRoute::initUntypedForwardingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_forwarding_namespaces() ||
+      config.overrides().metadata_options().forwarding_namespaces().untyped().empty()) {
+    return absl::nullopt;
+  }
+
+  return initNamespaces(config.overrides().metadata_options().forwarding_namespaces().untyped());
+}
+
+absl::optional<std::vector<std::string>>
+FilterConfigPerRoute::initTypedForwardingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_forwarding_namespaces() ||
+      config.overrides().metadata_options().forwarding_namespaces().typed().empty()) {
+    return absl::nullopt;
+  }
+
+  return initNamespaces(config.overrides().metadata_options().forwarding_namespaces().typed());
+}
+
+absl::optional<std::vector<std::string>>
+FilterConfigPerRoute::initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_receiving_namespaces() ||
+      config.overrides().metadata_options().receiving_namespaces().untyped().empty()) {
+    return absl::nullopt;
+  }
+
+  return initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped());
+}
+
 absl::optional<ProcessingMode>
 FilterConfigPerRoute::initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -140,16 +186,54 @@ FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_speci
                                                     : less_specific.processingMode();
 }
 
+absl::optional<std::vector<std::string>> FilterConfigPerRoute::mergeNamespaces(
+    const absl::optional<std::vector<std::string>>& less_specific,
+    const absl::optional<std::vector<std::string>>& more_specific) {
+  // If the more specific config does not have a value, we can return the less specific directly.
+  if (!more_specific.has_value()) {
+    return less_specific;
+  }
+
+  // If the more specific config has an empty array, we want to eliminate anything from the less
+  // specific config.
+  if (more_specific.value().empty()) {
+    return absl::nullopt;
+  }
+
+  // If the more specific config has a value, but the less specific does not, just use whatever is
+  // in the more specific.
+  if (!less_specific.has_value()) {
+    return more_specific;
+  }
+  std::vector<std::string> vec{less_specific.value().begin(), less_specific.value().end()};
+  for (const auto& elem : more_specific.value()) {
+    vec.emplace_back(elem);
+  }
+  return {vec};
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
-      grpc_service_(initGrpcService(config)) {}
+      grpc_service_(initGrpcService(config)),
+      untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
+      typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
+      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
     : disabled_(more_specific.disabled()),
       processing_mode_(mergeProcessingMode(less_specific, more_specific)),
       grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
-                                                            : less_specific.grpcService()) {}
+                                                            : less_specific.grpcService()),
+      untyped_forwarding_namespaces_(
+          mergeNamespaces(less_specific.untypedForwardingMetadataNamespaces(),
+                          more_specific.untypedForwardingMetadataNamespaces())),
+      typed_forwarding_namespaces_(
+          mergeNamespaces(less_specific.typedForwardingMetadataNamespaces(),
+                          more_specific.typedForwardingMetadataNamespaces())),
+      untyped_receiving_namespaces_(
+          mergeNamespaces(less_specific.untypedReceivingMetadataNamespaces(),
+                          more_specific.untypedReceivingMetadataNamespaces())) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -694,7 +778,7 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                                 ProcessingResponse& response) {
-  if (state.untypedReceivingMetadataNamespaces().size() == 0 || !response.has_dynamic_metadata()) {
+  if (state.untypedReceivingMetadataNamespaces().empty() || !response.has_dynamic_metadata()) {
     if (response.has_dynamic_metadata()) {
       ENVOY_LOG(debug, "processing response included dynamic metadata, but no receiving "
                        "namespaces are configured.");
@@ -970,8 +1054,6 @@ void Filter::mergePerRouteConfig() {
     return;
   }
 
-  route_config_merged_ = true;
-
   absl::optional<FilterConfigPerRoute> merged_config;
 
   decoder_callbacks_->traversePerFilterConfig([&merged_config](
@@ -991,6 +1073,8 @@ void Filter::mergePerRouteConfig() {
   if (!merged_config.has_value()) {
     return;
   }
+
+  route_config_merged_.emplace(merged_config.value());
 
   if (merged_config->disabled()) {
     // Rather than introduce yet another flag, use the processing mode

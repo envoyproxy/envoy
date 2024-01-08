@@ -250,13 +250,14 @@ public:
     return grpc_service_;
   }
 
-  const absl::optional<std::vector<std::string>>& untypedForwardingMetadataNamespaces() const {
+  const absl::optional<const std::vector<std::string>>&
+  untypedForwardingMetadataNamespaces() const {
     return untyped_forwarding_namespaces_;
   }
-  const absl::optional<std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
+  const absl::optional<const std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
     return typed_forwarding_namespaces_;
   }
-  const absl::optional<std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
+  const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
 
@@ -267,18 +268,34 @@ private:
   absl::optional<envoy::config::core::v3::GrpcService>
   initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
+  absl::optional<std::vector<std::string>>
+  initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns);
+
+  absl::optional<std::vector<std::string>> initUntypedForwardingNamespaces(
+      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  absl::optional<std::vector<std::string>> initTypedForwardingNamespaces(
+      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  absl::optional<std::vector<std::string>> initUntypedReceivingNamespaces(
+      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
   mergeProcessingMode(const FilterConfigPerRoute& less_specific,
                       const FilterConfigPerRoute& more_specific);
+
+  absl::optional<std::vector<std::string>>
+  mergeNamespaces(const absl::optional<std::vector<std::string>>& less_specific,
+                  const absl::optional<std::vector<std::string>>& more_specific);
 
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
 
-  absl::optional<std::vector<std::string>> untyped_forwarding_namespaces_;
-  absl::optional<std::vector<std::string>> typed_forwarding_namespaces_;
-  absl::optional<std::vector<std::string>> untyped_receiving_namespaces_;
+  const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
