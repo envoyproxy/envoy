@@ -370,6 +370,7 @@ envoy_cc_test_binary(
         "//source/exe:platform_impl_lib",
         "//source/exe:process_wide_lib",
         "//source/exe:stripped_main_base_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
     ],
 )
 

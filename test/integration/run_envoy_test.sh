@@ -18,6 +18,12 @@ function expect_fail_with_error() {
   check grep "$expected_error" "$log"
 }
 
+function expect_ok() {
+  ${ENVOY_BIN} --use-dynamic-base-id "$@"
+  EXIT_CODE=$?
+  check [ $EXIT_CODE -eq 0 ]
+}
+
 
 start_test "Launching envoy with a bogus command line flag."
 expect_fail_with_error "PARSE ERROR: Argument: --bogus-flag" --bogus-flag
@@ -40,3 +46,12 @@ expect_fail_with_error "error: invalid log level specified" --component-log-leve
 
 start_test "Launching envoy with invalid component."
 expect_fail_with_error "error: invalid component specified" --component-log-level foo:debug
+
+start_test "Launching envoy with empty config and validate."
+expect_ok -c "${TEST_SRCDIR}/envoy/test/config/integration/empty.yaml" --mode validate
+
+start_test "Launching envoy with empty config."
+run_in_background_saving_pid "${ENVOY_BIN}" -c "${TEST_SRCDIR}/envoy/test/config/integration/empty.yaml"
+sleep 3
+kill "${BACKGROUND_PID}"
+wait "${BACKGROUND_PID}"
