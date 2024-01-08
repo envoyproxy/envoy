@@ -121,14 +121,6 @@ envoy_engine_t init_engine(envoy_engine_callbacks callbacks, envoy_logger logger
   return reinterpret_cast<envoy_engine_t>(engine);
 }
 
-envoy_status_t run_engine(envoy_engine_t handle, const char* config, const char* log_level) {
-  if (auto engine = reinterpret_cast<Envoy::Engine*>(handle)) {
-    engine->run(config, log_level);
-    return ENVOY_SUCCESS;
-  }
-  return ENVOY_FAILURE;
-}
-
 envoy_status_t terminate_engine(envoy_engine_t handle, bool release) {
   auto engine = reinterpret_cast<Envoy::Engine*>(handle);
   envoy_status_t ret = engine->terminate();

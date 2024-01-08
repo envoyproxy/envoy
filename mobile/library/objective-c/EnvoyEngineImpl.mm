@@ -546,7 +546,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   [self startObservingLifecycleNotifications];
 
   @try {
-    return (int)run_engine(_engineHandle, yaml.UTF8String, logLevel.UTF8String);
+    return reinterpret_cast<Envoy::Engine *>(_engineHandle)->run(yaml.UTF8String, logLevel.UTF8String);
   } @catch (NSException *exception) {
     [self logException:exception];
     return kEnvoyFailure;

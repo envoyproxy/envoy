@@ -145,7 +145,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 
   jint result;
   if (!bootstrap) {
-    result = run_engine(engine, string_config, string_log_level);
+    result = reinterpret_cast<Envoy::Engine*>(engine)->run(string_config, string_log_level);
   } else {
     auto options = std::make_unique<Envoy::OptionsImplBase>();
     options->setConfigProto(std::move(bootstrap));
