@@ -11,6 +11,9 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   }
 
   func testHTTRequestUsingProxy() throws {
+    EnvoyTestServer.startHttpProxyServer()
+    let port = EnvoyTestServer.getEnvoyPort()
+
     let engineExpectation = self.expectation(description: "Run started engine")
     let responseExpectation = self.expectation(description: "Successful response received")
 
@@ -25,7 +28,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
     // Send a request to trigger the test filter which should log an event.
-    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
+    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
                                                authority: "api.lyft.com", path: "/ping")
       .build()
 

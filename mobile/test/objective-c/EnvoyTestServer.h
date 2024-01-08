@@ -9,6 +9,10 @@
 + (NSInteger)getEnvoyPort;
 // Starts a server with HTTP1 and no TLS.
 + (void)startHttp1PlaintextServer;
+// Starts a server as a HTTP proxy.
++ (void)startHttpProxyServer;
+// Starts a server as a HTTPS proxy.
++ (void)startHttpsProxyServer;
 // Shut down and clean up server.
 + (void)shutdownTestServer;
 // Add response data to the upstream.
