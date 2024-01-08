@@ -226,7 +226,8 @@ build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],
 build:coverage --remote_download_minimal
 build:coverage --define=tcmalloc=gperftools
 build:coverage --define=no_debug_info=1
-build:coverage --linkopt=-Wl,-s
+# `--no-relax` is required for coverage to not err with `relocation R_X86_64_REX_GOTPCRELX`
+build:coverage --linkopt=-Wl,-s,--no-relax
 build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:test-coverage --test_arg="-l trace"

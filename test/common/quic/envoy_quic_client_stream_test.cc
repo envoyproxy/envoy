@@ -755,6 +755,14 @@ TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
   quic_session_.OnMessageReceived(datagram_fragment_);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
+
+TEST_F(EnvoyQuicClientStreamTest, ResetStreamWithHttpDatagramHandler) {
+  setUpCapsuleProtocol(true, false);
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(quic_stream_->rst_sent());
+}
+
 #endif
 
 } // namespace Quic

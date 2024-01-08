@@ -73,9 +73,11 @@ TEST_F(DatadogTracerTest, Breathing) {
   // does not throw exceptions.
   datadog::tracing::TracerConfig config;
   config.defaults.service = "envoy";
+  config.report_traces = false;
+  config.report_telemetry = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                thread_local_slot_allocator_);
+                thread_local_slot_allocator_, time_);
 }
 
 TEST_F(DatadogTracerTest, NoOpMode) {
@@ -83,6 +85,8 @@ TEST_F(DatadogTracerTest, NoOpMode) {
   // `startSpan` subsequently returns `NullSpan` instances.
   datadog::tracing::TracerConfig config;
   config.defaults.service = "envoy";
+  config.report_traces = false;
+  config.report_telemetry = false;
   datadog::tracing::TraceSamplerConfig::Rule invalid_rule;
   // The `sample_rate`, below, is invalid (should be between 0.0 and 1.0).
   // As a result, the constructor of `Tracer` will fail to initialize the
@@ -92,7 +96,7 @@ TEST_F(DatadogTracerTest, NoOpMode) {
   config.trace_sampler.rules.push_back(invalid_rule);
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                thread_local_slot_allocator_);
+                thread_local_slot_allocator_, time_);
 
   Tracing::TestTraceContextImpl context{};
   // Any values will do for the sake of this test.
@@ -116,12 +120,14 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   // resulting span.
   datadog::tracing::TracerConfig config;
   config.defaults.service = "envoy";
+  config.report_traces = false;
+  config.report_telemetry = false;
   // Configure the tracer to keep all spans. We then override that
   // configuration in the `Tracing::Decision`, below.
   config.trace_sampler.sample_rate = 1.0; // 100%
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                thread_local_slot_allocator_);
+                thread_local_slot_allocator_, time_);
 
   Tracing::TestTraceContextImpl context{};
   // A sampling decision of "false" forces the created trace to be dropped,
@@ -165,9 +171,11 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   // the extracted trace.
   datadog::tracing::TracerConfig config;
   config.defaults.service = "envoy";
+  config.report_traces = false;
+  config.report_telemetry = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                thread_local_slot_allocator_);
+                thread_local_slot_allocator_, time_);
 
   // Any values will do for the sake of this test.
   Tracing::Decision decision;
@@ -204,9 +212,11 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   // will be the start of a new trace).
   datadog::tracing::TracerConfig config;
   config.defaults.service = "envoy";
+  config.report_traces = false;
+  config.report_telemetry = false;
 
   Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                thread_local_slot_allocator_);
+                thread_local_slot_allocator_, time_);
 
   // Any values will do for the sake of this test.
   Tracing::Decision decision;
@@ -311,8 +321,10 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     EnvVarGuard guard{"DD_TRACE_PROPAGATION_STYLE", style_name};
     datadog::tracing::TracerConfig config;
     config.defaults.service = "envoy";
+    config.report_traces = false;
+    config.report_telemetry = false;
     Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                  thread_local_slot_allocator_);
+                  thread_local_slot_allocator_, time_);
 
     Tracing::Decision envoy_decision;
     envoy_decision.reason = Tracing::Reason::Sampling;

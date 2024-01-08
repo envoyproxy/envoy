@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/tracers/datadog/time_util.h"
 
@@ -51,14 +52,28 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
     return;
   }
 
-  // The special "resource.name" tag is a holdover from when the Datadog tracer
-  // was OpenTracing-based, and so there was no way to set the Datadog resource
-  // name directly.
-  // In Envoy, it's still the case that there's no way to set the Datadog
-  // resource name directly; so, here if the tag name is "resource.name", we
-  // actually set the resource name instead of setting a tag.
+  const auto& Tags = Envoy::Tracing::Tags::get();
+
   if (name == "resource.name") {
+    // The special "resource.name" tag is a holdover from when the Datadog
+    // tracer was OpenTracing-based, and so there was no way to set the Datadog
+    // resource name directly.
+    // In Envoy, it's still the case that there's no way to set the Datadog
+    // resource name directly; so, here if the tag name is "resource.name", we
+    // actually set the resource name instead of setting a tag.
     span_->set_resource_name(value);
+  } else if (name == Tags.Error) {
+    // Envoy marks spans as containing errors by setting the "error" tag.
+    // Here we translate into the dd-trace-cpp equivalent.
+    if (value == Tags.True) {
+      span_->set_error(true);
+    }
+  } else if (name == Tags.ErrorReason) {
+    // Envoy conveys information about an error by setting the "error.reason"
+    // tag.
+    // Here we translate into the dd-trace-cpp equivalent.
+    span_->set_error_message(value);
+    span_->set_tag(name, value);
   } else {
     span_->set_tag(name, value);
   }

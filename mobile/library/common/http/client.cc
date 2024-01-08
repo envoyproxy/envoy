@@ -38,6 +38,12 @@ Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream
     : direct_stream_(direct_stream), bridge_callbacks_(bridge_callbacks), http_client_(http_client),
       explicit_flow_control_(direct_stream_.explicit_flow_control_) {}
 
+Client::DirectStreamCallbacks::~DirectStreamCallbacks() {
+  if (error_.has_value()) {
+    release_envoy_error(error_.value());
+  }
+}
+
 void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& headers,
                                                   bool end_stream) {
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
@@ -136,6 +142,8 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
         debug, "[S{}] buffering {} bytes due to explicit flow control. {} total bytes buffered.",
         direct_stream_.stream_handle_, data.length(), data.length() + response_data_->length());
     response_data_->move(data);
+  } else if (error_.has_value()) {
+    sendErrorToBridge();
   }
 }
 
@@ -240,8 +248,8 @@ void Client::DirectStreamCallbacks::resumeData(int32_t bytes_to_send) {
   }
 }
 
-void Client::DirectStreamCallbacks::closeStream() {
-  remote_end_stream_received_ = true;
+void Client::DirectStreamCallbacks::closeStream(bool end_stream) {
+  remote_end_stream_received_ |= end_stream;
   // Latch stream intel on stream completion, as the stream info will go away.
   direct_stream_.saveFinalStreamIntel();
 
@@ -288,13 +296,31 @@ void Client::DirectStreamCallbacks::onError() {
   // errors must be deferred until after resumeData has been called.
   // TODO(goaway): What is the expected behavior when an error is received, held, and then another
   // error occurs (e.g., timeout)?
+
+  error_ = streamError();
   if (explicit_flow_control_ && response_headers_forwarded_ && bytes_to_send_ == 0) {
+    ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
+              direct_stream_.stream_handle_);
+    if (!remote_end_stream_received_) {
+      closeStream(false);
+    }
     return;
   }
 
-  error_ = streamError();
-
   http_client_.removeStream(direct_stream_.stream_handle_);
+  direct_stream_.request_decoder_ = nullptr;
+  sendErrorToBridge();
+}
+
+void Client::DirectStreamCallbacks::sendErrorToBridge() {
+  if (remote_end_stream_forwarded_) {
+    // If the request was not fully sent, but the response was complete, Envoy
+    // will reset the stream after sending the fin bit. Don't pass this class of
+    // errors up to the user.
+    ENVOY_LOG(debug, "[S{}] not sending error as onComplete was called");
+    return;
+  }
+
   // The stream should no longer be preset in the map, because onError() was either called from a
   // terminal callback that mapped to an error or it was called in response to a resetStream().
   ASSERT(!http_client_.getStream(direct_stream_.stream_handle_,
@@ -309,6 +335,7 @@ void Client::DirectStreamCallbacks::onError() {
 
   bridge_callbacks_.on_error(error_.value(), streamIntel(), finalStreamIntel(),
                              bridge_callbacks_.context);
+  error_.reset();
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -530,9 +557,11 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
 
 void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
   ASSERT(dispatcher_.isThreadSafe());
+  // This is allowed for closed streams, else we could never send data up after
+  // the FIN was received.
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
-  // If direct_stream is not found, it means the stream has already closed or been reset
+  // If direct_stream is not found, it means the stream has already canceled or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
   if (direct_stream) {
@@ -544,6 +573,12 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
+
+  // Take ownership of data early, in case of early returns.
+  // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
+  // of the InstancePtr to outlive this function call.
+  Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
+
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
@@ -560,9 +595,6 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   }
 
   ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
-  // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
-  // of the InstancePtr to outlive this function call.
-  Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
 
   ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream, data.length,
             end_stream);

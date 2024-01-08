@@ -253,7 +253,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
           quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(port)),
       *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, *stats_store_.rootScope(),
-      options, nullptr, connection_id_generator_);
+      options, nullptr, connection_id_generator_, quic_transport_socket_factory_ref);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -371,7 +371,7 @@ void HttpIntegrationTest::initialize() {
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_);
+  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_, custom_alpns_);
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"}, test_server_);
