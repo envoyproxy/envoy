@@ -79,7 +79,7 @@ struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota>
     }
 
     if (send_reports_timer != nullptr) {
-      send_reports_timer->enableTimer(std::chrono::milliseconds(report_interval_ms));
+      send_reports_timer->enableTimer(report_interval_ms);
     } else {
       ENVOY_LOG(error, "Reports timer has been destroyed; no periodical report send");
     }
@@ -90,7 +90,7 @@ struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota>
   // The timer for sending the reports periodically.
   Event::TimerPtr send_reports_timer;
   // Periodical reporting interval(in milliseconds).
-  int64_t report_interval_ms = 0;
+  std::chrono::milliseconds report_interval_ms = std::chrono::milliseconds::zero();
 };
 
 class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
