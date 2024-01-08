@@ -24,6 +24,9 @@ bug_fixes:
     Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
 - area: tracing
   change: |
+    Fixed a bug where Datadog spans tagged as errors would not have the appropriate error property set.
+- area: tracing
+  change: |
     Fixed a bug where child spans produced by the Datadog tracer would have an incorrect operation name.
 - area: tracing
   change: |
