@@ -675,7 +675,8 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
       .WillOnce(DoAll(SaveArg<2>(&connect_req), Return<IoUringResult>(IoUringResult::Ok)));
   socket.connect(addr);
   // The socket stays in Initialized status if connect failed.
-  EXPECT_CALL(mock_io_uring, injectCompletion(_, _, _));
+  EXPECT_CALL(mock_io_uring, injectCompletion(_, _, _))
+      .WillOnce(Invoke([](os_fd_t, Request* req, int32_t) { delete req; }));
   socket.onConnect(nullptr, 1, false);
   EXPECT_EQ(socket.getStatus(), Initialized);
 
