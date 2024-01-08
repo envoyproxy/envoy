@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/hotrestart_main"
+export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/hotrestart_small_main"
 
 # shellcheck source=test/integration/test_utility.sh
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
