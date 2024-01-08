@@ -131,16 +131,22 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
     server_.flushStats();
   }
 
-  prometheusFlushAndRender(params, response);
-  return Http::Code::OK;
+  return prometheusFlushAndRender(params, response);
 }
 
-void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
+Http::Code StatsHandler::prometheusFlushAndRender(const StatsParams& params,
+                                                  Buffer::Instance& response) {
+  absl::Status paramsStatus = PrometheusStatsFormatter::validateParams(params);
+  if (!paramsStatus.ok()) {
+    response.add(paramsStatus.message());
+    return Http::Code::BadRequest;
+  }
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
   prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
                    params, response);
+  return Http::Code::OK;
 }
 
 void StatsHandler::prometheusRender(Stats::Store& stats,

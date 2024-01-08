@@ -316,6 +316,17 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return absl::StrJoin(buf, ",");
 }
 
+absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params) {
+  switch (params.histogram_buckets_mode_) {
+  case Utility::HistogramBucketsMode::Summary:
+  case Utility::HistogramBucketsMode::Unset:
+  case Utility::HistogramBucketsMode::Cumulative:
+    return absl::OkStatus();
+  default:
+    return absl::InvalidArgumentError("unsupported prometheus histogram bucket mode");
+  }
+}
+
 absl::optional<std::string>
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
@@ -363,6 +374,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
   metric_name_count += outputStatType<Stats::TextReadout>(
       response, params, text_readouts, generateTextReadoutOutput, "gauge", custom_namespaces);
 
+  // validation of bucket modes is handled separately
   switch (params.histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Summary:
     metric_name_count += outputStatType<Stats::ParentHistogram>(
@@ -373,10 +385,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
     break;
-  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics
-  case Utility::HistogramBucketsMode::Detailed:
-  case Utility::HistogramBucketsMode::Disjoint:
-    IS_ENVOY_BUG("unsupported Prometheus histogram bucket mode");
+  default:
     break;
   }
 

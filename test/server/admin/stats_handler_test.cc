@@ -1526,7 +1526,18 @@ envoy_h1_count{} 1
 
 TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusUnsupportedBucketMode) {
   const std::string url = "/stats?format=prometheus&histogram_buckets=disjoint";
-  EXPECT_ENVOY_BUG(handlerStats(url), "unsupported Prometheus histogram bucket mode");
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_response = "unsupported prometheus histogram bucket mode";
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
 }
 
 class StatsHandlerPrometheusWithTextReadoutsTest
