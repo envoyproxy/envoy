@@ -1,6 +1,7 @@
 #include "envoy/network/address.h"
 
 #include "source/server/config_validation/server.h"
+
 #include "test/integration/server.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
@@ -8,7 +9,7 @@
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
-#include "gunit/gunit.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 

@@ -25,8 +25,6 @@ envoy_cc_test(
         "internal_listener_missing_bootstrap.yaml",
     ],
     deps = [
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
