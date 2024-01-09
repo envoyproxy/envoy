@@ -70,15 +70,6 @@ minor_behavior_changes:
     which is expected to reduce config update time or startup time by 10-25%. The new algorithm is also
     used for ``http_cache_filter`` hashing, which will effectively cause a one-time cache flush on update
     for users with a persistent cache. To enable this behavior set ``envoy.restart_features.use_fast_protobuf_hash`` to ``true``.
-- area: filter state
-  change: |
-    Added config name of filter sending a local reply in filter state with key
-    ``envoy.filters.network.http_connection_manager.local_reply_owner``.
-    See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
-- area: composite filter
-  change: |
-    Added composite filter's matched action name to filter state with key
-    ``envoy.extensions.filters.http.composite.matched_actions``.
 - area: http2
   change: |
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
@@ -213,6 +204,15 @@ new_features:
   change: |
     Added :ref:`ExtensionConfiguration discovery service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` support for
     :ref:`composite filter <config_http_filters_composite>`.
+- area: filter state
+  change: |
+    Added config name of filter sending a local reply in filter state with key
+    ``envoy.filters.network.http_connection_manager.local_reply_owner``.
+    See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
+- area: composite filter
+  change: |
+    Added composite filter's matched action name to filter state with key
+    ``envoy.extensions.filters.http.composite.matched_actions``.
 - area: aws
   change: |
     Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``. To enable
