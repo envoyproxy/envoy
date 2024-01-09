@@ -9,7 +9,7 @@ on:
     - include/**
     - source/common/**
     branches-ignore:
-    - 'dependabot/**'
+    - dependabot/**
   pull_request:
 
 concurrency:
