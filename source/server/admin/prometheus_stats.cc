@@ -322,7 +322,8 @@ absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params)
   case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Cumulative:
     return absl::OkStatus();
-  default:
+  case Utility::HistogramBucketsMode::Detailed:
+  case Utility::HistogramBucketsMode::Disjoint:
     return absl::InvalidArgumentError("unsupported prometheus histogram bucket mode");
   }
 }
@@ -385,7 +386,10 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     metric_name_count += outputStatType<Stats::ParentHistogram>(
         response, params, histograms, generateHistogramOutput, "histogram", custom_namespaces);
     break;
-  default:
+  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics
+  case Utility::HistogramBucketsMode::Detailed:
+  case Utility::HistogramBucketsMode::Disjoint:
+    IS_ENVOY_BUG("unsupported prometheus histogram bucket mode");
     break;
   }
 
