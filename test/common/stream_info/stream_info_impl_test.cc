@@ -138,7 +138,6 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
   EXPECT_FALSE(stream_info.hasAnyResponseFlag());
-  EXPECT_FALSE(stream_info.intersectResponseFlags(0));
   for (ResponseFlag flag : responseFlags) {
     // Test cumulative setting of response flags.
     EXPECT_FALSE(stream_info.hasResponseFlag(flag))
@@ -149,11 +148,6 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
   EXPECT_EQ(0xFFF, stream_info.responseFlags());
-
-  StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  stream_info2.setResponseFlag(FailedLocalHealthCheck);
-
-  EXPECT_TRUE(stream_info2.intersectResponseFlags(FailedLocalHealthCheck));
 }
 
 TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {

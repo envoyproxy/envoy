@@ -188,7 +188,7 @@ public:
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  uint64_t configured_flags_{};
+  std::vector<bool> configured_flags_{};
 };
 
 /**

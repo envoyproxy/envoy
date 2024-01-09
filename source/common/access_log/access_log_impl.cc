@@ -216,19 +216,30 @@ bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
 
 ResponseFlagFilter::ResponseFlagFilter(
     const envoy::config::accesslog::v3::ResponseFlagFilter& config) {
+  // Preallocate the vector to avoid frequent reallocations. 64 should be enough for most use cases.
+  configured_flags_.resize(64, false);
   for (int i = 0; i < config.flags_size(); i++) {
-    absl::optional<StreamInfo::ResponseFlag> response_flag =
+    absl::optional<uint16_t> response_flag =
         StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
     // The config has been validated. Therefore, every flag in the config will have a mapping.
     ASSERT(response_flag.has_value());
-    configured_flags_ |= response_flag.value();
+    if (response_flag.value() >= configured_flags_.size()) {
+      configured_flags_.resize(response_flag.value() + 1, false);
+    }
+
+    configured_flags_[response_flag.value()] = true;
   }
 }
 
 bool ResponseFlagFilter::evaluate(const Formatter::HttpFormatterContext&,
                                   const StreamInfo::StreamInfo& info) const {
-  if (configured_flags_ != 0) {
-    return info.intersectResponseFlags(configured_flags_);
+  if (!configured_flags_.empty()) {
+    for (uint16_t flag : info.responseFlags()) {
+      if (flag < configured_flags_.size() && configured_flags_[flag]) {
+        return true;
+      }
+    }
+    return false;
   }
   return info.hasAnyResponseFlag();
 }

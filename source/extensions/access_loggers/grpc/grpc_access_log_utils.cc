@@ -41,8 +41,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x8000000,
-                "A flag has been added. Fix this code.");
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 27, "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
     common_access_log.mutable_response_flags()->set_failed_local_healthcheck(true);

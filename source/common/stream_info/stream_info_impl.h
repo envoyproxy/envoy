@@ -231,17 +231,19 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
-  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
-
-  bool intersectResponseFlags(uint64_t response_flags) const override {
-    return (response_flags_ & response_flags) != 0;
+  void setResponseFlag(uint16_t flag) override {
+    if (!hasResponseFlag(flag)) {
+      response_flags_.push_back(flag);
+    }
   }
 
-  bool hasResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
+  bool hasResponseFlag(uint16_t flag) const override {
+    return std::find(response_flags_.begin(), response_flags_.end(), flag) != response_flags_.end();
+  }
 
-  bool hasAnyResponseFlag() const override { return response_flags_ != 0; }
+  bool hasAnyResponseFlag() const override { return !response_flags_.empty(); }
 
-  uint64_t responseFlags() const override { return response_flags_; }
+  absl::Span<const uint16_t> responseFlags() const override { return response_flags_; }
 
   const std::string& getRouteName() const override {
     return route_ != nullptr ? route_->routeName() : EMPTY_STRING;
@@ -374,7 +376,10 @@ struct StreamInfoImpl : public StreamInfo {
       // derive final time from other info's complete duration and start time.
       final_time_ = info.startTimeMonotonic() + info.requestComplete().value();
     }
-    response_flags_ = info.responseFlags();
+    response_flags_.clear();
+    auto other_response_flags = info.responseFlags();
+    response_flags_.insert(response_flags_.end(), other_response_flags.begin(),
+                           other_response_flags.end());
     health_check_request_ = info.healthCheck();
     route_ = info.route();
     metadata_ = info.dynamicMetadata();
@@ -423,7 +428,7 @@ private:
 public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
-  uint64_t response_flags_{};
+  absl::InlinedVector<uint16_t, 4> response_flags_{};
   bool health_check_request_{};
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};

@@ -24,11 +24,17 @@ const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, boo
   // We don't expect more than 4 flags are set. Relax to 16 since the vector is allocated on stack
   // anyway.
   absl::InlinedVector<absl::string_view, 16> flag_strings_vec;
-  for (const auto& [flag_strings, flag] : ALL_RESPONSE_STRINGS_FLAGS) {
-    if (stream_info.hasResponseFlag(flag)) {
-      flag_strings_vec.push_back(use_long_name ? flag_strings.long_string_
-                                               : flag_strings.short_string_);
+
+  const auto& all_flag_strings = responseFlagsVec();
+  for (const uint16_t flag : stream_info.responseFlags()) {
+    if (flag >= all_flag_strings.size()) {
+      ASSERT(false, fmt::format("Unexpected flag index: {}", flag));
+      continue;
     }
+
+    const auto flag_strings = all_flag_strings[flag];
+    flag_strings_vec.push_back(use_long_name ? flag_strings.long_string_
+                                             : flag_strings.short_string_);
   }
   if (flag_strings_vec.empty()) {
     return std::string(NONE);
@@ -36,27 +42,76 @@ const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, boo
   return absl::StrJoin(flag_strings_vec, ",");
 }
 
-absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
-  static_assert(ResponseFlag::LastFlag == 0x8000000,
-                "A flag has been added. Add the new flag to ALL_RESPONSE_STRINGS_FLAGS.");
-  absl::flat_hash_map<std::string, ResponseFlag> res;
-  for (auto [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
-    res.emplace(flag_strings.short_string_, flag);
-  }
-  return res;
+ResponseFlagUtils::CustomResponseFlagsMap& ResponseFlagUtils::customResponseFlags() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(CustomResponseFlagsMap);
 }
 
-absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
-  // This `MapType` is introduce because CONSTRUCT_ON_FIRST_USE doesn't like template.
-  using MapType = absl::flat_hash_map<std::string, ResponseFlag>;
-  const auto& flag_map = []() {
-    CONSTRUCT_ON_FIRST_USE(MapType, ResponseFlagUtils::getFlagMap());
-  }();
+uint16_t ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag,
+                                               absl::string_view custom_flag_long) {
+  auto& custom_flags = customResponseFlags();
+  RELEASE_ASSERT(
+      !custom_flags.contains(custom_flag),
+      fmt::format("Custom flag: {}/{} already registered", custom_flag, custom_flag_long));
+
+  uint16_t next_flag = static_cast<uint16_t>(ResponseFlag::LastFlag) + 1 + custom_flags.size();
+
+  custom_flags.emplace(custom_flag, std::make_pair(next_flag, std::string(custom_flag_long)));
+
+  return next_flag;
+}
+
+const ResponseFlagUtils::ResponseFlagsVec& ResponseFlagUtils::responseFlagsVec() {
+  CONSTRUCT_ON_FIRST_USE(ResponseFlagsVec, []() {
+    static_assert(ResponseFlag::LastFlag == 27,
+                  "A flag has been added. Add the new flag to ALL_RESPONSE_STRINGS_FLAGS.");
+    RELEASE_ASSERT(ALL_RESPONSE_STRINGS_FLAGS.size() == ResponseFlag::LastFlag + 1,
+                   "Not all inlined flags are contained by ALL_RESPONSE_STRINGS_FLAGS.");
+
+    ResponseFlagsVec res;
+
+    res.resize(ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS.size() + customResponseFlags().size());
+    for (const auto& [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+      res[static_cast<uint16_t>(flag)] = flag_strings;
+    }
+    for (const auto& [custom_flag, custom_flag_data] : customResponseFlags()) {
+      RELEASE_ASSERT(custom_flag_data.first < res.size(), "Custom flag out of range.");
+      res[custom_flag_data.first] = {custom_flag, custom_flag_data.second};
+    }
+
+    return res;
+  }());
+}
+const ResponseFlagUtils::ResponseFlagsMap& ResponseFlagUtils::responseFlagsMap() {
+  CONSTRUCT_ON_FIRST_USE(ResponseFlagsMap, []() {
+    ResponseFlagsMap res;
+
+    res.reserve(ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS.size() +
+                customResponseFlags().size());
+    for (const auto& [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+      res.emplace(flag_strings.short_string_, flag);
+    }
+
+    for (const auto& [custom_flag, custom_flag_data] : customResponseFlags()) {
+      res.emplace(custom_flag, custom_flag_data.first);
+    }
+
+    return res;
+  }());
+}
+
+absl::optional<uint16_t> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
+  const auto& flag_map = responseFlagsMap();
+
   const auto& it = flag_map.find(flag);
   if (it != flag_map.end()) {
-    return absl::make_optional<ResponseFlag>(it->second);
+    return absl::make_optional<uint16_t>(it->second);
   }
   return absl::nullopt;
+}
+
+CustomResponseFlagRegister::CustomResponseFlagRegister(absl::string_view flag,
+                                                       absl::string_view flag_long) {
+  flag_ = ResponseFlagUtils::registerCustomFlag(flag, flag_long);
 }
 
 OptRef<const UpstreamTiming> getUpstreamTiming(const StreamInfo& stream_info) {

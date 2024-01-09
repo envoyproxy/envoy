@@ -36,63 +36,63 @@ using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
 namespace StreamInfo {
 
-enum ResponseFlag {
+enum ResponseFlag : uint16_t {
   // Local server healthcheck failed.
-  FailedLocalHealthCheck = 0x1,
+  FailedLocalHealthCheck,
   // No healthy upstream.
-  NoHealthyUpstream = 0x2,
+  NoHealthyUpstream,
   // Request timeout on upstream.
-  UpstreamRequestTimeout = 0x4,
+  UpstreamRequestTimeout,
   // Local codec level reset was sent on the stream.
-  LocalReset = 0x8,
+  LocalReset,
   // Remote codec level reset was received on the stream.
-  UpstreamRemoteReset = 0x10,
+  UpstreamRemoteReset,
   // Local reset by a connection pool due to an initial connection failure.
-  UpstreamConnectionFailure = 0x20,
+  UpstreamConnectionFailure,
   // If the stream was locally reset due to connection termination.
-  UpstreamConnectionTermination = 0x40,
+  UpstreamConnectionTermination,
   // The stream was reset because of a resource overflow.
-  UpstreamOverflow = 0x80,
+  UpstreamOverflow,
   // No route found for a given request.
-  NoRouteFound = 0x100,
+  NoRouteFound,
   // Request was delayed before proxying.
-  DelayInjected = 0x200,
+  DelayInjected,
   // Abort with error code was injected.
-  FaultInjected = 0x400,
+  FaultInjected,
   // Request was ratelimited locally by rate limit filter.
-  RateLimited = 0x800,
+  RateLimited,
   // Request was unauthorized by external authorization service.
-  UnauthorizedExternalService = 0x1000,
+  UnauthorizedExternalService,
   // Unable to call Ratelimit service.
-  RateLimitServiceError = 0x2000,
+  RateLimitServiceError,
   // If the stream was reset due to a downstream connection termination.
-  DownstreamConnectionTermination = 0x4000,
+  DownstreamConnectionTermination,
   // Exceeded upstream retry limit.
-  UpstreamRetryLimitExceeded = 0x8000,
+  UpstreamRetryLimitExceeded,
   // Request hit the stream idle timeout, triggering a 408.
-  StreamIdleTimeout = 0x10000,
+  StreamIdleTimeout,
   // Request specified x-envoy-* header values that failed strict header checks.
-  InvalidEnvoyRequestHeaders = 0x20000,
+  InvalidEnvoyRequestHeaders,
   // Downstream request had an HTTP protocol error
-  DownstreamProtocolError = 0x40000,
+  DownstreamProtocolError,
   // Upstream request reached to user defined max stream duration.
-  UpstreamMaxStreamDurationReached = 0x80000,
+  UpstreamMaxStreamDurationReached,
   // True if the response was served from an Envoy cache filter.
-  ResponseFromCacheFilter = 0x100000,
+  ResponseFromCacheFilter,
   // Filter config was not received within the permitted warming deadline.
-  NoFilterConfigFound = 0x200000,
+  NoFilterConfigFound,
   // Request or connection exceeded the downstream connection duration.
-  DurationTimeout = 0x400000,
+  DurationTimeout,
   // Upstream response had an HTTP protocol error
-  UpstreamProtocolError = 0x800000,
+  UpstreamProtocolError,
   // No cluster found for a given request.
-  NoClusterFound = 0x1000000,
+  NoClusterFound,
   // Overload Manager terminated the stream.
-  OverloadManager = 0x2000000,
+  OverloadManager,
   // DNS resolution failed.
-  DnsResolutionFailed = 0x4000000,
+  DnsResolutionFailed,
   // Drop certain percentage of overloaded traffic.
-  DropOverLoad = 0x8000000,
+  DropOverLoad,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
   LastFlag = DropOverLoad,
 };
@@ -596,7 +596,7 @@ public:
    * @param response_flag the response flag. Each filter can set independent response flags. The
    * flags are accumulated.
    */
-  virtual void setResponseFlag(ResponseFlag response_flag) PURE;
+  virtual void setResponseFlag(uint16_t response_flag) PURE;
 
   /**
    * @param code the HTTP response code to set for this request.
@@ -616,13 +616,6 @@ public:
    */
   virtual void
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
-
-  /**
-   * @param response_flags the response_flags to intersect with.
-   * @return true if the intersection of the response_flags argument and the currently set response
-   * flags is non-empty.
-   */
-  virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
    * @return std::string& the name of the route. The name is get from the route() and it is
@@ -758,7 +751,7 @@ public:
   /**
    * @return whether response flag is set or not.
    */
-  virtual bool hasResponseFlag(ResponseFlag response_flag) const PURE;
+  virtual bool hasResponseFlag(uint16_t response_flag) const PURE;
 
   /**
    * @return whether any response flag is set or not.
@@ -768,7 +761,7 @@ public:
   /**
    * @return response flags encoded as an integer.
    */
-  virtual uint64_t responseFlags() const PURE;
+  virtual absl::Span<const uint16_t> responseFlags() const PURE;
 
   /**
    * @return whether the request is a health check request or not.

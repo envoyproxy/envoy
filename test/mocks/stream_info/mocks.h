@@ -67,11 +67,10 @@ public:
   ~MockStreamInfo() override;
 
   // StreamInfo::StreamInfo
-  MOCK_METHOD(void, setResponseFlag, (ResponseFlag response_flag));
+  MOCK_METHOD(void, setResponseFlag, (uint16_t response_flag));
   MOCK_METHOD(void, setResponseCode, (uint32_t));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
   MOCK_METHOD(void, setConnectionTerminationDetails, (absl::string_view));
-  MOCK_METHOD(bool, intersectResponseFlags, (uint64_t), (const));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(SystemTime, startTime, (), (const));
   MOCK_METHOD(MonotonicTime, startTimeMonotonic, (), (const));
@@ -105,9 +104,9 @@ public:
   MOCK_METHOD(uint64_t, bytesSent, (), (const));
   MOCK_METHOD(void, addWireBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesSent, (), (const));
-  MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
+  MOCK_METHOD(bool, hasResponseFlag, (uint16_t), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));
-  MOCK_METHOD(uint64_t, responseFlags, (), (const));
+  MOCK_METHOD(absl::Span<const uint16_t>, responseFlags, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
@@ -153,7 +152,7 @@ public:
   absl::optional<std::string> connection_termination_details_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
-  uint64_t response_flags_{};
+  absl::InlinedVector<uint16_t, 4> response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};

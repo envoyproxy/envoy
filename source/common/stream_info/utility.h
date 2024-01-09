@@ -10,6 +10,25 @@
 namespace Envoy {
 namespace StreamInfo {
 
+class CustomResponseFlag {
+public:
+  CustomResponseFlag(absl::string_view flag, absl::string_view flag_long);
+  uint16_t flag() const { return flag_; }
+
+private:
+  uint16_t flag_{};
+};
+
+// Register a custom response flag by specifying the flag and the long name of the flag.
+// This macro should never be used in header files.
+#define REGISTER_CUSTOM_RESPONSE_FLAG(flag, flag_long)                                             \
+  static CustomResponseFlag /* NOLINT(fuchsia-statically-constructed-objects) */                   \
+      registered##flag{flag, flag_long};
+
+// Get the registered flag value.
+// This macro should never be used in header files.
+#define CUSTOM_RESPONSE_FLAG(flag) registered##flag.flag()
+
 /**
  * Util class for ResponseFlags.
  */
@@ -17,12 +36,17 @@ class ResponseFlagUtils {
 public:
   static const std::string toString(const StreamInfo& stream_info);
   static const std::string toShortString(const StreamInfo& stream_info);
-  static absl::optional<ResponseFlag> toResponseFlag(absl::string_view response_flag);
+  static absl::optional<uint16_t> toResponseFlag(absl::string_view response_flag);
 
   struct FlagStrings {
-    const absl::string_view short_string_;
-    const absl::string_view long_string_; // PascalCase string
+    absl::string_view short_string_;
+    absl::string_view long_string_; // PascalCase string
   };
+
+  using ResponseFlagsVec = std::vector<FlagStrings>;
+  using ResponseFlagsMap = absl::flat_hash_map<std::string, uint16_t>;
+  static const ResponseFlagsVec& responseFlagsVec();
+  static const ResponseFlagsMap& responseFlagsMap();
 
   using FlagStringsAndEnum = std::pair<const FlagStrings, ResponseFlag>;
 
@@ -145,9 +169,23 @@ public:
   };
 
 private:
+  friend class CustomResponseFlag;
+
   ResponseFlagUtils();
   static const std::string toString(const StreamInfo& stream_info, bool use_long_name);
-  static absl::flat_hash_map<std::string, ResponseFlag> getFlagMap();
+
+  /**
+   * Register a custom response flag.
+   * @param flag supplies the flag to register. It should be an all upper case string with only
+   * multiple characters.
+   * @param flag_long supplies the long name of the flag to register. It should be PascalCase
+   * string.
+   * @return uint16_t the flag value.
+   */
+  static uint16_t registerCustomFlag(absl::string_view flag, absl::string_view flag_long);
+
+  using CustomResponseFlagsMap = absl::flat_hash_map<std::string, std::pair<uint16_t, std::string>>;
+  static CustomResponseFlagsMap& customResponseFlags();
 };
 
 class TimingUtility {
