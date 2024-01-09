@@ -18,8 +18,8 @@ class GlobTemplateMatcher : public Filters::Common::RBAC::Matcher,
                             public Logger::Loggable<Logger::Id::rbac> {
 public:
   GlobTemplateMatcher(
-      const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig& proto) 
-      : glob_matcher_(proto) {};
+      const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig& proto)
+      : glob_matcher_(proto){};
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
