@@ -18,8 +18,8 @@ envoy_proto_library(
 )
 
 envoy_cc_test(
-    name = "listener_impl_integration_test",
-    srcs = ["listener_impl_integration_test.cc"],
+    name = "listener_impl_test",
+    srcs = ["listener_impl_test.cc"],
     data = [
         "internal_listener.yaml",
         "internal_listener_missing_bootstrap.yaml",
