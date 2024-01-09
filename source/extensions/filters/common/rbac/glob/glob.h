@@ -13,7 +13,7 @@ namespace Common {
 namespace RBAC {
 namespace Matchers {
 
-// RBAC matcher extension for matching URL patht according to glob standard.
+// RBAC matcher extension for matching URL path according to glob standard.
 class GlobTemplateMatcher : public Filters::Common::RBAC::Matcher,
                             public Logger::Loggable<Logger::Id::rbac> {
 public:
