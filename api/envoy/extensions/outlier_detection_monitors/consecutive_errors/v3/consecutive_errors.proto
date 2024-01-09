@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.outlier_detection_monitors.consecutive_errors.v3;
 
-import "envoy/extensions/outlier_detection_monitors/common/v3/error_types.proto";
+import "envoy/extensions/outlier_detection_monitors/error_types/v3/error_types.proto";
 
 import "google/protobuf/wrappers.proto";
 
