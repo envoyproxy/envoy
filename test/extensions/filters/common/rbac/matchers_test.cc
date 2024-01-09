@@ -544,7 +544,7 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
 }
 
-TEST(GlobMatcherFactory, glob) {
+TEST(GlobMatcherFactory, GlobMatcherFactory) {
   const std::string yaml_string = R"EOF(
       name: envoy.rbac.matchers.glob_matcher
       typed_config:
