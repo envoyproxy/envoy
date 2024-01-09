@@ -66,10 +66,11 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({GetParam()}),
-        peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
-                                                        12345)),
+        peer_addr_(
+            Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(), 0)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         54321)),
+        peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
             quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
@@ -120,6 +121,7 @@ public:
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
+    peer_socket_->close();
   }
 
   EnvoyQuicClientStream& sendGetRequest(Http::ResponseDecoder& response_decoder,
@@ -144,8 +146,12 @@ protected:
   EnvoyQuicAlarmFactory alarm_factory_;
   quic::ParsedQuicVersionVector quic_version_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
+  // Initialized with port 0 and modified during peer_socket_ creation.
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
+  // Used in some tests to trigger a read event on the connection to test its full interaction with
+  // socket read utility functions.
+  Network::ConnectionSocketPtr peer_socket_;
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   TestEnvoyQuicClientConnection* quic_connection_;
@@ -415,10 +421,7 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   Buffer::RawSlice slice;
   slice.mem_ = const_cast<char*>(stateless_reset_packet->data());
   slice.len_ = stateless_reset_packet->length();
-  Network::ConnectionSocketPtr peer_socket =
-      createConnectionSocket(new_self_address, peer_addr_, nullptr);
-  peer_socket->connect(new_self_address);
-  peer_socket->ioHandle().writev(&slice, 1);
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *new_self_address);
 
   // Receiving the STATELESS_RESET on the probing socket shouldn't close the connection but should
   // fail the probing.
@@ -430,7 +433,6 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
-  peer_socket->close();
 }
 
 } // namespace Quic
