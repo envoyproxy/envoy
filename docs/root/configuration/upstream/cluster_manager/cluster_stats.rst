@@ -268,10 +268,10 @@ If TLS is used by the cluster the following statistics are rooted at *cluster.<n
 
 .. _config_cluster_manager_cluster_stats_certs:
 
-TLS & CA certificates
+TLS and CA certificates
 ---------------------
 
-TLS & CA certificate statistics are rooted in the *cluster.<name>.ssl.certificate.<cert_name>.*:
+TLS and CA certificate statistics are rooted in the ``cluster.<name>.ssl.certificate.<cert_name>.``:
 
 .. include:: ../../../_include/cert_stats.rst
 
