@@ -8,7 +8,7 @@
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
-#include "gunit/gunit.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 
