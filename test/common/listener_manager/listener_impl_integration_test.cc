@@ -12,7 +12,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-
+namespace Server {
+namespace {
 // Regression test for https://github.com/envoyproxy/envoy/issues/28413
 TEST(ConfigValidateTest, ValidateGood) {
   Server::TestComponentFactory component_factory;
@@ -30,5 +31,6 @@ TEST(ConfigValidateTest, ValidateBad) {
                               Network::Address::InstanceConstSharedPtr(), component_factory,
                               Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
 }
-
+} // namespace
+} // namespace Server
 } // namespace Envoy
