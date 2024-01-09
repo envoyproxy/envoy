@@ -1,6 +1,7 @@
 #include "envoy/network/address.h"
 
 #include "source/server/config_validation/server.h"
+
 #include "test/integration/server.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
