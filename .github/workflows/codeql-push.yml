@@ -6,9 +6,10 @@ permissions:
 on:
   push:
     paths:
-    - 'source/common/**'
+    - include/**
+    - source/common/**
     branches-ignore:
-    - 'dependabot/**'
+    - dependabot/**
   pull_request:
 
 concurrency:
@@ -22,31 +23,30 @@ env:
 jobs:
   CodeQL-Build:
     permissions:
+      actions: read
+      contents: read
       # for github/codeql-action/analyze to upload SARIF results
       security-events: write
       pull-requests: read
     runs-on: ubuntu-20.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
-    - name: Pre-cleanup
-      uses: envoyproxy/toolshed/gh-actions/diskspace@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
-      with:
-        to_remove: |
-          /usr/local/lib/android
-
     - name: Checkout repository
       uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+      with:
+        fetch-depth: 2
 
     - name: Get build targets
       run: |
         # TODO(phlax): Shift this to an action
         compare_head () {
             while IFS= read -r line; do
+                echo "CHECK: ${line}"
                 bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
-            done < <(git diff --name-only HEAD FETCH_HEAD -- source/* include/*)
+            done < <(git diff --name-only HEAD "${1}" -- source/* include/*)
         }
         if [[ "$GIT_EVENT" == "pull_request" ]]; then
-            git fetch https://github.com/envoyproxy/envoy.git main 2> /dev/null
+            git fetch "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2> /dev/null
             TO_OTHER=FETCH_HEAD
         else
             TO_OTHER=HEAD^1
@@ -57,6 +57,13 @@ jobs:
         echo 'EOF' >> $GITHUB_ENV
       env:
         GIT_EVENT: ${{ github.event_name }}
+
+    - name: Free disk space
+      if: ${{ env.BUILD_TARGETS != '' }}
+      uses: envoyproxy/toolshed/gh-actions/diskspace@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+      with:
+        to_remove: |
+          /usr/local/lib/android
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
