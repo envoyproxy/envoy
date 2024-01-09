@@ -220,7 +220,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   onComplete();
 }
 
-void Client::DirectStreamCallbacks::resumeData(int32_t bytes_to_send) {
+void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
   ASSERT(explicit_flow_control_);
   ASSERT(bytes_to_send > 0);
 
