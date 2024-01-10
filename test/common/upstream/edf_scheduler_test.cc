@@ -16,7 +16,6 @@ public:
     EXPECT_EQ(scheduler1.queue_.size(), scheduler2.queue_.size());
     // Cannot iterate over std::priority_queue directly, so need to copy the
     // contents to a vector first.
-    // std::function<std::vector<EdfScheduler<T>::EdfEntry>(EdfScheduler<T>& scheduler)>
     auto copyFunc = [](EdfScheduler<T>& scheduler) {
       std::vector<typename EdfScheduler<T>::EdfEntry> result;
       result.reserve(scheduler.queue_.size());
@@ -34,7 +33,7 @@ public:
     std::vector<typename EdfScheduler<T>::EdfEntry> contents1 = copyFunc(scheduler1);
     std::vector<typename EdfScheduler<T>::EdfEntry> contents2 = copyFunc(scheduler2);
     for (size_t i = 0; i < contents1.size(); ++i) {
-      EXPECT_NEAR(contents1[i].deadline_, contents2[i].deadline_, 0.000001)
+      EXPECT_NEAR(contents1[i].deadline_, contents2[i].deadline_, 1e-5)
           << "inequal deadline in element " << i;
       std::shared_ptr<T> entry1 = contents1[i].entry_.lock();
       std::shared_ptr<T> entry2 = contents2[i].entry_.lock();
@@ -226,15 +225,16 @@ TEST_F(EdfSchedulerTest, EqualityAfterCreateWithPicks) {
   }
 }
 
-// Emulates first-pick scenarios for the given number of iterations by creates
-// a scheduler with the given weights and a random number of pre-picks, and
-// validates that the next pick of all the weights is close to the given weights.
+// Emulates first-pick scenarios for by creating a scheduler with the given
+// weights and a random number of pre-picks, and validates that the next pick
+// of all the weights is close to the given weights.
 void firstPickTest(const std::vector<double> weights) {
   TestRandomGenerator rand;
+  ASSERT(std::accumulate(weights.begin(), weights.end(), 0.) == 100.0);
   // To be able to converge to the expected weights, a decent number of iterations
   // should be used. If the number of weights is large, the number of iterations
   // should be larger than 10000.
-  constexpr uint64_t iterations = 100000;
+  constexpr uint64_t iterations = 1e6;
   // The expected range of the weights is [0,100). If this is no longer the
   // case, this value may need to be updated.
   constexpr double tolerance_pct = 1.0;

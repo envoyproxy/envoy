@@ -91,9 +91,15 @@ public:
     }
 
     // Augment the weight computation to add some epsilon to each entry's
-    // weight to avoid cases where weights are multiplications one of each other.
+    // weight to avoid cases where weights are multiplies of each other. For
+    // example if there are 2 weights: 25 and 75, and picks=23, then the
+    // floor_picks will be {5, 17} (respectively), and the deadlines will be
+    // {0.24000000000000002 and 0.24} (respectively). This small difference will
+    // cause a "wrong" pick compared to when starting from an empty scheduelr
+    // and picking 23 times. Adding a small value to each weight circumvents
+    // this problem.
     auto aug_calculate_weight = [&calculate_weight](const C& entry) -> double {
-      return calculate_weight(entry) + 0.00000000001;
+      return calculate_weight(entry) + 1e-10;
     };
 
     // Let weights {w_1, w_2, ..., w_N} be the per-entry weight where (w_i > 0),
@@ -120,10 +126,9 @@ public:
     // Pre-compute the priority-queue entries to use an O(N) initialization c'tor.
     std::vector<EdfEntry> scheduler_entries;
     scheduler_entries.reserve(entries.size());
-    uint32_t order_offset = 0;
     uint32_t picks_so_far = 0;
     double max_pick_time = 0.0;
-    // Emulate a per-entry add to a deadline that is applicable to N picks.
+    // Emulate a per-entry addition to a deadline that is applicable to N picks.
     for (size_t i = 0; i < entries.size(); ++i) {
       // Add the entry with c'_i picks. As there were c'_i picks, the entry's
       // next deadline is (c'_i + 1) / w_i.
@@ -132,19 +137,19 @@ public:
       const double deadline = pick_time + 1.0 / weight;
       EDF_TRACE("Insertion {} in queue with emualted {} picks, deadline {} and weight {}.",
                 static_cast<const void*>(entries[i].get()), floor_picks[i], deadline, weight);
-      scheduler_entries.emplace_back(EdfEntry{deadline, order_offset++, entries[i]});
+      scheduler_entries.emplace_back(EdfEntry{deadline, i, entries[i]});
       max_pick_time = std::max(max_pick_time, pick_time);
       picks_so_far += floor_picks[i];
     }
     // The scheduler's current_time_ needs to be the largest time that some entry was picked.
-    EdfScheduler<C> scheduler(std::move(scheduler_entries), max_pick_time, order_offset);
+    EdfScheduler<C> scheduler(std::move(scheduler_entries), max_pick_time, entries.size());
     ASSERT(scheduler.queue_.top().deadline_ >= scheduler.current_time_);
 
     // Left to do some picks, execute them one after the other.
     EDF_TRACE("Emulated {} picks in init step, {} picks remaining for one after the other step",
               picks_so_far, picks - picks_so_far);
     for (; picks_so_far < picks; ++picks_so_far) {
-      scheduler.pickAndAdd(aug_calculate_weight);
+      scheduler.pickAndAdd(calculate_weight);
     }
     return scheduler;
   }
