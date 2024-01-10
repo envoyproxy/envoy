@@ -46,6 +46,9 @@ behavior_changes:
     Handle empty response bodies in ``grpc_http1_reverse_bridge``. This may cause problems for clients expecting the filter to crash
     for empty responses.  This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` to ``false``.
+- area: access_log
+  change: |
+    Added issuer in certificate_properties to the gRPC access log service(AlS).
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
