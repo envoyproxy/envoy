@@ -148,8 +148,9 @@ public:
     // Left to do some picks, execute them one after the other.
     EDF_TRACE("Emulated {} picks in init step, {} picks remaining for one after the other step",
               picks_so_far, picks - picks_so_far);
-    for (; picks_so_far < picks; ++picks_so_far) {
+    while (picks_so_far < picks) {
       scheduler.pickAndAdd(calculate_weight);
+      picks_so_far++;
     }
     return scheduler;
   }

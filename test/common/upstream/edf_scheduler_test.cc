@@ -172,7 +172,7 @@ TEST_F(EdfSchedulerTest, ManyPeekahead) {
 
 // Validates that creating a scheduler using the createWithPicks (with 0 picks)
 // is equal to creating an empty scheduler and adding entries one after the other.
-TEST_F(EdfSchedulerTest, EqualityAfterCreateEmpty) {
+TEST_F(EdfSchedulerTest, SchedulerWithZeroPicksEqualToEmptyWithAddedEntries) {
   constexpr uint32_t num_entries = 128;
   std::vector<std::shared_ptr<uint32_t>> entries;
   entries.reserve(num_entries);
@@ -193,7 +193,7 @@ TEST_F(EdfSchedulerTest, EqualityAfterCreateEmpty) {
 // Validates that creating a scheduler using the createWithPicks (with 5 picks)
 // is equal to creating an empty scheduler and adding entries one after the other,
 // and then performing some number of picks.
-TEST_F(EdfSchedulerTest, EqualityAfterCreateWithPicks) {
+TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEqualToEmptyWithAddedEntries) {
   constexpr uint32_t num_entries = 128;
   // Use double-precision weights from the range [0.01, 100.5].
   // Using different weights to avoid a case where entries with the same weight
@@ -272,7 +272,7 @@ void firstPickTest(const std::vector<double> weights) {
 // Validates that after creating schedulers using the createWithPicks (with random picks)
 // and then performing a "first-pick", the distribution of the "first-picks" is
 // equal to the weights.
-TEST_F(EdfSchedulerTest, CreateWithPicksFirstPickDistribution) {
+TEST_F(EdfSchedulerTest, SchedulerWithRandomPicksFirstPickDistribution) {
   firstPickTest({25.0, 75.0});
   firstPickTest({1.0, 99.0});
   firstPickTest({50.0, 50.0});
