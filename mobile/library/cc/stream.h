@@ -8,14 +8,12 @@
 #include "stream_callbacks.h"
 
 namespace Envoy {
-namespace Platform {
-
 class Engine;
-using EngineSharedPtr = std::shared_ptr<Engine>;
+namespace Platform {
 
 class Stream {
 public:
-  Stream(envoy_engine_t engine_handle, envoy_stream_t handle);
+  Stream(Envoy::Engine* engine, envoy_stream_t handle);
 
   Stream& sendHeaders(RequestHeadersSharedPtr headers, bool end_stream);
   Stream& sendData(envoy_data data);
@@ -25,7 +23,7 @@ public:
   void cancel();
 
 private:
-  envoy_engine_t engine_handle_;
+  Envoy::Engine* engine_;
   envoy_stream_t handle_;
 };
 
