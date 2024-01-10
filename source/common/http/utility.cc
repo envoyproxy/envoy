@@ -22,6 +22,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -779,6 +780,61 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       prepareLocalReply(encode_functions, local_reply_data);
 
   encodeLocalReply(is_reset, std::move(prepared_local_reply));
+}
+
+bool Utility::remoteAddressIsTrustedProxy(
+    const Envoy::Network::Address::InstanceConstSharedPtr& remote,
+    const std::vector<Network::Address::CidrRange> trusted_cidrs) {
+  for (const auto& cidr : trusted_cidrs) {
+    if (cidr.isInRange(*remote.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
+    const Http::RequestHeaderMap& request_headers,
+    const std::vector<Network::Address::CidrRange> trusted_cidrs) {
+  const auto xff_header = request_headers.ForwardedFor();
+  if (xff_header == nullptr) {
+    return {nullptr, false};
+  }
+
+  absl::string_view xff_string(xff_header->value().getStringView());
+  static constexpr absl::string_view separator(",");
+
+  const auto xff_entries = StringUtil::splitToken(xff_string, separator, false, true);
+
+  for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {
+    auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(*it));
+    if (addr == nullptr) {
+      continue;
+    }
+
+    bool trusted = false;
+    for (const auto& cidr : trusted_cidrs) {
+      if (cidr.isInRange(*addr.get())) {
+        trusted = true;
+        break;
+      }
+    }
+
+    if (trusted) {
+      continue;
+    }
+
+    // If we reach here we found a non-trusted address
+    if (Network::Utility::isInternalAddress(*addr.get()) ||
+        Network::Utility::isLoopbackAddress(*addr.get())) {
+      // If the next IP after skipping all trusted IPs is internal or loopback
+      // we cannot determine the true remote IP: Either a proxy didn't add its IP,
+      // or XFF is malformed.
+      return {nullptr, false};
+    }
+    return {addr, true};
+  }
+  return {nullptr, false};
 }
 
 Utility::GetLastAddressFromXffInfo
