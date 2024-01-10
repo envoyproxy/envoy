@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package envoy.extensions.compression.qatzstd.compressor.v3alpha;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.compression.qatzstd.compressor.v3alpha";
+option java_outer_classname = "QatzstdProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/compression/qatzstd/compressor/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Qatzstd Compressor]
+// [#extension: envoy.compression.qatzstd.compressor]
+
+// [#next-free-field: 8]
+message Qatzstd {
+  // Reference to http://facebook.github.io/zstd/zstd_manual.html
+  enum Strategy {
+    DEFAULT = 0;
+    FAST = 1;
+    DFAST = 2;
+    GREEDY = 3;
+    LAZY = 4;
+    LAZY2 = 5;
+    BTLAZY2 = 6;
+    BTOPT = 7;
+    BTULTRA = 8;
+    BTULTRA2 = 9;
+  }
+
+  // Set compression parameters according to pre-defined compression level table.
+  // Note that exact compression parameters are dynamically determined,
+  // depending on both compression level and source content size (when known).
+  // Value 0 means default, and default level is 3.
+  // Setting a level does not automatically set all other compression parameters
+  // to default. Setting this will however eventually dynamically impact the compression
+  // parameters which have not been manually set. The manually set
+  // ones will 'stick'.
+  google.protobuf.UInt32Value compression_level = 1;
+
+  // A 32-bits checksum of content is written at end of frame. If not set, defaults to false.
+  bool enable_checksum = 2;
+
+  // The higher the value of selected strategy, the more complex it is,
+  // resulting in stronger and slower compression.
+  // Special: value 0 means "use default strategy".
+  Strategy strategy = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // A dictionary for compression. Zstd offers dictionary compression, which greatly improves
+  // efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
+  // that can be used to search the same dictionary during decompression.
+  // Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
+  // to train a specific dictionary for compression.
+  config.core.v3.DataSource dictionary = 4;
+
+  // Value for compressor's next output buffer. If not set, defaults to 4096.
+  google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
+
+  
+  // Enable QAT to accelerate zstd compresstion or not. If not set, defaults to false.
+  bool enable_qat_zstd = 6;
+
+  // Fall back to software for QAT-zstd when input size is less than this value.
+  // Valid only enable_qat_zstd is true. 0 means no fallback at all. If not set, defaults to 4000.
+  google.protobuf.UInt32Value qat_zstd_fallback_threshold = 7 [(validate.rules).uint32 = {lte: 65536 gte: 0}];
+}

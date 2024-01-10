@@ -18,6 +18,11 @@ envoy.compression.qatzip.compressor:
   - envoy.compression.compressor
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
+envoy.compression.qatzstd.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http

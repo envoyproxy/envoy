@@ -5,6 +5,7 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.compression.qatzip.compressor":                      "//contrib/qat/compression/qatzip/compressor/source:config",
+    "envoy.compression.qatzstd.compressor":                      "//contrib/qat/compression/qatzstd/compressor/source:config",
 
     #
     # HTTP filters
