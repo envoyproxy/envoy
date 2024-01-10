@@ -127,7 +127,7 @@ jobs:
         title: >-
           [${{ (! inputs.summary || inputs.wip) && 'WIP/' || '' }}release/${{ steps.checkout.outputs.branch-name }}]
           repo: Release ${{ steps.release.outputs.version }}
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   sync_version_histories:
     runs-on: ubuntu-22.04
@@ -168,7 +168,7 @@ jobs:
         diff-upload: version-histories-${{ steps.checkout.outputs.branch-name }}
         diff-show: true
         dry-run: ${{ ! inputs.pr }}
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
         title: >-
           ${{ steps.checkout.outputs.branch-name != 'main' && '[${{ steps.checkout.outputs.branch-name }}]' || '' }}
           repo: Sync version histories
