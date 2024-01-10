@@ -37,7 +37,7 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/_mobile_container_ci.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-compile-time-options }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-compile-time-cc }}
     needs: load
     with:
       args: ${{ matrix.args }}
@@ -133,7 +133,8 @@ jobs:
     if: >-
       ${{ always()
           && github.event.workflow_run.conclusion == 'success'
-          && fromJSON(needs.load.outputs.request).run.mobile-compile-time-options }}
+          && (fromJSON(needs.load.outputs.request).run.mobile-compile-time-options
+              || fromJSON(needs.load.outputs.request).run.mobile-compile-time-options-cc) }}
     needs:
     - load
     - cc

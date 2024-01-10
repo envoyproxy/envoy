@@ -88,7 +88,7 @@ public:
   MockAddressResolver();
   ~MockAddressResolver() override;
 
-  MOCK_METHOD(Address::InstanceConstSharedPtr, resolve,
+  MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, resolve,
               (const envoy::config::core::v3::SocketAddress&));
   MOCK_METHOD(std::string, name, (), (const));
 };

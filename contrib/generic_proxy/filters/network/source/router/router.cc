@@ -271,11 +271,12 @@ void OwnedGenericUpstream::onDecodingFailure() {
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
-      stream_info_(parent.context_.serverFactoryContext().timeSource(), nullptr) {
+      stream_info_(parent.time_source_, nullptr),
+      upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()) {
 
   // Set the upstream info for the stream info.
-  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  parent_.callbacks_->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
+  stream_info_.setUpstreamInfo(upstream_info_);
+  parent_.callbacks_->streamInfo().setUpstreamInfo(upstream_info_);
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
 
@@ -289,11 +290,14 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr 
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
-        parent.context_.serverFactoryContext().timeSource().systemTime());
+        parent.time_source_.systemTime());
   }
 }
 
-void UpstreamRequest::startStream() { generic_upstream_->insertUpstreamRequest(stream_id_, this); }
+void UpstreamRequest::startStream() {
+  connecting_start_time_ = parent_.time_source_.monotonicTime();
+  generic_upstream_->insertUpstreamRequest(stream_id_, this);
+}
 
 void UpstreamRequest::resetStream(StreamResetReason reason) {
   if (stream_reset_) {
@@ -352,6 +356,9 @@ void UpstreamRequest::deferredDelete() {
 void UpstreamRequest::sendRequestStartToUpstream() {
   request_stream_header_sent_ = true;
   ASSERT(generic_upstream_ != nullptr);
+
+  // The first frame of request is sent.
+  upstream_info_->upstreamTiming().onFirstUpstreamTxByteSent(parent_.time_source_);
   generic_upstream_->clientCodec()->encode(*parent_.request_stream_, *this);
 }
 
@@ -377,6 +384,9 @@ void UpstreamRequest::onEncodingSuccess(Buffer::Instance& buffer, bool end_strea
   if (!end_stream) {
     return;
   }
+
+  // The request is fully sent.
+  upstream_info_->upstreamTiming().onLastUpstreamTxByteSent(parent_.time_source_);
 
   // Request is complete.
   ENVOY_LOG(debug, "upstream request encoding success");
@@ -412,7 +422,7 @@ void UpstreamRequest::onUpstreamSuccess(Upstream::HostDescriptionConstSharedPtr 
 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};
-    span_->injectContext(trace_context, upstream_host_);
+    span_->injectContext(trace_context, upstream_info_->upstream_host_);
   }
 
   sendRequestStartToUpstream();
@@ -426,18 +436,30 @@ void UpstreamRequest::onDecodingSuccess(StreamFramePtr response) {
   }
 
   if (response_stream_header_received_) {
-    parent_.onResponseFrame(std::move(response));
-    return;
-  }
+    if (end_stream) {
+      // The response is fully received.
+      upstream_info_->upstreamTiming().onLastUpstreamRxByteReceived(parent_.time_source_);
+    }
 
-  StreamFramePtrHelper<StreamResponse> helper(std::move(response));
-  if (helper.typed_frame_ == nullptr) {
-    ENVOY_LOG(error, "upstream request: first frame is not StreamResponse");
-    resetStream(StreamResetReason::ProtocolError);
-    return;
+    parent_.onResponseFrame(std::move(response));
+  } else {
+    // The first frame of response is received.
+    upstream_info_->upstreamTiming().onFirstUpstreamRxByteReceived(parent_.time_source_);
+
+    StreamFramePtrHelper<StreamResponse> helper(std::move(response));
+    if (helper.typed_frame_ == nullptr) {
+      ENVOY_LOG(error, "upstream request: first frame is not StreamResponse");
+      resetStream(StreamResetReason::ProtocolError);
+      return;
+    }
+    response_stream_header_received_ = true;
+
+    if (end_stream) {
+      // The response is fully received.
+      upstream_info_->upstreamTiming().onLastUpstreamRxByteReceived(parent_.time_source_);
+    }
+    parent_.onResponseStart(std::move(helper.typed_frame_));
   }
-  response_stream_header_received_ = true;
-  parent_.onResponseStart(std::move(helper.typed_frame_));
 }
 
 void UpstreamRequest::onDecodingFailure() { resetStream(StreamResetReason::ProtocolError); }
@@ -463,7 +485,10 @@ void UpstreamRequest::onConnectionClose(Network::ConnectionEvent event) {
 
 void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_LOG(debug, "upstream request: selected upstream {}", host->address()->asString());
-  upstream_host_ = std::move(host);
+  ASSERT(connecting_start_time_.has_value());
+  upstream_info_->upstreamTiming().recordConnectionPoolCallbackLatency(
+      connecting_start_time_.value(), parent_.time_source_);
+  upstream_info_->setUpstreamHost(std::move(host));
 }
 
 void UpstreamRequest::encodeBufferToUpstream(Buffer::Instance& buffer) {
@@ -524,18 +549,26 @@ void RouterFilter::resetStream(StreamResetReason reason) {
   ASSERT(upstream_requests_.empty());
   switch (reason) {
   case StreamResetReason::LocalReset:
+    // Note if the connection is closed because of the downstream connection close, this
+    // resetStream() will not be called. So this means the connection is closed by the Envoy self
+    // with unknown reason.
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ProtocolError:
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionFailure:
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionTermination:
+    callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UpstreamConnectionTermination);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::Overflow:
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   }
@@ -544,10 +577,10 @@ void RouterFilter::resetStream(StreamResetReason reason) {
 void RouterFilter::kickOffNewUpstreamRequest() {
   const auto& cluster_name = route_entry_->clusterName();
 
-  auto thread_local_cluster =
-      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster_name);
+  auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
     filter_complete_ = true;
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
     callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     return;
   }
@@ -557,6 +590,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
 
   if (cluster_->maintenanceMode()) {
     filter_complete_ = true;
+    // No response flag for maintenance mode for now.
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
     return;
   }
@@ -578,6 +612,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
       auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
       if (!pool_data.has_value()) {
         filter_complete_ = true;
+        callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
         callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
         return;
       }
@@ -597,6 +632,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
     if (!pool_data.has_value()) {
       filter_complete_ = true;
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
       callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
       return;
     }
@@ -634,6 +670,8 @@ FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
   }
 
   ENVOY_LOG(debug, "No route for current request and send local reply");
+  filter_complete_ = true;
+  callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
   callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "route_not_found"));
   return FilterStatus::StopIteration;
 }

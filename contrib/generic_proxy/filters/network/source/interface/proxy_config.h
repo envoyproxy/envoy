@@ -54,6 +54,11 @@ public:
   virtual GenericFilterStats& stats() PURE;
 
   /**
+   * @return code or flags stats name to use.
+   */
+  virtual const CodeOrFlags& codeOrFlags() const PURE;
+
+  /**
    * @return const std::vector<AccessLogInstanceSharedPtr>& access logs.
    */
   virtual const std::vector<AccessLogInstanceSharedPtr>& accessLogs() const PURE;

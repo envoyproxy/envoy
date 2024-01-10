@@ -456,6 +456,11 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   // In order to delegate to the StreamActivation method, we have to set the
   // context properties to match the Wasm context properties in all callbacks
   // (e.g. onLog or onEncodeHeaders) for the duration of the call.
+  if (root_local_info_) {
+    local_info_ = root_local_info_;
+  } else if (plugin_) {
+    local_info_ = &plugin()->localInfo();
+  }
   activation_info_ = info;
   activation_request_headers_ = request_headers_ ? request_headers_ : access_log_request_headers_;
   activation_response_headers_ =
