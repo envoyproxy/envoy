@@ -49,11 +49,11 @@ SigningAlgorithm getSigningAlgorithm(
 absl::StatusOr<Http::FilterFactoryCb>
 AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& server_context) {
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), makeOptRef(context), config.region(),
+          server_context.api(), makeOptRef(server_context), config.region(),
           Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
@@ -63,7 +63,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         config.service_name(), config.region(), credentials_provider,
-        context.mainThreadDispatcher().timeSource(), matcher_config);
+        server_context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     // Verify that we have not specified a region set formatted region for sigv4 algorithm
     if (isARegionSet(config.region())) {
@@ -72,7 +72,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         config.service_name(), config.region(), credentials_provider,
-        context.mainThreadDispatcher().timeSource(), matcher_config);
+        server_context.mainThreadDispatcher().timeSource(), matcher_config);
   }
 
   auto filter_config =
