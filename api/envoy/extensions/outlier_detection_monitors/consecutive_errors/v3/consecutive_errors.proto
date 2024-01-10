@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.outlier_detection_monitors.consecutive_errors.v3;
 
-import "envoy/extensions/outlier_detection_monitors/error_types/v3/error_types.proto";
+import "envoy/extensions/outlier_detection_monitors/common/v3/error_types.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -30,6 +30,5 @@ message ConsecutiveErrors {
   google.protobuf.UInt32Value enforcing = 3 [(validate.rules).uint32 = {lte: 100}];
 
   // List of error buckets.
-  repeated error_types.v3.ErrorBucket error_buckets = 4
-      [(validate.rules).repeated = {min_items: 1}];
+  repeated common.v3.ErrorBucket error_buckets = 4 [(validate.rules).repeated = {min_items: 1}];
 }

@@ -2,7 +2,8 @@ syntax = "proto3";
 
 package envoy.config.cluster.v3;
 
-import "google/protobuf/any.proto";
+import "envoy/config/core/v3/extension.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -24,16 +25,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message OutlierDetection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.OutlierDetection";
-
-  // Set of passive monitors.
-  // [#not-implemented-hide:]
-  message Monitor {
-    string name = 1 [(validate.rules).string = {min_len: 1}];
-
-    // Configuration for the outlier detection monitor being instantiated.
-    // [#extension-category: envoy.outlier_detection_monitors]
-    google.protobuf.Any typed_config = 2;
-  }
 
   // The number of consecutive server-side error responses (for HTTP traffic,
   // 5xx responses; for TCP traffic, connection failures; for Redis, failure to
@@ -181,5 +172,5 @@ message OutlierDetection {
 
   // Set of host's passive monitors.
   // [#not-implemented-hide:]
-  repeated Monitor monitors = 24;
+  repeated core.v3.TypedExtensionConfig monitors = 24;
 }

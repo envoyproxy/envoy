@@ -6,7 +6,7 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
-        "//envoy/extensions/outlier_detection_monitors/error_types/v3:pkg",
+        "//envoy/extensions/outlier_detection_monitors/common/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
     ],
 )
