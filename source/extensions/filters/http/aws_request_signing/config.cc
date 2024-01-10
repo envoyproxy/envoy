@@ -46,15 +46,13 @@ SigningAlgorithm getSigningAlgorithm(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-
-  auto& server_context = context.serverFactoryContext();
+    DualInfo dual_info, Server::Configuration::ServerFactoryContext& context) {
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), config.region(),
+          context.api(), makeOptRef(context), config.region(),
           Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
@@ -64,7 +62,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
   if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         config.service_name(), config.region(), credentials_provider,
-        server_context.mainThreadDispatcher().timeSource(), matcher_config);
+        context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     // Verify that we have not specified a region set formatted region for sigv4 algorithm
     if (isARegionSet(config.region())) {
@@ -73,11 +71,11 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         config.service_name(), config.region(), credentials_provider,
-        server_context.mainThreadDispatcher().timeSource(), matcher_config);
+        context.mainThreadDispatcher().timeSource(), matcher_config);
   }
 
   auto filter_config =
-      std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, context.scope(),
+      std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, dual_info.scope,
                                          config.host_rewrite(), config.use_unsigned_payload());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
@@ -126,6 +124,9 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
  */
 REGISTER_FACTORY(AwsRequestSigningFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAwsRequestSigningFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
+
 
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters

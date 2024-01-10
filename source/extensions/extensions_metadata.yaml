@@ -205,6 +205,7 @@ envoy.filters.http.aws_lambda:
 envoy.filters.http.aws_request_signing:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
   type_urls:
