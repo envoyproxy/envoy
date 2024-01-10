@@ -74,6 +74,24 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
 
 .. include:: _include/aws_credentials.rst
 
+Configuration as an upstream HTTP filter
+----------------------------------------
+SigV4 or SigV4A request signatures cover the HTTP host, URL and payload. Depending on the configuration, Envoy may modify these during
+prior to forwarding to the Cluster subsystem, but after the signature has been calculated and inserted into the HTTP headers. This will
+invalidate the signature, by design.
+To resolve this situation, the AWS Request Signing Filter can be configured as an upstream HTTP filter. This allows signatures to be
+calculated as a final step before the HTTP request is forwarded upstream, ensuring signatures are correctly calculated over the updated
+HTTP fields.
+
+An example of configuring this filter as an upstream HTTP filter:
+
+.. literalinclude:: _include/aws-request-signing-filter-upstream.yaml
+    :language: yaml
+    :lines: 56-100
+    :lineno-start: 56
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-upstream.yaml <_include/aws-request-signing-filter-upstream.yaml>`
+
 Statistics
 ----------
 
