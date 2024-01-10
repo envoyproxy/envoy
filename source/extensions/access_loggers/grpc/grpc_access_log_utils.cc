@@ -204,6 +204,9 @@ void Utility::extractCommonAccessLogProperties(
     }
 
     peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
+    peer_properties->set_issuer(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->issuerPeerCertificate()));
+
     tls_properties->set_tls_session_id(
         MessageUtil::sanitizeUtf8String(downstream_ssl_connection->sessionId()));
     tls_properties->set_tls_version(

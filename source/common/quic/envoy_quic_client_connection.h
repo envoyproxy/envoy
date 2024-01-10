@@ -27,6 +27,29 @@ class EnvoyQuicClientConnection : public quic::QuicConnection,
                                   public QuicNetworkConnection,
                                   public Network::UdpPacketProcessor {
 public:
+  // Holds all components needed for a QUIC connection probing/migration.
+  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
+  public:
+    EnvoyQuicPathValidationContext(const quic::QuicSocketAddress& self_address,
+                                   const quic::QuicSocketAddress& peer_address,
+                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
+                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
+
+    ~EnvoyQuicPathValidationContext() override;
+
+    quic::QuicPacketWriter* WriterToUse() override;
+
+    EnvoyQuicPacketWriter* releaseWriter();
+
+    Network::ConnectionSocket& probingSocket();
+
+    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
+
+  private:
+    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+    Network::ConnectionSocketPtr socket_;
+  };
+
   // A connection socket will be created with given |local_addr|. If binding
   // port not provided in |local_addr|, pick up a random port.
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
@@ -91,29 +114,6 @@ public:
   probeAndMigrateToServerPreferredAddress(const quic::QuicSocketAddress& server_preferred_address);
 
 private:
-  // Holds all components needed for a QUIC connection probing/migration.
-  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
-  public:
-    EnvoyQuicPathValidationContext(const quic::QuicSocketAddress& self_address,
-                                   const quic::QuicSocketAddress& peer_address,
-                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
-                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
-
-    ~EnvoyQuicPathValidationContext() override;
-
-    quic::QuicPacketWriter* WriterToUse() override;
-
-    EnvoyQuicPacketWriter* releaseWriter();
-
-    Network::ConnectionSocket& probingSocket();
-
-    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
-
-  private:
-    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
-    Network::ConnectionSocketPtr socket_;
-  };
-
   // Receives notifications from the Quiche layer on path validation results.
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
   public:

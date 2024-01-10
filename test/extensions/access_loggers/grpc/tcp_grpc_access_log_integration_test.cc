@@ -536,6 +536,7 @@ tcp_logs:
           subject_alt_name:
             uri: "spiffe://lyft.com/frontend-team"
           subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -600,6 +601,7 @@ tcp_logs:
           subject_alt_name:
             uri: "spiffe://lyft.com/frontend-team"
           subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
       upstream_remote_address:
         socket_address:
       upstream_local_address:
