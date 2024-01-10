@@ -323,9 +323,11 @@ absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params)
   case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Cumulative:
     result = absl::OkStatus();
+    break;
   case Utility::HistogramBucketsMode::Detailed:
   case Utility::HistogramBucketsMode::Disjoint:
     result = absl::InvalidArgumentError("unsupported prometheus histogram bucket mode");
+    break;
   }
   return result;
 }
