@@ -156,7 +156,7 @@ public:
 
   virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    const std::string& stats_prefix, DualInfo dual_info,
+                                    const std::string& stats_prefix, DualInfo info,
                                     Server::Configuration::ServerFactoryContext& context) PURE;
 };
 
