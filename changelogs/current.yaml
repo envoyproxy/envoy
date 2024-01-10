@@ -113,6 +113,9 @@ bug_fixes:
   change: |
     Fixed a bug in QUIC and HCM interaction which could cause ``use-after-free`` during asynchronous certificates retrieval.
     The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
+- area: quic
+  change: |
+    Fixed a bug in QUIC upstream port migration which could cause use-after-free upon STATELESS_RESET packets.
 - area: redis
   change: |
     Fixed a bug causing crash if incoming redis key does not match against a ``prefix_route`` and ``catch_all_route`` is not defined.
