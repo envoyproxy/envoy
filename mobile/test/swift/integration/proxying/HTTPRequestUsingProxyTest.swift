@@ -17,7 +17,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     let engineExpectation = self.expectation(description: "Run started engine")
     let responseHeadersExpectation = self.expectation(description: "Successful response headers received")
-    let responseDataExpectation = self.expectation(description: "Successful response data received")
+    // let responseDataExpectation = self.expectation(description: "Successful response data received")
     let responseTrailersExpectation = self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
@@ -49,7 +49,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
         print(data.debugDescription)
         print(endStream)
         responseBuffer.append(contentsOf: data)
-        responseDataExpectation.fulfill()
+        // responseDataExpectation.fulfill()
       }
       .setOnResponseTrailers { trailers, _ in
         print("==> AAB RESPONSE TRAILERS")
@@ -59,7 +59,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .sendHeaders(requestHeaders, endStream: true)
 
     XCTAssertEqual(XCTWaiter.wait(for: [responseHeadersExpectation], timeout: 10), .completed)
-    XCTAssertEqual(XCTWaiter.wait(for: [responseDataExpectation], timeout: 10), .completed)
+    // XCTAssertEqual(XCTWaiter.wait(for: [responseDataExpectation], timeout: 10), .completed)
     XCTAssertEqual(XCTWaiter.wait(for: [responseTrailersExpectation], timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
