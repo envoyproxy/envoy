@@ -21,7 +21,7 @@ using AwsRequestSigningProtoPerRouteConfig =
  */
 class AwsRequestSigningFilterFactory
     : public Common::DualFactoryBase<AwsRequestSigningProtoConfig,
-                                 AwsRequestSigningProtoPerRouteConfig> {
+                                     AwsRequestSigningProtoPerRouteConfig> {
 public:
   AwsRequestSigningFilterFactory() : DualFactoryBase("envoy.filters.http.aws_request_signing") {}
 

@@ -46,9 +46,10 @@ SigningAlgorithm getSigningAlgorithm(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-absl::StatusOr<Http::FilterFactoryCb> AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
-    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
-    DualInfo dual_info, Server::Configuration::ServerFactoryContext& context) {
+absl::StatusOr<Http::FilterFactoryCb>
+AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
+    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& context) {
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
@@ -126,7 +127,6 @@ REGISTER_FACTORY(AwsRequestSigningFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
 REGISTER_FACTORY(UpstreamAwsRequestSigningFilterFactory,
                  Server::Configuration::UpstreamHttpFilterConfigFactory);
-
 
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
