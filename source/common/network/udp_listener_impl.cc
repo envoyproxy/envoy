@@ -43,11 +43,8 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
     parent_drained_callback_registrar_->registerParentDrainedCallback(
         socket_->connectionInfoProvider().localAddress(),
         [this, &dispatcher, alive = std::weak_ptr<void>(destruction_checker_)]() {
-          std::cerr << "XXXXX callback" << std::endl;
           dispatcher.post([this, alive = std::move(alive)]() {
-            std::cerr << "XXXXX dispatch" << std::endl;
             if (alive.lock()) {
-              std::cerr << "XXXXX lock" << std::endl;
               unpause();
             }
           });
