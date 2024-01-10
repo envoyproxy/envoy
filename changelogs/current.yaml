@@ -164,6 +164,10 @@ bug_fixes:
     setting. The OAuth spec does not dictate that an authorization server must respond with an expiry. Envoy currently
     fails any OAuth flow if the expiry is not set. This setting allows you to provide a default in this case to ensure
     the OAuth flow can succeed.
+- area: aws_request_signing
+  change: |
+    Update aws_request_signing filter to support use as an upstream http filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
