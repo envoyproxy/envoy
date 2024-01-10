@@ -80,7 +80,6 @@ jobs:
     needs:
     - load
     - container
-    - host
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}
