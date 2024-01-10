@@ -317,15 +317,17 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 }
 
 absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params) {
+  absl::Status result;
   switch (params.histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Summary:
   case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Cumulative:
-    return absl::OkStatus();
+    result = absl::OkStatus();
   case Utility::HistogramBucketsMode::Detailed:
   case Utility::HistogramBucketsMode::Disjoint:
-    return absl::InvalidArgumentError("unsupported prometheus histogram bucket mode");
+    result = absl::InvalidArgumentError("unsupported prometheus histogram bucket mode");
   }
+  return result;
 }
 
 absl::optional<std::string>
