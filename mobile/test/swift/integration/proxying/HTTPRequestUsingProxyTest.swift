@@ -63,7 +63,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [responseTrailersExpectation], timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
-      XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 50)
+      XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
     }
 
     engine.terminate()
