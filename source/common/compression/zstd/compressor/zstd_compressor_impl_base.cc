@@ -8,8 +8,9 @@ namespace Zstd {
 namespace Compressor {
 
 ZstdCompressorImplBase::ZstdCompressorImplBase(uint32_t compression_level, bool enable_checksum,
-                                       uint32_t strategy, const ZstdCDictManagerPtr& cdict_manager,
-                                       uint32_t chunk_size)
+                                               uint32_t strategy,
+                                               const ZstdCDictManagerPtr& cdict_manager,
+                                               uint32_t chunk_size)
     : Common::Base(chunk_size), cctx_(ZSTD_createCCtx(), &ZSTD_freeCCtx),
       cdict_manager_(cdict_manager), compression_level_(compression_level) {
   size_t result;
@@ -29,18 +30,18 @@ ZstdCompressorImplBase::ZstdCompressorImplBase(uint32_t compression_level, bool 
 }
 
 void ZstdCompressorImplBase::compress(Buffer::Instance& buffer,
-                                  Envoy::Compression::Compressor::State state) {
-  compressPreprocess();
-  
+                                      Envoy::Compression::Compressor::State state) {
+  compressPreprocess(buffer, state);
+
   Buffer::OwnedImpl accumulation_buffer;
   for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
     if (input_slice.len_ > 0) {
-      compressProcess(input_slice, accumulation_buffer);
+      compressProcess(buffer, input_slice, accumulation_buffer);
       buffer.drain(input_slice.len_);
     }
   }
 
-  compressPostprocess();
+  compressPostprocess(accumulation_buffer);
 
   ASSERT(buffer.length() == 0);
   buffer.move(accumulation_buffer);

@@ -1,0 +1,85 @@
+diff --git a/src/Makefile b/src/Makefile
+index 1abf10d..a0c7e9a 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -41,6 +41,7 @@ LIBDIR     ?= $(INSTALLDIR)/lib
+ INCLUDEDIR ?= $(INSTALLDIR)/include
+ 
+ CP ?= cp
++MKDIR ?= mkdir
+ 
+ ENABLE_USDM_DRV ?= 0
+ ifneq ($(ICP_ROOT), )
+@@ -55,10 +56,8 @@ ifneq ($(ICP_ROOT), )
+ else
+ 	QATFLAGS = -DINTREE
+ 	LDFLAGS  = -lqat
+-	ifneq ($(ENABLE_USDM_DRV), 0)
+-		QATFLAGS += -DENABLE_USDM_DRV
+-		LDFLAGS	 += -lusdm
+-	endif
++	QATFLAGS += -DENABLE_USDM_DRV
++	LDFLAGS	 += -lusdm
+ endif
+ 
+ ifdef ZSTDLIB
+@@ -69,8 +68,8 @@ CFLAGS += -Wall -Werror -Wextra -Wcast-align -Wshadow -Wstrict-aliasing=1 \
+ 		  -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes \
+ 		  -Wundef -Wpointer-arith -Wvla -Wformat=2 -Winit-self \
+ 		  -Wfloat-equal -Wwrite-strings -Wredundant-decls -Wc++-compat \
+-		  -pedantic -fstack-protector-strong -fPIE -fPIC \
+-		  -fno-delete-null-pointer-checks -fwrapv -fno-strict-overflow
++		  -pedantic -fstack-protector-strong \
++		  -fno-delete-null-pointer-checks -fwrapv 
+ 
+ DEBUGLEVEL ?=0
+ 
+@@ -81,27 +80,30 @@ else
+ 	QATFLAGS += -O3
+ endif
+ 
++$(info INSTALLDIR="$(INSTALLDIR)")
++$(info CPPFLAGS="$(CPPFLAGS)")
++
+ qatseqprod.o: qatseqprod.c
+-	$(CC) -c $(CFLAGS) $(QATFLAGS) $(DEBUGFLAGS) $^ -o $@
++	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(QATFLAGS) $(DEBUGFLAGS) $^ -o $@
+ 
+ lib: qatseqprod.o
+ 	$(AR) rc libqatseqprod.a $^
+-	$(CC) -shared $^ $(LDFLAGS) -o libqatseqprod.so
++	@echo qatseqprod library successfully build
+ 
+ .PHONY: install
+ install: lib
++	$(MKDIR) -p $(LIBDIR)
++	$(MKDIR) -p $(INCLUDEDIR)
+ 	$(CP) libqatseqprod.a $(LIBDIR)
+-	$(CP) libqatseqprod.so $(LIBDIR)
+ 	$(CP) qatseqprod.h $(INCLUDEDIR)
+ 	@echo qatseqprod library successfully installed
+ 
+ .PHONY: uninstall
+ uninstall:
+ 	$(RM) $(LIBDIR)/libqatseqprod.a
+-	$(RM) $(LIBDIR)/libqatseqprod.so
+ 	$(RM) $(INCLUDEDIR)/qatseqprod.h
+ 	@echo qatseqprod library successfully uninstalled
+ 
+ clean:
+ 	$(RM) *.o
+-	$(RM) libqatseqprod.a libqatseqprod.so
++	$(RM) libqatseqprod.a 
+diff --git a/test/Makefile b/test/Makefile
+index dff0c8e..4ba01b2 100644
+--- a/test/Makefile
++++ b/test/Makefile
+@@ -34,7 +34,7 @@
+ # #######################################################################
+ LIB     = ../src
+ 
+-LDFLAGS = $(LIB)/libqatseqprod.a -I$(LIB)
++LDFLAGS = $(LIB)/libqatseqprod.a -I$(LIB) -L$(LIB) -l:libqatseqprod.a -l:libqat.a -l:libusdm.a -l:libzstd.a -lpthread -lcrypto
+ 
+ ifneq ($(ICP_ROOT), )
+ 	LDFLAGS += -lqat_s -lusdm_drv_s -Wl,-rpath,$(ICP_ROOT)/build -L$(ICP_ROOT)/build

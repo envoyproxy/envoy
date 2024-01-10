@@ -17,7 +17,8 @@ namespace Zstd {
 namespace Decompressor {
 
 using ZstdDDictManager =
-    Envoy::Compression::Zstd::Common::DictionaryManager<ZSTD_DDict, ZSTD_freeDDict, ZSTD_getDictID_fromDDict>;
+    Envoy::Compression::Zstd::Common::DictionaryManager<ZSTD_DDict, ZSTD_freeDDict,
+                                                        ZSTD_getDictID_fromDDict>;
 using ZstdDDictManagerPtr = std::unique_ptr<ZstdDDictManager>;
 
 /**

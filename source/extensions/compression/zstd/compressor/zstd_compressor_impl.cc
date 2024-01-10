@@ -6,14 +6,17 @@ namespace Compression {
 namespace Zstd {
 namespace Compressor {
 
-void ZstdCompressorImpl::compressPreprocess() {}
+void ZstdCompressorImpl::compressPreprocess(Buffer::Instance&,
+                                            Envoy::Compression::Compressor::State) {}
 
-void ZstdCompressorImpl::compressProcess(const Buffer::RawSlice& input_slice, Buffer::Instance& accumulation_buffer) {
+void ZstdCompressorImpl::compressProcess(const Buffer::Instance&,
+                                         const Buffer::RawSlice& input_slice,
+                                         Buffer::Instance& accumulation_buffer) {
   setInput(input_slice);
   process(accumulation_buffer, ZSTD_e_continue);
 }
 
-void ZstdCompressorImpl::compressPostprocess() {}
+void ZstdCompressorImpl::compressPostprocess(Buffer::Instance&) {}
 
 } // namespace Compressor
 } // namespace Zstd

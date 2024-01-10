@@ -1,18 +1,25 @@
 #pragma once
 
 #include "envoy/compression/compressor/factory.h"
-#include "contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.pb.h"
-#include "contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.pb.validate.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/compression/common/compressor/factory_base.h"
+
+#include "contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.pb.h"
+#include "contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.pb.validate.h"
 #include "contrib/qat/compression/qatzstd/compressor/source/qatzstd_compressor_impl.h"
+#include "qatseqprod.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
 namespace Qatzstd {
 namespace Compressor {
+
+// Default threshold for qat_zstd fallback to software.
+const uint32_t DefaultQatZstdFallbackThreshold = 4000;
 
 namespace {
 
@@ -25,9 +32,9 @@ const std::string& qatzstdExtensionName() {
 
 class QatzstdCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  QatzstdCompressorFactory(const envoy::extensions::compression::qatzstd::compressor::v3alpha::Qatzstd& qatzstd,
-                        Event::Dispatcher& dispatcher, Api::Api& api,
-                        ThreadLocal::SlotAllocator& tls);
+  QatzstdCompressorFactory(
+      const envoy::extensions::compression::qatzstd::compressor::v3alpha::Qatzstd& qatzstd,
+      Event::Dispatcher& dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls);
 
   // Envoy::Compression::Compressor::CompressorFactory
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override;
@@ -37,11 +44,21 @@ public:
   }
 
 private:
+  struct QatzstdThreadLocal : public ThreadLocal::ThreadLocalObject {
+    QatzstdThreadLocal();
+    ~QatzstdThreadLocal() override;
+    void* GetQATSession();
+    bool initialized_;
+    void* sequenceProducerState_;
+  };
   const uint32_t compression_level_;
   const bool enable_checksum_;
   const uint32_t strategy_;
   const uint32_t chunk_size_;
   ZstdCDictManagerPtr cdict_manager_{nullptr};
+  const bool enable_qat_zstd_;
+  const uint32_t qat_zstd_fallback_threshold_;
+  ThreadLocal::TypedSlotPtr<QatzstdThreadLocal> tls_slot_;
 };
 
 class QatzstdCompressorLibraryFactory
