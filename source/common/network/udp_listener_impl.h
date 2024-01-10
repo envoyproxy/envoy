@@ -67,7 +67,7 @@ private:
   const ResolvedUdpSocketConfig config_;
   OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar_;
   // Taking a weak_ptr to this lets us detect if the listener has been destroyed.
-  std::shared_ptr<void> destruction_checker_;
+  std::shared_ptr<bool> destruction_checker_ = std::make_shared<bool>(true);
   uint32_t events_when_unpaused_ = Event::FileReadyType::Read | Event::FileReadyType::Write;
 };
 

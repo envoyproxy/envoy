@@ -43,8 +43,11 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
     parent_drained_callback_registrar_->registerParentDrainedCallback(
         socket_->connectionInfoProvider().localAddress(),
         [this, &dispatcher, alive = std::weak_ptr<void>(destruction_checker_)]() {
+          std::cerr << "XXXXX callback" << std::endl;
           dispatcher.post([this, alive = std::move(alive)]() {
+            std::cerr << "XXXXX dispatch" << std::endl;
             if (alive.lock()) {
+              std::cerr << "XXXXX lock" << std::endl;
               unpause();
             }
           });
@@ -55,11 +58,13 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
 void UdpListenerImpl::unpause() {
   // Remove the paused state so enable will actually start listening to events.
   parent_drained_callback_registrar_ = absl::nullopt;
-  // Start listening to events.
-  enable();
-  // There may have already been events while this instance was ignoring them,
-  // so try reading immediately.
-  socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+  if (events_when_unpaused_ != 0) {
+    // Start listening to events.
+    enable();
+    // There may have already been events while this instance was ignoring them,
+    // so try reading immediately.
+    activateRead();
+  }
 }
 
 UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
@@ -75,7 +80,9 @@ void UdpListenerImpl::enable() {
 
 void UdpListenerImpl::disableEvent() {
   events_when_unpaused_ = 0;
-  socket_->ioHandle().enableFileEvents(0);
+  if (!paused()) {
+    socket_->ioHandle().enableFileEvents(0);
+  }
 }
 
 void UdpListenerImpl::onSocketEvent(short flags) {

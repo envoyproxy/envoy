@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/network/address.h"
 
 #include "absl/functional/any_invocable.h"
@@ -16,9 +14,7 @@ namespace Network {
 class ParentDrainedCallbackRegistrar {
 public:
   /**
-   * @param address is the address of the listener. A std::string rather than a
-   *                string_view or reference to avoid a copy if the string was
-   *                constructed at the call-site.
+   * @param address is the address of the listener.
    * @param callback the function to call when the listener matching address is
    *                 drained on the parent instance.
    */
