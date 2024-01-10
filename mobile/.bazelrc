@@ -79,6 +79,7 @@ build:test-android --define=static_extension_registration=enabled
 
 # Default flags for iOS tests.
 build:test-ios --config=ios
+# Needed for running test Envoy servers as HTTP(S) proxies.
 build:test-ios --define=envoy_mobile_listener=enabled
 build:test-ios --define=static_extension_registration=enabled
 
