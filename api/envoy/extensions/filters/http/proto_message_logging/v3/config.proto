@@ -209,18 +209,6 @@ message ProtoMessageLoggingConfig {
   // The proto descriptor set binary for the gRPC services.
   //
 
-  oneof descriptor_set {
-      // It could be passed by a local file through `Datasource.filename` or
-      // embedded in the `Datasource.inline_bytes`.
-      config.core.v3.DataSource data_source = 1;
-
-     // Unimplemented, the key of proto descriptor TypedMetadata.
-     // Among filters depending on the proto descriptor, we can have a TypedMetadata
-     // for proto descriptors, so that these filters can share one copy of proto
-     // descriptor in memory.
-     string proto_descriptor_typed_metadata = 2;
-  }
-
   enum LogMode {
     LogMode_UNSPECIFIED = 0;
 
@@ -230,8 +218,19 @@ message ProtoMessageLoggingConfig {
     FIRST_AND_LAST = 1;
   }
 
-  LogMode mode = 3;
+  oneof descriptor_set {
+    // It could be passed by a local file through `Datasource.filename` or
+    // embedded in the `Datasource.inline_bytes`.
+    config.core.v3.DataSource data_source = 1;
 
+    // Unimplemented, the key of proto descriptor TypedMetadata.
+    // Among filters depending on the proto descriptor, we can have a TypedMetadata
+    // for proto descriptors, so that these filters can share one copy of proto
+    // descriptor in memory.
+    string proto_descriptor_typed_metadata = 2;
+  }
+
+  LogMode mode = 3;
 
   // Specify the message logging info.
   // The key is the fully qualified gRPC method name.
