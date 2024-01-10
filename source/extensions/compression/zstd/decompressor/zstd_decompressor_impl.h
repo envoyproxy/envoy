@@ -5,8 +5,8 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/compression/zstd/common/base.h"
-#include "source/extensions/compression/zstd/common/dictionary_manager.h"
+#include "source/common/compression/zstd/common/base.h"
+#include "source/common/compression/zstd/common/dictionary_manager.h"
 
 #include "zstd_errors.h"
 
@@ -17,7 +17,7 @@ namespace Zstd {
 namespace Decompressor {
 
 using ZstdDDictManager =
-    Common::DictionaryManager<ZSTD_DDict, ZSTD_freeDDict, ZSTD_getDictID_fromDDict>;
+    Envoy::Compression::Zstd::Common::DictionaryManager<ZSTD_DDict, ZSTD_freeDDict, ZSTD_getDictID_fromDDict>;
 using ZstdDDictManagerPtr = std::unique_ptr<ZstdDDictManager>;
 
 /**
@@ -39,7 +39,7 @@ struct ZstdDecompressorStats {
 /**
  * Implementation of decompressor's interface.
  */
-class ZstdDecompressorImpl : public Common::Base,
+class ZstdDecompressorImpl : public Envoy::Compression::Zstd::Common::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression>,
                              NonCopyable {

@@ -18,8 +18,8 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/compression/zstd/common:zstd_base_lib",
-        "//source/extensions/compression/zstd/common:zstd_dictionary_manager_lib",
+        "//source/common/compression/zstd/common:zstd_base_lib",
+        "//source/common/compression/zstd/common:zstd_dictionary_manager_lib",
     ],
 )
 
