@@ -1,10 +1,8 @@
 import argparse
 import asyncio
-import os
-import select
 import sys
 from functools import cached_property
-from typing import cast
+from typing import AsyncGenerator, cast
 from urllib.parse import urlparse
 
 import aioquic
@@ -18,6 +16,18 @@ from aioquic.h3.events import (
 )
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import QuicEvent
+
+
+async def _stream_stdin_generator() -> AsyncGenerator[str, None]:
+    loop = asyncio.get_event_loop()
+    reader = asyncio.StreamReader()
+    await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(reader), sys.stdin)
+    while True:
+        # Read input asynchronously
+        data = await reader.read(10 * 1024)
+        if not data:
+            break
+        yield data
 
 
 class Http3Client(QuicConnectionProtocol):
@@ -83,13 +93,10 @@ class Http3Client(QuicConnectionProtocol):
             end_stream=False if post_stdin else True,
         )
         if post_stdin:
-            os.set_blocking(sys.stdin.fileno(), False)
-            while True:
-                select.select([sys.stdin], [], [])
-                data = sys.stdin.buffer.read(10 * 1024)
-                self._http.send_data(stream_id=stream_id, data=data, end_stream=not data)
-                if not data:
-                    break
+            async for data in _stream_stdin_generator():
+                self._http.send_data(stream_id=stream_id, data=data, end_stream=False)
+            self._http.send_data(stream_id=stream_id, data=b'', end_stream=True)
+
         await future
 
 
