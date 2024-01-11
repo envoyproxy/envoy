@@ -10,10 +10,8 @@ _ANDROID_NDK_HOME = "ANDROID_NDK_HOME"
 _ANDROID_SDK_HOME = "ANDROID_HOME"
 
 def _android_autoconf_impl(repository_ctx):
-    # sdk_home = repository_ctx.os.environ.get(_ANDROID_SDK_HOME)
-    # ndk_home = repository_ctx.os.environ.get(_ANDROID_NDK_HOME)
-    sdk_home = "/usr/local/google/home/fredyw/Android/Sdk"
-    ndk_home = "/usr/local/google/home/fredyw/Android/Sdk/ndk/21.3.6528147"
+    sdk_home = repository_ctx.os.environ.get(_ANDROID_SDK_HOME)
+    ndk_home = repository_ctx.os.environ.get(_ANDROID_NDK_HOME)
 
     sdk_api_level = repository_ctx.attr.sdk_api_level
     ndk_api_level = repository_ctx.attr.ndk_api_level
