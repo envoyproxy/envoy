@@ -13,15 +13,13 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/out
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Outlier detection error buckets]
-// Error bucket for HTTP codes
+// Error bucket for HTTP codes.
 // [#not-implemented-hide:]
-message HttpErrorsBucket {
-  string name = 1;
-
-  type.v3.Int32Range range = 2;
+message HttpCodes {
+  type.v3.Int32Range range = 1;
 }
 
-// Error bucket for locally originated errors
+// Error bucket for locally originated errors.
 // [#not-implemented-hide:]
 message LocalOriginEvents {
 }
@@ -34,12 +32,13 @@ message DatabaseTransactions {
 
 // Union of possible error buckets.
 // [#not-implemented-hide:]
-message ErrorBucket {
-  oneof bucket {
-    HttpErrorsBucket http_errors = 1;
+message ErrorBuckets {
+  // List of buckets "catching" HTTP codes.
+  repeated HttpCodes http_errors = 1;
 
-    LocalOriginEvents local_origin_events = 2;
+  // List of buckets "catching" locally originated errors.
+  repeated LocalOriginEvents local_origin_events = 2;
 
-    DatabaseTransactions database_transactions = 3;
-  }
+  // List of buckets "catching" database errors.
+  repeated DatabaseTransactions database_transactions = 3;
 }
