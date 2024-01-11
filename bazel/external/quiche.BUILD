@@ -1470,6 +1470,8 @@ envoy_cc_library(
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_hpack_hpack_lib",
         ":spdy_core_http2_header_block_lib",
+        ":spdy_header_byte_listener_interface_lib",
+        ":spdy_no_op_headers_handler_lib",
     ],
 )
 
@@ -5285,6 +5287,7 @@ envoy_quic_cc_library(
     hdrs = ["quiche/quic/load_balancer/load_balancer_config.h"],
     deps = [
         ":quic_core_types_lib",
+        ":quic_core_utils_lib",
         ":quic_load_balancer_server_id_lib",
         ":quic_platform_bug_tracker",
         ":quic_platform_export",
