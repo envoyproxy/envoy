@@ -48,7 +48,6 @@ jobs:
         # and the GitHub Action runner image no longer includes Android SDK 30:
         # https://github.com/actions/runner-images/issues/8952
         ./ci/mac_ci_setup.sh --android
-        ls /Users/runner/Library/Android/sdk/platforms
         ./bazelw shutdown
       steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
