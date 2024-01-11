@@ -51,7 +51,7 @@ start_test "Launching envoy with empty config and validate."
 expect_ok -c "${TEST_SRCDIR}/envoy/test/config/integration/empty.yaml" --mode validate
 
 start_test "Launching envoy with empty config."
-run_in_background_saving_pid "${ENVOY_BIN}" -c "${TEST_SRCDIR}/envoy/test/config/integration/empty.yaml"
+run_in_background_saving_pid "${ENVOY_BIN}" -c "${TEST_SRCDIR}/envoy/test/config/integration/empty.yaml" --use-dynamic-base-id
 sleep 3
 kill "${BACKGROUND_PID}"
 wait "${BACKGROUND_PID}"
