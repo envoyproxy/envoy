@@ -116,11 +116,18 @@ protected:
         std::make_unique<IoUringImpl>(20, false), *dispatcher_);
   }
 
-  void createServerListenerAndClientSocket() {
+  void createListenerAndConnectedSocketPair() {
     socket(true, true);
     listen();
     connect();
     accept();
+  }
+
+  void createListenerAndSocketPair() {
+    // Create the client socket as a blocking socket, so we can observe the client socket's behavior
+    // on connecting.
+    socket(true, false);
+    listen();
   }
 
   void cleanup() {
@@ -210,7 +217,7 @@ protected:
 
 TEST_F(IoUringWorkerIntegrationTest, Injection) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket =
       dynamic_cast<IoUringSocketTestImpl&>(io_uring_worker_->addTestSocket(server_socket_));
@@ -253,7 +260,7 @@ TEST_F(IoUringWorkerIntegrationTest, Injection) {
 
 TEST_F(IoUringWorkerIntegrationTest, MergeInjection) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket =
       dynamic_cast<IoUringSocketTestImpl&>(io_uring_worker_->addTestSocket(server_socket_));
@@ -276,7 +283,7 @@ TEST_F(IoUringWorkerIntegrationTest, MergeInjection) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketRead) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   absl::optional<int32_t> result = absl::nullopt;
   OptRef<IoUringSocket> socket;
@@ -336,7 +343,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadError) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   absl::optional<int32_t> result = absl::nullopt;
   OptRef<IoUringSocket> socket;
@@ -369,7 +376,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketRemoteClose) {
 // Verify that enables a socket will continue reading its remaining data.
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   absl::optional<int32_t> result = absl::nullopt;
   OptRef<IoUringSocket> socket;
@@ -417,7 +424,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketWrite) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket = io_uring_worker_->addServerSocket(
       server_socket_, [](uint32_t) {}, false);
@@ -491,7 +498,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteError) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket = io_uring_worker_->addServerSocket(
       server_socket_, [](uint32_t) {}, false);
@@ -519,7 +526,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteTimeout) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket = io_uring_worker_->addServerSocket(
       server_socket_, [](uint32_t) {}, false);
@@ -550,7 +557,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketShutdownAfterWrite) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdown) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket = io_uring_worker_->addServerSocket(
       server_socket_, [](uint32_t) {}, false);
@@ -566,7 +573,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdown) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket = io_uring_worker_->addServerSocket(
       server_socket_, [](uint32_t) {}, false);
@@ -601,7 +608,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterShutdownWrite) {
 // In this case, we should deliver this close event if the enable_close_event is true.
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableCloseEvent) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   bool is_closed = false;
   auto& socket = io_uring_worker_->addServerSocket(
@@ -630,7 +637,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithEnableClo
 // close.
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadAndCloseAfterDisabledWithEnableCloseEvent) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   bool is_closed = false;
   auto& socket = io_uring_worker_->addServerSocket(
@@ -662,7 +669,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketReadAndCloseAfterDisabledWithEn
 // is false.
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithoutEnableCloseEvent) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   bool is_closed = false;
   OptRef<IoUringSocket> socket;
@@ -690,7 +697,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithoutEnableCloseEvent) {
 // a remote close happened, then deliver the remote close by write event.
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithoutEnableCloseEvent) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   bool is_closed = false;
   OptRef<IoUringSocket> socket;
@@ -717,7 +724,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseAfterDisabledWithoutEnable
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   auto& socket = io_uring_worker_->addServerSocket(
       server_socket_, [](uint32_t) {}, false);
@@ -741,9 +748,9 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseWithAnyRequest) {
 
 // This test ensures that a write after the client reset the connection
 // will trigger a closed event.
-TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteWithClientRST) {
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteWithClientRst) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
   bool expected_read = false;
   bool expected_closed = false;
   auto& socket = io_uring_worker_->addServerSocket(
@@ -794,7 +801,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketWriteWithClientRST) {
 
 TEST_F(IoUringWorkerIntegrationTest, AddServerSocketWithBuffer) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   absl::optional<int32_t> result = absl::nullopt;
   OptRef<IoUringSocket> socket;
@@ -823,9 +830,9 @@ TEST_F(IoUringWorkerIntegrationTest, AddServerSocketWithBuffer) {
   cleanup();
 }
 
-TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
+TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFdOpen) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   OptRef<IoUringSocket> socket;
   socket = io_uring_worker_->addServerSocket(
@@ -833,7 +840,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
 
   socket->close(true);
-  while (io_uring_worker_->getSockets().size() != 0) {
+  while (!io_uring_worker_->getSockets().empty()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
@@ -848,7 +855,7 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketCloseButKeepFDOpen) {
 
 TEST_F(IoUringWorkerIntegrationTest, ServerSocketUpdateFileEventCb) {
   initialize();
-  createServerListenerAndClientSocket();
+  createListenerAndConnectedSocketPair();
 
   absl::optional<int32_t> result = absl::nullopt;
   OptRef<IoUringSocket> socket;
@@ -873,6 +880,74 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketUpdateFileEventCb) {
 
   socket->close(false);
   runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnect) {
+  initialize();
+  createListenerAndSocketPair();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addClientSocket(
+      client_socket_,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Write);
+        EXPECT_NE(absl::nullopt, socket->getWriteParam());
+        result = socket->getWriteParam()->result_;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the client socket connect.
+  struct sockaddr_in listen_addr = getListenSocketAddress();
+  auto addr = std::make_shared<Network::Address::Ipv4Instance>(&listen_addr);
+  socket->connect(addr);
+
+  // Accept through client socket.
+  accept();
+
+  // The client socket should be writable.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), 0);
+
+  socket->close(false);
+  runToClose(client_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnectError) {
+  initialize();
+  createListenerAndSocketPair();
+
+  absl::optional<int32_t> result = absl::nullopt;
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addClientSocket(
+      client_socket_,
+      [&socket, &result](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Write);
+        EXPECT_NE(absl::nullopt, socket->getWriteParam());
+        result = socket->getWriteParam()->result_;
+      },
+      false);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 1);
+
+  // Waiting for the client socket connect.
+  auto addr = std::make_shared<Network::Address::Ipv4Instance>(0);
+  socket->connect(addr);
+
+  // The client socket should be writable.
+  while (!result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(result.value(), -ECONNREFUSED);
+
+  socket->close(false);
+  runToClose(client_socket_);
   EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
   cleanup();
 }
