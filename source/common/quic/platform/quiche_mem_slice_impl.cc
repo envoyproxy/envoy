@@ -52,7 +52,7 @@ QuicheMemSliceImpl::QuicheMemSliceImpl(std::unique_ptr<char[]> buffer, size_t le
   ASSERT(this->length() == length);
 }
 
-QuicheMemSliceImpl::QuicheMemSliceImpl(char buffer[], size_t length,
+QuicheMemSliceImpl::QuicheMemSliceImpl(const char* buffer, size_t length,
                                        SingleUseCallback<void(const char*)> deleter)
     : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
           buffer, length,
