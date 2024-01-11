@@ -19,7 +19,7 @@ public:
 
   // HpackDecoderListener
   void OnHeaderListStart() override {}
-  void OnHeader(const std::string& name, const std::string& value) override {
+  void OnHeader(const absl::string_view name, const absl::string_view value) override {
     map_.emplace(name, value);
   }
   void OnHeaderListEnd() override {}
