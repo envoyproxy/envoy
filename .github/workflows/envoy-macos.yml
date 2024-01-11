@@ -60,7 +60,10 @@ jobs:
         - target: ci/mac_ci_steps.sh
           name: macOS
           steps-pre: |
-            - run: ./ci/mac_ci_setup.sh
+            # TODO(fredyw): A workaround since mobile/WORKSPACE requires Android SDK to be available
+            # and the GitHub Action runner image no longer includes Android SDK 30:
+            # https://github.com/actions/runner-images/issues/8952
+            - run: ./ci/mac_ci_setup.sh --android
               shell: bash
               name: Setup macos
           source: |
