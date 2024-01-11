@@ -475,7 +475,7 @@ TEST_P(HotRestartedUdpListenerImplTest,
   setup();
   EXPECT_CALL(*io_handle_, enableFileEvents(_)).Times(0);
   listener_ = nullptr;
-  // Signalling end-of-drain after the listener was destroyed should do nothing.
+  // Signaling end-of-drain after the listener was destroyed should do nothing.
   std::move(parent_drained_callback_)();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // At this point io_handle should be an invalid reference.
