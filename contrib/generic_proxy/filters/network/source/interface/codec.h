@@ -46,11 +46,10 @@ public:
   /**
    * Create a response frame with specified status and flags.
    * @param status status of the response.
-   * @param short_response_flags short flags of the response.
+   * @param data any data that generic proxy filter wants to tell the codec.
    * @param request origin request that the response is created for.
    */
-  virtual ResponsePtr respond(Status status, absl::string_view short_response_flags,
-                              const Request& request) PURE;
+  virtual ResponsePtr respond(Status status, absl::string_view data, const Request& request) PURE;
 };
 
 /**

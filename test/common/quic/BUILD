@@ -247,6 +247,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_dispatcher_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
         "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",
@@ -363,6 +364,7 @@ envoy_cc_test(
     ],
     tags = ["nofips"],
     deps = [
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/mocks/server:transport_socket_factory_context_mocks",

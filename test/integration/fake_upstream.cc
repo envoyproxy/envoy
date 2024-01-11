@@ -189,7 +189,11 @@ void FakeStream::encodeResetStream() {
         return;
       }
     }
-    encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    if (parent_.type() == Http::CodecType::HTTP1) {
+      parent_.connection().close(Network::ConnectionCloseType::FlushWrite);
+    } else {
+      encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    }
   });
 }
 
@@ -950,6 +954,11 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
   RELEASE_ASSERT(done->WaitForNotificationWithTimeout(absl::FromChrono(timeout)),
                  "Timed out waiting for cb to run on dispatcher");
   return *result;
+}
+
+void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
+  ASSERT(!dispatcher_->isThreadSafe());
+  dispatcher_->post([&]() { cb(); });
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,

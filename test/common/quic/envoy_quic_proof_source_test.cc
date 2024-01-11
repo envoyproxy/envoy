@@ -149,6 +149,7 @@ public:
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         proof_source_(listen_socket_, filter_chain_manager_, listener_stats_, time_system_) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
+    EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
         true, listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
@@ -201,6 +202,7 @@ protected:
   Server::ListenerStats listener_stats_;
   Event::GlobalTimeSystem time_system_;
   EnvoyQuicProofSource proof_source_;
+  std::string alpn_{"h3"};
 };
 
 TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {

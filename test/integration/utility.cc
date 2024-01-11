@@ -26,7 +26,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #endif
 
@@ -258,7 +258,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
           quic_transport_socket_factory.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(addr->ip()->port())),
       *dispatcher, addr, local_address, quic_stat_names, {}, *mock_stats_store.rootScope(), nullptr,
-      nullptr, generator);
+      nullptr, generator, quic_transport_socket_factory);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
                                options);

@@ -123,7 +123,7 @@ envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>&
                          &verified_chain);
   switch (result) {
   case CERT_VERIFY_STATUS_OK:
-    return {ENVOY_SUCCESS};
+    return {ENVOY_SUCCESS, 0, nullptr};
   case CERT_VERIFY_STATUS_EXPIRED: {
     return {ENVOY_FAILURE, SSL_AD_CERTIFICATE_EXPIRED,
             "AndroidNetworkLibrary_verifyServerCertificates failed: expired cert."};

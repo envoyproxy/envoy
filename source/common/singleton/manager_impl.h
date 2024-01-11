@@ -21,10 +21,12 @@ public:
       : thread_factory_(thread_factory), run_tid_(thread_factory.currentThreadId()) {}
 
   // Singleton::Manager
-  InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;
+  InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb, bool pin) override;
 
 private:
   absl::node_hash_map<std::string, std::weak_ptr<Instance>> singletons_;
+  std::vector<InstanceSharedPtr> pinned_singletons_;
+
   Thread::ThreadFactory& thread_factory_;
   const Thread::ThreadId run_tid_;
 };

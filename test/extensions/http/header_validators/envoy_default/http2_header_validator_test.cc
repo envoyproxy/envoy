@@ -280,10 +280,10 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Extended CONNECT is transformed to H/1 upgrade
-  EXPECT_EQ(headers.method(), "GET");
+  EXPECT_EQ(headers.getMethodValue(), "GET");
   EXPECT_EQ(headers.getUpgradeValue(), "websocket");
   EXPECT_EQ(headers.getConnectionValue(), "upgrade");
-  EXPECT_EQ(headers.protocol(), "");
+  EXPECT_EQ(headers.getProtocolValue(), "");
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {
@@ -295,7 +295,7 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(headers),
                              UhvResponseCodeDetail::get().InvalidScheme);
   // If validation failed, the extended CONNECT request should not be transformed to H/1 upgrade
-  EXPECT_EQ(headers.method(), "CONNECT");
+  EXPECT_EQ(headers.getMethodValue(), "CONNECT");
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoPath) {
@@ -330,12 +330,12 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectPathNormalization) {
 
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir2");
   // Expect transformation to H/1 upgrade as well
-  EXPECT_EQ(headers.method(), "GET");
+  EXPECT_EQ(headers.getMethodValue(), "GET");
   EXPECT_EQ(headers.getUpgradeValue(), "websocket");
   EXPECT_EQ(headers.getConnectionValue(), "upgrade");
-  EXPECT_EQ(headers.protocol(), "");
+  EXPECT_EQ(headers.getProtocolValue(), "");
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoAuthorityIsOk) {
@@ -369,13 +369,13 @@ TEST_F(Http2HeaderValidatorTest, UpstreamUpgradeRequestTransformedToExtendedConn
   auto result = uhv->transformRequestHeaders(headers);
   EXPECT_TRUE(result.status.ok());
   // Expect the extended CONNECT request
-  EXPECT_EQ(result.new_headers->method(), "CONNECT");
-  EXPECT_EQ(result.new_headers->protocol(), "websocket");
+  EXPECT_EQ(result.new_headers->getMethodValue(), "CONNECT");
+  EXPECT_EQ(result.new_headers->getProtocolValue(), "websocket");
   EXPECT_EQ(result.new_headers->Upgrade(), nullptr);
   EXPECT_EQ(result.new_headers->Connection(), nullptr);
   // No path normalization is expected at the client codec
-  EXPECT_EQ(result.new_headers->path(), "/./dir1/../dir2");
-  EXPECT_EQ(result.new_headers->host(), "envoy.com");
+  EXPECT_EQ(result.new_headers->getPathValue(), "/./dir1/../dir2");
+  EXPECT_EQ(result.new_headers->getHostValue(), "envoy.com");
   EXPECT_EQ(result.new_headers->getSchemeValue(), "https");
 
   // New headers must be valid H/2 extended CONNECT headers
@@ -672,7 +672,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
 
   EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
   EXPECT_TRUE(uhv->transformRequestHeaders(headers).ok());
-  EXPECT_EQ(headers.path(), "/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir2");
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
@@ -832,8 +832,8 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedHttp2) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Note that \ is translated to / and [] remain unencoded
-  EXPECT_EQ(headers.path(), absl::StrCat("/path/with%09%20%22%3C%3E[]%5E%60%7B%7D/%7C",
-                                         generatePercentEncodedExtendedAscii()));
+  EXPECT_EQ(headers.getPathValue(), absl::StrCat("/path/with%09%20%22%3C%3E[]%5E%60%7B%7D/%7C",
+                                                 generatePercentEncodedExtendedAscii()));
 }
 
 // Validate that H/3 UHV allows additional characters "<>[]^`{}\| space TAB
@@ -853,7 +853,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedHttp3) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Note that \ is translated to / and [] remain unencoded
-  EXPECT_EQ(headers.path(), "/path/with%09%20%22%3C%3E[]%5E%60%7B%7D/%7C");
+  EXPECT_EQ(headers.getPathValue(), "/path/with%09%20%22%3C%3E[]%5E%60%7B%7D/%7C");
 }
 
 // Validate that without path normalization additional characters remain untouched
@@ -868,7 +868,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedWithoutPathNor
       {":path", absl::StrCat("/path/with", AdditionallyAllowedCharactersHttp2)}};
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(),
+  EXPECT_EQ(headers.getPathValue(),
             absl::StrCat("/path/with\t \"<>[]^`{}\\|", generateExtendedAsciiString()));
 }
 
@@ -884,7 +884,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedWithoutPathNor
       {":path", absl::StrCat("/path/with", AdditionallyAllowedCharactersHttp3)}};
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/path/with\t \"<>[]^`{}\\|");
+  EXPECT_EQ(headers.getPathValue(), "/path/with\t \"<>[]^`{}\\|");
 }
 
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInQueryAllowedHttp2) {
@@ -902,7 +902,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInQueryAllowedHttp2) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Additional characters in query always remain untouched
-  EXPECT_EQ(headers.path(),
+  EXPECT_EQ(headers.getPathValue(),
             absl::StrCat("/path/with?value=\t \"<>[]^`{}\\|", generateExtendedAsciiString()));
 }
 
@@ -922,7 +922,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInQueryAllowedHttp3) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Additional characters in query always remain untouched
-  EXPECT_EQ(headers.path(), "/path/with?value=\t \"<>[]^`{}\\|");
+  EXPECT_EQ(headers.getPathValue(), "/path/with?value=\t \"<>[]^`{}\\|");
 }
 
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInFragmentAllowedHttp2) {
@@ -940,7 +940,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInFragmentAllowedHttp2) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // UHV strips fragment from URL path
-  EXPECT_EQ(headers.path(), "/path/with?value=aaa");
+  EXPECT_EQ(headers.getPathValue(), "/path/with?value=aaa");
 }
 
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInFragmentAllowedHttp3) {
@@ -959,7 +959,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInFragmentAllowedHttp3) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // UHV strips fragment from URL path
-  EXPECT_EQ(headers.path(), "/path/with?value=aaa");
+  EXPECT_EQ(headers.getPathValue(), "/path/with?value=aaa");
 }
 
 } // namespace

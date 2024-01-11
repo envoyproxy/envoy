@@ -30,7 +30,6 @@ import org.chromium.net.UrlRequest;
 import org.chromium.net.impl.CronvoyVersionSafeCallbacks.RequestFinishedInfoListener;
 import org.chromium.net.urlconnection.CronvoyHttpURLConnection;
 import org.chromium.net.urlconnection.CronvoyURLStreamHandlerFactory;
-import org.chromium.net.impl.CronvoyLogger;
 
 /**
  * Cronvoy engine shim.
@@ -61,7 +60,6 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   private Thread mNetworkThread;
 
   private final String mUserAgent;
-  private final CronvoyEngineBuilderImpl mBuilder;
   private final AtomicReference<Runnable> mInitializationCompleter = new AtomicReference<>();
   private final CronvoyLogger mCronvoyLogger = new CronvoyLogger();
 
@@ -77,7 +75,6 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
       new HashMap<>();
 
   public CronvoyUrlRequestContext(NativeCronvoyEngineBuilderImpl builder) {
-    mBuilder = builder;
     // On android, all background threads (and all threads that are part
     // of background processes) are put in a cgroup that is allowed to
     // consume up to 5% of CPU - these worker threads spend the vast
@@ -112,8 +109,6 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
       return mEngine;
     }
   }
-
-  CronvoyEngineBuilderImpl getBuilder() { return mBuilder; }
 
   void setTaskToExecuteWhenInitializationIsCompleted(Runnable runnable) {
     if (!mInitializationCompleter.compareAndSet(null, runnable)) {

@@ -1,4 +1,4 @@
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
@@ -10,6 +10,7 @@
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/test_common/test_random_generator.h"
 
 #include "extension_registry.h"
 #include "library/common/data/utility.h"
@@ -142,7 +143,7 @@ public:
 
   void basicTest();
   void trickleTest();
-  void explicitFlowControlWithCancels(uint32_t body_size = 1000);
+  void explicitFlowControlWithCancels(uint32_t body_size = 1000, bool terminate_engine = false);
 
   static std::string protocolToString(Http::CodecType type) {
     if (type == Http::CodecType::HTTP3) {
@@ -222,7 +223,7 @@ void ClientIntegrationTest::basicTest() {
   } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
     ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
   } else {
-    // This verifies the H3 attempt was made due to the quic hints
+    // This verifies the H3 attempt was made due to the quic hints.
     absl::MutexLock l(&engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
@@ -344,13 +345,21 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
   ASSERT_EQ(num_requests, cc_.on_complete_calls);
 }
 
-void ClientIntegrationTest::explicitFlowControlWithCancels(uint32_t body_size) {
+void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_size,
+                                                           const bool terminate_engine) {
   default_request_headers_.addCopy(AutonomousStream::RESPONSE_SIZE_BYTES,
                                    std::to_string(body_size));
 
   uint32_t num_requests = 100;
   std::vector<Platform::StreamPrototypeSharedPtr> prototype_streams;
   std::vector<Platform::StreamSharedPtr> streams;
+
+  // Randomly select which request number to terminate the engine on.
+  uint32_t request_for_engine_termination = 0;
+  if (terminate_engine) {
+    TestRandomGenerator rand;
+    request_for_engine_termination = rand.random() % (num_requests / 2);
+  }
 
   for (uint32_t i = 0; i < num_requests; ++i) {
     Platform::StreamPrototypeSharedPtr stream_prototype;
@@ -391,13 +400,25 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(uint32_t body_size) {
     } else {
       stream->readData(100);
     }
-  }
-  ASSERT(streams.size() == num_requests);
-  ASSERT(prototype_streams.size() == num_requests);
 
-  terminal_callback_.waitReady();
-  ASSERT_EQ(num_requests / 2, cc_.on_complete_calls);
-  ASSERT_EQ(num_requests / 2, cc_.on_cancel_calls);
+    if (terminate_engine && request_for_engine_termination == i) {
+      absl::MutexLock l(&engine_lock_);
+      ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
+      engine_.reset();
+      break;
+    }
+  }
+
+  if (terminate_engine) {
+    // Only the cancel calls are guaranteed to have completed when engine->terminate() is called.
+    EXPECT_GE(cc_.on_cancel_calls, request_for_engine_termination / 2);
+  } else {
+    ASSERT(streams.size() == num_requests);
+    ASSERT(prototype_streams.size() == num_requests);
+    terminal_callback_.waitReady();
+    EXPECT_EQ(num_requests / 2, cc_.on_complete_calls);
+    EXPECT_EQ(num_requests / 2, cc_.on_cancel_calls);
+  }
 }
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
@@ -409,7 +430,13 @@ TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancels) {
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsAfterComplete) {
   explicit_flow_control_ = true;
   initialize();
-  explicitFlowControlWithCancels(100);
+  explicitFlowControlWithCancels(/*body_size=*/100);
+}
+
+TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowWithCancelsAfterCompleteEngineTermination) {
+  explicit_flow_control_ = true;
+  initialize();
+  explicitFlowControlWithCancels(/*body_size=*/100, /*terminate_engine=*/true);
 }
 
 TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
@@ -518,7 +545,7 @@ TEST_P(ClientIntegrationTest, InvalidDomain) {
   ASSERT_EQ(cc_.on_headers_calls, 0);
 }
 
-TEST_P(ClientIntegrationTest, BasicReset) {
+TEST_P(ClientIntegrationTest, BasicBeforeResponseHeaders) {
   initialize();
 
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
@@ -530,10 +557,78 @@ TEST_P(ClientIntegrationTest, BasicReset) {
   ASSERT_EQ(cc_.on_headers_calls, 0);
 }
 
+TEST_P(ClientIntegrationTest, ResetAfterResponseHeaders) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetAfterResponseHeadersExplicit) {
+  explicit_flow_control_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  // Read the body chunk. This releases the error.
+  stream_->readData(100);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetAfterHeaderOnlyResponse) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "0");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetBetweenDataChunks) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "2");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+TEST_P(ClientIntegrationTest, ResetAfterData) {
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_DATA, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
 TEST_P(ClientIntegrationTest, CancelBeforeRequestHeadersSent) {
   autonomous_upstream_ = false;
   initialize();
-  ConditionalInitializer headers_callback;
 
   stream_->cancel();
 
@@ -612,16 +707,6 @@ TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStream) {
   autonomous_upstream_ = false;
 
   initialize();
-  ConditionalInitializer headers_callback;
-
-  stream_prototype_->setOnHeaders(
-      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
-                                envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
-        headers_callback.setReady();
-        return nullptr;
-      });
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
 
@@ -788,6 +873,81 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   if (upstreamProtocol() != Http::CodecType::HTTP1) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
+}
+
+TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
+  autonomous_upstream_ = false;
+  initialize();
+  ConditionalInitializer headers_callback;
+
+  stream_prototype_->setOnHeaders(
+      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
+                                envoy_stream_intel) {
+        cc_.status = absl::StrCat(headers->httpStatus());
+        cc_.on_headers_calls++;
+        headers_callback.setReady();
+        return nullptr;
+      });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+
+  // Send response headers but no body.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  // Make sure the headers are sent up.
+  headers_callback.waitReady();
+  // Reset the stream.
+  upstream_request_->encodeResetStream();
+
+  // Encoding data should not be problematic.
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+  // Make sure cancel isn't problematic.
+  stream_->cancel();
+}
+
+TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
+  explicit_flow_control_ = true;
+  autonomous_upstream_ = false;
+  initialize();
+  ConditionalInitializer headers_callback;
+
+  stream_prototype_->setOnHeaders(
+      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
+                                envoy_stream_intel) {
+        cc_.status = absl::StrCat(headers->httpStatus());
+        cc_.on_headers_calls++;
+        headers_callback.setReady();
+        return nullptr;
+      });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+
+  // Send response headers and body but no fin.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1, false);
+  upstream_request_->encodeResetStream();
+  if (getCodecType() != Http::CodecType::HTTP3) {
+    // Make sure the headers are sent up.
+    headers_callback.waitReady();
+  }
+
+  // Encoding data should not be problematic.
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+  // Make sure cancel isn't problematic.
+  stream_->cancel();
 }
 
 TEST_P(ClientIntegrationTest, Proxying) {

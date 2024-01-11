@@ -175,7 +175,6 @@ envoy_cc_library(
         ":process_context_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
-        "//envoy/config:dynamic_extension_config_provider_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/grpc:context_interface",

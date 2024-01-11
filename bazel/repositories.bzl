@@ -14,6 +14,23 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
+    # Extensions that require CEL.
+    "envoy.access_loggers.extension_filters.cel",
+    "envoy.rate_limit_descriptors.expr",
+    "envoy.filters.http.rate_limit_quota",
+    "envoy.formatter.cel",
+    "envoy.matching.inputs.cel_data_input",
+    "envoy.matching.matchers.cel_matcher",
+    # Wasm and RBAC extensions have a link dependency on CEL.
+    "envoy.access_loggers.wasm",
+    "envoy.bootstrap.wasm",
+    "envoy.filters.http.wasm",
+    "envoy.filters.network.wasm",
+    "envoy.stat_sinks.wasm",
+    # RBAC extensions have a link dependency on CEL.
+    "envoy.filters.http.rbac",
+    "envoy.filters.network.rbac",
+    "envoy.rbac.matchers.upstream_ip_port",
 ]
 
 NO_HTTP3_SKIP_TARGETS = [
@@ -1413,7 +1430,7 @@ filegroup(
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
     external_http_archive(
-        name = "edenhill_librdkafka",
+        name = "confluentinc_librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <ostream>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -123,6 +124,63 @@ bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs
   return (lhs.must_validate_ == rhs.must_validate_) && (lhs.no_store_ == rhs.no_store_) &&
          (lhs.no_transform_ == rhs.no_transform_) && (lhs.no_stale_ == rhs.no_stale_) &&
          (lhs.is_public_ == rhs.is_public_) && (lhs.max_age_ == rhs.max_age_);
+}
+
+std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control) {
+  std::vector<std::string> fields;
+
+  if (request_cache_control.must_validate_) {
+    fields.push_back("must_validate");
+  }
+  if (request_cache_control.no_store_) {
+    fields.push_back("no_store");
+  }
+  if (request_cache_control.no_transform_) {
+    fields.push_back("no_transform");
+  }
+  if (request_cache_control.only_if_cached_) {
+    fields.push_back("only_if_cached");
+  }
+  if (request_cache_control.max_age_.has_value()) {
+    fields.push_back(
+        absl::StrCat("max-age=", std::to_string(request_cache_control.max_age_->count())));
+  }
+  if (request_cache_control.min_fresh_.has_value()) {
+    fields.push_back(
+        absl::StrCat("min-fresh=", std::to_string(request_cache_control.min_fresh_->count())));
+  }
+  if (request_cache_control.max_stale_.has_value()) {
+    fields.push_back(
+        absl::StrCat("max-stale=", std::to_string(request_cache_control.max_stale_->count())));
+  }
+
+  return os << "{" << absl::StrJoin(fields, ", ") << "}";
+}
+
+std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control) {
+  std::vector<std::string> fields;
+
+  if (response_cache_control.must_validate_) {
+    fields.push_back("must_validate");
+  }
+  if (response_cache_control.no_store_) {
+    fields.push_back("no_store");
+  }
+  if (response_cache_control.no_transform_) {
+    fields.push_back("no_transform");
+  }
+  if (response_cache_control.no_stale_) {
+    fields.push_back("no_stale");
+  }
+  if (response_cache_control.is_public_) {
+    fields.push_back("public");
+  }
+  if (response_cache_control.max_age_.has_value()) {
+    fields.push_back(
+        absl::StrCat("max-age=", std::to_string(response_cache_control.max_age_->count())));
+  }
+
+  return os << "{" << absl::StrJoin(fields, ", ") << "}";
 }
 
 SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {

@@ -110,7 +110,7 @@ To enable the previous behavior of the `release.server_only` target where the fi
 (e.g. envoy-binary.tar.gz), you can run:
 
   ```bash
-  ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server_only.binary
+  ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server_only.binary'
   ```
 
 For a debug version of the Envoy binary you can run:
@@ -137,7 +137,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `docker` &mdash; build Docker images, expects `release` or `release.server_only` to have been run furst.
+* `docker` &mdash; build Docker images, expects `release` or `release.server_only` to have been run first.
 * `dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
 * `dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
