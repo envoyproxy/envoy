@@ -189,7 +189,11 @@ void FakeStream::encodeResetStream() {
         return;
       }
     }
-    encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    if (parent_.type() == Http::CodecType::HTTP1) {
+      parent_.connection().close(Network::ConnectionCloseType::FlushWrite);
+    } else {
+      encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    }
   });
 }
 

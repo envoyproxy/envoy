@@ -2,11 +2,11 @@ agent-ubuntu: ubuntu-22.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
-  sha: 1386a26f687826850ba488d66a6cd5337c5941b3b8793d08cfa6f9df12aa2fcf
-  mobile-sha: 1db9bac6578115179fe686cd0e58ee340e2cb3737d19d9136a264d5d94351961
+  sha: d736c58f06f36848e7966752cc7e01519cc1b5101a178d5c6634807e8ac3deab
+  mobile-sha: 13674edd989ada8b94257f410e38e5e8e4c6a0a9c2fdf8bda9261047a7f843e4
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: b0c0e07c97337fdd56423ddd6749a4250adaea9f66f85763a8d9cec36162c972
-  tag: fd9ec000fdd72d5c5e4e4ef16db4f9103058779e
+  gcr-sha: 0434d2f6a65895a00f8936fba83b7ff14d21e149dc15c9ac25a31a6fa018234f
+  tag: 0ca52447572ee105a4730da5e76fe47c9c5a7c64
 
 config:
   envoy:
@@ -51,6 +51,7 @@ checks:
   mobile-compile-time-options:
     name: Mobile/Compile time options
     on-run:
+    - mobile-compile-time-cc
     - mobile-compile-time-options
   mobile-core:
     name: Mobile/Core
@@ -228,6 +229,9 @@ run:
     - bazel/repository_locations.bzl
     - mobile/**/*
     - tools/code_format/check_format.py
+  mobile-compile-time-cc:
+    paths:
+    - "**/*"
   mobile-compile-time-options:
     paths:
     - .bazelrc
@@ -248,13 +252,7 @@ run:
     - tools/code_format/check_format.py
   mobile-core:
     paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
-    - mobile/**/*
-    - tools/code_format/check_format.py
+    - "**/*"
   mobile-format:
     paths:
     - .bazelrc

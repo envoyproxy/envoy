@@ -305,6 +305,9 @@ case $CI_TARGET in
             # echo "Copying go files ${INPUT_DIR} -> ${OUTPUT_DIR}"
             while read -r GO_FILE; do
                 cp -a "$GO_FILE" "$OUTPUT_DIR"
+                if [[ "$GO_FILE" = *.validate.go ]]; then
+                    sed -i '1s;^;//go:build !disable_pgv\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                fi
             done <<< "$(find "$INPUT_DIR" -name "*.go")"
         done
         ;;

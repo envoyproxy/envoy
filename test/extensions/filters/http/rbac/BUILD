@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
         "//test/mocks/server:factory_context_mocks",
@@ -29,6 +30,7 @@ envoy_extension_cc_test(
     name = "rbac_filter_test",
     srcs = ["rbac_filter_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
@@ -52,6 +54,7 @@ envoy_extension_cc_test(
     srcs = ["rbac_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
     shard_count = 2,
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
@@ -68,6 +71,7 @@ envoy_extension_cc_mock(
     name = "route_config_mocks",
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.http.rbac"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
