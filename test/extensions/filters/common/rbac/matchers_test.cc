@@ -72,7 +72,7 @@ TEST(AndMatcher, Principal_Set) {
   envoy::config::rbac::v3::Principal* principal = set.add_ids();
   principal->set_any(true);
 
-  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true);
+  checkMatcher(RBAC::AndMatcher(set), true);
 
   principal = set.add_ids();
   auto* cidr = principal->mutable_direct_remote_ip();
@@ -86,14 +86,12 @@ TEST(AndMatcher, Principal_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
-  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
-               headers, info);
+  checkMatcher(RBAC::AndMatcher(set), true, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 123, false);
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
-  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
-               headers, info);
+  checkMatcher(RBAC::AndMatcher(set), false, conn, headers, info);
 }
 
 TEST(OrMatcher, Permission_Set) {
@@ -139,14 +137,12 @@ TEST(OrMatcher, Principal_Set) {
       Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 456, false);
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
-  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
-               headers, info);
+  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
 
   id = set.add_ids();
   id->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
-               headers, info);
+  checkMatcher(RBAC::OrMatcher(set), true, conn, headers, info);
 }
 
 TEST(NotMatcher, Permission) {
@@ -161,8 +157,7 @@ TEST(NotMatcher, Principal) {
   envoy::config::rbac::v3::Principal principal;
   principal.set_any(true);
 
-  checkMatcher(RBAC::NotMatcher(principal, ProtobufMessage::getStrictValidationVisitor()), false,
-               Envoy::Network::MockConnection());
+  checkMatcher(RBAC::NotMatcher(principal), false, Envoy::Network::MockConnection());
 }
 
 TEST(HeaderMatcher, HeaderMatcher) {

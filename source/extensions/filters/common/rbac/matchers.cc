@@ -49,13 +49,12 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal) {
   switch (principal.identifier_case()) {
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAndIds:
-    return std::make_shared<const AndMatcher>(principal.and_ids(), validation_visitor);
+    return std::make_shared<const AndMatcher>(principal.and_ids());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kOrIds:
-    return std::make_shared<const OrMatcher>(principal.or_ids(), validation_visitor);
+    return std::make_shared<const OrMatcher>(principal.or_ids());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
@@ -74,7 +73,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(principal.metadata());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kNotId:
-    return std::make_shared<const NotMatcher>(principal.not_id(), validation_visitor);
+    return std::make_shared<const NotMatcher>(principal.not_id());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
     return std::make_shared<const PathMatcher>(principal.url_path());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterState:
@@ -92,10 +91,9 @@ AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set,
-                       ProtobufMessage::ValidationVisitor& validation_visitor) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set) {
   for (const auto& id : set.ids()) {
-    matchers_.push_back(Matcher::create(id, validation_visitor));
+    matchers_.push_back(Matcher::create(id));
   }
 }
 
@@ -118,10 +116,9 @@ OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::P
   }
 }
 
-OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids,
-                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids) {
   for (const auto& id : ids) {
-    matchers_.push_back(Matcher::create(id, validation_visitor));
+    matchers_.push_back(Matcher::create(id));
   }
 }
 

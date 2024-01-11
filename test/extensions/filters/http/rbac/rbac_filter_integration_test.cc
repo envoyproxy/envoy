@@ -113,7 +113,7 @@ typed_config:
               name: envoy.rbac.matchers.uri_template
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-                path_template: "/test/*/path"
+                path_template: "/test/deny/path"
         principals:
           - any: true
 )EOF";
