@@ -1,5 +1,7 @@
 import argparse
 import asyncio
+import os
+import select
 import sys
 from functools import cached_property
 from typing import cast
@@ -19,9 +21,9 @@ from aioquic.quic.events import QuicEvent
 
 
 class Http3Client(QuicConnectionProtocol):
-    """Note, this class is extremely minimal.
+    """Note, this class is pretty minimal.
 
-    It supports only GET, doesn't properly validate URLs, etc. Since this
+    It supports only simple GET and POST doesn't properly validate URLs, etc. Since this
     is just for tests, that's all that's required right now.
     It is based on https://github.com/aiortc/aioquic/blob/main/examples/http3_client.py
     which is a far more complete implementation.
@@ -62,7 +64,8 @@ class Http3Client(QuicConnectionProtocol):
         for http_event in self._http.handle_event(event):
             self.http_event_received(http_event)
 
-    async def request(self, url: str, include_headers: bool = False) -> None:
+    async def request(
+            self, url: str, include_headers: bool = False, post_stdin: bool = False) -> None:
         """Issue an http/3 get request, print response pieces as the packets arrive."""
         stream_id: int = self._quic.get_next_available_stream_id()
         future: asyncio.Future[bool] = self._loop.create_future()
@@ -72,17 +75,26 @@ class Http3Client(QuicConnectionProtocol):
         self._http.send_headers(
             stream_id=stream_id,
             headers=[
-                (b":method", "GET".encode()),
+                (b":method", "POST".encode() if post_stdin else "GET".encode()),
                 (b":scheme", parsed_url.scheme.encode()),
                 (b":authority", parsed_url.netloc.encode()),
                 (b":path", parsed_url.path.encode()),
             ],
-            end_stream=True,
+            end_stream=False if post_stdin else True,
         )
+        if post_stdin:
+            os.set_blocking(sys.stdin.fileno(), False)
+            while True:
+                select.select([sys.stdin], [], [])
+                data = sys.stdin.buffer.read(10 * 1024)
+                self._http.send_data(stream_id=stream_id, data=data, end_stream=not data)
+                if not data:
+                    break
         await future
 
 
-async def request(url: str, config: QuicConfiguration, include_headers: bool) -> None:
+async def request(
+        url: str, config: QuicConfiguration, include_headers: bool, post_stdin: bool) -> None:
     parsed_url = urlparse(url)
     client_resolver = aioquic.asyncio.client.connect(
         host=parsed_url.hostname,
@@ -93,7 +105,7 @@ async def request(url: str, config: QuicConfiguration, include_headers: bool) ->
     )
     async with client_resolver as client:
         client = cast(Http3Client, client)
-        await client.request(url, include_headers)
+        await client.request(url, include_headers, post_stdin)
 
 
 async def main(argv) -> None:
@@ -103,6 +115,10 @@ async def main(argv) -> None:
         "--ca-certs", type=str, nargs="+", help="load CA certificates from the specified file")
     parser.add_argument(
         "--include-headers", action="store_true", help="output the headers before the body")
+    parser.add_argument(
+        "--post-stdin",
+        action="store_true",
+        help="if set, request will be POST and body will be read from stdin")
     args = parser.parse_args(argv)
     config = QuicConfiguration(
         is_client=True,
@@ -110,7 +126,7 @@ async def main(argv) -> None:
     )
     for cert in args.ca_certs or []:
         config.load_verify_locations(cert)
-    await request(args.url, config, args.include_headers)
+    await request(args.url, config, args.include_headers, args.post_stdin)
 
 
 if __name__ == '__main__':
