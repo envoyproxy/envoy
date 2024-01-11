@@ -71,7 +71,8 @@ protected:
 private:
   friend class HotRestartUdpForwardingTestHelper;
   const int restart_epoch_;
-  bool parent_terminated_{};
+  bool parent_terminated_;
+  bool parent_drained_;
   sockaddr_un parent_address_;
   sockaddr_un parent_address_udp_forwarding_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};

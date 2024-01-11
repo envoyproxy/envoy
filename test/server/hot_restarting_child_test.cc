@@ -69,6 +69,33 @@ public:
     });
     udp_forwarding_rpc_stream_.sendHotRestartMessage(child_address_udp_forwarding_, message);
   }
+  static ssize_t hotRestartMessageIntoRecvBuffer(msghdr* msg, const HotRestartMessage& proto) {
+    msg->msg_control = nullptr;
+    msg->msg_controllen = 0;
+    msg->msg_flags = 0;
+    RELEASE_ASSERT(msg->msg_iovlen == 1,
+                   fmt::format("recv buffer iovlen={}, expected 1", msg->msg_iovlen));
+    const uint64_t serialized_size = proto.ByteSizeLong();
+    const uint64_t total_size = sizeof(uint64_t) + serialized_size;
+    RELEASE_ASSERT(msg->msg_iov[0].iov_len >= total_size,
+                   fmt::format("recv buffer size={}, expected at least {}", msg->msg_iov[0].iov_len,
+                               total_size));
+    *reinterpret_cast<uint64_t*>(msg->msg_iov[0].iov_base) = htobe64(serialized_size);
+    proto.SerializeToArray(reinterpret_cast<char*>(msg->msg_iov[0].iov_base) + sizeof(uint64_t),
+                           serialized_size);
+    msg->msg_iov[0].iov_len = total_size;
+    return static_cast<ssize_t>(total_size);
+  }
+  void expectParentAdminShutdownMessages() {
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+      return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+    });
+    EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillOnce([](int, msghdr* msg, int) {
+      HotRestartMessage proto;
+      proto.mutable_reply()->mutable_shutdown_admin();
+      return Api::SysCallSizeResult{hotRestartMessageIntoRecvBuffer(msg, proto), 0};
+    });
+  }
   Api::MockOsSysCalls& os_sys_calls_;
   Event::FileReadyCb udp_file_ready_callback_;
   sockaddr_un child_address_udp_forwarding_;
@@ -101,6 +128,36 @@ public:
   std::unique_ptr<FakeHotRestartingParent> fake_parent_;
   std::unique_ptr<HotRestartingChild> hot_restarting_child_;
 };
+
+TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
+  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
+  testing::MockFunction<void()> callback1;
+  testing::MockFunction<void()> callback2;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback1.AsStdFunction());
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr2,
+                                                       callback2.AsStdFunction());
+  EXPECT_CALL(callback1, Call());
+  EXPECT_CALL(callback2, Call());
+  fake_parent_->expectParentAdminShutdownMessages();
+  hot_restarting_child_->sendParentAdminShutdownRequest();
+}
+
+TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlreadyDrained) {
+  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
+  testing::MockFunction<void()> callback1;
+  testing::MockFunction<void()> callback2;
+  fake_parent_->expectParentAdminShutdownMessages();
+  hot_restarting_child_->sendParentAdminShutdownRequest();
+  EXPECT_CALL(callback1, Call());
+  EXPECT_CALL(callback2, Call());
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback1.AsStdFunction());
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr2,
+                                                       callback2.AsStdFunction());
+}
 
 TEST_F(HotRestartingChildTest, LogsErrorOnReplyMessageInUdpStream) {
   envoy::HotRestartMessage msg;

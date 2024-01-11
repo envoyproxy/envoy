@@ -48,7 +48,8 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
 
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                        const std::string& socket_path, mode_t socket_mode)
-    : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
+    : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
+      parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -102,7 +103,7 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::Ud
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
                                                     uint32_t worker_index) {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return -1;
   }
 
@@ -121,7 +122,7 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
 }
 
 std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return nullptr;
   }
 
@@ -138,7 +139,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 }
 
 void HotRestartingChild::drainParentListeners() {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return;
   }
   // No reply expected.
@@ -156,10 +157,13 @@ void HotRestartingChild::registerUdpForwardingListener(
 
 void HotRestartingChild::registerParentDrainedCallback(
     const Network::Address::InstanceConstSharedPtr& address, absl::AnyInvocable<void()> callback) {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_drained_) {
     callback();
   } else {
-    on_drained_actions_.try_emplace(address->asString(), std::move(callback));
+    auto result = on_drained_actions_.try_emplace(address->asString(), std::move(callback));
+    RELEASE_ASSERT(result.second,
+                   fmt::format("two udp listeners with the same address ({}) is unexpected",
+                               address->asString()));
   }
 }
 
@@ -169,14 +173,15 @@ void HotRestartingChild::allDrainsImplicitlyComplete() {
     std::move(drain_action.second)();
   }
   on_drained_actions_.clear();
+  parent_drained_ = true;
 }
 
 absl::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
-  allDrainsImplicitlyComplete();
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return absl::nullopt;
   }
+  allDrainsImplicitlyComplete();
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_shutdown_admin();
@@ -194,9 +199,11 @@ HotRestartingChild::sendParentAdminShutdownRequest() {
 }
 
 void HotRestartingChild::sendParentTerminateRequest() {
-  if (restart_epoch_ == 0 || parent_terminated_) {
+  if (parent_terminated_) {
     return;
   }
+  allDrainsImplicitlyComplete();
+
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_terminate();
   main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);

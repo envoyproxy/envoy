@@ -87,6 +87,14 @@ public:
   std::unique_ptr<HotRestartImpl> hot_restart_;
 };
 
+TEST_F(HotRestartImplTest, ParentDrainedCallbackRegistrarIsSetAndCanBeCalled) {
+  setup();
+  OptRef<Network::ParentDrainedCallbackRegistrar> registrar =
+      hot_restart_->parentDrainedCallbackRegistrar();
+  ASSERT_TRUE(registrar.has_value());
+  registrar->registerParentDrainedCallback(test_addresses_.ipv4_test_addr_, []() {});
+}
+
 TEST_F(HotRestartImplTest, VersionString) {
   // Tests that the version-string will be consistent and HOT_RESTART_VERSION,
   // between multiple instantiations.
