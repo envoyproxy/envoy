@@ -65,6 +65,7 @@ if [[ "${1:-}" == "--android" ]]; then
   "${SDKMANAGER}" --install "ndk;21.4.7075529"
   # Download and set up build-tools 30.0.3, 31.0.0 is missing dx.jar.
   "${SDKMANAGER}" --install "build-tools;30.0.3"
+  "${SDKMANAGER}" --install "platforms;android-30"
   ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/21.4.7075529"
   export ANDROID_NDK_HOME
 fi
