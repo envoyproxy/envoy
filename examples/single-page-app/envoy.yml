@@ -76,15 +76,6 @@ static_resources:
               domains: ["*"]
               routes:
               - match:
-                  prefix: "/other/"
-                route:
-                  regex_rewrite:
-                    pattern:
-                      regex: '^/other/(.*)'
-                    substitution: '/\1'
-                  cluster: other
-
-              - match:
                   prefix: "/hub/"
                 route:
                   host_rewrite_literal: api.myhub
