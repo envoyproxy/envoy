@@ -8,8 +8,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/extensions/filters/common/rbac/matchers/uri_template.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
+#include "source/extensions/filters/common/rbac/matchers/uri_template.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"

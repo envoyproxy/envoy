@@ -13,7 +13,7 @@ namespace Matchers {
 
 // RBAC matcher extension for matching URI templates.
 class UriTemplateMatcher : public Filters::Common::RBAC::Matcher,
-                            public Logger::Loggable<Logger::Id::rbac> {
+                           public Logger::Loggable<Logger::Id::rbac> {
 public:
   UriTemplateMatcher(
       const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig& proto)
