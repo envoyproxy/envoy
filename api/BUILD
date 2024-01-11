@@ -299,6 +299,7 @@ proto_library(
         "//envoy/extensions/rate_limit_descriptors/expr/v3:pkg",
         "//envoy/extensions/rbac/audit_loggers/stream/v3:pkg",
         "//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg",
+        "//envoy/extensions/rbac/matchers/uri_template/v3:pkg",
         "//envoy/extensions/regex_engines/v3:pkg",
         "//envoy/extensions/request_id/uuid/v3:pkg",
         "//envoy/extensions/resource_monitors/downstream_connections/v3:pkg",

@@ -1,7 +1,5 @@
 #pragma once
 
-// #include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
-
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
@@ -13,28 +11,28 @@ namespace Common {
 namespace RBAC {
 namespace Matchers {
 
-// RBAC matcher extension for matching URL path according to glob standard.
-class GlobTemplateMatcher : public Filters::Common::RBAC::Matcher,
+// RBAC matcher extension for matching URI templates.
+class UriTemplateMatcher : public Filters::Common::RBAC::Matcher,
                             public Logger::Loggable<Logger::Id::rbac> {
 public:
-  GlobTemplateMatcher(
+  UriTemplateMatcher(
       const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig& proto)
-      : glob_matcher_(proto){};
+      : uri_template_matcher_(proto){};
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  const Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher glob_matcher_;
+  const Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher uri_template_matcher_;
 };
 
-// Extension factory for GlobTemplateMatcher.
-class GlobTemplateMatcherFactory
+// Extension factory for UriTemplateMatcher.
+class UriTemplateMatcherFactory
     : public Filters::Common::RBAC::BaseMatcherExtensionFactory<
-          GlobTemplateMatcher,
+          UriTemplateMatcher,
           envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig> {
 public:
-  std::string name() const override { return "envoy.rbac.matchers.glob_matcher"; }
+  std::string name() const override { return "envoy.rbac.matchers.uri_template"; }
 };
 
 } // namespace Matchers

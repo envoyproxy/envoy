@@ -424,7 +424,7 @@ EXTENSIONS = {
     #
 
     "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
-    "envoy.rbac.matchers.glob_matcher":         "//source/extensions/filters/common/rbac/glob:glob_lib",
+    "envoy.rbac.matchers.uri_template":         "//source/extensions/filters/common/rbac/matchers:uri_template_lib",
 
     #
     # DNS Resolver
