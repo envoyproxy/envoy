@@ -85,12 +85,12 @@ class Http3Client(QuicConnectionProtocol):
         self._http.send_headers(
             stream_id=stream_id,
             headers=[
-                (b":method", "POST".encode() if post_stdin else "GET".encode()),
+                (b":method", b"POST" if post_stdin else b"GET"),
                 (b":scheme", parsed_url.scheme.encode()),
                 (b":authority", parsed_url.netloc.encode()),
                 (b":path", parsed_url.path.encode()),
             ],
-            end_stream=False if post_stdin else True,
+            end_stream=not post_stdin,
         )
         if post_stdin:
             async for data in _stream_stdin_generator():
