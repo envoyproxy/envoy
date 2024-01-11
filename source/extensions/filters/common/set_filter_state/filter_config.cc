@@ -1,12 +1,26 @@
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/formatter/substitution_format_string.h"
+#include "source/common/router/string_accessor_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace SetFilterState {
+
+class GenericStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.string"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(GenericStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 std::vector<Value>
 Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
@@ -16,8 +30,10 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
   for (const auto& proto_value : proto_values) {
     Value value;
     value.key_ = proto_value.object_key();
+    const std::string& factory_key =
+        proto_value.factory_key().empty() ? value.key_ : proto_value.factory_key();
     value.factory_ =
-        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(value.key_);
+        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(factory_key);
     if (value.factory_ == nullptr) {
       throw EnvoyException(fmt::format("'{}' does not have an object factory", value.key_));
     }

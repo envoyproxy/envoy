@@ -32,7 +32,7 @@ TEST_F(IpResolverTest, Basic) {
   envoy::config::core::v3::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_port_value(443);
-  auto address = resolver_->resolve(socket_address);
+  auto address = resolver_->resolve(socket_address).value();
   EXPECT_EQ(address->ip()->addressAsString(), "1.2.3.4");
   EXPECT_EQ(address->ip()->port(), 443);
 }
@@ -41,26 +41,25 @@ TEST_F(IpResolverTest, DisallowsNamedPort) {
   envoy::config::core::v3::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_named_port("http");
-  EXPECT_THROW_WITH_MESSAGE(
-      resolver_->resolve(socket_address), EnvoyException,
-      fmt::format("IP resolver can't handle port specifier type {}",
-                  envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort));
+  EXPECT_EQ(resolver_->resolve(socket_address).status().message(),
+            fmt::format("IP resolver can't handle port specifier type {}",
+                        envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort));
 }
 
 TEST(ResolverTest, FromProtoAddress) {
   envoy::config::core::v3::Address ipv4_address;
   ipv4_address.mutable_socket_address()->set_address("1.2.3.4");
   ipv4_address.mutable_socket_address()->set_port_value(5);
-  EXPECT_EQ("1.2.3.4:5", resolveProtoAddress(ipv4_address)->asString());
+  EXPECT_EQ("1.2.3.4:5", resolveProtoAddress(ipv4_address).value()->asString());
 
   envoy::config::core::v3::Address ipv6_address;
   ipv6_address.mutable_socket_address()->set_address("1::1");
   ipv6_address.mutable_socket_address()->set_port_value(2);
-  EXPECT_EQ("[1::1]:2", resolveProtoAddress(ipv6_address)->asString());
+  EXPECT_EQ("[1::1]:2", resolveProtoAddress(ipv6_address).value()->asString());
 
   envoy::config::core::v3::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("/foo/bar");
-  EXPECT_EQ("/foo/bar", resolveProtoAddress(pipe_address)->asString());
+  EXPECT_EQ("/foo/bar", resolveProtoAddress(pipe_address).value()->asString());
 }
 
 TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
@@ -68,14 +67,14 @@ TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
   internal_listener_address.mutable_envoy_internal_address()->set_server_listener_name(
       "internal_listener_foo");
   EXPECT_EQ("envoy://internal_listener_foo/",
-            resolveProtoAddress(internal_listener_address)->asString());
+            resolveProtoAddress(internal_listener_address).value()->asString());
 }
 
 TEST(ResolverTest, UninitializedInternalAddressFromProtoAddress) {
   envoy::config::core::v3::Address internal_address;
   internal_address.mutable_envoy_internal_address();
   EXPECT_THROW_WITH_MESSAGE(
-      resolveProtoAddress(internal_address), EnvoyException,
+      resolveProtoAddress(internal_address).IgnoreError(), EnvoyException,
       fmt::format("Failed to resolve address:{}", internal_address.DebugString()));
 }
 
@@ -85,7 +84,7 @@ TEST(ResolverTest, FromProtoAddressV4Compat) {
     envoy::config::core::v3::Address ipv6_address;
     ipv6_address.mutable_socket_address()->set_address("1::1");
     ipv6_address.mutable_socket_address()->set_port_value(2);
-    auto resolved_addr = resolveProtoAddress(ipv6_address);
+    auto resolved_addr = resolveProtoAddress(ipv6_address).value();
     EXPECT_EQ("[1::1]:2", resolved_addr->asString());
   }
   {
@@ -93,14 +92,14 @@ TEST(ResolverTest, FromProtoAddressV4Compat) {
     ipv6_address.mutable_socket_address()->set_address("1::1");
     ipv6_address.mutable_socket_address()->set_port_value(2);
     ipv6_address.mutable_socket_address()->set_ipv4_compat(true);
-    auto resolved_addr = resolveProtoAddress(ipv6_address);
+    auto resolved_addr = resolveProtoAddress(ipv6_address).value();
     EXPECT_EQ("[1::1]:2", resolved_addr->asString());
   }
 }
 
 class TestResolver : public Resolver {
 public:
-  InstanceConstSharedPtr
+  absl::StatusOr<InstanceConstSharedPtr>
   resolve(const envoy::config::core::v3::SocketAddress& socket_address) override {
     const std::string& logical = socket_address.address();
     const std::string physical = getPhysicalName(logical);
@@ -154,7 +153,7 @@ TEST(ResolverTest, NonStandardResolver) {
     socket->set_address("foo");
     socket->set_port_value(5);
     socket->set_resolver_name("envoy.test.resolver");
-    auto instance = resolveProtoAddress(address);
+    auto instance = resolveProtoAddress(address).value();
     EXPECT_EQ("1.2.3.4:5", instance->asString());
     EXPECT_EQ("foo:5", instance->logicalName());
   }
@@ -164,7 +163,7 @@ TEST(ResolverTest, NonStandardResolver) {
     socket->set_address("bar");
     socket->set_named_port("http");
     socket->set_resolver_name("envoy.test.resolver");
-    auto instance = resolveProtoAddress(address);
+    auto instance = resolveProtoAddress(address).value();
     EXPECT_EQ("4.3.2.1:http", instance->asString());
     EXPECT_EQ("bar:http", instance->logicalName());
   }
@@ -172,7 +171,8 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException, "Address must be set: ");
+  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address).IgnoreError(), EnvoyException,
+                            "Address must be set: ");
 }
 
 TEST(ResolverTest, NoSuchResolver) {
@@ -181,7 +181,7 @@ TEST(ResolverTest, NoSuchResolver) {
   socket->set_address("foo");
   socket->set_port_value(5);
   socket->set_resolver_name("envoy.test.resolver");
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address).IgnoreError(), EnvoyException,
                             "Unknown address resolver: envoy.test.resolver");
 }
 

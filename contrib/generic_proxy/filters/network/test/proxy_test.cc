@@ -29,7 +29,7 @@ namespace {
 static const std::string DEFAULT_LOG_FORMAT =
     "%HOST% %PATH% %METHOD% %PROTOCOL% %REQUEST_PROPERTY(request-key)% "
     "%RESPONSE_PROPERTY(response-key)% "
-    "%REQUEST_PROPERTY(non-exist-key)%";
+    "%REQUEST_PROPERTY(non-exist-key)% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS%";
 
 class MockRouteConfigProvider : public Rds::RouteConfigProvider {
 public:
@@ -91,8 +91,9 @@ public:
     }
 
     filter_config_ = std::make_shared<FilterConfigImpl>(
-        "test_prefix", std::move(codec_factory), route_config_provider_, factories, tracer_,
-        std::move(tracing_config_), std::move(access_logs), factory_context_);
+        "generic_proxy.test_prefix.", std::move(codec_factory), route_config_provider_, factories,
+        tracer_, std::move(tracing_config_), std::move(access_logs), code_or_flags_,
+        factory_context_);
   }
 
   AccessLogInstanceSharedPtr loggerFormFormat(const std::string& format = DEFAULT_LOG_FORMAT) {
@@ -107,11 +108,13 @@ public:
         factory_context_.server_factory_context_.accessLogManager());
   }
 
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  CodeOrFlags code_or_flags_{factory_context_.server_factory_context_};
+
   std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
 
   std::shared_ptr<FilterConfig> filter_config_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 
   std::shared_ptr<NiceMock<MockRouteConfigProvider>> route_config_provider_{
       new NiceMock<MockRouteConfigProvider>()};
@@ -188,9 +191,7 @@ public:
         .WillOnce(
             Invoke([this](ServerCodecCallbacks& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_,
-                                       factory_context_.server_factory_context_.time_system_,
-                                       factory_context_.server_factory_context_.runtime_loader_);
+    filter_ = std::make_shared<Filter>(filter_config_, factory_context_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 
@@ -230,6 +231,11 @@ TEST_F(FilterTest, OnDecodingFailureWithoutActiveStreams) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
   decoder_callback_->onDecodingFailure();
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_decoding_error_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 0);
+  // No request was received and no request was reset.
+  EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
 }
 
 TEST_F(FilterTest, OnDecodingSuccessWithNormalRequest) {
@@ -251,6 +257,9 @@ TEST_F(FilterTest, OnDecodingSuccessWithNormalRequest) {
   EXPECT_CALL(*mock_stream_filter, onStreamDecoded(_)).Times(3);
 
   decoder_callback_->onDecodingSuccess(std::move(request));
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 }
@@ -312,34 +321,27 @@ TEST_F(FilterTest, NewStreamAndResetStream) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
-  active_stream->resetStream();
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  active_stream->resetStream(DownstreamStreamResetReason::ConnectionTermination);
 
   EXPECT_EQ(0, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 1);
+
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_flag.DC").value(),
+      1);
 }
 
 TEST_F(FilterTest, SimpleBufferWaterMarkTest) {
   initializeFilter();
   filter_->onAboveWriteBufferHighWatermark();
   filter_->onBelowWriteBufferLowWatermark();
-}
-
-TEST_F(FilterTest, NewStreamAndResetStreamFromFilter) {
-  mock_stream_filters_.push_back({"mock_0", std::make_shared<NiceMock<MockStreamFilter>>()});
-
-  initializeFilter();
-
-  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
-
-  filter_->onDecodingSuccess(std::move(request));
-  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
-
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
-
-  active_stream->decoderFiltersForTest()[0]->resetStream();
-
-  EXPECT_EQ(0, filter_->activeStreamsForTest().size());
 }
 
 TEST_F(FilterTest, NewStreamAndDispatcher) {
@@ -351,6 +353,9 @@ TEST_F(FilterTest, NewStreamAndDispatcher) {
 
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
@@ -368,6 +373,9 @@ TEST_F(FilterTest, OnDecodingFailureWithActiveStreams) {
 
   EXPECT_EQ(2, filter_->activeStreamsForTest().size());
 
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 2);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 2);
+
   Buffer::OwnedImpl fake_empty_buffer;
   EXPECT_CALL(*server_codec_, decode(_, _));
   filter_->onData(fake_empty_buffer, false);
@@ -376,6 +384,13 @@ TEST_F(FilterTest, OnDecodingFailureWithActiveStreams) {
   decoder_callback_->onDecodingFailure();
 
   EXPECT_EQ(0, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 2);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 2);
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_flag.DPE").value(),
+      2);
 }
 
 TEST_F(FilterTest, ActiveStreamRouteEntry) {
@@ -385,6 +400,9 @@ TEST_F(FilterTest, ActiveStreamRouteEntry) {
 
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
   EXPECT_EQ(active_stream->routeEntry(), route_matcher_->route_entry_.get());
@@ -619,12 +637,21 @@ TEST_F(FilterTest, ActiveStreamFiltersContinueEncoding) {
 }
 
 TEST_F(FilterTest, ActiveStreamSendLocalReply) {
-  initializeFilter();
+  initializeFilter(false, loggerFormFormat());
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  request->host_ = "host-value";
+  request->path_ = "/path-value";
+  request->method_ = "method-value";
+  request->protocol_ = "protocol-value";
+  request->data_["request-key"] = "request-value";
 
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_local_.value(), 0);
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
@@ -637,6 +664,13 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
         return response;
       }));
 
+  EXPECT_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_,
+              write("host-value /path-value method-value protocol-value request-value "
+                    "response-value - 2 test_detail"));
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
@@ -648,7 +682,13 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  active_stream->sendLocalReply(Status(StatusCode::kUnknown, "test_detail"), [](Response&) {});
+  active_stream->sendLocalReply(
+      Status(StatusCode::kUnknown, "test_detail"), {},
+      [](StreamResponse& response) { response.set("response-key", "response-value"); });
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_local_.value(), 1);
 }
 
 TEST_F(FilterTest, ActiveStreamCompleteDirectly) {
@@ -659,9 +699,15 @@ TEST_F(FilterTest, ActiveStreamCompleteDirectly) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   active_stream->completeDirectly();
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
 
   EXPECT_EQ(0, filter_->activeStreamsForTest().size());
 }
@@ -676,9 +722,15 @@ TEST_F(FilterTest, ActiveStreamCompleteDirectlyFromFilter) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   active_stream->decoderFiltersForTest()[0]->completeDirectly();
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
 
   EXPECT_EQ(0, filter_->activeStreamsForTest().size());
 }
@@ -700,6 +752,11 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
+
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
@@ -711,17 +768,25 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  EXPECT_CALL(
-      *factory_context_.server_factory_context_.access_log_manager_.file_,
-      write("host-value /path-value method-value protocol-value request-value response-value -"));
+  EXPECT_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_,
+              write("host-value /path-value method-value protocol-value request-value "
+                    "response-value - 0 via_upstream"));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  response->status_ = {0, true};
   response->data_["response-key"] = "response-value";
 
   active_stream->onResponseStart(std::move(response));
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_code.0").value(), 1);
 }
 
 TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
@@ -751,6 +816,10 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
   EXPECT_EQ(1, filter_->frameHandlersForTest().size());
 
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
+
   // stream_frame_handler will be called twice to handle the two frames (except the first
   // StreamRequest frame).
   EXPECT_CALL(mock_stream_frame_handler, onStreamFrame(_)).Times(2);
@@ -770,9 +839,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(
-      *factory_context_.server_factory_context_.access_log_manager_.file_,
-      write("host-value /path-value method-value protocol-value request-value response-value -"));
+  EXPECT_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_,
+              write("host-value /path-value method-value protocol-value request-value "
+                    "response-value - 123 via_upstream"));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -789,6 +858,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->data_["response-key"] = "response-value";
   response->stream_frame_flags_ = FrameFlags(StreamFlags(), false);
+  response->status_ = {123, false}; // Response non-OK.
 
   active_stream->onResponseStart(std::move(response));
 
@@ -796,6 +866,13 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   response_frame_1->stream_frame_flags_ = FrameFlags(StreamFlags(), true);
 
   active_stream->onResponseFrame(std::move(response_frame_1));
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 1);
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_code.123").value(),
+      1);
 }
 
 TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
@@ -808,6 +885,10 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
 
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
@@ -825,7 +906,19 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  response->status_ = {234, false}; // Response non-OK.
+  active_stream->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
   active_stream->onResponseStart(std::move(response));
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 1);
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_code.234").value(),
+      1);
+  EXPECT_EQ(
+      factory_context_.store_.counter("generic_proxy.test_prefix.downstream_rq_flag.UPE").value(),
+      1);
 }
 
 TEST_F(FilterTest, NewStreamAndReplyNormallyWithStreamDrainClose) {
@@ -900,26 +993,6 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   active_stream->onResponseStart(std::move(response));
-}
-
-TEST_F(FilterTest, TestStats) {
-  initializeFilter(false);
-  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
-  request->stream_frame_flags_ = FrameFlags(StreamFlags(123, false, false, false), true);
-
-  filter_->onDecodingSuccess(std::move(request));
-  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
-  EXPECT_EQ(1, filter_config_->stats().request_.value());
-  EXPECT_EQ(1, filter_config_->stats().request_active_.value());
-
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
-  Buffer::OwnedImpl buffer;
-  buffer.add("123");
-  // Mock response.
-  active_stream->onResponseStart(std::make_unique<FakeStreamCodecFactory::FakeResponse>());
-  active_stream->onEncodingSuccess(buffer, true);
-  EXPECT_EQ(1, filter_config_->stats().response_.value());
-  EXPECT_EQ(0, filter_config_->stats().request_active_.value());
 }
 
 } // namespace

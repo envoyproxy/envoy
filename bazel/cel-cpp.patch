@@ -1,168 +1,75 @@
-diff --git a/base/memory_manager.cc b/base/memory_manager.cc
-index 1b7b355..4c7810c 100644
---- a/base/memory_manager.cc
-+++ b/base/memory_manager.cc
-@@ -234,7 +234,7 @@ class GlobalMemoryManager final : public MemoryManager {
-   void* Allocate(size_t size, size_t align) override {
-     static_cast<void>(size);
-     static_cast<void>(align);
--    ABSL_INTERNAL_UNREACHABLE;
-+    ABSL_UNREACHABLE();
-     return nullptr;
-   }
+diff --git a/eval/public/cel_value.cc b/eval/public/cel_value.cc
+index 6aeff6d..c43864c 100644
+--- a/eval/public/cel_value.cc
++++ b/eval/public/cel_value.cc
+@@ -107,7 +107,7 @@ struct DebugStringVisitor {
  
-@@ -242,7 +242,7 @@ class GlobalMemoryManager final : public MemoryManager {
-   void OwnDestructor(void* pointer, void (*destructor)(void*)) override {
-     static_cast<void>(pointer);
-     static_cast<void>(destructor);
--    ABSL_INTERNAL_UNREACHABLE;
-+    ABSL_UNREACHABLE();
-   }
- };
+ }  // namespace
  
-diff --git a/eval/eval/evaluator_stack.h b/eval/eval/evaluator_stack.h
-index 1ecab27..9df65d7 100644
---- a/eval/eval/evaluator_stack.h
-+++ b/eval/eval/evaluator_stack.h
-@@ -5,6 +5,7 @@
- #include <utility>
- #include <vector>
+-const absl::string_view kPayloadUrlMissingAttributePath =
++ABSL_CONST_INIT const absl::string_view kPayloadUrlMissingAttributePath =
+     cel::runtime_internal::kPayloadUrlMissingAttributePath;
  
-+#include "absl/log/log.h"
- #include "absl/types/span.h"
- #include "eval/eval/attribute_trail.h"
- #include "eval/public/cel_value.h"
-diff --git a/eval/public/cel_expr_builder_factory.h b/eval/public/cel_expr_builder_factory.h
-index 7321e29..0d0d5e6 100644
---- a/eval/public/cel_expr_builder_factory.h
-+++ b/eval/public/cel_expr_builder_factory.h
-@@ -1,6 +1,7 @@
- #ifndef THIRD_PARTY_CEL_CPP_EVAL_PUBLIC_CEL_EXPR_BUILDER_FACTORY_H_
- #define THIRD_PARTY_CEL_CPP_EVAL_PUBLIC_CEL_EXPR_BUILDER_FACTORY_H_
+ CelValue CelValue::CreateDuration(absl::Duration value) {
+diff --git a/internal/strings.cc b/internal/strings.cc
+index dc5a118..24457ab 100644
+--- a/internal/strings.cc
++++ b/internal/strings.cc
+@@ -53,12 +53,12 @@ bool CheckForClosingString(absl::string_view source,
+   if (closing_str.empty()) return true;
  
-+#include "absl/log/log.h"
- #include "google/protobuf/descriptor.h"
- #include "eval/public/cel_expression.h"
- #include "eval/public/cel_options.h"
-diff --git a/eval/public/cel_value.h b/eval/public/cel_value.h
-index b2d13f8..73e1909 100644
---- a/eval/public/cel_value.h
-+++ b/eval/public/cel_value.h
-@@ -25,7 +25,6 @@
- #include "absl/base/attributes.h"
- #include "absl/base/macros.h"
- #include "absl/base/optimization.h"
--#include "absl/log/log.h"
- #include "absl/status/status.h"
- #include "absl/status/statusor.h"
- #include "absl/strings/str_cat.h"
-@@ -481,8 +480,8 @@ class CelValue {
-   }
+   const char* p = source.data();
+-  const char* end = source.end();
++  const char* end = p + source.size();
  
-   // Crashes with a null pointer error.
--  static void CrashNullPointer(Type type) ABSL_ATTRIBUTE_COLD {
--    LOG(FATAL) << "Null pointer supplied for " << TypeName(type);  // Crash ok
-+  static void CrashNullPointer(Type) ABSL_ATTRIBUTE_COLD {
-+    ABSL_ASSERT(false);
-   }
+   bool is_closed = false;
+   while (p + closing_str.length() <= end) {
+     if (*p != '\\') {
+-      size_t cur_pos = p - source.begin();
++      size_t cur_pos = p - source.data();
+       bool is_closing =
+           absl::StartsWith(absl::ClippedSubstr(source, cur_pos), closing_str);
+       if (is_closing && p + closing_str.length() < end) {
+@@ -132,7 +132,7 @@ bool UnescapeInternal(absl::string_view source, absl::string_view closing_str,
+   dest->reserve(source.size());
  
-   // Null pointer checker for pointer-based types.
-@@ -493,11 +492,9 @@ class CelValue {
-   }
+   const char* p = source.data();
+-  const char* end = source.end();
++  const char* end = p + source.size();
+   const char* last_byte = end - 1;
  
-   // Crashes with a type mismatch error.
--  static void CrashTypeMismatch(Type requested_type,
--                                Type actual_type) ABSL_ATTRIBUTE_COLD {
--    LOG(FATAL) << "Type mismatch"                             // Crash ok
--               << ": expected " << TypeName(requested_type)   // Crash ok
--               << ", encountered " << TypeName(actual_type);  // Crash ok
-+  static void CrashTypeMismatch(Type,
-+                                Type) ABSL_ATTRIBUTE_COLD {
-+    ABSL_ASSERT(false);
-   }
- 
-   // Gets value of type specified
-diff --git a/eval/public/portable_cel_expr_builder_factory.cc b/eval/public/portable_cel_expr_builder_factory.cc
-index 80ac45c..7dceb93 100644
---- a/eval/public/portable_cel_expr_builder_factory.cc
-+++ b/eval/public/portable_cel_expr_builder_factory.cc
-@@ -20,6 +20,7 @@
- #include <string>
- #include <utility>
- 
-+#include "absl/log/log.h"
- #include "absl/status/status.h"
- #include "eval/compiler/flat_expr_builder.h"
- #include "eval/public/cel_options.h"
-diff --git a/eval/public/structs/BUILD b/eval/public/structs/BUILD
-index 9187518..5151bb0 100644
---- a/eval/public/structs/BUILD
-+++ b/eval/public/structs/BUILD
-@@ -192,7 +192,6 @@ cc_library(
-     hdrs = ["legacy_type_provider.h"],
-     deps = [
-         ":legacy_type_adapter",
--        "//base:type_provider",
-         "@com_google_absl//absl/types:optional",
-     ],
- )
-diff --git a/eval/public/structs/field_access_impl.cc b/eval/public/structs/field_access_impl.cc
-index 788a476..e4b70b3 100644
---- a/eval/public/structs/field_access_impl.cc
-+++ b/eval/public/structs/field_access_impl.cc
-@@ -25,6 +25,7 @@
- #include "google/protobuf/arena.h"
- #include "google/protobuf/map_field.h"
- #include "absl/container/flat_hash_set.h"
-+#include "absl/log/log.h"
- #include "absl/status/status.h"
- #include "absl/status/statusor.h"
- #include "absl/strings/str_cat.h"
-diff --git a/eval/public/structs/legacy_type_provider.h b/eval/public/structs/legacy_type_provider.h
-index b1623fc..d3d88d6 100644
---- a/eval/public/structs/legacy_type_provider.h
-+++ b/eval/public/structs/legacy_type_provider.h
-@@ -16,7 +16,6 @@
- #define THIRD_PARTY_CEL_CPP_EVAL_PUBLIC_STRUCTS_TYPE_PROVIDER_H_
- 
- #include "absl/types/optional.h"
--#include "base/type_provider.h"
- #include "eval/public/structs/legacy_type_adapter.h"
- 
- namespace google::api::expr::runtime {
-@@ -25,8 +24,10 @@ namespace google::api::expr::runtime {
- //
- // Note: This API is not finalized. Consult the CEL team before introducing new
- // implementations.
--class LegacyTypeProvider : public cel::TypeProvider {
-+class LegacyTypeProvider {
-  public:
-+  virtual ~LegacyTypeProvider() = default;
-+
-   // Return LegacyTypeAdapter for the fully qualified type name if available.
-   //
-   // nullopt values are interpreted as not present.
-@@ -45,7 +46,7 @@ class LegacyTypeProvider : public cel::TypeProvider {
-   // created ones, the TypeInfoApis returned from this method should be the same
-   // as the ones used in value creation.
-   virtual absl::optional<const LegacyTypeInfoApis*> ProvideLegacyTypeInfo(
--      absl::string_view name) const {
-+      absl::string_view) const {
+   while (p < end) {
+@@ -446,7 +446,9 @@ std::string EscapeInternal(absl::string_view src, bool escape_all_bytes,
+   // byte.
+   dest.reserve(src.size() * 4);
+   bool last_hex_escape = false;  // true if last output char was \xNN.
+-  for (const char* p = src.begin(); p < src.end(); ++p) {
++  const char* p = src.data();
++  const char* end = p + src.size();
++  for (; p < end; ++p) {
+     unsigned char c = static_cast<unsigned char>(*p);
+     bool is_hex_escape = false;
+     switch (c) {
+@@ -552,7 +554,9 @@ std::string EscapeString(absl::string_view str) {
+ std::string EscapeBytes(absl::string_view str, bool escape_all_bytes,
+                         char escape_quote_char) {
+   std::string escaped_bytes;
+-  for (const char* p = str.begin(); p < str.end(); ++p) {
++  const char* p = str.data();
++  const char* end = p + str.size();
++  for (; p < end; ++p) {
+     unsigned char c = *p;
+     if (escape_all_bytes || !absl::ascii_isprint(c)) {
+       escaped_bytes += "\\x";
+diff --git a/tools/flatbuffers_backed_impl.cc b/tools/flatbuffers_backed_impl.cc
+index 10c0b1c..45ba72f 100644
+--- a/tools/flatbuffers_backed_impl.cc
++++ b/tools/flatbuffers_backed_impl.cc
+@@ -130,6 +130,7 @@ class ObjectStringIndexedMapImpl : public CelMap {
      return absl::nullopt;
    }
- };
-diff --git a/base/function_result.h b/base/function_result.h
-index 9bc2d67..bf6110c 100644
---- a/base/function_result.h
-+++ b/base/function_result.h
-@@ -26,7 +26,10 @@ namespace cel {
- // allows for lazy evaluation of expensive functions.
- class FunctionResult final {
-  public:
-+#pragma GCC diagnostic push
-+#pragma GCC diagnostic ignored "-Wdefaulted-function-deleted"
-   FunctionResult() = default;
-+#pragma GCC diagnostic pop
-   FunctionResult(const FunctionResult&) = default;
-   FunctionResult(FunctionResult&&) = default;
-   FunctionResult& operator=(const FunctionResult&) = default;
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override { return &keys_; }
+ 
+  private:

@@ -28,20 +28,32 @@ PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config
     : mutations_(config.mutations()) {}
 
 HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config)
-    : mutations_(config.mutations()) {}
+    : mutations_(config.mutations()),
+      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {}
 
 Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   Formatter::HttpFormatterContext ctx{&headers};
   config_->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
 
-  // Only the most specific route config is used.
-  // TODO(wbpcode): It's possible to traverse all the route configs to merge the header mutations
-  // in the future.
-  route_config_ =
-      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
+  // Traverse through all route configs to retrieve all available header mutations.
+  // `getAllPerFilterConfig` returns in ascending order of specificity (i.e., route table
+  // first, then virtual host, then per route).
+  route_configs_ = Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(decoder_callbacks_);
 
-  if (route_config_ != nullptr) {
-    route_config_->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
+  if (!config_->mostSpecificHeaderMutationsWins()) {
+    // most_specific_wins means that most specific level per filter config is evaluated last. In
+    // other words, header mutations are evaluated in ascending order of specificity (same order as
+    // `getAllPerFilterConfig` above returns).
+    // Thus, here we reverse iterate the vector when `most_specific_wins` is false.
+    for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
+      (*it)->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
+    }
+  } else {
+    for (const auto* route_config : route_configs_) {
+      ASSERT(route_config != nullptr);
+      route_config->mutations().mutateRequestHeaders(headers, ctx,
+                                                     decoder_callbacks_->streamInfo());
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -51,15 +63,22 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
   Formatter::HttpFormatterContext ctx{encoder_callbacks_->requestHeaders().ptr(), &headers};
   config_->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
 
-  if (route_config_ == nullptr) {
-    // If we haven't already resolved the route config, do so now.
-    route_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteHeaderMutation>(
-        encoder_callbacks_);
+  // If we haven't already traversed the route configs, do so now.
+  if (route_configs_.empty()) {
+    route_configs_ =
+        Http::Utility::getAllPerFilterConfig<PerRouteHeaderMutation>(encoder_callbacks_);
   }
 
-  if (route_config_ != nullptr) {
-    route_config_->mutations().mutateResponseHeaders(headers, ctx,
-                                                     encoder_callbacks_->streamInfo());
+  if (!config_->mostSpecificHeaderMutationsWins()) {
+    for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
+      (*it)->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
+    }
+  } else {
+    for (const auto* route_config : route_configs_) {
+      ASSERT(route_config != nullptr);
+      route_config->mutations().mutateResponseHeaders(headers, ctx,
+                                                      encoder_callbacks_->streamInfo());
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
