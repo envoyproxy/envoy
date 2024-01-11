@@ -84,6 +84,10 @@ minor_behavior_changes:
 - area: generic_proxy
   change: |
     Update the stats prefix of generic proxy from ``<stats_prefix>`` to ``generic_proxy.<stats_prefix>``.
+- area: header_mutation
+  change: |
+    If per route configuration is configured at multiple levels (route, virtual host, and route table), all specified
+    levels' mutations are applied. Default order is from least to most specific level (i.e. most specific level wins).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
