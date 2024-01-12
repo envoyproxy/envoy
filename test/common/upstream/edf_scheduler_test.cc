@@ -10,7 +10,7 @@ namespace Upstream {
 class EdfSchedulerTest : public testing::Test {
 public:
   template <typename T>
-  static void compareEdfScehdulers(EdfScheduler<T>& scheduler1, EdfScheduler<T>& scheduler2) {
+  static void compareEdfSchedulers(EdfScheduler<T>& scheduler1, EdfScheduler<T>& scheduler2) {
     // Compares that the given EdfSchedulers internal queues are equal up
     // (ignoring the order_offset_ values).
     EXPECT_EQ(scheduler1.queue_.size(), scheduler2.queue_.size());
@@ -33,6 +33,11 @@ public:
     std::vector<typename EdfScheduler<T>::EdfEntry> contents1 = copyFunc(scheduler1);
     std::vector<typename EdfScheduler<T>::EdfEntry> contents2 = copyFunc(scheduler2);
     for (size_t i = 0; i < contents1.size(); ++i) {
+      // Given 2 queues and some number of picks P, where one queue is created empty
+      // and P picks are performed, and the other queue is created using
+      // `EdfScheduler::createWithPicks()` thier deadlines may be a bit different
+      // due to floating point arithemetic differences. The comparison code uses
+      // a NEAR comparison to account for such differences.
       EXPECT_NEAR(contents1[i].deadline_, contents2[i].deadline_, 1e-5)
           << "inequal deadline in element " << i;
       std::shared_ptr<T> entry1 = contents1[i].entry_.lock();
@@ -187,7 +192,7 @@ TEST_F(EdfSchedulerTest, SchedulerWithZeroPicksEqualToEmptyWithAddedEntries) {
   EdfScheduler<uint32_t> sched2 = EdfScheduler<uint32_t>::createWithPicks(
       entries, [](const double& w) { return w; }, 0);
 
-  compareEdfScehdulers(sched1, sched2);
+  compareEdfSchedulers(sched1, sched2);
 }
 
 // Validates that creating a scheduler using the createWithPicks (with 5 picks)
@@ -221,11 +226,11 @@ TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEqualToEmptyWithAddedEntries) {
     EdfScheduler<double> sched2 = EdfScheduler<double>::createWithPicks(
         entries, [](const double& w) { return w; }, picks);
 
-    compareEdfScehdulers(sched1, sched2);
+    compareEdfSchedulers(sched1, sched2);
   }
 }
 
-// Emulates first-pick scenarios for by creating a scheduler with the given
+// Emulates first-pick scenarios by creating a scheduler with the given
 // weights and a random number of pre-picks, and validates that the next pick
 // of all the weights is close to the given weights.
 void firstPickTest(const std::vector<double> weights) {
