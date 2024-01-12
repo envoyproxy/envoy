@@ -77,6 +77,6 @@ The HTTP credential injector filter outputs statistics in the ``http.<stat_prefi
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  injected, Counter, Total number of requests with injected credentials
-  failed, Counter, Total number of requests that failed to inject credentials
-  already_exists, Counter, Total number of requests that already had credentials and overwrite is false
+  ``injected``, Counter, Total number of requests with injected credentials
+  ``failed``, Counter, Total number of requests that failed to inject credentials
+  ``already_exists``, Counter, Total number of requests that already had credentials and overwrite is false
