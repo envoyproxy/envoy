@@ -52,6 +52,9 @@ behavior_changes:
     mitigates CPU starvation by connections that simultaneously send high number of requests by allowing requests from other
     connections to make progress. This runtime value can be set to 1 in the presence of abusive HTTP/2 or HTTP/3 connections.
     By default this limit is disabled.
+- area: http
+  change: |
+    In the http codec, skip flushing the bytes to the network when the connection is closed.
 
 minor_behavior_changes:
 - area: ext_authz
