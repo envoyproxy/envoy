@@ -207,6 +207,9 @@ public:
   void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, nullptr); }
 
   void dropOverloadTest(uint32_t numerator, const std::string& status) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.enable_drop_overload", "true"}});
     autonomous_upstream_ = true;
 
     initializeTest(false);

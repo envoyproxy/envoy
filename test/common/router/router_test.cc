@@ -789,6 +789,10 @@ TEST_F(RouterTest, MaintenanceMode) {
 
 // DropOverload pass test
 TEST_F(RouterTest, DropOverloadPassed) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.enable_drop_overload", "true"}});
+
   EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(0.3)));
   EXPECT_CALL(random_, random())
       .WillRepeatedly(Return(0.5 * float(std::numeric_limits<uint64_t>::max())));
@@ -807,6 +811,10 @@ TEST_F(RouterTest, DropOverloadPassed) {
 
 // DropOverload drop test
 TEST_F(RouterTest, DropOverloadDropped) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.enable_drop_overload", "true"}});
+
   EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(0.3)));
   EXPECT_CALL(random_, random())
       .WillRepeatedly(Return(0.2 * float(std::numeric_limits<uint64_t>::max())));
@@ -832,6 +840,24 @@ TEST_F(RouterTest, DropOverloadDropped) {
                     .counter("upstream_rq_dropped")
                     .value());
   EXPECT_EQ(callbacks_.details(), "drop_overload");
+}
+
+// DropOverload runtime flag disable test
+TEST_F(RouterTest, DropOverloadDroppedDisableRuntime) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.enable_drop_overload", "false"}});
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_drop_overload")
+                    .value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_dropped")
+                    .value());
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
