@@ -95,7 +95,7 @@ public:
     // example if there are 2 weights: 25 and 75, and picks=23, then the
     // floor_picks will be {5, 17} (respectively), and the deadlines will be
     // {0.24000000000000002 and 0.24} (respectively). This small difference will
-    // cause a "wrong" pick compared to when starting from an empty scheduelr
+    // cause a "wrong" pick compared to when starting from an empty scheduler
     // and picking 23 times. Adding a small value to each weight circumvents
     // this problem.
     auto aug_calculate_weight = [&calculate_weight](const C& entry) -> double {
