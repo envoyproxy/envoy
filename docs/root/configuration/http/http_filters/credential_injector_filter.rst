@@ -7,7 +7,7 @@ The credential injector HTTP filter serves the purpose of injecting credentials 
 At present, the filter configuration is used to retrieve the credentials, or they can be requested through
 the OAuth2 client credential grant. Furthermore, it has the potential to support additional credential providers
 in the future, such as the OAuth2 resource owner password credentials grant, STS, etc. The credentials obtained
-are then injected into the Authorization header of the proxied HTTP requests, utilizing either the Basic or Bearer scheme.
+are then injected into the ``Authorization`` header of the proxied HTTP requests, utilizing either the ``Basic`` or ``Bearer`` scheme.
 
 Notice: This filter is intended to be used for workload authentication, which means that the identity associated
 with the inserted credential is considered as the identity of the workload behind the envoy proxy(in this case,
