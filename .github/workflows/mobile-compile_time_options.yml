@@ -97,29 +97,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: kotlin-build
-          args: >-
-            build
-            --config=mobile-remote-ci-macos-kotlin
-            //:android_dist
-          source: |
-            . ./ci/mac_ci_setup.sh --android
-            echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
-            export ANDROID_NDK_HOME
-          steps-pre: |
-            - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0  # v3.13.0
-              with:
-                java-version: '8'
-                java-package: jdk
-                architecture: x64
-                distribution: zulu
         - name: swift-build
           args: >-
             build
             --config=mobile-remote-ci-macos-swift
             //library/swift:ios_framework
           source: |
-            ./ci/mac_ci_setup.sh
+            # TODO(fredyw): A workaround since mobile/WORKSPACE requires Android SDK to be available
+            # and the GitHub Action runner image no longer includes Android SDK 30:
+            # https://github.com/actions/runner-images/issues/8952
+            ./ci/mac_ci_setup.sh --android
             ./bazelw shutdown
 
   request:

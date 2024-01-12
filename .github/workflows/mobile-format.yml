@@ -65,78 +65,6 @@ jobs:
           target: swift-lint
           timeout-minutes: 45
 
-  host:
-    permissions:
-      contents: read
-      packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-format }}
-    needs: load
-    uses: ./.github/workflows/_run.yml
-    with:
-      args: ${{ matrix.args }}
-      command: ${{ matrix.command }}
-      container-command:
-      request: ${{ needs.load.outputs.request }}
-      runs-on: ${{ matrix.runs-on }}
-      source: ${{ matrix.source }}
-      steps-pre: ${{ matrix.steps-pre }}
-      steps-post: ${{ matrix.steps-post }}
-      target: ${{ matrix.target }}
-      timeout-minutes: ${{ matrix.timeout-minutes }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
-      working-directory: mobile
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - name: Run drstring
-          args: >-
-            run
-            --config=remote-ci
-            @DrString//:drstring check
-          command: ./bazelw
-          runs-on: macos-12
-          source: |
-            export DEVELOPER_DIR=/Applications/Xcode_14.1.app
-          target: drstring
-          timeout-minutes: 10
-        - name: Pre-commit
-          command: pre-commit
-          args: >-
-            run
-            --files
-            mobile/*
-          source: |
-            pip install pre-commit
-          target: pre-commit
-          timeout-minutes: 45
-        - name: Kotlin lint
-          args: >-
-            build
-            --config=mobile-remote-ci-macos
-            //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint
-            //examples/kotlin/hello_world:hello_envoy_kt_lint
-          command: ./bazelw
-          runs-on: macos-12
-          source: |
-            export DEVELOPER_DIR=/Applications/Xcode_14.1.app
-            ./ci/mac_ci_setup.sh
-          steps-pre: |
-            - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0  # v3.13.0
-              with:
-                java-version: '8'
-                java-package: jdk
-                architecture: x64
-                distribution: zulu
-          steps-post: |
-            - name: Run Kotlin Formatter (ktlint)
-              shell: bash
-              run: |
-                cd mobile
-                ./bazelw build --config=remote-ci kotlin_format
-          target: kotlin-lint
-          timeout-minutes: 10
-
   request:
     secrets:
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
@@ -152,7 +80,6 @@ jobs:
     needs:
     - load
     - container
-    - host
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}
