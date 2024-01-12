@@ -52,6 +52,9 @@ bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
   }
   BN_CTX_start(ctx_.get());
   k_ = BN_CTX_get(ctx_.get());
+  if (!k_) {
+    return false;
+  }
   do {
     if (!BN_rand_range(k_, order)) {
       return false;
