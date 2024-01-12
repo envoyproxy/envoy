@@ -309,6 +309,9 @@ public class AndroidEnvoyExplicitFlowTest {
     assertThat(response.getEnvoyError()).isNull();
   }
 
+  // This was supposed to be a simple post, but because the stream is not properly closed, it
+  // actually ends up testing sending a post, getting a response, and Envoy resetting the
+  // "incomplete" request stream.
   @Test
   public void post_simple() throws Exception {
     mockWebServer.setDispatcher(new Dispatcher() {

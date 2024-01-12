@@ -535,12 +535,11 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
     mBytesReceivedFromRedirects += mBytesReceivedFromLastRedirect;
     mAdditionalStatusDetails = Status.CONNECTING;
     mUrlChain.add(mCurrentUrl);
-    Map<String, List<String>> envoyRequestHeaders =
-        buildEnvoyRequestHeaders(mInitialMethod, mRequestHeaders, mUploadDataStream, mUserAgent,
-                                 mCurrentUrl, mRequestContext.getBuilder().quicEnabled());
+    Map<String, List<String>> envoyRequestHeaders = buildEnvoyRequestHeaders(
+        mInitialMethod, mRequestHeaders, mUploadDataStream, mUserAgent, mCurrentUrl);
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
-                                                             /* explicitFlowCrontrol= */ true));
+                                                             /* explicitFlowControl= */ true));
     mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null);
     if (mUploadDataStream != null && mUrlChain.size() == 1) {
       mUploadDataStream.initializeWithRequest();
@@ -550,7 +549,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
   private static Map<String, List<String>>
   buildEnvoyRequestHeaders(String initialMethod, HeadersList headersList,
                            CronvoyUploadDataStream mUploadDataStream, String userAgent,
-                           String currentUrl, boolean isQuicEnabled) {
+                           String currentUrl) {
     Map<String, List<String>> headers = new LinkedHashMap<>();
     final URL url;
     try {

@@ -34,35 +34,35 @@ ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
 MAINTAINERS = {
+    'abeyad': 'U03CVM7GPM1',
+    'adisuissa': 'UT17EMMTP',
     'alyssawilk': 'U78RP48V9',
-    'mattklein123': 'U5CALEVSL',
-    'lizan': 'U79E51EQ6',
-    'snowp': 'U93KTPQP6',
     'ggreenway': 'U78MBV869',
     'htuch': 'U78E7055Z',
-    'zuercher': 'U78J72Q82',
-    'phlax': 'U017PLM0GNQ',
     'jmarantz': 'U80HPLBPG',
-    'ravenblackx': 'U02MJHFEX35',
-    'yanavlasov': 'UJHLR5KFS',
-    'RyanTheOptimist': 'U01SW3JC8GP',
-    'adisuissa': 'UT17EMMTP',
     'KBaichoo': 'U016ZPU8KBK',
-    'wbpcode': 'U017KF5C0Q6',
-    'kyessenov': 'U7KTRAA8M',
     'keith': 'UGS5P90CF',
-    'abeyad': 'U03CVM7GPM1',
+    'kyessenov': 'U7KTRAA8M',
+    'lizan': 'U79E51EQ6',
+    'mattklein123': 'U5CALEVSL',
+    'nezdolik': 'UDYUWRL13',
+    'phlax': 'U017PLM0GNQ',
+    'ravenblackx': 'U02MJHFEX35',
+    'RyanTheOptimist': 'U01SW3JC8GP',
+    'snowp': 'U93KTPQP6',
     'soulxu': 'U01GNQ3B8AY',
+    'wbpcode': 'U017KF5C0Q6',
+    'yanavlasov': 'UJHLR5KFS',
+    'zuercher': 'U78J72Q82',
 }
 
 # First pass reviewers who are not maintainers should get
 # notifications but not result in a PR not getting assigned a
 # maintainer owner.
 FIRST_PASS = {
-    'silverstar194': 'U03LNPC8JN9',
-    'nezdolik': 'UDYUWRL13',
-    'daixiang0': 'U020CJG6UU8',
     'botengyao': 'U037YUAK147',
+    'daixiang0': 'U020CJG6UU8',
+    'silverstar194': 'U03LNPC8JN9',
     'tyxia': 'U023U1ZN9SP',
 }
 
@@ -70,7 +70,6 @@ FIRST_PASS = {
 # Maintainers are already notified of pending PRs.
 API_REVIEWERS = {
     'markdroth': 'UMN8K55A6',
-    'adisuissa': 'UT17EMMTP',
 }
 
 

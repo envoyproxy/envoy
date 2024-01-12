@@ -53,15 +53,21 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'create-release'
     name: Create release
     steps:
-    - id: checkout
-      name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+    - id: appauth
+      name: App auth
+      uses: envoyproxy/toolshed/gh-actions/appauth@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-        app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+      with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         strip-prefix: release/
+        token: ${{ steps.appauth.outputs.token }}
     - run: |
         if [[ ! -s "changelogs/summary.md" ]]; then
             if [[ "${{ inputs.summary }}" == "false" ]]; then
@@ -77,10 +83,10 @@ jobs:
       name: Check changelog summary
     - if: ${{ inputs.author }}
       name: Validate signoff email
-      uses: envoyproxy/toolshed/gh-actions/email/validate@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/email/validate@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       with:
         email: ${{ inputs.author }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+    - uses: envoyproxy/toolshed/gh-actions/github/run@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       name: Create release
       with:
         source: |
@@ -105,7 +111,7 @@ jobs:
       name: Release version
       id: release
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/github/pr@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       with:
         base: ${{ github.ref_name }}
         commit: false
@@ -119,24 +125,29 @@ jobs:
         dry-run: ${{ ! inputs.pr }}
         wip: ${{ ! inputs.summary || inputs.wip }}
         title: >-
-          [${{ (! inputs.summary || inputs.wip) && 'WIP/' || '' }}release/${{ steps.branch.outputs.name }}]
+          [${{ (! inputs.summary || inputs.wip) && 'WIP/' || '' }}release/${{ steps.checkout.outputs.branch-name }}]
           repo: Release ${{ steps.release.outputs.version }}
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   sync_version_histories:
     runs-on: ubuntu-22.04
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'sync-version-histories'
     name: Sync version histories
     steps:
-    - id: checkout
-      name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+    - id: appauth
+      name: App auth
+      uses: envoyproxy/toolshed/gh-actions/appauth@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-        app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+      with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+    - uses: envoyproxy/toolshed/gh-actions/github/run@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       name: Sync version histories
       with:
         command: >-
@@ -146,7 +157,7 @@ jobs:
           --
           --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+      uses: envoyproxy/toolshed/gh-actions/github/pr@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       with:
         append-commit-message: true
         base: ${{ github.ref_name }}
@@ -157,11 +168,10 @@ jobs:
         diff-upload: version-histories-${{ steps.checkout.outputs.branch-name }}
         diff-show: true
         dry-run: ${{ ! inputs.pr }}
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
         title: >-
-          ${{ steps.branch.outputs.name != 'main' && '[${{ steps.branch.outputs.name }}]' || '' }}
+          ${{ steps.checkout.outputs.branch-name != 'main' && '[${{ steps.checkout.outputs.branch-name }}]' || '' }}
           repo: Sync version histories
-
 
   ## Triggered actions
 
@@ -175,13 +185,19 @@ jobs:
     if: github.event_name == 'release' && endsWith(github.ref, '.0')
     name: Create release branch
     steps:
-    - name: Checkout repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@6b3ddd1e42c252d68fb98973760c0ee1943c9c21  # actions-v0.2.20
+    - id: appauth
+      name: App auth
+      uses: envoyproxy/toolshed/gh-actions/appauth@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-        app_key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+
+    - name: Checkout repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+      with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
+        token: ${{ steps.appauth.outputs.token }}
     - name: Create release branch
       run: |
         version="$(cut -d- -f1 < VERSION.txt | cut -d. -f-2)"
