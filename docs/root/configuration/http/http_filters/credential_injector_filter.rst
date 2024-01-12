@@ -11,8 +11,12 @@ are then injected into the ``Authorization`` header of the proxied HTTP requests
 
 Notice: This filter is intended to be used for workload authentication, which means that the identity associated
 with the inserted credential is considered as the identity of the workload behind the envoy proxy(in this case,
-envoy is typically deployed as a sidecar alongside that workload). Please note that this filter does not handle
-end user authentication. Its purpose is solely to authenticate the workload itself.
+Envoy is typically deployed as a sidecar alongside that workload).
+
+.. note::
+  This filter does not handle end user authentication.
+  
+  The purpose of the filter is solely to authenticate the workload itself.
 
 Configuration
 -------------
