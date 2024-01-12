@@ -208,8 +208,7 @@ public:
 
   void dropOverloadTest(uint32_t numerator, const std::string& status) {
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.enable_drop_overload", "true"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_drop_overload", "true"}});
 
     autonomous_upstream_ = true;
 

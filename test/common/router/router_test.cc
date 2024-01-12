@@ -790,8 +790,7 @@ TEST_F(RouterTest, MaintenanceMode) {
 // DropOverload pass test
 TEST_F(RouterTest, DropOverloadPassed) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.enable_drop_overload", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_drop_overload", "true"}});
 
   EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(0.3)));
   EXPECT_CALL(random_, random())
@@ -812,8 +811,7 @@ TEST_F(RouterTest, DropOverloadPassed) {
 // DropOverload drop test
 TEST_F(RouterTest, DropOverloadDropped) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.enable_drop_overload", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_drop_overload", "true"}});
 
   EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(0.3)));
   EXPECT_CALL(random_, random())
@@ -845,8 +843,7 @@ TEST_F(RouterTest, DropOverloadDropped) {
 // DropOverload runtime flag disable test
 TEST_F(RouterTest, DropOverloadDroppedDisableRuntime) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.enable_drop_overload", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_drop_overload", "false"}});
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
