@@ -17,6 +17,7 @@ public:
 };
 
 using SecretReaderSharedPtr = std::shared_ptr<SecretReader>;
+using SecretReaderConstSharedPtr = std::shared_ptr<const SecretReader>;
 
 class SDSSecretReader : public SecretReader {
 public:

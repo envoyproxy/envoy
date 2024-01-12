@@ -39,7 +39,7 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
   }
 
   auto secret_reader =
-      std::make_shared<Common::SDSSecretReader>(secret_provider, server_context.api());
+      std::make_shared<const Common::SDSSecretReader>(secret_provider, server_context.api());
   std::string header = config.header();
   if (header.empty()) {
     header = "Authorization";

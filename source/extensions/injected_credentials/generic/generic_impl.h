@@ -14,7 +14,8 @@ namespace Generic {
  */
 class GenericCredentialInjector : public Common::CredentialInjector {
 public:
-  GenericCredentialInjector(const std::string& header, Common::SecretReaderSharedPtr secret_reader)
+  GenericCredentialInjector(const std::string& header,
+                            Common::SecretReaderConstSharedPtr secret_reader)
       : header_(header), secret_reader_(secret_reader){};
 
   // Common::CredentialInjector
@@ -27,7 +28,7 @@ public:
 
 private:
   const std::string header_;
-  const Common::SecretReaderSharedPtr secret_reader_;
+  const Common::SecretReaderConstSharedPtr secret_reader_;
 };
 
 } // namespace Generic
