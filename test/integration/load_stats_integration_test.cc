@@ -10,6 +10,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -680,6 +681,8 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
 
 // Validate the load reports for dropped requests due to drop_overload make sense.
 TEST_P(LoadStatsIntegrationTest, DropOverloadDropped) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_drop_overload", "true"}});
   initialize();
   waitForLoadStatsStream();
   ASSERT_TRUE(waitForLoadStatsRequest({}));
