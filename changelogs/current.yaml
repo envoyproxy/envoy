@@ -1,7 +1,6 @@
-date: Pending
+date: January 12, 2024
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http
   change: |
     Remove the hop by hop TE header from downstream request headers. This change can be temporarily reverted
@@ -51,7 +50,6 @@ behavior_changes:
     Added issuer in certificate_properties to the gRPC access log service(AlS).
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: golang
   change: |
     Remove ``Protocol`` method from ``RequestHeaderMap``.
@@ -90,7 +88,6 @@ minor_behavior_changes:
     levels' mutations are applied. Default order is from least to most specific level (i.e. most specific level wins).
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: upstream
   change: |
     Fixed a bug with upstream auto-config with HTTP/3 where certain network configurations would result in zombie
@@ -178,7 +175,6 @@ bug_fixes:
     the OAuth flow can succeed.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
     Removed ``envoy.reloadable_features.expand_agnostic_stream_lifetime`` and legacy code paths.
