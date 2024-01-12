@@ -410,6 +410,10 @@ def _boringssl_fips():
     external_http_archive(
         name = "boringssl_fips",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel:boringssl_fips.patch",
+        ],
     )
 
 def _com_github_openhistogram_libcircllhist():
