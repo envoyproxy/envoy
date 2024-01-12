@@ -101,6 +101,8 @@ jobs:
         displayName: "Upload $(CI_TARGET) Report to GCS"
         condition: and(not(canceled()), or(eq(variables['CI_TARGET'], 'coverage'), eq(variables['CI_TARGET'], 'fuzz_coverage')))
         env:
+          # This is for gcc
+          ENVOY_CONTRIB_BUILD: 1
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
 
 - job: complete

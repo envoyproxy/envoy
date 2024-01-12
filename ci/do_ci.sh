@@ -764,6 +764,10 @@ case $CI_TARGET in
             -- "${TEST_TARGETS[@]}"
         echo "bazel release build with gcc..."
         bazel_envoy_binary_build fastbuild
+        if [[ -n "$ENVOY_CONTRIB_BUILD" ]]; then
+            echo "bazel contrib build with gcc..."
+            bazel_contrib_binary_build fastbuild
+        fi
         ;;
 
     info)
