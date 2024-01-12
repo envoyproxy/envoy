@@ -98,6 +98,8 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_drop_overload);
+
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);

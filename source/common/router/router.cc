@@ -2026,6 +2026,9 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 
 bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                                std::function<void(Http::ResponseHeaderMap&)>& modify_headers) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_drop_overload")) {
+    return false;
+  }
   if (cluster.dropOverload().value()) {
     ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}", *callbacks_,
                      cluster.dropOverload().value());
