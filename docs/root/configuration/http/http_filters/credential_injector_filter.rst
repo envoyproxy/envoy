@@ -10,7 +10,7 @@ in the future, such as the OAuth2 resource owner password credentials grant, STS
 are then injected into the ``Authorization`` header of the proxied HTTP requests, utilizing either the ``Basic`` or ``Bearer`` scheme.
 
 Notice: This filter is intended to be used for workload authentication, which means that the identity associated
-with the inserted credential is considered as the identity of the workload behind the envoy proxy(in this case,
+with the inserted credential is considered as the identity of the workload behind the Envoy proxy (in this case,
 Envoy is typically deployed as a sidecar alongside that workload).
 
 .. note::
