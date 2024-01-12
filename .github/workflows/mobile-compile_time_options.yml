@@ -121,7 +121,7 @@ jobs:
       ${{ always()
           && github.event.workflow_run.conclusion == 'success'
           && (fromJSON(needs.load.outputs.request).run.mobile-compile-time-options
-              || fromJSON(needs.load.outputs.request).run.mobile-compile-time-options-cc) }}
+              || fromJSON(needs.load.outputs.request).run.mobile-compile-time-cc) }}
     needs:
     - load
     - cc
