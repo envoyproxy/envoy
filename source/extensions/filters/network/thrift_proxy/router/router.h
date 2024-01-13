@@ -149,7 +149,8 @@ public:
         upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
         upstream_resp_exception_local_(stat_name_set_->add("thrift.upstream_resp_exception_local")),
-        upstream_resp_exception_local_overflow_(stat_name_set_->add("thrift.upstream_resp_exception_local_overflow")),
+        upstream_resp_exception_local_overflow_(
+            stat_name_set_->add("thrift.upstream_resp_exception_local_overflow")),
         upstream_resp_exception_local_local_connection_failure_(
             stat_name_set_->add("thrift.upstream_resp_exception_local_local_connection_failure")),
         upstream_resp_exception_local_remote_connection_failure_(
@@ -269,28 +270,31 @@ public:
    * upstream.
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
    */
-  void incResponseLocalException(const Upstream::ClusterInfo& cluster, LocalExceptionErrorType error_code) const {
+  void incResponseLocalException(const Upstream::ClusterInfo& cluster,
+                                 LocalExceptionErrorType error_code) const {
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_);
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_);
     switch (error_code) {
-      case LocalExceptionErrorType::Overflow:
-        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_overflow_);
-        break;
-      case LocalExceptionErrorType::LocalConnectionFailure:
-        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_local_connection_failure_);
-        break;
-      case LocalExceptionErrorType::RemoteConnectionFailure:
-        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_remote_connection_failure_);
-        break;
-      case LocalExceptionErrorType::Timeout:
-        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_timeout_);
-        break;
-      case LocalExceptionErrorType::MaintenanceMode:
-        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_maintenance_mode_);
-        break;
-      case LocalExceptionErrorType::NoHealthyUpstream:
-        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_no_healthy_upstream_);
-        break;
+    case LocalExceptionErrorType::Overflow:
+      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_overflow_);
+      break;
+    case LocalExceptionErrorType::LocalConnectionFailure:
+      incClusterScopeCounter(cluster, nullptr,
+                             upstream_resp_exception_local_local_connection_failure_);
+      break;
+    case LocalExceptionErrorType::RemoteConnectionFailure:
+      incClusterScopeCounter(cluster, nullptr,
+                             upstream_resp_exception_local_remote_connection_failure_);
+      break;
+    case LocalExceptionErrorType::Timeout:
+      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_timeout_);
+      break;
+    case LocalExceptionErrorType::MaintenanceMode:
+      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_maintenance_mode_);
+      break;
+    case LocalExceptionErrorType::NoHealthyUpstream:
+      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_no_healthy_upstream_);
+      break;
     }
   }
 
