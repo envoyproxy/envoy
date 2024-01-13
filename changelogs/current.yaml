@@ -81,6 +81,9 @@ minor_behavior_changes:
 - area: generic_proxy
   change: |
     Update the stats prefix of generic proxy from ``<stats_prefix>`` to ``generic_proxy.<stats_prefix>``.
+- area: adaptive concurrency filter stats
+  change: |
+    Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000)
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
