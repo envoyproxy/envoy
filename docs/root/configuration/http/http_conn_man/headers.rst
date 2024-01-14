@@ -265,6 +265,12 @@ additional addresses from XFF:
   the XFF contains fewer than N addresses, Envoy falls back to using the immediate downstream
   connection's source address as trusted client address.)
 
+.. note::
+
+ If the trusted client address should be determined from a list of known CIDRs, use the
+ :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` original IP
+ detection extension instead.
+
 Envoy uses the trusted client address contents to determine whether a request originated
 externally or internally. This influences whether the
 :ref:`config_http_conn_man_headers_x-envoy-internal` header is set.
