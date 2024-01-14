@@ -388,6 +388,10 @@ new_features:
 - area: rbac filter
   change: |
     allow listed ``HttpAttributesCelMatchInput`` to be used with the xDS matcher in the RBAC filter.
+- area: original_ip_detection extension
+  change: |
+    The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+    original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
 
 deprecated:
 - area: wasm
