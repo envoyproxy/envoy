@@ -198,6 +198,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_mux_failover_lib",
+    hdrs = ["grpc_mux_failover.h"],
+    deps = [
+        ":grpc_stream_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "pausable_ack_queue_lib",
     srcs = ["pausable_ack_queue.cc"],
     hdrs = ["pausable_ack_queue.h"],
