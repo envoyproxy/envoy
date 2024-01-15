@@ -1,7 +1,5 @@
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 
-#include "google/protobuf/wrappers.pb.h"
-
 #include "source/common/network/address_impl.h"
 #include "source/extensions/http/original_ip_detection/xff/xff.h"
 
