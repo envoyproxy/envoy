@@ -254,9 +254,15 @@ public:
 
   /**
    * Enable close event. This is used for the case the socket is listening on the file close event.
-   * Then a remote close is found by a read request will delievered as file close event.
+   * Then a remote close is found by a read request will be delivered as a file close event.
    */
   virtual void enableCloseEvent(bool enable) PURE;
+
+  /**
+   * Connect to an address.
+   * @param address the peer of address which is connected to.
+   */
+  virtual void connect(const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   /**
    * Write data to the socket.
@@ -382,21 +388,34 @@ public:
   ~IoUringWorker() override = default;
 
   /**
-   * Add an server socket socket to the worker.
+   * Add a server socket to the worker.
    */
   virtual IoUringSocket& addServerSocket(os_fd_t fd, Event::FileReadyCb cb,
                                          bool enable_close_event) PURE;
 
   /**
-   * Add an server socket from an existing socket from another thread.
+   * Add a server socket from an existing socket from another thread.
    */
   virtual IoUringSocket& addServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                          Event::FileReadyCb cb, bool enable_close_event) PURE;
 
   /**
+   * Add a client socket to the worker.
+   */
+  virtual IoUringSocket& addClientSocket(os_fd_t fd, Event::FileReadyCb cb,
+                                         bool enable_close_event) PURE;
+
+  /**
    * Return the current thread's dispatcher.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Submit a connect request for a socket.
+   */
+  virtual Request*
+  submitConnectRequest(IoUringSocket& socket,
+                       const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   /**
    * Submit a read request for a socket.
