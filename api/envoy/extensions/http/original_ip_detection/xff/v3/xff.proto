@@ -31,7 +31,7 @@ message XffConfig {
     uint32 xff_num_trusted_hops = 1;
 
     // The `CIDR <https://tools.ietf.org/html/rfc4632>`_ ranges to trust when
-    // evalutating the remote IP address to determine the origin client's IP address.
+    // evaluating the remote IP address to determine the origin client's IP address.
     // This is used instead of
     // :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`.
     // When the remote IP address matches a trusted CIDR and the
