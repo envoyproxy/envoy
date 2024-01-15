@@ -17,6 +17,7 @@ from aiohttp import web
 
 from shared import Data, debug_request, TokenStorage
 
+logger = logging.getLogger(__name__)
 MYHUB_URL = os.environ.get("MYHUB_URL") or "http://localhost:7000"
 
 # TODO: add to app
@@ -42,7 +43,6 @@ async def resources(request):
     resource_type = request.match_info["resource"]
     debug_request(request, resource_type)
     _data = Data(pathlib.Path(os.environ["DATA_PATH"]))
-    logger = logging.getLogger(__name__)
     access_token = request.cookies.get("BearerToken")
     allowed = (
         access_token

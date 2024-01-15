@@ -52,10 +52,12 @@ to ``true``
 .. warning::
    Setting
    :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
-   means the provided access token will be forwarded to upstreams proxied by Envoy unless explicitly excluded.
+   means the provided access token will be forwarded to any cluster/upstreams proxied by Envoy for this HTTP filter chain..
 
-   This can be avoided by disabling the OAuth2 filter with
-   :ref:`per-route configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`.
+   If untrusted upstreams are present, care will need to be taken to remove any sensitive cookies, such as ``BearerToken``.
+
+   This can be achieved by setting :ref:`request_headers_to_remove <envoy_v3_api_field_config.route.v3.VirtualHost.request_headers_to_remove>`
+   for the affected route.
 
 A dummy "Myhub" backend is provided with a minimal OAuth provider and API for use in the example.
 
