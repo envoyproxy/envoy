@@ -8,6 +8,7 @@
 #include "stream_client.h"
 
 namespace Envoy {
+class Engine;
 class BaseClientIntegrationTest;
 
 namespace Platform {
@@ -26,7 +27,7 @@ public:
   envoy_status_t terminate();
 
 private:
-  Engine(envoy_engine_t engine);
+  Engine(::Envoy::Engine* engine);
 
   // required to access private constructor
   friend class EngineBuilder;
@@ -35,7 +36,7 @@ private:
   // for testing only
   friend class ::Envoy::BaseClientIntegrationTest;
 
-  envoy_engine_t engine_;
+  Envoy::Engine* engine_;
   StreamClientSharedPtr stream_client_;
   PulseClientSharedPtr pulse_client_;
   bool terminated_;

@@ -46,6 +46,9 @@ behavior_changes:
     Handle empty response bodies in ``grpc_http1_reverse_bridge``. This may cause problems for clients expecting the filter to crash
     for empty responses.  This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` to ``false``.
+- area: access_log
+  change: |
+    Added issuer in certificate_properties to the gRPC access log service(AlS).
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -70,15 +73,6 @@ minor_behavior_changes:
     which is expected to reduce config update time or startup time by 10-25%. The new algorithm is also
     used for ``http_cache_filter`` hashing, which will effectively cause a one-time cache flush on update
     for users with a persistent cache. To enable this behavior set ``envoy.restart_features.use_fast_protobuf_hash`` to ``true``.
-- area: filter state
-  change: |
-    Added config name of filter sending a local reply in filter state with key
-    ``envoy.filters.network.http_connection_manager.local_reply_owner``.
-    See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
-- area: composite filter
-  change: |
-    Added composite filter's matched action name to filter state with key
-    ``envoy.extensions.filters.http.composite.matched_actions``.
 - area: http2
   change: |
     Flip the runtime guard ``envoy.reloadable_features.defer_processing_backedup_streams`` to be on by default.
@@ -90,6 +84,10 @@ minor_behavior_changes:
 - area: generic_proxy
   change: |
     Update the stats prefix of generic proxy from ``<stats_prefix>`` to ``generic_proxy.<stats_prefix>``.
+- area: header_mutation
+  change: |
+    If per route configuration is configured at multiple levels (route, virtual host, and route table), all specified
+    levels' mutations are applied. Default order is from least to most specific level (i.e. most specific level wins).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -119,6 +117,9 @@ bug_fixes:
   change: |
     Fixed a bug in QUIC and HCM interaction which could cause ``use-after-free`` during asynchronous certificates retrieval.
     The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
+- area: quic
+  change: |
+    Fixed a bug in QUIC upstream port migration which could cause use-after-free upon STATELESS_RESET packets.
 - area: redis
   change: |
     Fixed a bug causing crash if incoming redis key does not match against a ``prefix_route`` and ``catch_all_route`` is not defined.
@@ -147,6 +148,9 @@ bug_fixes:
 - area: tracing
   change: |
     Fixed a bug where child spans produced by the Datadog tracer would have an incorrect operation name.
+- area: tracing
+  change: |
+    Fixed a bug where Datadog spans tagged as errors would not have the appropriate error property set.
 - area: DNS
   change: |
     Fixed a race condition that when multiple requests with the same authority header are sent to Envoy, sometimes some requests
@@ -159,6 +163,10 @@ bug_fixes:
 - area: docker
   change: |
     Updated base image to ``ubuntu:22.04`` to fix Redis memory issue (https://github.com/envoyproxy/envoy/issues/31248).
+- area: aws
+  change: |
+    Default credentials file location was relying on incorrect ``~`` expansion. This fix now resolves to the correct path
+    by using ``HOME`` environment variable, if the credentials file location is not explicitly specified.
 - area: ext_authz
   change: |
     Fixed a bug to ensure the proper functioning of the ``with_request_body`` feature within the per-route ExtAuthZ filter.
@@ -206,6 +214,15 @@ new_features:
   change: |
     Added :ref:`ExtensionConfiguration discovery service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` support for
     :ref:`composite filter <config_http_filters_composite>`.
+- area: filter state
+  change: |
+    Added config name of filter sending a local reply in filter state with key
+    ``envoy.filters.network.http_connection_manager.local_reply_owner``.
+    See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
+- area: composite filter
+  change: |
+    Added composite filter's matched action name to filter state with key
+    ``envoy.extensions.filters.http.composite.matched_actions``.
 - area: aws
   change: |
     Added support for AWS common utility to fetch metadata credentials from AWS STS by using ``WebIdentityToken``. To enable
@@ -368,6 +385,9 @@ new_features:
   change: |
     Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
     <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
+- area: rbac filter
+  change: |
+    allow listed ``HttpAttributesCelMatchInput`` to be used with the xDS matcher in the RBAC filter.
 - area: ext_proc
   change: |
     added

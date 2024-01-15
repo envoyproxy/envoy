@@ -131,7 +131,7 @@ public:
     return false;
   }
 
-  absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const override {
+  absl::optional<Grpc::Status::GrpcStatus> getCloseStatusForTest() const {
     return last_close_status_;
   }
 

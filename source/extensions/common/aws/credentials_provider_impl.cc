@@ -42,7 +42,7 @@ constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult"
 
 constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
 constexpr char AWS_PROFILE[] = "AWS_PROFILE";
-constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "~/.aws/credentials";
+constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "/.aws/credentials";
 constexpr char DEFAULT_AWS_PROFILE[] = "default";
 
 constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
@@ -195,9 +195,19 @@ std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
 void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
-  const auto credentials_file = getEnvironmentVariableOrDefault(
-      AWS_SHARED_CREDENTIALS_FILE, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+  // Default path plus current home directory. Will fall back to / if HOME environment variable does
+  // not exist
+
+  const auto home = getEnvironmentVariableOrDefault("HOME", "");
+  const auto default_credentials_file_path =
+      absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+
+  const auto credentials_file =
+      getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
+
   const auto profile = getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+
+  ENVOY_LOG(debug, "Credentials file path = {}, profile = {}", credentials_file, profile);
 
   extractCredentials(credentials_file, profile);
 }

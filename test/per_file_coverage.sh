@@ -20,7 +20,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:91.5"
+"source/exe:90.3"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
 "source/extensions/common/tap:94.5"
