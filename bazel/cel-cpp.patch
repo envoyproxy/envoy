@@ -1,3 +1,30 @@
+diff --git a/eval/eval/cel_expression_flat_impl.cc b/eval/eval/cel_expression_flat_impl.cc
+index b930845..088cb60 100644
+--- a/eval/eval/cel_expression_flat_impl.cc
++++ b/eval/eval/cel_expression_flat_impl.cc
+@@ -22,6 +22,7 @@
+ #include "base/value_factory.h"
+ #include "base/values/opaque_value.h"
+ #include "eval/eval/evaluator_core.h"
++#include "eval/eval/cel_expression_flat_impl.h"
+ #include "eval/internal/adapter_activation_impl.h"
+ #include "eval/internal/interop.h"
+ #include "eval/public/cel_expression.h"
+@@ -61,6 +62,14 @@ CelExpressionFlatEvaluationState::CelExpressionFlatEvaluationState(
+     : arena_(arena),
+       state_(expression.MakeEvaluatorState(ProtoMemoryManagerRef(arena_))) {}
+ 
++CelExpressionFlatImpl& CelExpressionFlatImpl::operator=(
++    CelExpressionFlatImpl&& other) {
++  if (this != &other) {
++    flat_expression_ = std::move(other.flat_expression_);
++  }
++  return *this;
++}
++
+ absl::StatusOr<CelValue> CelExpressionFlatImpl::Trace(
+     const BaseActivation& activation, CelEvaluationState* _state,
+     CelEvaluationListener callback) const {
 diff --git a/eval/public/cel_value.cc b/eval/public/cel_value.cc
 index 6aeff6d..c43864c 100644
 --- a/eval/public/cel_value.cc
@@ -59,6 +86,19 @@ index fabb594..86a314c 100644
    absl::StatusOr<const CelList*> ListKeys() const override {
      return &key_list_;
    }
+diff --git a/internal/proto_wire.h b/internal/proto_wire.h
+index deb7fd9..0a0cced 100644
+--- a/internal/proto_wire.h
++++ b/internal/proto_wire.h
+@@ -75,7 +75,7 @@ inline constexpr size_t VarintSize(bool x ABSL_ATTRIBUTE_UNUSED) { return 1; }
+ // Compile-time constant for the size required to encode any value of the
+ // integral type `T` using varint.
+ template <typename T>
+-inline constexpr size_t kMaxVarintSize = VarintSize(static_cast<T>(~T{0}));
++inline constexpr size_t kMaxVarintSize = VarintSize(static_cast<T>(!T{0}));
+ 
+ // Enumeration of the protocol buffer wire tags, see
+ // https://protobuf.dev/programming-guides/encoding/#structure.
 diff --git a/internal/strings.cc b/internal/strings.cc
 index dc5a118..24457ab 100644
 --- a/internal/strings.cc
