@@ -386,10 +386,10 @@ private:
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
   void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
-                          envoy::service::ext_proc::v3::ProcessingResponse& response);
-  void setEncoderDynamicMetadata(envoy::service::ext_proc::v3::ProcessingResponse& response);
-  void setDecoderDynamicMetadata(envoy::service::ext_proc::v3::ProcessingResponse& response);
-  void addDynamicMetadata(ProcessorState& state,
+                          const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setEncoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void addDynamicMetadata(const ProcessorState& state,
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;

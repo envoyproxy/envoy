@@ -224,6 +224,28 @@ message MetadataOptions {
     // envoy and the external processing server to share the protobuf message
     // definition for safe parsing.
     repeated string typed = 2;
+
+    enum MergeBehavior {
+        // Allows overwriting a namespace list if the more-specific config is
+        // non-empty. An empty more-specific config will cause the less-specific
+        // config to be used.
+        overwrite = 1;
+
+        // Allows overwriting a namespace list with an empty namespace list to
+        // effectively disable the less-specific config.
+        overwrite_with_empty = 2;
+
+        // Merge the more-specific config into the less-specific config. With this
+        // option, more-specifig config is always a strict superset of less-specific
+        // config.
+        merge = 3;
+    }
+
+    // [#not-implemented-hide:]
+    // TODO(jbohanon) implement
+    // Specifies how more-specific config (e.g. on a virtual host or route) is
+    // handled when merging into less-specific config (e.g. listener).
+    MergeBehavior merge_behavior = 3;
   }
 
   // Describes which typed or untyped dynamic metadata namespaces to forward to

@@ -726,7 +726,7 @@ void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout)
   stats_.override_message_timeout_received_.inc();
 }
 
-void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
+void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& req) {
   // get the callbacks from the ProcessorState. This will be the appropriate
   // callbacks for the current state of the filter
   auto* cb = state.callbacks();
@@ -777,7 +777,7 @@ void Filter::addDynamicMetadata(ProcessorState& state, ProcessingRequest& req) {
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
-                                ProcessingResponse& response) {
+                                const ProcessingResponse& response) {
   if (state.untypedReceivingMetadataNamespaces().empty() || !response.has_dynamic_metadata()) {
     if (response.has_dynamic_metadata()) {
       ENVOY_LOG(debug, "processing response included dynamic metadata, but no receiving "
@@ -786,32 +786,30 @@ void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const Processor
     return;
   }
 
-  if (response.has_dynamic_metadata()) {
-    auto response_metadata = response.dynamic_metadata().fields();
-    auto receiving_namespaces = state.untypedReceivingMetadataNamespaces();
-    for (const auto& context_key : response_metadata) {
-      bool found_allowed_namespace = false;
-      if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
-                                       context_key.first);
-          metadata_it != receiving_namespaces.end()) {
-        cb->streamInfo().setDynamicMetadata(context_key.first,
-                                            response_metadata.at(context_key.first).struct_value());
-        found_allowed_namespace = true;
-      }
-      if (!found_allowed_namespace) {
-        ENVOY_LOG(debug,
-                  "processing response included dynamic metadata for namespace not "
-                  "configured for receiving: {}",
-                  context_key.first);
-      }
+  auto response_metadata = response.dynamic_metadata().fields();
+  auto receiving_namespaces = state.untypedReceivingMetadataNamespaces();
+  for (const auto& context_key : response_metadata) {
+    bool found_allowed_namespace = false;
+    if (auto metadata_it = std::find(receiving_namespaces.begin(), receiving_namespaces.end(),
+                                     context_key.first);
+        metadata_it != receiving_namespaces.end()) {
+      cb->streamInfo().setDynamicMetadata(context_key.first,
+                                          response_metadata.at(context_key.first).struct_value());
+      found_allowed_namespace = true;
+    }
+    if (!found_allowed_namespace) {
+      ENVOY_LOG(debug,
+                "processing response included dynamic metadata for namespace not "
+                "configured for receiving: {}",
+                context_key.first);
     }
   }
 }
 
-void Filter::setEncoderDynamicMetadata(ProcessingResponse& response) {
+void Filter::setEncoderDynamicMetadata(const ProcessingResponse& response) {
   setDynamicMetadata(encoder_callbacks_, encoding_state_, response);
 }
-void Filter::setDecoderDynamicMetadata(ProcessingResponse& response) {
+void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
   setDynamicMetadata(decoder_callbacks_, decoding_state_, response);
 }
 

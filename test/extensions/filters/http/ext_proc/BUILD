@@ -120,6 +120,7 @@ envoy_extension_cc_test(
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = [
         "envoy.filters.http.ext_proc",
+        # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
     shard_count = 4,
