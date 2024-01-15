@@ -303,6 +303,7 @@ public:
   // Default stubs.
   int size() const override { return 0; }
   bool empty() const override { return true; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return &WrapperFields::get().Empty;
   }

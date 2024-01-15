@@ -46,6 +46,9 @@ behavior_changes:
     Handle empty response bodies in ``grpc_http1_reverse_bridge``. This may cause problems for clients expecting the filter to crash
     for empty responses.  This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` to ``false``.
+- area: access_log
+  change: |
+    Added issuer in certificate_properties to the gRPC access log service(AlS).
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -84,6 +87,10 @@ minor_behavior_changes:
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000)
+- area: header_mutation
+  change: |
+    If per route configuration is configured at multiple levels (route, virtual host, and route table), all specified
+    levels' mutations are applied. Default order is from least to most specific level (i.e. most specific level wins).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -113,6 +120,9 @@ bug_fixes:
   change: |
     Fixed a bug in QUIC and HCM interaction which could cause ``use-after-free`` during asynchronous certificates retrieval.
     The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
+- area: quic
+  change: |
+    Fixed a bug in QUIC upstream port migration which could cause use-after-free upon STATELESS_RESET packets.
 - area: redis
   change: |
     Fixed a bug causing crash if incoming redis key does not match against a ``prefix_route`` and ``catch_all_route`` is not defined.
@@ -378,6 +388,9 @@ new_features:
   change: |
     Added support for emitting per opcode decoder error metrics via :ref:`enable_per_opcode_decoder_error_metrics
     <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>`.
+- area: rbac filter
+  change: |
+    allow listed ``HttpAttributesCelMatchInput`` to be used with the xDS matcher in the RBAC filter.
 
 deprecated:
 - area: wasm

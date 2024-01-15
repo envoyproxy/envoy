@@ -1325,6 +1325,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform",
+        ":spdy_header_byte_listener_interface_lib",
     ],
 )
 
@@ -1470,6 +1471,7 @@ envoy_cc_library(
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_hpack_hpack_lib",
         ":spdy_core_http2_header_block_lib",
+        ":spdy_no_op_headers_handler_lib",
     ],
 )
 
@@ -3154,6 +3156,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/web_transport_stats.h",
     ],
     deps = [
+        ":http2_adapter_header_validator",
         ":quic_core_connection_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_error_codes_lib",
@@ -5285,6 +5288,7 @@ envoy_quic_cc_library(
     hdrs = ["quiche/quic/load_balancer/load_balancer_config.h"],
     deps = [
         ":quic_core_types_lib",
+        ":quic_core_utils_lib",
         ":quic_load_balancer_server_id_lib",
         ":quic_platform_bug_tracker",
         ":quic_platform_export",
