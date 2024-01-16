@@ -160,6 +160,8 @@ pkg_files(
     srcs = glob([
         "root/**/*.css",
         "root/**/*.ico",
+        "root/**/*.jpeg",
+        "root/**/*.jpg",
         "root/**/*.js",
         "root/**/*.json",
         "root/**/*.pb",
