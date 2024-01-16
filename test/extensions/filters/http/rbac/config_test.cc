@@ -30,7 +30,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);
@@ -50,7 +50,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);
@@ -94,13 +94,15 @@ matcher_tree:
   Stats::IsolatedStoreImpl store;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
-                   config, "test", store, context, ProtobufMessage::getStrictValidationVisitor()),
+                   config, "test", *store.rootScope(), context,
+                   ProtobufMessage::getStrictValidationVisitor()),
                Envoy::EnvoyException);
 
   config.clear_matcher();
   *config.mutable_shadow_matcher() = matcher_proto;
   EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
-                   config, "test", store, context, ProtobufMessage::getStrictValidationVisitor()),
+                   config, "test", *store.rootScope(), context,
+                   ProtobufMessage::getStrictValidationVisitor()),
                Envoy::EnvoyException);
 }
 

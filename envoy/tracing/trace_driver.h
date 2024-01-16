@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_config.h"
 
 namespace Envoy {
@@ -107,9 +108,10 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_conext,
-                            const std::string& operation_name, SystemTime start_time,
-                            const Tracing::Decision tracing_decision) PURE;
+  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_context,
+                            const StreamInfo::StreamInfo& stream_info,
+                            const std::string& operation_name,
+                            Tracing::Decision tracing_decision) PURE;
 };
 
 using DriverPtr = std::unique_ptr<Driver>;

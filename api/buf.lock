@@ -2,17 +2,13 @@
 version: v1
 deps:
   - remote: buf.build
-    owner: beta
-    repository: prometheus
-    commit: a91b42d18a994cd4b07b37f365f87cf9
-  - remote: buf.build
     owner: cncf
     repository: xds
-    commit: f6f9b109ae2f445e9c1c00bb765b5373
+    commit: c313df85559e44248d0115969f2c8c24
   - remote: buf.build
     owner: envoyproxy
     repository: protoc-gen-validate
-    commit: 45685e052c7e406b9fbd441fc7a568a5
+    commit: 6607b10f00ed4a3d98f906807131c44a
   - remote: buf.build
     owner: gogo
     repository: protobuf
@@ -24,8 +20,12 @@ deps:
   - remote: buf.build
     owner: opencensus
     repository: opencensus
-    commit: d1d7ccd1281e4f42ab7ce9a7d2b29e33
+    commit: bc2645b085534e4f8ebae3ef20088165
   - remote: buf.build
     owner: opentelemetry
     repository: opentelemetry
-    commit: 038316eb65414db8bb0cd88c47a4ee0f
+    commit: 43554dfbbfbd4873bde8993d32ea8332
+  - remote: buf.build
+    owner: prometheus
+    repository: client-model
+    commit: 1d56a02d481a412a83b3c4984eb90c2e

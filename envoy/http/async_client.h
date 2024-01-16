@@ -3,11 +3,14 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -129,6 +132,8 @@ public:
     virtual void onReset() PURE;
   };
 
+  using StreamDestructorCallbacks = std::function<void()>;
+
   /**
    * An in-flight HTTP stream.
    */
@@ -164,10 +169,55 @@ public:
     virtual void reset() PURE;
 
     /***
+     * Register callback to be called on stream destruction. This callback must persist beyond the
+     * lifetime of the stream or be unregistered via removeDestructorCallback. If there's already a
+     * destructor callback registered, this method will ASSERT-fail.
+     */
+    virtual void setDestructorCallback(StreamDestructorCallbacks callback) PURE;
+
+    /***
+     * Remove previously set destructor callback. Calling this without having previously set a
+     * Destructor callback will ASSERT-fail.
+     */
+    virtual void removeDestructorCallback() PURE;
+
+    /***
+     * Register a callback to be called when high/low write buffer watermark events occur on the
+     * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
+     * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
+     * will ASSERT-fail.
+     */
+    virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
+
+    /***
+     * Remove previously set watermark callbacks.
+     */
+    virtual void removeWatermarkCallbacks() PURE;
+
+    /***
      * @returns if the stream has enough buffered outbound data to be over the configured buffer
      * limits
      */
     virtual bool isAboveWriteBufferHighWatermark() const PURE;
+
+    /***
+     * @returns the stream info object associated with the stream.
+     */
+    virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  };
+
+  /***
+   * An in-flight HTTP request to which additional data and trailers can be sent, as well as resets
+   * and other stream-cancelling events. Must be terminated by sending trailers or data with
+   * end_stream.
+   */
+  class OngoingRequest : public virtual Request, public virtual Stream {
+  public:
+    /***
+     * Takes ownership of trailers, and sends it to the underlying stream.
+     * @param trailers owned trailers to pass to upstream.
+     */
+    virtual void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) PURE;
   };
 
   virtual ~AsyncClient() = default;
@@ -216,6 +266,16 @@ public:
       return *this;
     }
 
+    // Set buffer restriction and accounting for the stream.
+    StreamOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
+      account_ = account;
+      return *this;
+    }
+    StreamOptions& setBufferLimit(uint32_t limit) {
+      buffer_limit_ = limit;
+      return *this;
+    }
+
     // this should be done with setBufferedBodyForRetry=true ?
     StreamOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       retry_policy = p;
@@ -257,6 +317,11 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+
+    // Buffer memory account for tracking bytes.
+    Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
+
+    absl::optional<uint32_t> buffer_limit_;
 
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
 
@@ -318,6 +383,14 @@ public:
       sampled_ = sampled;
       return *this;
     }
+    RequestOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
+      account_ = account;
+      return *this;
+    }
+    RequestOptions& setBufferLimit(uint32_t limit) {
+      buffer_limit_ = limit;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
@@ -350,7 +423,20 @@ public:
                         const RequestOptions& options) PURE;
 
   /**
-   * Start an HTTP stream asynchronously.
+   * Starts a new OngoingRequest asynchronously with the given headers.
+   *
+   * @param request_headers headers to send.
+   * @param callbacks the callbacks to be notified of request status.
+   * @param options the data struct to control the request sending.
+   * @return a request handle or nullptr if no request could be created. See note attached to
+   * `send`. Calling startRequest will not trigger end stream. For header-only requests, `send`
+   * should be called instead.
+   */
+  virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
+                                       const RequestOptions& options) PURE;
+
+  /**
+   * Start an HTTP stream asynchronously, without an associated HTTP request.
    * @param callbacks the callbacks to be notified of stream status.
    * @param options the data struct to control the stream.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case

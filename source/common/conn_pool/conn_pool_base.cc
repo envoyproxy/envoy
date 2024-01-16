@@ -107,7 +107,6 @@ float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
 }
 
 ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
-  ASSERT(!is_draining_for_deletion_);
   ConnPoolImplBase::ConnectionResult result;
   // Somewhat arbitrarily cap the number of connections preconnected due to new
   // incoming connections. The preconnect ratio is capped at 3, so in steady
@@ -121,6 +120,7 @@ ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
       break;
     }
   }
+  ASSERT(!is_draining_for_deletion_ || result != ConnectionResult::CreatedNewConnection);
   return result;
 }
 
@@ -448,13 +448,24 @@ bool ConnPoolImplBase::isIdleImpl() const {
          connecting_clients_.empty() && early_data_clients_.empty();
 }
 
+/*
+  This method may be invoked once or twice.
+  It is called first time in ConnPoolImplBase::onConnectionEvent for Local/RemoteClose events.
+  The second time it is called from Envoy::Tcp::ActiveTcpClient::~ActiveTcpClient via
+  ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining.
+
+  The logic must be constructed in such way that the method is called once or twice.
+  See PR 30807 description for explanation why idle callbacks are deleted after being called.
+*/
 void ConnPoolImplBase::checkForIdleAndNotify() {
   if (isIdleImpl()) {
-    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_for_deletion_={}",
-              is_draining_for_deletion_);
+    ENVOY_LOG(debug, "invoking {} idle callback(s) - is_draining_for_deletion_={}",
+              idle_callbacks_.size(), is_draining_for_deletion_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb();
     }
+    // Clear callbacks, so they are not executed if checkForIdleAndNotify is called again.
+    idle_callbacks_.clear();
   }
 }
 
@@ -581,7 +592,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
           [&client]() { client.onConnectionDurationTimeout(); });
       client.connection_duration_timer_->enableTimer(max_connection_duration.value());
     }
-
+    // Initialize client read filters
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
+      client.initializeReadFilters();
+    }
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
     onConnected(client);

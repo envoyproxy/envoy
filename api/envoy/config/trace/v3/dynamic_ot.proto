@@ -4,6 +4,7 @@ package envoy.config.trace.v3;
 
 import "google/protobuf/struct.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -29,9 +30,14 @@ message DynamicOtConfig {
 
   // Dynamic library implementing the `OpenTracing API
   // <https://github.com/opentracing/opentracing-cpp>`_.
-  string library = 1 [(validate.rules).string = {min_len: 1}];
+  string library = 1 [
+    deprecated = true,
+    (validate.rules).string = {min_len: 1},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // The configuration to use when creating a tracer from the given dynamic
   // library.
-  google.protobuf.Struct config = 2;
+  google.protobuf.Struct config = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }

@@ -572,9 +572,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
                      // Only delta xDS is supported for on-demand CDS.
-                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
-                     // Only new DSS is supported for on-demand CDS.
-                     testing::Values(OldDssOrNewDss::New)));
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
 
 // tests a scenario when:
 //  - making a request to an unknown cluster
@@ -756,7 +754,7 @@ key:
                                        {"Pick-This-Cluster", "new_cluster"},
                                        {"Addr", "x-foo-key=foo"}});
     createRdsStream("foo_route1");
-    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1"), "1");
+    sendRdsResponse(fmt::format(fmt::runtime(route_config_tmpl), "foo_route1"), "1");
     test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
     return response;
   }

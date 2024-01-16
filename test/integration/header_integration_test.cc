@@ -24,12 +24,13 @@ namespace Envoy {
 namespace {
 
 std::string ipSuppressEnvoyHeadersTestParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>>& params) {
   return fmt::format(
-      "{}_{}",
+      "{}_{}_{}",
       TestUtility::ipTestParamsToString(
           ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-      std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
+      std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router",
+      std::get<2>(params.param) ? "with_UHV" : "without_UHV");
 }
 
 void disableHeaderValueOptionAppend(
@@ -178,7 +179,7 @@ route_config:
 } // namespace
 
 class HeaderIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>>,
       public HttpIntegrationTest {
 public:
   HeaderIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
@@ -422,6 +423,9 @@ public:
       };
     }
 
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      std::get<2>(GetParam()) ? "true" : "false");
+
     HttpIntegrationTest::initialize();
   }
 
@@ -464,10 +468,19 @@ protected:
   FakeStreamPtr eds_stream_;
 };
 
+#ifdef ENVOY_ENABLE_UHV
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
+                     testing::Values(true)),
     ipSuppressEnvoyHeadersTestParamsToString);
+#else
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
+                     testing::Values(false)),
+    ipSuppressEnvoyHeadersTestParamsToString);
+#endif
 
 TEST_P(HeaderIntegrationTest, WeightedClusterWithClusterHeader) {
   config_helper_.addConfigModifier(
@@ -1177,22 +1190,14 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
-          {":path", "/private/..%2Fpublic%5c"},
+          {":path", "/private/..%2Fpublic%5C"},
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
-#ifdef ENVOY_ENABLE_UHV
-      // UHV normalizes percent encodings to UPPERCASE
       Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
                                      {":path", "/private/..%2Fpublic%5C"},
                                      {":method", "GET"},
                                      {"x-site", "private"}},
-#else
-      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
-                                     {":path", "/private/..%2Fpublic%5c"},
-                                     {":method", "GET"},
-                                     {"x-site", "private"}},
-#endif
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
@@ -1263,22 +1268,14 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
-          {":path", "/private/..%2Fpublic%5c"},
+          {":path", "/private/..%2Fpublic%5C"},
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       },
-#ifdef ENVOY_ENABLE_UHV
-      // UHV normalizes percent encodings to UPPERCASE
       Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
                                      {":path", "/private/..%2Fpublic%5C"},
                                      {":method", "GET"},
                                      {"x-site", "private"}},
-#else
-      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
-                                     {":path", "/private/..%2Fpublic%5c"},
-                                     {":method", "GET"},
-                                     {"x-site", "private"}},
-#endif
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
@@ -1344,8 +1341,9 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
                                    });
 }
 
-// Validates TE header is forwarded if it contains a supported value
+// Validates legacy TE handling: TE header is forwarded if it contains a supported value
 TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
@@ -1378,8 +1376,9 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
       });
 }
 
-// Validates TE header is stripped if it contains an unsupported value
+// Validates legacy TE handling: that TE header stripped if it contains an unsupported value.
 TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
@@ -1422,7 +1421,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, EmptyHeaderIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
-  auto vhost = config_helper_.createVirtualHost("empty-headers.com");
+  auto vhost = config_helper_.createVirtualHost("sni.lyft.com");
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-add-empty"
@@ -1451,10 +1450,8 @@ TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/"},
-                                     {":scheme", "http"},
-                                     {":authority", "empty-headers.com"}},
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}},
       0,
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"}, {"content-length", "0"}, {":status", "200"}},

@@ -3,6 +3,7 @@
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
@@ -15,6 +16,9 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/matcher.h"
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
+#include "source/extensions/matching/input_matchers/cel_matcher/config.h"
 
 #include "absl/status/statusor.h"
 
@@ -23,103 +27,86 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using FilterConfig =
-    envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
-using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
-using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota::v3::
-    RateLimitQuotaBucketSettings_BucketIdBuilder_ValueBuilder::ValueSpecifierCase;
-using BucketId = ::envoy::service::rate_limit_quota::v3::BucketId;
+using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
     BucketAction::QuotaAssignmentAction;
 
-class RateLimitQuotaValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
-public:
-  // TODO(tyxia) Add actual validation later once CEL expression is added.
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view) override {
-    return absl::OkStatus();
-  }
-};
-
-// Contextual information used to construct the onMatch actions for a match tree.
-// Currently it is empty struct.
-struct RateLimitOnMactchActionContext {};
-
-// This class implements the on_match action behavior.
-class RateLimitOnMactchAction : public Matcher::ActionBase<BucketId>,
-                                public Logger::Loggable<Logger::Id::filter> {
-public:
-  explicit RateLimitOnMactchAction(
-      envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings settings)
-      : setting_(std::move(settings)) {}
-
-  absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                            Server::Configuration::FactoryContext& factory_context,
-                                            RateLimitQuotaValidationVisitor& visitor) const;
-
-private:
-  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings setting_;
-};
-
-class RateLimitOnMactchActionFactory
-    : public Matcher::ActionFactory<RateLimitOnMactchActionContext> {
-public:
-  std::string name() const override { return "rate_limit_quota"; }
-
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RateLimitOnMactchActionContext&,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    // Validate and then retrieve the bucket settings from config.
-    const auto bucket_settings =
-        MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::rate_limit_quota::
-                                             v3::RateLimitQuotaBucketSettings&>(config,
-                                                                                validation_visitor);
-    return [bucket_settings = std::move(bucket_settings)]() {
-      return std::make_unique<RateLimitOnMactchAction>(std::move(bucket_settings));
-    };
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>();
-  }
+/**
+ * Possible async results for a limit call.
+ */
+enum class RateLimitStatus {
+  // The request is not over limit.
+  OK,
+  // The request is over limit.
+  OverLimit,
+  // The rate limit service could not be queried.
+  Error,
 };
 
 class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RateLimitQuotaCallbacks,
-                             public Logger::Loggable<Logger::Id::filter> {
+                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
-                       Server::Configuration::FactoryContext& factory_context)
-      : config_(std::move(config)), factory_context_(factory_context) {
+                       Server::Configuration::FactoryContext& factory_context,
+                       BucketsCache& quota_buckets, ThreadLocalClient& client,
+                       Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
+      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
+        factory_context_(factory_context), quota_buckets_(quota_buckets), client_(client),
+        time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
     createMatcher();
   }
 
-  // Http::PassThroughDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
-  void onDestroy() override {}
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
+  void onDestroy() override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
 
   // RateLimitQuota::RateLimitQuotaCallbacks
-  void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
+  void onQuotaResponse(RateLimitQuotaResponse& response) override;
 
-  // Perform request matching. It returns the generated bucket ids if the matching succeeded and
-  // returns the error status otherwise.
-  absl::StatusOr<BucketId> requestMatching(const Http::RequestHeaderMap& headers);
+  // Perform request matching. It returns the generated bucket ids if the matching succeeded,
+  // error status otherwise.
+  absl::StatusOr<Matcher::ActionPtr> requestMatching(const Http::RequestHeaderMap& headers);
 
-  ~RateLimitQuotaFilter() override = default;
+  Http::Matching::HttpMatchingDataImpl matchingData() {
+    ASSERT(data_ptr_ != nullptr);
+    return *data_ptr_;
+  }
+
+  ~RateLimitQuotaFilter() override {
+    // Notify the client that the filter has been destroyed and the callback can not be used
+    // anymore.
+    if (client_.rate_limit_client != nullptr) {
+      client_.rate_limit_client->resetCallback();
+    }
+  }
 
 private:
   // Create the matcher factory and matcher.
   void createMatcher();
+  // Create a new bucket and add it to the quota bucket cache.
+  void createNewBucket(const BucketId& bucket_id, size_t id);
+  // Send the report to RLQS server immediately.
+  Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
+                                                const RateLimitOnMatchAction& match_action);
 
+  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id);
   FilterConfigConstSharedPtr config_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
+
+  // Reference to the objects that are stored in TLS.
+  BucketsCache& quota_buckets_;
+  ThreadLocalClient& client_;
+  TimeSource& time_source_;
+
+  bool initiating_call_{};
 };
 
 } // namespace RateLimitQuota

@@ -35,7 +35,7 @@ public:
       proto_config.mutable_update_period()->MergeFrom(
           ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
     }
-    config_ = std::make_shared<Config>(proto_config, store_);
+    config_ = std::make_shared<Config>(proto_config, *store_.rootScope());
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     ON_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
         .WillByDefault(Invoke([this](int, int, void* optval, socklen_t* optlen) {

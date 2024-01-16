@@ -1,9 +1,9 @@
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
-load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 
@@ -21,14 +21,24 @@ filegroup(
     srcs = glob(
         ["root/**/*.yaml"],
         exclude = [
+            "root/_configs/go/*",
             "root/**/envoy-dynamic-cds-demo.yaml",
             "root/**/envoy-dynamic-lds-demo.yaml",
             "root/**/envoy-dynamic-filesystem-demo.yaml",
+            "root/operations/_include/traffic_tapping_*.yaml",
+            "root/configuration/http/http_filters/_include/checksum_filter.yaml",
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/other_features/_include/dlb.yaml",
+            "root/configuration/other_features/_include/hyperscan_matcher.yaml",
+            "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
+            "root/configuration/other_features/_include/hyperscan_regex_engine.yaml",
+            "root/configuration/other_features/_include/qatzip.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
+            "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
+            "root/configuration/overview/_include/xds_api/oauth-sds-example.yaml",
+            "root/configuration/security/_include/sds-source-example.yaml",
         ],
     ) + select({
         "//bazel:windows_x86_64": [],
@@ -36,6 +46,17 @@ filegroup(
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
+    }),
+)
+
+filegroup(
+    name = "contrib_configs",
+    srcs = [
+        "root/configuration/http/http_filters/_include/checksum_filter.yaml",
+        "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
+    ] + select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": glob(["root/_configs/go/*.yaml"]),
     }),
 )
 
@@ -56,7 +77,7 @@ genrule(
         $(location //source/extensions:extensions_metadata.yaml) \\
         $(location //contrib:extensions_metadata.yaml) $@
     """,
-    exec_tools = ["//tools/docs:generate_extensions_security_rst"],
+    tools = ["//tools/docs:generate_extensions_security_rst"],
 )
 
 genrule(
@@ -67,7 +88,7 @@ genrule(
         $(location //bazel:all_repository_locations) \
         $@
     """,
-    exec_tools = [
+    tools = [
         "//bazel:all_repository_locations",
         "//tools/docs:generate_external_deps_rst",
     ],
@@ -93,7 +114,7 @@ genrule(
     cmd = """
     cat $(location :v3_proto_srcs) $(location :xds_proto_srcs)  > $@
     """,
-    exec_tools = [
+    tools = [
         ":v3_proto_srcs",
         ":xds_proto_srcs",
     ],
@@ -104,10 +125,10 @@ genrule(
     srcs = [":empty_extensions.json"],
     outs = ["empty_protos_rst.tar.gz"],
     cmd = """
-    $(location //tools/protodoc:generate_empty) \\
+    $(location //tools/protodoc:generate_empty) \
         $(location empty_extensions.json) $@
     """,
-    exec_tools = ["//tools/protodoc:generate_empty"],
+    tools = ["//tools/protodoc:generate_empty"],
 )
 
 genrule(
@@ -121,7 +142,7 @@ genrule(
     $(location //tools/docs:generate_api_rst) \\
         $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
     """,
-    exec_tools = ["//tools/docs:generate_api_rst"],
+    tools = ["//tools/docs:generate_api_rst"],
 )
 
 pkg_files(
@@ -161,9 +182,9 @@ genrule(
     name = "version_histories",
     outs = ["version_histories.tar.gz"],
     cmd = """
-    $(location //tools/docs:generate_version_histories) $@
+    $(location //tools/docs:generate_version_histories) --path=$$(dirname $(location //:VERSION.txt)) $@
     """,
-    exec_tools = [
+    tools = [
         ":versions.yaml",
         "//:VERSION.txt",
         "//changelogs",
@@ -181,6 +202,13 @@ pkg_files(
 )
 
 pkg_files(
+    name = "repo_configs",
+    srcs = ["//configs"],
+    prefix = "_configs/repo",
+    strip_prefix = "/configs",
+)
+
+pkg_files(
     name = "examples_rst",
     srcs = ["//examples:files"],
     prefix = "start/sandboxes/_include",
@@ -191,6 +219,7 @@ pkg_filegroup(
     name = "rst_files",
     srcs = [
         ":examples_rst",
+        ":repo_configs",
         ":sphinx_base",
         ":sphinx_inventories",
         ":sphinx_root",
@@ -221,25 +250,29 @@ pkg_tar(
 genrule(
     name = "html_release",
     outs = ["html_release.tar.gz"],
+    # BUILD_SHA must be set in release builds
+    # The Envoy workspace will provide this on stamped builds. For external builds
+    # you must either pass an env var or pass it through the workspace's status.
     cmd = """
     . $(location //bazel:volatile_env) \
+    && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
     && $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_SCM_REVISION:-}" \
+         --build_sha="$$_BUILD_SHA" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location rst) \
          $@
     """,
-    exec_tools = [
-        "//bazel:volatile_env",
-        "//tools/docs:sphinx_runner",
+    stamp = 1,
+    tools = [
         ":rst",
         "//:VERSION.txt",
+        "//bazel:volatile_env",
+        "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
-    stamp = 1,
 )
 
 # No git stamping, speeds up local dev switching branches
@@ -249,15 +282,21 @@ genrule(
     cmd = """
     $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
+         --build_sha="$${BUILD_DOCS_SHA:-}" \
          --version_file=$(location //:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location :rst) \
          $@
     """,
-    exec_tools = [
-        "//tools/docs:sphinx_runner",
+    tools = [
         ":rst",
         "//:VERSION.txt",
+        "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
+)
+
+alias(
+    name = "docs",
+    actual = ":html_release",
 )

@@ -54,8 +54,8 @@ protected:
   }
 
   void init(MakeStatFn make_stat) {
-    make_stat(*store_, {pool_.add("symbolic1")});
-    make_stat(*store_, {Stats::DynamicName("dynamic1")});
+    make_stat(*store_->rootScope(), {pool_.add("symbolic1")});
+    make_stat(*store_->rootScope(), {Stats::DynamicName("dynamic1")});
     make_stat(*scope_, {pool_.add("symbolic2")});
     make_stat(*scope_, {Stats::DynamicName("dynamic2")});
     make_stat(*scope_, {Stats::DynamicSavedName("dynamicsaved3")});
@@ -112,8 +112,8 @@ protected:
   }
 
   template <class StatType> void storeOnce(const MakeStatFn make_stat) {
-    CachedReference<StatType> symbolic1_ref(*store_, "symbolic1");
-    CachedReference<StatType> dynamic1_ref(*store_, "dynamic1");
+    CachedReference<StatType> symbolic1_ref(*store_->rootScope(), "symbolic1");
+    CachedReference<StatType> dynamic1_ref(*store_->rootScope(), "dynamic1");
     EXPECT_FALSE(symbolic1_ref.get());
     EXPECT_FALSE(dynamic1_ref.get());
 

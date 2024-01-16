@@ -23,11 +23,11 @@ public:
   public:
     FakeClusterSpecifierPlugin(absl::string_view cluster) : cluster_name_(cluster) {}
 
-    RouteConstSharedPtr route(const RouteEntry& parent,
+    RouteConstSharedPtr route(RouteConstSharedPtr parent,
                               const Http::RequestHeaderMap&) const override {
-      ASSERT(dynamic_cast<const RouteEntryImplBase*>(&parent) != nullptr);
+      ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
       return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
-          dynamic_cast<const RouteEntryImplBase*>(&parent), cluster_name_);
+          dynamic_cast<const RouteEntryImplBase*>(parent.get()), parent, cluster_name_);
     }
 
     const std::string cluster_name_;

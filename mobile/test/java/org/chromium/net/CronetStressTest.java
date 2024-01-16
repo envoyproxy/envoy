@@ -8,7 +8,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.NativeTestServer;
 import org.chromium.net.testing.TestUrlRequestCallback;
@@ -40,7 +39,6 @@ public class CronetStressTest {
 
   @Test
   @LargeTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testLargeNumberOfUploads() throws Exception {
     final int kNumRequest = 1000;

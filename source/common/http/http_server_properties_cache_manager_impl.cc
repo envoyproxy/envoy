@@ -24,16 +24,10 @@ HttpServerPropertiesCacheManagerImpl::HttpServerPropertiesCacheManagerImpl(
 HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCache(
     const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
     Event::Dispatcher& dispatcher) {
-  if (options.has_key_value_store_config() && data_.concurrency_ != 1) {
-    throw EnvoyException(
-        fmt::format("options has key value store but Envoy has concurrency = {} : {}",
-                    data_.concurrency_, options.DebugString()));
-  }
-
   const auto& existing_cache = (*slot_).caches_.find(options.name());
   if (existing_cache != (*slot_).caches_.end()) {
     if (!Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
-      throw EnvoyException(fmt::format(
+      IS_ENVOY_BUG(fmt::format(
           "options specified alternate protocols cache '{}' with different settings"
           " first '{}' second '{}'",
           options.name(), existing_cache->second.options_.DebugString(), options.DebugString()));
@@ -67,7 +61,7 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
            entry : options.prepopulated_entries()) {
     const HttpServerPropertiesCacheImpl::Origin origin = {"https", entry.hostname(), entry.port()};
     std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocol = {
-        {"h3", entry.hostname(), entry.port(),
+        {"h3", "", entry.port(),
          dispatcher.timeSource().monotonicTime() + std::chrono::hours(168)}};
     OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> existing_protocols =
         new_cache->findAlternatives(origin);

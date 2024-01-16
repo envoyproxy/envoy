@@ -74,13 +74,17 @@ IntegrationTcpClient::IntegrationTcpClient(
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
+void IntegrationTcpClient::close(Network::ConnectionCloseType close_type) {
+  connection_->close(close_type);
+}
+
 void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match) {
   auto found = payload_reader_->data().find(data);
   if (found == 0 || (!exact_match && found != std::string::npos)) {
     return;
   }
 
-  payload_reader_->set_data_to_wait_for(data, exact_match);
+  payload_reader_->setDataToWaitFor(data, exact_match);
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
@@ -94,6 +98,9 @@ AssertionResult IntegrationTcpClient::waitForData(size_t length,
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  if (disconnected_) {
+    return;
+  }
   Event::TimerPtr timeout_timer =
       connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
   timeout_timer->enableTimer(TestUtility::DefaultTimeout);
@@ -108,11 +115,27 @@ void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
   EXPECT_TRUE(disconnected_);
 }
 
-void IntegrationTcpClient::waitForHalfClose() {
+void IntegrationTcpClient::waitForHalfClose(bool ignore_spurious_events) {
+  waitForHalfClose(TestUtility::DefaultTimeout, ignore_spurious_events);
+}
+
+void IntegrationTcpClient::waitForHalfClose(std::chrono::milliseconds timeout,
+                                            bool ignore_spurious_events) {
   if (payload_reader_->readLastByte()) {
     return;
   }
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(timeout);
+
+  if (ignore_spurious_events) {
+    while (!payload_reader_->readLastByte() && timeout_timer->enabled()) {
+      connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+    }
+  } else {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  }
+
   EXPECT_TRUE(payload_reader_->readLastByte());
 }
 

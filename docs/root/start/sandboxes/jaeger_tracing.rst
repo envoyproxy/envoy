@@ -20,9 +20,9 @@ All incoming requests are routed via the front Envoy, which is acting as a rever
 sitting on the edge of the ``envoymesh`` network. Port ``8000`` is exposed
 by docker compose (see :download:`docker-compose.yaml <_include/jaeger-tracing/docker-compose.yaml>`). Notice that
 all Envoys are configured to collect request traces (e.g., http_connection_manager/config/tracing setup in
-:download:`front-envoy-jaeger.yaml <_include/jaeger-tracing/front-envoy-jaeger.yaml>`) and setup to propagate the spans generated
+:download:`envoy.yaml <_include/jaeger-tracing/envoy.yaml>`) and setup to propagate the spans generated
 by the Jaeger tracer to a Jaeger cluster (trace driver setup
-in :download:`front-envoy-jaeger.yaml <_include/jaeger-tracing/front-envoy-jaeger.yaml>`).
+in :download:`envoy.yaml <_include/jaeger-tracing/envoy.yaml>`).
 
 Before routing a request to the appropriate service Envoy or the application, Envoy will take
 care of generating the appropriate spans for tracing (parent/child context spans).
@@ -32,8 +32,8 @@ needed to correlate the span with other related spans (e.g., the trace ID).
 One of the most important benefits of tracing from Envoy is that it will take care of
 propagating the traces to the Jaeger service cluster. However, in order to fully take advantage
 of tracing, the application has to propagate trace headers that Envoy generates, while making
-calls to other services. In the sandbox we have provided, the simple flask app
-(see trace function in :download:`examples/shared/tracing/service.py <_include/shared/tracing/service.py>`) acting as service1 propagates
+calls to other services. In the sandbox we have provided, the simple ``aiohttp`` app
+(see trace function in :download:`examples/shared/python/tracing/service.py <_include/shared/python/tracing/service.py>`) acting as service1 propagates
 the trace headers while making an outbound call to service2.
 
 Step 1: Build the sandbox
@@ -45,9 +45,9 @@ To build this sandbox example, and start the example apps run the following comm
 
     $ pwd
     envoy/examples/jaeger-tracing
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
                 Name                          Command             State                                    Ports
     ----------------------------------------------------------------------------------------------------------------------------------------------------------------------

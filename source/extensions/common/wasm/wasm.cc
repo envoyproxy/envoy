@@ -68,7 +68,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
                                       [this, weak](Event::PostCb post_cb) {
                                         auto lock = weak.lock();
                                         if (lock) { // See if we are still alive.
-                                          server_shutdown_post_cb_ = post_cb;
+                                          server_shutdown_post_cb_ = std::move(post_cb);
                                         }
                                       });
 }
@@ -148,7 +148,7 @@ Wasm::~Wasm() {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
   if (server_shutdown_post_cb_) {
-    dispatcher_.post(server_shutdown_post_cb_);
+    dispatcher_.post(std::move(server_shutdown_post_cb_));
   }
 }
 
@@ -226,12 +226,10 @@ ContextBase* Wasm::createRootContext(const std::shared_ptr<PluginBase>& plugin) 
 
 ContextBase* Wasm::createVmContext() { return new Context(this); }
 
-void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
-               const Http::ResponseHeaderMap* response_headers,
-               const Http::ResponseTrailerMap* response_trailers,
-               const StreamInfo::StreamInfo& stream_info) {
+void Wasm::log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
+               const StreamInfo::StreamInfo& info) {
   auto context = getRootContext(plugin, true);
-  context->log(request_headers, response_headers, response_trailers, stream_info);
+  context->log(log_context, info);
 }
 
 void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot) {
@@ -323,6 +321,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
   auto vm_config = config.config().vm_config();
   bool fetch = false;
   if (vm_config.code().has_remote()) {
+    // TODO(https://github.com/envoyproxy/envoy/issues/25052) Stabilize this feature.
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
+                        "Wasm remote code fetch is unstable and may cause a crash");
     auto now = dispatcher.timeSource().monotonicTime() + cache_time_offset_for_testing;
     source = vm_config.code().remote().http_uri().uri();
     std::lock_guard<std::mutex> guard(code_cache_mutex);

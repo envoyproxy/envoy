@@ -375,8 +375,8 @@ TEST_F(MultiConnectionBaseImplTest, CloseDuringAttempt) {
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*createdConnections()[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite));
-  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush, _));
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 
@@ -393,11 +393,11 @@ TEST_F(MultiConnectionBaseImplTest, CloseDuringAttemptWithCallbacks) {
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*createdConnections()[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush, _));
   // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*createdConnections()[0], addConnectionCallbacks(_))
       .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); }));
-  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite, _));
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 
@@ -406,7 +406,7 @@ TEST_F(MultiConnectionBaseImplTest, CloseAfterAttemptComplete) {
 
   connectFirstAttempt();
 
-  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite, _));
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 
@@ -966,17 +966,17 @@ TEST_F(MultiConnectionBaseImplTest, ReadDisable) {
   setupMultiConnectionImpl(3);
 
   // The disables will be captured by the impl and not passed to the connection until it completes.
-  impl_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled, impl_->readDisable(true));
 
   startConnect();
 
   timeOutAndStartNextAttempt();
 
   // The disables will be captured by the impl and not passed to the connection until it completes.
-  impl_->readDisable(true);
-  impl_->readDisable(true);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, impl_->readDisable(true));
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, impl_->readDisable(true));
   // Read disable count should now be 2.
-  impl_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled, impl_->readDisable(false));
 
   // readDisable() should be applied to the now final connection.
   EXPECT_CALL(*createdConnections()[1], readDisable(true)).Times(2);
@@ -984,23 +984,27 @@ TEST_F(MultiConnectionBaseImplTest, ReadDisable) {
 
   // Verify that addBytesSentCallback() calls are delegated to the remaining connection.
   EXPECT_CALL(*createdConnections()[1], readDisable(false));
-  impl_->readDisable(false);
+  EXPECT_EQ(Connection::ReadDisableStatus::NoTransition, impl_->readDisable(false));
 }
 
 TEST_F(MultiConnectionBaseImplTest, ReadEnabled) {
   setupMultiConnectionImpl(2);
 
   EXPECT_TRUE(impl_->readEnabled());
-  impl_->readDisable(true); // Disable count 1.
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadDisabled,
+            impl_->readDisable(true)); // Disable count 1.
   EXPECT_FALSE(impl_->readEnabled());
 
   startConnect();
 
-  impl_->readDisable(true); // Disable count 2
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+            impl_->readDisable(true)); // Disable count 2
   EXPECT_FALSE(impl_->readEnabled());
-  impl_->readDisable(false); // Disable count 1
+  EXPECT_EQ(Connection::ReadDisableStatus::StillReadDisabled,
+            impl_->readDisable(false)); // Disable count 1
   EXPECT_FALSE(impl_->readEnabled());
-  impl_->readDisable(false); // Disable count 0
+  EXPECT_EQ(Connection::ReadDisableStatus::TransitionedToReadEnabled,
+            impl_->readDisable(false)); // Disable count 0
   EXPECT_TRUE(impl_->readEnabled());
 }
 

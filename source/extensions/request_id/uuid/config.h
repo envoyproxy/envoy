@@ -78,7 +78,7 @@ public:
         MessageUtil::downcastAndValidate<
             const envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig&>(
             config, context.messageValidationVisitor()),
-        context.api().randomGenerator());
+        context.serverFactoryContext().api().randomGenerator());
   }
 };
 

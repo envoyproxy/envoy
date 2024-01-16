@@ -23,7 +23,7 @@ namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
-DetectorSharedPtr DetectorImplFactory::createForCluster(
+absl::StatusOr<DetectorSharedPtr> DetectorImplFactory::createForCluster(
     Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger,
     Random::RandomGenerator& random) {
@@ -257,7 +257,9 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
           config, max_ejection_time,
           std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))),
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
-          config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))) {}
+          config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
+      successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, successful_active_health_check_uneject_host, true)) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -282,28 +284,40 @@ DetectorImpl::~DetectorImpl() {
   }
 }
 
-std::shared_ptr<DetectorImpl> DetectorImpl::create(
-    const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
-    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-    EventLoggerSharedPtr event_logger, Random::RandomGenerator& random) {
+absl::StatusOr<std::shared_ptr<DetectorImpl>>
+DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
+                     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                     TimeSource& time_source, EventLoggerSharedPtr event_logger,
+                     Random::RandomGenerator& random) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
 
   if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
   }
-
   detector->initialize(cluster);
 
   return detector;
 }
 
-void DetectorImpl::initialize(const Cluster& cluster) {
+void DetectorImpl::initialize(Cluster& cluster) {
   for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
     for (const HostSharedPtr& host : host_set->hosts()) {
       addHostMonitor(host);
     }
+  }
+
+  if (config_.successfulActiveHealthCheckUnejectHost() && cluster.healthChecker() != nullptr) {
+    cluster.healthChecker()->addHostCheckCompleteCb([this](HostSharedPtr host, HealthTransition) {
+      // If the host is ejected by outlier detection and active health check succeeds,
+      // we should treat this host as healthy.
+      if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+          host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+        host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+        unejectHost(host);
+      }
+    });
   }
   member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
@@ -340,10 +354,6 @@ void DetectorImpl::armIntervalTimer() {
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
                                        MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-    // Node seems to be healthy and was not ejected since the last check.
-    if (monitor->ejectTimeBackoff() != 0) {
-      monitor->ejectTimeBackoff()--;
-    }
     return;
   }
 
@@ -355,19 +365,23 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   ASSERT(monitor->numEjections() > 0);
   if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time) + jitter) <=
       (now - monitor->lastEjectionTime().value())) {
-    ejections_active_helper_.dec();
-    host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-    // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
-    // to the non-triggering counter being close to its trigger value.
-    host_monitors_[host]->resetConsecutive5xx();
-    host_monitors_[host]->resetConsecutiveGatewayFailure();
-    host_monitors_[host]->resetConsecutiveLocalOriginFailure();
-    monitor->uneject(now);
-    runCallbacks(host);
+    unejectHost(host);
+  }
+}
 
-    if (event_logger_) {
-      event_logger_->logUneject(host);
-    }
+void DetectorImpl::unejectHost(HostSharedPtr host) {
+  ejections_active_helper_.dec();
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
+  // to the non-triggering counter being close to its trigger value.
+  host_monitors_[host]->resetConsecutive5xx();
+  host_monitors_[host]->resetConsecutiveGatewayFailure();
+  host_monitors_[host]->resetConsecutiveLocalOriginFailure();
+  host_monitors_[host]->uneject(time_source_.monotonicTime());
+  runCallbacks(host);
+
+  if (event_logger_) {
+    event_logger_->logUneject(host);
   }
 }
 
@@ -459,10 +473,14 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
                              envoy::data::cluster::v3::OutlierEjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(MaxEjectionPercentRuntime, config_.maxEjectionPercent()));
-  double ejected_percent = 100.0 * ejections_active_helper_.value() / host_monitors_.size();
+  double ejected_percent = 100.0 * (ejections_active_helper_.value() + 1) / host_monitors_.size();
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
-  if (ejected_percent < max_ejection_percent) {
+  bool should_eject = (ejected_percent <= max_ejection_percent);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_mep_on_first_eject")) {
+    should_eject = (ejections_active_helper_.value() == 0) || should_eject;
+  }
+  if (should_eject) {
     if (type == envoy::data::cluster::v3::CONSECUTIVE_5XX ||
         type == envoy::data::cluster::v3::SUCCESS_RATE) {
       // Deprecated counter, preserving old behaviour until it's removed.
@@ -575,7 +593,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
     FALLTHRU;
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
-    IS_ENVOY_BUG("unexpected non-consecutive errorr");
+    IS_ENVOY_BUG("unexpected non-consecutive error");
     return;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     stats_.ejections_consecutive_5xx_.inc(); // Deprecated
@@ -738,6 +756,22 @@ void DetectorImpl::onIntervalTimer() {
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
 
+  // Decrement time backoff for all hosts which have not been ejected.
+  for (auto host : host_monitors_) {
+    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      auto& monitor = host.second;
+      // Node is healthy and was not ejected since the last check.
+      if (monitor->lastUnejectionTime().has_value() &&
+          ((now - monitor->lastUnejectionTime().value()) >=
+           std::chrono::milliseconds(
+               runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())))) {
+        if (monitor->ejectTimeBackoff() != 0) {
+          monitor->ejectTimeBackoff()--;
+        }
+      }
+    }
+  }
+
   armIntervalTimer();
 }
 
@@ -783,9 +817,13 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_consecutive_event();
   }
 
-  const auto json =
-      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true);
+  std::string json;
+#ifdef ENVOY_ENABLE_YAML
+  json = MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                      /* always_print_primitive_fields */ true);
+#else
+  IS_ENVOY_BUG("attempting outlier logging with JSON support removed");
+#endif
   file_->write(fmt::format("{}\n", json));
 }
 
@@ -797,9 +835,13 @@ void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
 
   event.set_action(envoy::data::cluster::v3::UNEJECT);
 
-  const auto json =
-      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                   /* always_print_primitive_fields */ true);
+  std::string json;
+#ifdef ENVOY_ENABLE_YAML
+  json = MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                      /* always_print_primitive_fields */ true);
+#else
+  IS_ENVOY_BUG("attempting outlier logging with JSON support removed");
+#endif
   file_->write(fmt::format("{}\n", json));
 }
 

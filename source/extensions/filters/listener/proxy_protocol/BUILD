@@ -26,12 +26,15 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:hex_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
@@ -39,6 +42,9 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    extra_visibility = [
+        "//test/common/listener_manager:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",

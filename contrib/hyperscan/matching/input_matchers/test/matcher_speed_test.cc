@@ -5,6 +5,8 @@
 #include "source/common/common/regex.h"
 #include "source/common/thread_local/thread_local_impl.h"
 
+#include "test/mocks/event/mocks.h"
+
 #include "benchmark/benchmark.h"
 #include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
 
@@ -43,9 +45,10 @@ BENCHMARK(BM_CompiledGoogleReMatcher);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HyperscanMatcher(benchmark::State& state) {
-  auto instance = ThreadLocal::InstanceImpl();
+  Event::MockDispatcher dispatcher;
+  ThreadLocal::InstanceImpl instance;
   auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(
-      {std::string(ClusterRePattern).c_str()}, {0}, {0}, instance, false);
+      {std::string(ClusterRePattern).c_str()}, {0}, {0}, dispatcher, instance, false);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : clusterInputs()) {
@@ -55,6 +58,7 @@ static void BM_HyperscanMatcher(benchmark::State& state) {
     }
   }
   RELEASE_ASSERT(passes > 0, "");
+  instance.shutdownGlobalThreading();
 }
 BENCHMARK(BM_HyperscanMatcher);
 

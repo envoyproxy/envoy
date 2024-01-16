@@ -28,7 +28,7 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
@@ -39,10 +39,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-// Shared factory context between server factories and cluster factories
-class FactoryContextBase {
+/**
+ * Common interface for downstream and upstream network filters to access server
+ * wide resources. This could be treated as limited form of server factory context.
+ */
+class CommonFactoryContext {
 public:
-  virtual ~FactoryContextBase() = default;
+  virtual ~CommonFactoryContext() = default;
 
   /**
    * @return Server::Options& the command-line options that Envoy was started with.
@@ -81,6 +84,12 @@ public:
   virtual Singleton::Manager& singletonManager() PURE;
 
   /**
+   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
@@ -100,23 +109,11 @@ public:
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-};
 
-/**
- * Common interface for downstream and upstream network filters.
- */
-class CommonFactoryContext : public FactoryContextBase {
-public:
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
    */
   virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
    * @return TimeSource& a reference to the time source.
@@ -132,16 +129,6 @@ public:
    * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
    */
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
-
-  /**
-   * @return the init manager of the cluster. This can be used for extensions that need
-   *         to initialize after cluster manager init but before the server starts listening.
-   *         All extensions should register themselves during configuration load. initialize()
-   *         will be called on  each registered target after cluster manager init but before the
-   *         server starts listening. Once all targets have initialized and invoked their callbacks,
-   *         the server will start listening.
-   */
-  virtual Init::Manager& initManager() PURE;
 };
 
 /**
@@ -154,14 +141,35 @@ public:
   ~ServerFactoryContext() override = default;
 
   /**
-   * @return the server-wide grpc context.
+   * @return Http::Context& the server-wide HTTP context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Grpc::Context& the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return Router::Context& a reference to the router context.
+   * @return Router::Context& the server-wide router context.
    */
   virtual Router::Context& routerContext() PURE;
+
+  /**
+   * @return ProcessContextOptRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
+   */
+  virtual ProcessContextOptRef processContext() PURE;
+
+  /**
+   * @return the init manager of the cluster. This can be used for extensions that need
+   *         to initialize after cluster manager init but before the server starts listening.
+   *         All extensions should register themselves during configuration load. initialize()
+   *         will be called on  each registered target after cluster manager init but before the
+   *         server starts listening. Once all targets have initialized and invoked their callbacks,
+   *         the server will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
 
   /**
    * @return DrainManager& the server-wide drain manager.
@@ -177,33 +185,50 @@ public:
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
+
+  /**
+   * @return OverloadManager& the overload manager for the server.
+   */
+  virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() const PURE;
 };
 
 /**
- * Factory context for access loggers that need access to listener properties.
- * This context is supplied to the access log factory when called with the listener context
- * available, such as from downstream HTTP filters.
- * NOTE: this interface is used in proprietary access loggers, please do not delete
- * without reaching to Envoy maintainers first.
+ * Generic factory context for multiple scenarios. This context provides a server factory context
+ * reference and other resources. Note that except for server factory context, other resources are
+ * not guaranteed to be available for the entire server lifetime. For example, context powered by a
+ * listener is only available for the lifetime of the listener.
  */
-class ListenerAccessLogFactoryContext : public virtual CommonFactoryContext {
+class GenericFactoryContext {
 public:
-  /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
+  virtual ~GenericFactoryContext() = default;
 
   /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
+   * @return ServerFactoryContext which lifetime is no shorter than the server and provides
+   *         access to the server's resources.
    */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
-   * @return ProcessContextOptRef an optional reference to the
-   * process context. Will be unset when running in validation mode.
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
-  virtual ProcessContextOptRef processContext() PURE;
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+
+  /**
+   * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   */
+  virtual Stats::Scope& scope() PURE;
 };
 
 /**
@@ -211,25 +236,19 @@ public:
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual ListenerAccessLogFactoryContext {
+class FactoryContext : public virtual GenericFactoryContext {
 public:
   ~FactoryContext() override = default;
 
   /**
-   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   * @return Stats::Scope& the listener's stats scope.
    */
-  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+  virtual Stats::Scope& listenerScope() PURE;
 
   /**
    * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
    */
   virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
-
-  /**
-   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
-   * the local proxy.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -238,40 +257,9 @@ public:
   virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return whether external healthchecks are currently failed or not.
+   * @return ListenerInfo description of the listener.
    */
-  virtual bool healthCheckFailed() PURE;
-
-  /**
-   * @return bool if these filters are created under the scope of a Quic listener.
-   */
-  virtual bool isQuicListener() const PURE;
-
-  /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this listener.
-   */
-  virtual const Envoy::Config::TypedMetadata& listenerTypedMetadata() const PURE;
-
-  /**
-   * @return OverloadManager& the overload manager for the server.
-   */
-  virtual OverloadManager& overloadManager() PURE;
-
-  /**
-   * @return Http::Context& a reference to the http context.
-   */
-  virtual Http::Context& httpContext() PURE;
-
-  /**
-   * @return Grpc::Context& a reference to the grpc context.
-   */
-  virtual Grpc::Context& grpcContext() PURE;
-
-  /**
-   * @return Router::Context& a reference to the router context.
-   */
-  virtual Router::Context& routerContext() PURE;
+  virtual const Network::ListenerInfo& listenerInfo() const PURE;
 };
 
 /**
@@ -307,13 +295,7 @@ public:
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
  * and connections. It can be used to create ListenerFilterChain.
  */
-class ListenerFactoryContext : public virtual FactoryContext {
-public:
-  /**
-   * Give access to the listener configuration
-   */
-  virtual const Network::ListenerConfig& listenerConfig() const PURE;
-};
+class ListenerFactoryContext : public virtual FactoryContext {};
 
 /**
  * FactoryContext for ProtocolOptionsFactory.
@@ -323,14 +305,14 @@ using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFact
 /**
  * FactoryContext for upstream HTTP filters.
  */
-class UpstreamHttpFactoryContext {
+class UpstreamFactoryContext {
 public:
-  virtual ~UpstreamHttpFactoryContext() = default;
+  virtual ~UpstreamFactoryContext() = default;
 
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() const PURE;
 
   /**
    * @return the init manager of the particular context. This can be used for extensions that need

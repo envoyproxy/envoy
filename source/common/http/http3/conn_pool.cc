@@ -47,8 +47,7 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
           return;
         }
         codec_client_->connect();
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data") &&
-            readyForStream()) {
+        if (readyForStream()) {
           // This client can send early data, so check if there are any pending streams can be sent
           // as early data.
           parent_.onUpstreamReadyForEarlyData(*this);
@@ -56,8 +55,6 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
       })) {
   ASSERT(codec_client_);
   if (dynamic_cast<CodecClientProd*>(codec_client_.get()) == nullptr) {
-    ASSERT(Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop"));
     // Hasn't called connect() yet, schedule one for the next event loop.
     async_connect_callback_->scheduleCallbackNextIteration();
   }
@@ -137,7 +134,7 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
       source_address, quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
-      transportSocketOptions(), connection_id_generator_);
+      transportSocketOptions(), connection_id_generator_, host_->transportSocketFactory());
 }
 
 std::unique_ptr<Http3ConnPoolImpl>
@@ -174,30 +171,16 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
               "Failed to create Http/3 client. Failed to create quic network connection.");
           return nullptr;
         }
-        // Store a handle to connection as it will be moved during client construction.
-        Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
-        if (connection.state() == Network::Connection::State::Closed) {
-          // TODO(danzh) remove this branch once
-          // "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
-          ASSERT(dynamic_cast<CodecClientProd*>(client->codec_client_.get()) != nullptr);
-          return nullptr;
-        }
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         // Because HTTP/3 codec client connect() can close connection inline and can raise 0-RTT
         // event inline, and both cases need to have network callbacks and http callbacks wired up
         // to propagate the event, so do not call connect() during codec client construction.
-        CodecClientPtr codec =
-            Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
-                ? std::make_unique<NoConnectCodecClientProd>(
-                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())
-                : std::make_unique<CodecClientProd>(
-                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
+        CodecClientPtr codec = std::make_unique<NoConnectCodecClientProd>(
+            CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);

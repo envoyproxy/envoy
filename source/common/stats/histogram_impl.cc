@@ -15,8 +15,7 @@ const ConstSupportedBuckets default_buckets{};
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl()
-    : supported_buckets_(default_buckets), computed_quantiles_(supportedQuantiles().size(), 0.0),
-      unit_(Histogram::Unit::Unspecified) {}
+    : supported_buckets_(default_buckets), computed_quantiles_(supportedQuantiles().size(), 0.0) {}
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr,
                                                  Histogram::Unit unit,
@@ -96,6 +95,8 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
     }
     computed_buckets_.emplace_back(hist_approx_count_below(new_histogram_ptr, bucket));
   }
+
+  out_of_bound_count_ = hist_approx_count_above(new_histogram_ptr, supported_buckets.back());
 }
 
 HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config)

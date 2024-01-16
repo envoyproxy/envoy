@@ -212,17 +212,17 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
       EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
       EXPECT_EQ("true",
                 request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
-      EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+      EXPECT_EQ(1UL, store_.counter("sxg.total_client_can_accept_sxg").value());
     } else {
       const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
       EXPECT_TRUE(request_headers.get(x_client_can_accept_sxg_key).empty());
-      EXPECT_EQ(0UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+      EXPECT_EQ(0UL, store_.counter("sxg.total_client_can_accept_sxg").value());
     }
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_should_sign").value());
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_attempts").value());
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_failed").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_should_sign").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_exceeded_max_payload_size").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_signed_attempts").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_signed_succeeded").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_signed_failed").value());
   }
 
   void testFallbackToHtml(Http::TestRequestHeaderMapImpl& request_headers,
@@ -249,13 +249,13 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
     EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
     EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
-    EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
-    EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+    EXPECT_EQ(1UL, store_.counter("sxg.total_client_can_accept_sxg").value());
+    EXPECT_EQ(1UL, store_.counter("sxg.total_should_sign").value());
     EXPECT_EQ(exceeded_max_payload_size ? 1UL : 0UL,
-              scope_.counter("sxg.total_exceeded_max_payload_size").value());
-    EXPECT_EQ(attempted_encode ? 1UL : 0L, scope_.counter("sxg.total_signed_attempts").value());
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
-    EXPECT_EQ(attempted_encode ? 1UL : 0UL, scope_.counter("sxg.total_signed_failed").value());
+              store_.counter("sxg.total_exceeded_max_payload_size").value());
+    EXPECT_EQ(attempted_encode ? 1UL : 0L, store_.counter("sxg.total_signed_attempts").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_signed_succeeded").value());
+    EXPECT_EQ(attempted_encode ? 1UL : 0UL, store_.counter("sxg.total_signed_failed").value());
   }
 
   void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
@@ -331,17 +331,18 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
     EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
     EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
-    EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
-    EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
-    EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
-    EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_succeeded").value());
-    EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_failed").value());
+    EXPECT_EQ(1UL, store_.counter("sxg.total_client_can_accept_sxg").value());
+    EXPECT_EQ(1UL, store_.counter("sxg.total_should_sign").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_exceeded_max_payload_size").value());
+    EXPECT_EQ(1UL, store_.counter("sxg.total_signed_attempts").value());
+    EXPECT_EQ(1UL, store_.counter("sxg.total_signed_succeeded").value());
+    EXPECT_EQ(0UL, store_.counter("sxg.total_signed_failed").value());
   }
 
   void callDoSxgAgain() { filter_->doSxg(); }
 
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<FilterConfig> config_;
   std::unique_ptr<Encoder> encoder_;
@@ -359,14 +360,13 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Api::ApiPtr api = Api::createApiForTest();
-  Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   Init::TargetHandlePtr init_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
-  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
       .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
@@ -395,7 +395,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client, typed_secret);
   const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
 
-  certificate_callback->onConfigUpdate(decoded_resources_client.refvec_, "");
+  EXPECT_TRUE(certificate_callback->onConfigUpdate(decoded_resources_client.refvec_, "").ok());
   EXPECT_EQ(secret_reader.certificate(), "certificate_test");
   EXPECT_EQ(secret_reader.privateKey(), "");
 
@@ -408,7 +408,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_token, typed_secret);
   const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
 
-  private_key_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
+  EXPECT_TRUE(private_key_callback->onConfigUpdate(decoded_resources_token.refvec_, "").ok());
   EXPECT_EQ(secret_reader.certificate(), "certificate_test");
   EXPECT_EQ(secret_reader.privateKey(), "private_key_test");
 
@@ -421,7 +421,8 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
   const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
 
-  certificate_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "");
+  EXPECT_TRUE(
+      certificate_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
   EXPECT_EQ(secret_reader.certificate(), "certificate_test_recheck");
   EXPECT_EQ(secret_reader.privateKey(), "private_key_test");
 }

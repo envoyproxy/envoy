@@ -185,7 +185,7 @@ TEST_F(AppleDnsImplTest, TypedAppleDnsResolverConfigExist) {
   typed_dns_resolver_config.set_name(std::string(Network::AppleDnsResolver));
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
   EXPECT_TRUE(config.has_typed_dns_resolver_config());
-  EXPECT_TRUE(checkUseAppleApiForDnsLookups(typed_dns_resolver_config));
+  EXPECT_TRUE(tryUseAppleApiForDnsLookups(typed_dns_resolver_config));
   typed_dns_resolver_config.Clear();
   typed_dns_resolver_config = Network::makeDnsResolverConfig(config);
   expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
@@ -387,7 +387,8 @@ class AppleDnsImplFakeApiTest : public testing::Test {
 public:
   void SetUp() override {
     config_.set_include_unroutable_families(false);
-    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_, stats_store_);
+    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_,
+                                                                *stats_store_.rootScope());
   }
 
   void checkErrorStat(DNSServiceErrorType error_code) {
@@ -705,7 +706,8 @@ TEST_F(AppleDnsImplFakeApiTest, SynchronousTimeoutInGetAddrInfo) {
 
 TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
   config_.set_include_unroutable_families(true);
-  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_, stats_store_);
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_,
+                                                              *stats_store_.rootScope());
 
   const std::string hostname = "foo.com";
   sockaddr_in addr4;

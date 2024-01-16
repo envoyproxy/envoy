@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
 #include "absl/strings/str_join.h"
@@ -97,6 +98,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, escaped)                        \
   do {                                                                                             \
     ASSERT_FALSE(expected_messages.empty()) << "Expected messages cannot be empty.";               \
+    ::Envoy::Assert::resetEnvoyBugCountersForTest();                                               \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     sink_ptr->setShouldEscape(escaped);                                                            \
@@ -199,6 +201,32 @@ using ExpectedLogMessages = std::vector<StringPair>;
     stmt;                                                                                          \
     const std::vector<std::string> logs = log_recorder.messages();                                 \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
+  } while (false)
+
+// Validates that when stmt is executed, the supplied substring is eventually logged.
+// This both waits infinitely (not ideal) and walks the full log list every time (not ideal).
+#define WAIT_FOR_LOG_CONTAINS(loglevel_raw, substr_raw, stmt)                                      \
+  do {                                                                                             \
+    Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
+    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
+    std::string loglevel = loglevel_raw;                                                           \
+    std::string substr = substr_raw;                                                               \
+    Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
+    stmt;                                                                                          \
+    while (true) {                                                                                 \
+      auto messages = log_recorder.messages();                                                     \
+      if (messages.empty()) {                                                                      \
+        continue;                                                                                  \
+      }                                                                                            \
+      const auto log_message = std::find_if(                                                       \
+          messages.begin(), messages.end(), [&substr, loglevel](const std::string& message) {      \
+            return (message.find(substr) != std::string::npos) &&                                  \
+                   (message.find(loglevel) != std::string::npos);                                  \
+          });                                                                                      \
+      if (log_message != messages.end()) {                                                         \
+        break;                                                                                     \
+      }                                                                                            \
+    }                                                                                              \
   } while (false)
 
 } // namespace Envoy

@@ -155,10 +155,10 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
   _streamHandle = handle;
 
   // Create callback context
-  ios_context *context = safe_malloc(sizeof(ios_context));
+  ios_context *context = (ios_context *)safe_malloc(sizeof(ios_context));
   context->callbacks = callbacks;
   context->stream = self;
-  context->closed = safe_malloc(sizeof(atomic_bool));
+  context->closed = (atomic_bool *)safe_malloc(sizeof(atomic_bool));
   atomic_store(context->closed, NO);
 
   // Create native callbacks
@@ -184,7 +184,7 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)dealloc {
-  ios_context *context = _nativeCallbacks.context;
+  ios_context *context = (ios_context *)_nativeCallbacks.context;
   free(context->closed);
   free(context);
 }

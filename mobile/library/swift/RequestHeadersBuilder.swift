@@ -34,20 +34,6 @@ public final class RequestHeadersBuilder: HeadersBuilder {
     return self
   }
 
-  /// Add an upstream HTTP protocol to use when executing this request.
-  ///
-  /// - parameter upstreamHttpProtocol: The protocol to use for this request.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addUpstreamHttpProtocol(_ upstreamHttpProtocol: UpstreamHttpProtocol)
-    -> RequestHeadersBuilder
-  {
-    self.internalSet(name: "x-envoy-mobile-upstream-protocol",
-                     value: [upstreamHttpProtocol.stringValue])
-    return self
-  }
-
   /// Build the request headers using the current builder.
   ///
   /// - returns: New instance of request headers.

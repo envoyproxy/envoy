@@ -1,0 +1,80 @@
+
+parameters:
+- name: nameDownloadTask
+  type: string
+  default: MaintainerGPGKey
+- name: downloadKey
+  type: boolean
+  default: true
+
+# Auth
+- name: authGPGPassphrase
+  type: string
+  default: ""
+- name: authGPGPath
+  type: string
+  default: ""
+- name: authGPGKey
+  type: string
+  default: ""
+
+## Paths
+# The configured GNUPGHOME.
+# This is used to set the path to the password file
+# and should point to the GPG homedir at the point of use,
+# ie inside the Docker container (/build/.gnupg)
+- name: pathGPGConfiguredHome
+  type: string
+  default: ""
+# The created GNUPGHOME
+# This is where the GPG homedir will actually be created, and should point to
+# the path on the host (ie /tmp/envoy-docker-build/.gnupg)
+- name: pathGPGHome
+  type: string
+  default: ""
+
+# All steps should include this condition
+- name: condition
+  type: string
+  default: eq('true', 'true')
+
+
+steps:
+# Secure key - postsubmit
+- task: DownloadSecureFile@1
+  name: ${{ parameters.nameDownloadTask }}
+  displayName: 'Download maintainer GPG key'
+  condition: |
+    and(succeeded(),
+        ${{ parameters.condition }},
+        eq(${{ parameters.downloadKey }}, true),
+        eq(variables['Build.DefinitionName'], 'envoy-postsubmit'))
+  inputs:
+    # NB: This is the path to the key and **must** be set on a per-pipeline basis
+    secureFile: '${{ parameters.authGPGKey }}'
+
+# Snakeoil key - non-postsubmit
+- task: DownloadBuildArtifacts@0
+  displayName: 'Download snakeoil GPG key'
+  inputs:
+    buildType: current
+    artifactName: "test.env"
+    itemPattern: "test.env/ci.snakeoil.gpg.key"
+    targetPath: $(Build.StagingDirectory)
+  condition: |
+    and(succeeded(),
+        ${{ parameters.condition }},
+        eq(${{ parameters.downloadKey }}, true),
+        ne(variables['Build.DefinitionName'], 'envoy-postsubmit'))
+
+- script: $(Build.SourcesDirectory)/.azure-pipelines/gpg/activate-key.sh
+  displayName: "Import and activate GPG key"
+  condition: |
+    and(succeeded(),
+        ${{ parameters.condition }})
+  env:
+    GPG_PASSPHRASE: ${{ parameters.authGPGPassphrase }}
+    GPG_KEYFILE: ${{ parameters.authGPGPath }}
+    GNUPGHOME_CONFIGURED: ${{ parameters.pathGPGConfiguredHome }}
+    GNUPGHOME: ${{ parameters.pathGPGHome }}
+  workingDirectory: $(Build.StagingDirectory)

@@ -39,9 +39,9 @@ envoy_cc_library(
     hdrs = ["thrift.h"],
     deps = [
         ":client_lib",
-        "//source/common/upstream:health_checker_base_lib",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
+        "//source/extensions/health_checkers/common:health_checker_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/health_checkers/thrift/v3:pkg_cc_proto",

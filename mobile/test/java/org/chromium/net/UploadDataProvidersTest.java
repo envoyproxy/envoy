@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.NativeTestServer;
 import org.chromium.net.testing.TestUrlRequestCallback;
@@ -136,7 +135,6 @@ public class UploadDataProvidersTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Tests that ByteBuffer's limit cannot be changed by the caller.
   @Ignore("Blocked by envoy-mobile flow control impl. ByteBuffer impl for cronvoy is different")
   public void testUploadChangeBufferLimit() throws Exception {

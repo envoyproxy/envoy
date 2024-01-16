@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "test/mocks/upstream/basic_resource_limit.h"
@@ -77,7 +78,7 @@ public:
   MockDnsCacheManager();
   ~MockDnsCacheManager() override;
 
-  MOCK_METHOD(DnsCacheSharedPtr, getCache,
+  MOCK_METHOD(absl::StatusOr<DnsCacheSharedPtr>, getCache,
               (const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config));
   MOCK_METHOD(DnsCacheSharedPtr, lookUpCacheByName, (absl::string_view cache_name));
 
@@ -94,6 +95,7 @@ public:
   MOCK_METHOD(const std::string&, resolvedHost, (), (const));
   MOCK_METHOD(bool, isIpAddress, (), (const));
   MOCK_METHOD(void, touch, ());
+  MOCK_METHOD(bool, firstResolveComplete, (), (const));
 
   Network::Address::InstanceConstSharedPtr address_;
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
@@ -119,6 +121,18 @@ public:
   ~MockLoadDnsCacheEntryCallbacks() override;
 
   MOCK_METHOD(void, onLoadDnsCacheComplete, (const DnsHostInfoSharedPtr&));
+};
+
+class MockDfpCluster : public DfpCluster {
+public:
+  MockDfpCluster() = default;
+  ~MockDfpCluster() override = default;
+
+  // Extensions::Common::DynamicForwardProxy::DfpCluster
+  MOCK_METHOD(bool, enableSubCluster, (), (const));
+  MOCK_METHOD((std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>),
+              createSubClusterConfig, (const std::string&, const std::string&, const int));
+  MOCK_METHOD(bool, touch, (const std::string&));
 };
 
 } // namespace DynamicForwardProxy

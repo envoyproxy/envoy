@@ -35,11 +35,8 @@ DEFINE_PROTO_FUZZER(
 
   try {
     TestUtility::validate(input);
-  } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-    return;
-  } catch (const ProtobufMessage::DeprecatedProtoFieldException& e) {
-    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
   try {
@@ -47,7 +44,7 @@ DEFINE_PROTO_FUZZER(
       ENVOY_LOG_MISC(debug, "In fill_interval, msecs must be greater than 50ms!");
       return;
     }
-  } catch (const DurationUtil::OutOfRangeException& e) {
+  } catch (const EnvoyException& e) {
     // TODO:
     // protoc-gen-validate has an issue on type "Duration" which may generate interval with seconds
     // > 0 while "nanos" < 0. And negative "nanos" will cause validation inside the filter to fail.
@@ -71,8 +68,8 @@ DEFINE_PROTO_FUZZER(
       input.config();
   ConfigSharedPtr config = nullptr;
   try {
-    config =
-        std::make_shared<Config>(proto_config, dispatcher, stats_store, runtime, singleton_manager);
+    config = std::make_shared<Config>(proto_config, dispatcher, *stats_store.rootScope(), runtime,
+                                      singleton_manager);
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException in config's constructor: {}", e.what());
     return;

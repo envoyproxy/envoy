@@ -55,6 +55,8 @@ The following sandboxes are available:
     ext_authz
     fault_injection
     front_proxy
+    golang-http
+    golang-network
     grpc_bridge
     gzip
     jaeger_native_tracing
@@ -63,6 +65,7 @@ The following sandboxes are available:
     load_reporting_service
     locality_load_balancing
     local_ratelimit
+    lua-cluster-specifier
     lua
     mysql
     opentelemetry

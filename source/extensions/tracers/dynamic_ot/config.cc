@@ -20,7 +20,9 @@ Tracing::DriverSharedPtr DynamicOpenTracingTracerFactory::createTracerDriverType
     Server::Configuration::TracerFactoryContext& context) {
   const std::string& library = proto_config.library();
   const ProtobufWkt::Struct& config_struct = proto_config.config();
-  const std::string config = MessageUtil::getJsonStringFromMessageOrDie(config_struct);
+  absl::StatusOr<std::string> json_or_error = MessageUtil::getJsonStringFromMessage(config_struct);
+  ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+  const std::string config = json_or_error.ok() ? json_or_error.value() : "";
   return std::make_shared<DynamicOpenTracingDriver>(context.serverFactoryContext().scope(), library,
                                                     config);
 }
@@ -28,8 +30,8 @@ Tracing::DriverSharedPtr DynamicOpenTracingTracerFactory::createTracerDriverType
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.
  */
-REGISTER_FACTORY(DynamicOpenTracingTracerFactory,
-                 Server::Configuration::TracerFactory){"envoy.dynamic.ot"};
+LEGACY_REGISTER_FACTORY(DynamicOpenTracingTracerFactory, Server::Configuration::TracerFactory,
+                        "envoy.dynamic.ot");
 
 } // namespace DynamicOt
 } // namespace Tracers

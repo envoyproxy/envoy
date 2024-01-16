@@ -43,6 +43,12 @@ message GrpcService {
     string authority = 2
         [(validate.rules).string =
              {min_len: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Indicates the retry policy for re-establishing the gRPC stream
+    // This field is optional. If max interval is not provided, it will be set to ten times the provided base interval.
+    // Currently only supported for xDS gRPC streams.
+    // If not set, xDS gRPC streams default base interval:500ms, maximum interval:30s will be applied.
+    RetryPolicy retry_policy = 3;
   }
 
   // [#next-free-field: 9]

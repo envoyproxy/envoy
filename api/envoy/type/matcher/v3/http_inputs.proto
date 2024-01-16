@@ -60,3 +60,12 @@ message HttpResponseTrailerMatchInput {
   string header_name = 1
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
+
+// Match input indicates that matching should be done on a specific query parameter.
+// The resulting input string will be the first query parameter for the value
+// 'query_param'.
+// [#extension: envoy.matching.inputs.query_params]
+message HttpRequestQueryParamMatchInput {
+  // The query parameter to match on.
+  string query_param = 1 [(validate.rules).string = {min_len: 1}];
+}

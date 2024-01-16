@@ -27,6 +27,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
+        "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -55,6 +56,7 @@ envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
     deps = [
+        "//envoy/grpc:async_client_manager_interface",
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

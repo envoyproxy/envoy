@@ -20,13 +20,13 @@ You can get a heap profile of Envoy by the following command:
 
 .. code-block:: bash
 
-    $ curl <Envoy IP>:<Envoy Admin Port>/dump_heap -o /heap/output/envoy.heap
+    $ curl <Envoy IP>:<Envoy Admin Port>/heap_dump -o /heap/output/envoy.heap
 
 And then you can analyze the outputted heap profile with pprof:
 
 .. code-block:: bash
 
-    $ pprof -http:localhost:9999 /heap/output/envoy.heap
+    $ pprof -http localhost:9999 /heap/output/envoy.heap
 
 .. note::
     If you dump the heap profile in the production environment and analyze it in the local environment, please ensure

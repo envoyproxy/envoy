@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/router/path_matcher.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
@@ -37,6 +38,8 @@ public:
 
   std::string name() const override { return "envoy.path.match.uri_template.uri_template_matcher"; }
 };
+
+DECLARE_FACTORY(UriTemplateMatcherFactory);
 
 } // namespace Match
 } // namespace UriTemplate

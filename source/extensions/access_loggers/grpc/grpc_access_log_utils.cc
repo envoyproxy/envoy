@@ -2,11 +2,13 @@
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/custom_tag_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +41,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x8000000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -155,7 +157,8 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const Http::RequestHeaderMap& request_header, const StreamInfo::StreamInfo& stream_info,
-    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+    AccessLog::AccessLogType access_log_type) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
@@ -172,9 +175,10 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
-  if (stream_info.downstreamAddressProvider().requestedServerName() != nullptr) {
+  if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
     common_access_log.mutable_tls_properties()->set_tls_sni_hostname(
-        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
+        MessageUtil::sanitizeUtf8String(
+            stream_info.downstreamAddressProvider().requestedServerName()));
   }
   if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
     common_access_log.mutable_tls_properties()->set_ja3_fingerprint(
@@ -188,18 +192,23 @@ void Utility::extractCommonAccessLogProperties(
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
       auto* local_san = local_properties->add_subject_alt_name();
-      local_san->set_uri(uri_san);
+      local_san->set_uri(MessageUtil::sanitizeUtf8String(uri_san));
     }
-    local_properties->set_subject(downstream_ssl_connection->subjectLocalCertificate());
+    local_properties->set_subject(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->subjectLocalCertificate()));
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanPeerCertificate()) {
       auto* peer_san = peer_properties->add_subject_alt_name();
-      peer_san->set_uri(uri_san);
+      peer_san->set_uri(MessageUtil::sanitizeUtf8String(uri_san));
     }
 
     peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
-    tls_properties->set_tls_session_id(downstream_ssl_connection->sessionId());
+    peer_properties->set_issuer(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->issuerPeerCertificate()));
+
+    tls_properties->set_tls_session_id(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->sessionId()));
     tls_properties->set_tls_version(
         tlsVersionStringToEnum(downstream_ssl_connection->tlsVersion()));
 
@@ -296,21 +305,17 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   for (const auto& key : config.filter_state_objects_to_log()) {
-    if (auto state = stream_info.filterState().getDataReadOnlyGeneric(key); state != nullptr) {
-      ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
-      if (serialized_proto != nullptr) {
-        auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
-        ProtobufWkt::Any& any = filter_state_objects[key];
-        if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
-          any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
-        } else {
-          any.PackFrom(*serialized_proto);
-        }
+    if (!(extractFilterStateData(stream_info.filterState(), key, common_access_log))) {
+      if (stream_info.upstreamInfo().has_value() &&
+          stream_info.upstreamInfo()->upstreamFilterState() != nullptr) {
+        extractFilterStateData(*(stream_info.upstreamInfo()->upstreamFilterState()), key,
+                               common_access_log);
       }
     }
   }
 
-  Tracing::CustomTagContext ctx{&request_header, stream_info};
+  Tracing::ReadOnlyHttpTraceContext trace_context(request_header);
+  Tracing::CustomTagContext ctx{trace_context, stream_info};
   for (const auto& custom_tag : config.custom_tags()) {
     const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
     tag_applier->applyLog(common_access_log, ctx);
@@ -318,13 +323,42 @@ void Utility::extractCommonAccessLogProperties(
 
   // If the stream is not complete, then this log entry is intermediate log entry.
   if (!stream_info.requestComplete().has_value()) {
-    common_access_log.set_intermediate_log_entry(true);
+    common_access_log.set_intermediate_log_entry(true); // Deprecated field
   }
 
   // Set stream unique id from the stream info.
   if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
     common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
   }
+
+  if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_downstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_downstream_wire_bytes_received(bytes_meter->wireBytesReceived());
+  }
+  if (const auto& bytes_meter = stream_info.getUpstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_upstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
+  }
+
+  common_access_log.set_access_log_type(access_log_type);
+}
+
+bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const std::string& key,
+                            envoy::data::accesslog::v3::AccessLogCommon& common_access_log) {
+  if (auto state = filter_state.getDataReadOnlyGeneric(key); state != nullptr) {
+    ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
+    if (serialized_proto != nullptr) {
+      auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
+      ProtobufWkt::Any& any = filter_state_objects[key];
+      if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
+        any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
+      } else {
+        any.PackFrom(*serialized_proto);
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 } // namespace GrpcCommon

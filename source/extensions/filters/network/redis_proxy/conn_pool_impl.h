@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/token_bucket_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -41,7 +42,8 @@ namespace ConnPool {
 
 #define REDIS_CLUSTER_STATS(COUNTER)                                                               \
   COUNTER(upstream_cx_drained)                                                                     \
-  COUNTER(max_upstream_unknown_connections_reached)
+  COUNTER(max_upstream_unknown_connections_reached)                                                \
+  COUNTER(connection_rate_limited)
 
 struct RedisClusterStats {
   REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -157,14 +159,16 @@ private:
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);
 
-    void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
+    void onClusterAddOrUpdateNonVirtual(absl::string_view cluster_name,
+                                        Upstream::ThreadLocalClusterCommand& get_cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
     void drainClients();
 
     // Upstream::ClusterUpdateCallbacks
-    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
-      onClusterAddOrUpdateNonVirtual(cluster);
+    void onClusterAddOrUpdate(absl::string_view cluster_name,
+                              Upstream::ThreadLocalClusterCommand& get_cluster) override {
+      onClusterAddOrUpdateNonVirtual(cluster_name, get_cluster);
     }
     void onClusterRemoval(const std::string& cluster_name) override;
 
@@ -177,6 +181,7 @@ private:
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
     Upstream::ThreadLocalCluster* cluster_{};
     absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
+    absl::node_hash_map<Upstream::HostConstSharedPtr, TokenBucketPtr> cx_rate_limiter_map_;
     Envoy::Common::CallbackHandlePtr host_set_member_update_cb_handle_;
     absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
     std::string auth_username_;
@@ -192,7 +197,7 @@ private:
      * clients_to_drain_ to the main data code path as this should only rarely be not empty.
      */
     Event::TimerPtr drain_timer_;
-    bool is_redis_cluster_;
+    bool is_redis_cluster_{false};
     Common::Redis::Client::ClientFactory& client_factory_;
     Common::Redis::Client::ConfigSharedPtr config_;
     Stats::ScopeSharedPtr stats_scope_;

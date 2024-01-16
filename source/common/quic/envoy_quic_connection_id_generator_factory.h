@@ -10,6 +10,10 @@ namespace Envoy {
 namespace Quic {
 
 using QuicConnectionIdGeneratorPtr = std::unique_ptr<quic::ConnectionIdGeneratorInterface>;
+// A function similar to the BPF program from createCompatibleLinuxBpfSocketOption, it takes
+// a QUIC packet and returns the appropriate worker_index.
+using QuicConnectionIdWorkerSelector =
+    std::function<uint32_t(const Buffer::Instance& packet, uint32_t default_value)>;
 
 /**
  * A factory interface to provide QUIC connection IDs and compatible BPF code for stable packet
@@ -33,6 +37,13 @@ public:
    */
   virtual Network::Socket::OptionConstSharedPtr
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) PURE;
+
+  /**
+   * Returns a function to retrieve the worker index associated with a QUIC packet; the same
+   * principle as the BPF program above, but for contexts where BPF is unavailable.
+   */
+  virtual QuicConnectionIdWorkerSelector
+  getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) PURE;
 };
 
 using EnvoyQuicConnectionIdGeneratorFactoryPtr =

@@ -183,7 +183,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   ENVOY_LOG(error, "GrpcClientImpl Failure {} {}", message, status);
-  // callbacks_->complete(ResponseType::FailureResp, status);
+  // callbacks_->complete(ResponseType::FailureResp, "", absl::any());
   // callbacks_ = nullptr;
 }
 
@@ -201,8 +201,10 @@ ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::Factor
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   return std::make_unique<SipProxy::TrafficRoutingAssistant::GrpcClientImpl>(
-      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true),
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .getOrCreateRawAsyncClient(grpc_service, context.scope(), true),
       dispatcher, timeout);
 }
 

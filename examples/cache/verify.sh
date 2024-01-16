@@ -3,16 +3,26 @@
 export NAME=cache
 
 export PORT_PROXY="${CACHE_PORT_PROXY:-10300}"
+export CACHE_RESPONSES_YAML=./ci-responses.yaml
+
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
 check_validated() {
     # Get the date header and the response generation timestamp
-    local _dates dates
+    local _dates dates httpCode
     _dates=$(grep -oP '\d\d:\d\d:\d\d' <<< "$1")
+    httpCode=$(echo "$response" | head -n 1 | cut -d ' ' -f 2)
     while read -r line; do dates+=("$line"); done \
         <<< "$_dates"
+
+    # Make sure it succeeds
+    if [[ $httpCode != "200" ]]; then
+      echo "ERROR: HTTP response code should be 200, but it was $httpCode" >&2
+      return 1
+    fi
+
     # Make sure they are different
     if [[ ${dates[0]} == "${dates[1]}" ]]; then
        echo "ERROR: validated responses should have a date AFTER the generation timestamp" >&2
@@ -56,15 +66,15 @@ run_log "Valid-for-minute: First request should be served by the origin"
 response=$(curl -si "localhost:${PORT_PROXY}/service/1/valid-for-minute")
 check_from_origin "$response"
 
-run_log "Snooze for 30 seconds"
-sleep 30
+run_log "Snooze for 2 seconds"
+sleep 2
 
 run_log "Valid-for-minute: Second request should be served from cache"
 response=$(curl -si "localhost:${PORT_PROXY}/service/1/valid-for-minute")
 check_cached "$response"
 
-run_log "Snooze for 31 more seconds"
-sleep 31
+run_log "Snooze for 3 more seconds"
+sleep 3
 
 run_log "Valid-for-minute: More than a minute has passed, this request should get a validated response"
 response=$(curl -si "localhost:${PORT_PROXY}/service/1/valid-for-minute")

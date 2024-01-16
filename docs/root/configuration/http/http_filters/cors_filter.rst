@@ -9,7 +9,17 @@ For the meaning of the headers please refer to the pages below.
 * https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
 * https://www.w3.org/TR/cors/
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors``.
-* :ref:`v3 API reference <envoy_v3_api_msg_config.route.v3.CorsPolicy>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+
+
+.. note::
+  This filter will be used to respond to preflight ``OPTIONS`` requests. Any legal ``OPTIONS`` requests will be
+  responded directly by the filter and will not be passed to the next filter in the filter chain. Other requests
+  will not be responded directly but if they are accepted cors requests, the filter will add the related headers
+  to the response.
+
+  In addition, this filter will be bypassed if a direct response or route redirect is configured for the route.
+
 
 .. _cors-runtime:
 
@@ -35,7 +45,7 @@ will not enforce any policies.
 Statistics
 ----------
 
-The CORS filter outputs statistics in the <stat_prefix>.cors.* namespace.
+The CORS filter outputs statistics in the ``<stat_prefix>.cors.*`` namespace.
 
 .. note::
   Requests that do not have an Origin header will be omitted from statistics.

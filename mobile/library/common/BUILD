@@ -1,8 +1,8 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package", "envoy_select_signal_trace")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "envoy_main_interface_lib",
@@ -18,11 +18,9 @@ envoy_cc_library(
     srcs = [
         "engine.cc",
         "engine.h",
-        "engine_handle.cc",
         "main_interface.cc",
     ],
     hdrs = [
-        "engine_handle.h",
         "main_interface.h",
     ],
     repository = "@envoy",
@@ -30,7 +28,6 @@ envoy_cc_library(
         ":engine_common_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/common:lambda_logger_delegate_lib",
-        "//library/common/config:config_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
@@ -40,6 +37,7 @@ envoy_cc_library(
         "//library/common/types:c_types_lib",
         "@envoy//envoy/server:lifecycle_notifier_interface",
         "@envoy//envoy/stats:stats_interface",
+        "@envoy//source/common/runtime:runtime_lib",
         "@envoy_build_config//:extension_registry",
     ],
 )
@@ -50,17 +48,22 @@ envoy_cc_library(
     hdrs = ["engine_common.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/config:config_lib",
+        "//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/local_error:filter_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/network_configuration:filter_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/platform_bridge:filter_cc_proto_descriptor",
+        "//library/common/extensions/filters/http/socket_tag:filter_cc_proto_descriptor",
+        "//library/common/extensions/key_value/platform:platform_cc_proto_descriptor",
+        "//library/common/extensions/retry/options/network_configuration:predicate_cc_proto_descriptor",
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/runtime:runtime_lib",
         "@envoy//source/exe:stripped_main_base_lib",
-    ] + select({
-        "@envoy//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "@envoy//source/common/signal:sigaction_lib",
-        ],
-    }),
+        "@envoy//source/server:null_overload_manager_lib",
+    ] + envoy_select_signal_trace(
+        ["@envoy//source/common/signal:sigaction_lib"],
+        "@envoy",
+    ),
 )
 
 envoy_cc_library(

@@ -31,13 +31,12 @@ public:
     return {nullptr, 0, nullptr};
   }
   Api::IoCallUint64Result flush() override {
-    return Api::IoCallUint64Result(
-        /*rc=*/0,
-        /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
+    return {/*rc=*/0,
+            /*err=*/Api::IoError::none()};
   }
 
 private:
-  bool write_blocked_;
+  bool write_blocked_{false};
   Network::IoHandle& io_handle_;
 };
 

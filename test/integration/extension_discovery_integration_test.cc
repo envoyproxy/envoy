@@ -795,6 +795,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilte
 }
 
 // Validate that deleting listeners does not break active ECDS subscription.
+// This test also verifies clean deletion of the filter config on the main thread.
 TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", false);

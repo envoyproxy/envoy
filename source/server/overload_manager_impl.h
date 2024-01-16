@@ -24,6 +24,21 @@
 namespace Envoy {
 namespace Server {
 
+/**
+ * Trigger encapsulates translating resource pressure into the corresponding
+ * OverloadActionState.
+ */
+class Trigger {
+public:
+  virtual ~Trigger() = default;
+
+  // Updates the current value of the metric and returns whether the trigger has changed state.
+  virtual bool updateValue(double value) PURE;
+
+  // Returns the action state for the trigger.
+  virtual OverloadActionState actionState() const PURE;
+};
+
 class OverloadAction {
 public:
   OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
@@ -36,23 +51,46 @@ public:
   // Returns the current action state, which is the max state across all registered triggers.
   OverloadActionState getState() const;
 
-  class Trigger {
-  public:
-    virtual ~Trigger() = default;
-
-    // Updates the current value of the metric and returns whether the trigger has changed state.
-    virtual bool updateValue(double value) PURE;
-
-    // Returns the action state for the trigger.
-    virtual OverloadActionState actionState() const PURE;
-  };
-  using TriggerPtr = std::unique_ptr<Trigger>;
-
 private:
+  using TriggerPtr = std::unique_ptr<Trigger>;
   absl::node_hash_map<std::string, TriggerPtr> triggers_;
   OverloadActionState state_;
   Stats::Gauge& active_gauge_;
   Stats::Gauge& scale_percent_gauge_;
+};
+
+/**
+ * Implement a LoadShedPoint which is a particular point in the connection /
+ * request lifecycle where we can either abort or continue the given work.
+ */
+class LoadShedPointImpl : public LoadShedPoint {
+public:
+  LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
+                    Stats::Scope& stats_scope, Random::RandomGenerator& random_generator);
+  LoadShedPointImpl(const LoadShedPointImpl&) = delete;
+  LoadShedPointImpl& operator=(const LoadShedPointImpl&) = delete;
+
+  bool shouldShedLoad() override;
+
+  /**
+   * Provide resource updates for the LoadShedPoint. It will update the
+   * probability of shedding load at this point atomically if needed.
+   * @param resource_name - the name of the resource that has been updated.
+   * @param resource_utilization - utilization of this resource. A ratio of the
+   *  current usage / the resource limit.
+   */
+  void updateResource(absl::string_view resource_name, double resource_utilization);
+
+private:
+  using TriggerPtr = std::unique_ptr<Trigger>;
+
+  // Helper to handle updating the probability to shed load given the triggers.
+  void updateProbabilityShedLoad();
+
+  absl::flat_hash_map<std::string, TriggerPtr> triggers_;
+  std::atomic<float> probability_shed_load_{0};
+  Stats::Gauge& scale_percent_;
+  Random::RandomGenerator& random_generator_;
 };
 
 // Simple table that converts strings into Symbol instances. Symbols are guaranteed to start at 0
@@ -68,7 +106,7 @@ public:
     size_t index() const { return index_; }
 
     // Support use as a map key.
-    bool operator==(const Symbol other) { return other.index_ == index_; }
+    bool operator==(const Symbol& other) const { return other.index_ == index_; }
 
     // Support absl::Hash.
     template <typename H>
@@ -117,12 +155,9 @@ public:
   bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
+  LoadShedPoint* getLoadShedPoint(absl::string_view point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
-
-  // Stop the overload manager timer and wait for any pending resource updates to complete.
-  // After this returns, overload manager clients should not receive any more callbacks
-  // about overload state changes.
-  void stop();
+  void stop() override;
 
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
@@ -147,7 +182,7 @@ private:
     const std::string name_;
     ResourceMonitorPtr monitor_;
     OverloadManagerImpl& manager_;
-    bool pending_update_;
+    bool pending_update_{false};
     FlushEpochId flush_epoch_;
     Stats::Gauge& pressure_gauge_;
     Stats::Counter& failed_updates_counter_;
@@ -166,17 +201,25 @@ private:
   // Flushes any enqueued action state updates to all worker threads.
   void flushResourceUpdates();
 
-  bool started_;
+  bool started_{false};
   Event::Dispatcher& dispatcher_;
+  TimeSource& time_source_;
   ThreadLocal::TypedSlot<ThreadLocalOverloadStateImpl> tls_;
   NamedOverloadActionSymbolTable action_symbol_table_;
   const std::chrono::milliseconds refresh_interval_;
+  // Tracks the latency between resource refresh updates.
+  Stats::Histogram& refresh_interval_delays_;
+  // Tracks when we last ran the resource monitor refresh loop.
+  // For the first measurement, we use the time when When the Overload Manager first starts.
+  MonotonicTime time_resources_last_measured_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
   std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>
       proactive_resources_;
 
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
+
+  absl::flat_hash_map<std::string, std::unique_ptr<LoadShedPointImpl>> loadshed_points_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
 

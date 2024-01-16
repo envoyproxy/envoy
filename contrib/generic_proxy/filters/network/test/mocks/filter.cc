@@ -1,5 +1,7 @@
 #include "contrib/generic_proxy/filters/network/test/mocks/filter.h"
 
+#include <cstdint>
+
 #include "source/common/protobuf/protobuf.h"
 
 using testing::_;
@@ -10,6 +12,8 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
+
+MockStreamFrameHandler::MockStreamFrameHandler() = default;
 
 MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([]() {
@@ -41,6 +45,8 @@ MockStreamFilter::MockStreamFilter() {
   ON_CALL(*this, onStreamEncoded(_)).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, onStreamDecoded(_)).WillByDefault(Return(FilterStatus::Continue));
 }
+
+MockDecoderFilterCallback::MockDecoderFilterCallback() = default;
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

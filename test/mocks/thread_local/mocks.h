@@ -16,8 +16,9 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb));
-  MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb, Event::PostCb main_callback));
+  MOCK_METHOD(void, runOnAllThreads, (std::function<void()> cb));
+  MOCK_METHOD(void, runOnAllThreads,
+              (std::function<void()> cb, std::function<void()> main_callback));
 
   // Server::ThreadLocal
   MOCK_METHOD(SlotPtr, allocateSlot, ());
@@ -28,11 +29,13 @@ public:
   bool isShutdown() const override { return shutdown_; }
 
   SlotPtr allocateSlotMock() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
-  void runOnAllThreads1(Event::PostCb cb) { cb(); }
-  void runOnAllThreads2(Event::PostCb cb, Event::PostCb main_callback) {
+  void runOnAllThreads1(std::function<void()> cb) { cb(); }
+  void runOnAllThreads2(std::function<void()> cb, std::function<void()> main_callback) {
     cb();
     main_callback();
   }
+
+  void setDispatcher(Event::Dispatcher* dispatcher) { dispatcher_ptr_ = dispatcher; }
 
   void shutdownThread_() {
     shutdown_ = true;
@@ -69,9 +72,10 @@ public:
       EXPECT_TRUE(was_set_);
       parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); });
     }
-    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& main_callback) override {
+    void runOnAllThreads(const UpdateCb& cb, const std::function<void()>& main_callback) override {
       EXPECT_TRUE(was_set_);
-      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); },
+                              std::move(main_callback));
     }
     bool isShutdown() const override { return parent_.shutdown_; }
 
@@ -80,7 +84,7 @@ public:
       if (parent_.defer_data_) {
         parent_.deferred_data_[index_] = cb;
       } else {
-        parent_.data_[index_] = cb(parent_.dispatcher_);
+        parent_.data_[index_] = cb(*parent_.dispatcher_ptr_);
       }
     }
 
@@ -91,13 +95,14 @@ public:
 
   void call() {
     for (unsigned i = 0; i < deferred_data_.size(); i++) {
-      data_[i] = deferred_data_[i](dispatcher_);
+      data_[i] = deferred_data_[i](*dispatcher_ptr_);
     }
     deferred_data_.clear();
   }
 
   uint32_t current_slot_{};
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::Dispatcher* dispatcher_ptr_ = &dispatcher_;
   std::vector<ThreadLocalObjectSharedPtr> data_;
   std::vector<Slot::InitializeCb> deferred_data_;
   bool defer_data_{};

@@ -38,9 +38,12 @@ To build this sandbox example and start the example services, run the following 
 .. code-block:: console
 
     # Start demo
-    $ docker-compose up --build -d
+    $ docker compose up --build -d
 
-The locality configuration is set in the client container via static Envoy configuration file. Please refer to the ``cluster`` section of the :download:`proxy configuration <_include/locality-load-balancing/envoy-proxy.yaml>` file.
+The locality configuration is set in the client container via static Envoy configuration file. Please refer to the ``cluster`` section of the :download:`proxy configuration <_include/locality-load-balancing/envoy.yaml>` file.
+
+.. note::
+    The ``locality_weighted_lb_config`` must be set in ``common_lb_config`` for the ``load_balancing_weight`` to be used.
 
 Step 2: Scenario with one replica in the highest priority locality
 ******************************************************************
@@ -50,7 +53,7 @@ In this scenario, each locality has 1 healthy replica running and all the reques
 .. code-block:: console
 
     # all requests to local-1
-    $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
+    $ docker compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
     Hello from backend-local-1!: 100, 100.0%
     Failed: 0
 
@@ -59,11 +62,11 @@ If locality ``local-1`` becomes unhealthy (i.e. fails the Envoy health check), t
 .. code-block:: console
 
     # bring down local-1
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_1:8000/unhealthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_1:8080/unhealthy
     [backend-local-1] Set to unhealthy
 
     # local-2 and remote-1 localities split the traffic 50:50
-    $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
+    $ docker compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
     Hello from backend-remote-1!: 51, 51.0%
     Hello from backend-local-2!: 49, 49.0%
     Failed: 0
@@ -73,10 +76,10 @@ Now if ``local-2`` becomes unhealthy also, priority 1 locality is only 50% healt
 .. code-block:: console
 
     # bring down local-2
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8000/unhealthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8080/unhealthy
 
     # remote-1 locality receive 100% of the traffic
-    $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
+    $ docker compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
     Hello from backend-remote-1!: actual weight 69.0%
     Hello from backend-remote-2!: actual weight 31.0%
     Failed: 0
@@ -90,8 +93,8 @@ Before moving on, we need to server local-1 and local-2 first.
 .. code-block:: console
 
     # recover local-1 and local-2 after the demo
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_1:8000/healthy
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8000/healthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_1:8080/healthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8080/healthy
 
 
 Step 4: Scenario with multiple replicas in the highest priority locality
@@ -101,32 +104,32 @@ To demonstrate how locality based load balancing works in multiple replicas setu
 
 .. code-block:: console
 
-    $ docker-compose up --scale backend-local-1=5 -d
+    $ docker compose up --scale backend-local-1=5 -d
 
 We are going to show the scenario that ``local-1`` is just partially healthy. So let's bring down 4 of the replicas in ``local-1``.
 
 .. code-block:: console
 
     # bring down local-1 replicas
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_2:8000/unhealthy
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_3:8000/unhealthy
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_4:8000/unhealthy
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_5:8000/unhealthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_2:8080/unhealthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_3:8080/unhealthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_4:8080/unhealthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_5:8080/unhealthy
 
 Then we check the endpoints again:
 
 .. code-block:: console
 
     # check healthiness
-    $ docker-compose exec -T client-envoy curl -s localhost:8001/clusters | grep health_flags
+    $ docker compose exec -T client-envoy curl -s localhost:8001/clusters | grep health_flags
 
-    backend::172.28.0.4:8000::health_flags::/failed_active_hc
-    backend::172.28.0.2:8000::health_flags::/failed_active_hc
-    backend::172.28.0.5:8000::health_flags::/failed_active_hc
-    backend::172.28.0.6:8000::health_flags::/failed_active_hc
-    backend::172.28.0.7:8000::health_flags::healthy
-    backend::172.28.0.8:8000::health_flags::healthy
-    backend::172.28.0.3:8000::health_flags::healthy
+    backend::172.28.0.4:8080::health_flags::/failed_active_hc
+    backend::172.28.0.2:8080::health_flags::/failed_active_hc
+    backend::172.28.0.5:8080::health_flags::/failed_active_hc
+    backend::172.28.0.6:8080::health_flags::/failed_active_hc
+    backend::172.28.0.7:8080::health_flags::healthy
+    backend::172.28.0.8:8080::health_flags::healthy
+    backend::172.28.0.3:8080::health_flags::healthy
 
 We can confirm that 4 backend endpoints become unhealthy.
 
@@ -135,7 +138,7 @@ Now we send the 100 requests again.
 .. code-block:: console
 
     # watch traffic change
-    $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
+    $ docker compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
 
     Hello from backend-remote-1!: actual weight 37.0%
     Hello from backend-local-2!: actual weight 36.0%
@@ -148,9 +151,9 @@ If we bring down all the servers in priority 1 locality, it will make priority 1
 
 .. code-block:: console
 
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8000/unhealthy
-    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-remote-1_1:8000/unhealthy
-    $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8080/unhealthy
+    $ docker compose exec -T client-envoy curl -s locality-load-balancing_backend-remote-1_1:8080/unhealthy
+    $ docker compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
 
     Hello from backend-remote-2!: actual weight 77.0%
     Hello from backend-local-1!: actual weight 23.0%

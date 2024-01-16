@@ -39,7 +39,6 @@ envoy_extension_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/http:message_lib",
-        "//source/common/network/matching:inputs_lib",
         "//source/extensions/filters/http/custom_response:config",
         "//source/extensions/filters/http/custom_response:custom_response_filter",
         "//source/extensions/filters/http/custom_response:factory",
@@ -59,12 +58,12 @@ envoy_extension_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/http:message_lib",
-        "//source/common/network/matching:inputs_lib",
         "//source/extensions/filters/http/custom_response:config",
         "//source/extensions/filters/http/custom_response:custom_response_filter",
         "//source/extensions/filters/http/custom_response:factory",
         "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
         "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -77,11 +76,15 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "custom_response_integration_test",
+    size = "large",
     srcs = [
         "custom_response_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.custom_response"],
-    shard_count = 4,
+    shard_count = 2,
+    tags = [
+        "cpu:3",
+    ],
     deps = [
         ":utility_lib",
         "//source/common/config:well_known_names",

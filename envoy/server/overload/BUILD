@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "overload_manager_interface",
     hdrs = ["overload_manager.h"],
     deps = [
+        ":load_shed_point_interface",
         ":thread_local_overload_state",
         "//envoy/event:dispatcher_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -29,4 +30,11 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_object",
         "//source/common/common:interval_value",
     ],
+)
+
+# This is seperate from `:overload_manager_interface` to break
+# circular dependencies.
+envoy_cc_library(
+    name = "load_shed_point_interface",
+    hdrs = ["load_shed_point.h"],
 )

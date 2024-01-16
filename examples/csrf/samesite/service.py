@@ -1,26 +1,23 @@
 import os
 
-from flask import Flask, send_from_directory
+from aiohttp import web
 
-app = Flask(__name__)
-app.url_map.strict_slashes = False
-
-
-@app.route('/csrf/ignored', methods=['GET'])
-def csrf_ignored():
-    return 'Success!'
+routes = web.RouteTableDef()
 
 
-@app.route('/csrf/<status>', methods=['POST'])
-def csrf_with_status(status):
-    return 'Success!'
+@routes.post("/csrf/{status}")
+async def csrf_with_status(request):
+    return web.Response(text="Success!")
 
 
-@app.route('/', methods=['GET'])
-def index():
+@routes.get("/")
+async def get(request):
     file_dir = os.path.dirname(os.path.realpath(__file__))
-    return send_from_directory(file_dir, 'index.html')
+    with open(f"{file_dir}/index.html") as f:
+        return web.Response(text=f.read())
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8000)
+    app = web.Application()
+    app.add_routes(routes)
+    web.run_app(app, host='0.0.0.0', port=8080)

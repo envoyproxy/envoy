@@ -7,6 +7,7 @@
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {
@@ -41,8 +42,10 @@ ConfigProto normalizeConfig(const ConfigProto& original) {
 class CacheSingleton : public Envoy::Singleton::Instance {
 public:
   CacheSingleton(
-      std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory>&& async_file_manager_factory)
-      : async_file_manager_factory_(async_file_manager_factory) {}
+      std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory>&& async_file_manager_factory,
+      Thread::ThreadFactory& thread_factory)
+      : async_file_manager_factory_(async_file_manager_factory),
+        cache_eviction_thread_(thread_factory) {}
 
   std::shared_ptr<FileSystemHttpCache> get(std::shared_ptr<CacheSingleton> singleton,
                                            const ConfigProto& non_normalized_config,
@@ -56,9 +59,11 @@ public:
       cache = it->second.lock();
     }
     if (!cache) {
-      cache = std::make_shared<FileSystemHttpCache>(
-          singleton, std::move(config),
-          async_file_manager_factory_->getAsyncFileManager(config.manager_config()), stats_scope);
+      std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager =
+          async_file_manager_factory_->getAsyncFileManager(config.manager_config());
+      cache = std::make_shared<FileSystemHttpCache>(singleton, cache_eviction_thread_,
+                                                    std::move(config),
+                                                    std::move(async_file_manager), stats_scope);
       caches_[key] = cache;
     } else if (!Protobuf::util::MessageDifferencer::Equals(cache->config(), config)) {
       throw EnvoyException(
@@ -70,6 +75,7 @@ public:
 
 private:
   std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory> async_file_manager_factory_;
+  CacheEvictionThread cache_eviction_thread_;
   absl::Mutex mu_;
   // We keep weak_ptr here so the caches can be destroyed if the config is updated to stop using
   // that config of cache. The caches each keep shared_ptrs to this singleton, which keeps the
@@ -94,14 +100,15 @@ public:
            Server::Configuration::FactoryContext& context) override {
     ConfigProto config;
     MessageUtil::unpackTo(filter_config.typed_config(), config);
-    std::shared_ptr<CacheSingleton> caches = context.singletonManager().getTyped<CacheSingleton>(
-        SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
-          return std::make_shared<CacheSingleton>(
-              Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()));
-        });
-    std::shared_ptr<FileSystemHttpCache> cache = caches->get(caches, config, context.scope());
-    cache->init();
-    return cache;
+    std::shared_ptr<CacheSingleton> caches =
+        context.serverFactoryContext().singletonManager().getTyped<CacheSingleton>(
+            SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
+              return std::make_shared<CacheSingleton>(
+                  Common::AsyncFiles::AsyncFileManagerFactory::singleton(
+                      &context.serverFactoryContext().singletonManager()),
+                  context.serverFactoryContext().api().threadFactory());
+            });
+    return caches->get(caches, config, context.scope());
   }
 };
 

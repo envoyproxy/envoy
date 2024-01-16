@@ -3,62 +3,35 @@
 namespace Envoy {
 namespace Platform {
 
-static const std::pair<RetryRule, std::string> RETRY_RULE_LOOKUP[]{
-    {RetryRule::Status5xx, "5xx"},
-    {RetryRule::GatewayError, "gateway-error"},
-    {RetryRule::ConnectFailure, "connect-failure"},
-    {RetryRule::RefusedStream, "refused-stream"},
-    {RetryRule::Retriable4xx, "retriable-4xx"},
-    {RetryRule::RetriableHeaders, "retriable-headers"},
-    {RetryRule::Reset, "reset"},
-};
-
-std::string retryRuleToString(RetryRule retry_rule) {
-  for (const auto& pair : RETRY_RULE_LOOKUP) {
-    if (pair.first == retry_rule) {
-      return pair.second;
-    }
-  }
-  throw std::invalid_argument("invalid retry rule");
-}
-
-RetryRule retryRuleFromString(const std::string& str) {
-  for (const auto& pair : RETRY_RULE_LOOKUP) {
-    if (pair.second == str) {
-      return pair.first;
-    }
-  }
-  throw std::invalid_argument("invalid retry rule");
-}
-
 RawHeaderMap RetryPolicy::asRawHeaderMap() const {
   RawHeaderMap outbound_headers{
-      {"x-envoy-max-retries", {std::to_string(this->max_retry_count)}},
-      {"x-envoy-upstream-rq-timeout-ms",
-       {std::to_string(this->total_upstream_timeout_ms.value_or(0))}},
+      {"x-envoy-max-retries", {std::to_string(max_retry_count)}},
+      {"x-envoy-upstream-rq-timeout-ms", {std::to_string(total_upstream_timeout_ms.value_or(0))}},
   };
 
-  if (this->per_try_timeout_ms.has_value()) {
+  if (per_try_timeout_ms.has_value()) {
     outbound_headers["x-envoy-upstream-rq-per-try-timeout-ms"] =
-        std::vector<std::string>{std::to_string(this->per_try_timeout_ms.value())};
+        std::vector<std::string>{std::to_string(per_try_timeout_ms.value())};
   }
 
-  std::vector<std::string> retry_on;
-  for (const auto& retry_rule : this->retry_on) {
-    retry_on.push_back(retryRuleToString(retry_rule));
+  std::vector<std::string> retry_on_copy;
+  retry_on_copy.reserve(retry_on.size());
+  for (const auto& retry_rule : retry_on) {
+    retry_on_copy.push_back(retry_rule);
   }
 
-  if (this->retry_status_codes.size() > 0) {
-    retry_on.push_back("retriable-status-codes");
-    std::vector<std::string> retry_status_codes;
-    for (const auto& status_code : this->retry_status_codes) {
-      retry_status_codes.push_back(std::to_string(status_code));
+  if (!retry_status_codes.empty()) {
+    retry_on_copy.push_back("retriable-status-codes");
+    std::vector<std::string> retry_status_codes_copy;
+    retry_status_codes_copy.reserve(retry_status_codes.size());
+    for (const auto& status_code : retry_status_codes) {
+      retry_status_codes_copy.push_back(std::to_string(status_code));
     }
-    outbound_headers["x-envoy-retriable-status-codes"] = retry_status_codes;
+    outbound_headers["x-envoy-retriable-status-codes"] = retry_status_codes_copy;
   }
 
-  if (retry_on.size() > 0) {
-    outbound_headers["x-envoy-retry-on"] = retry_on;
+  if (!retry_on.empty()) {
+    outbound_headers["x-envoy-retry-on"] = retry_on_copy;
   }
 
   return outbound_headers;
@@ -88,7 +61,7 @@ RetryPolicy RetryPolicy::fromRawHeaderMap(const RawHeaderMap& headers) {
         has_retriable_status_codes = true;
         continue;
       }
-      retry_policy.retry_on.push_back(retryRuleFromString(retry_rule_str));
+      retry_policy.retry_on.push_back(retry_rule_str);
     }
   }
 

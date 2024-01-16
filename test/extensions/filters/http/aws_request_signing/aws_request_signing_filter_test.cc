@@ -19,6 +19,7 @@ using Common::Aws::MockSigner;
 using ::testing::An;
 using ::testing::InSequence;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
 
 class MockFilterConfig : public FilterConfig {
@@ -32,7 +33,7 @@ public:
 
   std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_{Filter::generateStats("test", stats_store_)};
+  FilterStats stats_{Filter::generateStats("test", *stats_store_.rootScope())};
   std::string host_rewrite_;
   bool use_unsigned_payload_;
 };
@@ -189,12 +190,31 @@ TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   Stats::IsolatedStoreImpl stats;
   auto signer = std::make_unique<Common::Aws::MockSigner>();
   const auto* signer_ptr = signer.get();
-  FilterConfigImpl config(std::move(signer), "prefix", stats, "foo", true);
+  FilterConfigImpl config(std::move(signer), "prefix", *stats.rootScope(), "foo", true);
 
   EXPECT_EQ(signer_ptr, &config.signer());
   EXPECT_EQ(0UL, config.stats().signing_added_.value());
   EXPECT_EQ("foo", config.hostRewrite());
   EXPECT_EQ(true, config.useUnsignedPayload());
+}
+
+// Verify filter functionality when a host rewrite happens on route-level config.
+TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
+  setup();
+  filter_config_->host_rewrite_ = "original-host";
+
+  Stats::IsolatedStoreImpl stats;
+  auto signer = std::make_unique<Common::Aws::MockSigner>();
+  EXPECT_CALL(*(signer), signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+
+  FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(),
+                                    "overridden-host", false);
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&per_route_config));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ("overridden-host", headers.getHostValue());
 }
 
 } // namespace

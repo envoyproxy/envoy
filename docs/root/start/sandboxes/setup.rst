@@ -29,9 +29,9 @@ Install Docker
 
 Ensure that you have a recent versions of ``docker`` installed.
 
-You will need a minimum version of ``18.06.0+``.
+You will need a minimum version of ``19.03.0+``.
 
-Version ``19.03`` is well tested.
+Version ``20.10`` is well tested, and has the benefit of included ``compose``.
 
 The user account running the examples will need to have permission to use Docker on your system.
 
@@ -42,19 +42,25 @@ If you want to use the Windows based Envoy images make sure that you
 
 .. _start_sandboxes_setup_docker_compose:
 
-Install Docker Compose
-----------------------
+Install ``docker compose``
+--------------------------
 
 The examples use
-`Docker compose configuration version 3.7 <https://docs.docker.com/compose/compose-file/compose-versioning/#version-37>`_.
+`Docker compose configuration version 3.8 <https://docs.docker.com/compose/compose-file/compose-versioning/#version-38>`_.
 
-You will need to install a fairly recent version of `Docker Compose <https://docs.docker.com/compose/>`_.
+You will need to a fairly recent version of `Docker Compose <https://docs.docker.com/compose/>`_.
 
-Version ``1.27.4`` is well tested.
+.. note::
+   Any ``20.0+`` version of Docker provides a builtin ``docker compose`` command.
 
-Docker Compose is a `python application <https://pypi.org/project/docker-compose/>`_ and can be
-installed through a variety of methods including `pip <https://pip.pypa.io/en/stable/>`_ and
-`native operating system installation <https://docs.docker.com/compose/install/>`_.
+   The sandboxes are tested using ``compose`` in this way, so this is preferable over using the python version.
+
+   See `Docker compose installation documenation <https://docs.docker.com/compose/install/>`_ for more information.
+
+Docker Compose (``docker-compose``) can also be installed as a `python application <https://pypi.org/project/docker-compose/>`_ and can be
+installed through a variety of methods including `pip <https://pip.pypa.io/en/stable/>`_ and native operating system installation.
+
+Most of the sandboxes should also work using ``docker-compose``.
 
 .. _start_sandboxes_setup_git:
 
@@ -101,6 +107,15 @@ Many of the examples use the `curl <https://curl.se/>`_ utility to make ``HTTP``
 Instructions for installing `curl <https://curl.se/>`_ on many platforms and operating systems
 can be `found on the curl website <https://curl.haxx.se/download.html>`_.
 
+.. _start_sandboxes_setup_envsubst:
+
+envsubst
+~~~~~~~~
+
+Some of the examples require the ``envsubst`` command to interpolate environment variables in templates.
+
+The command is a part of the GNU ‘gettext’ package, and is available through most package managers.
+
 .. _start_sandboxes_setup_jq:
 
 jq
@@ -111,6 +126,15 @@ whether it be ``HTTP`` response data, logs or statistics.
 
 Instructions for installing `jq <https://stedolan.github.io/jq/>`_ on many platforms and operating systems
 can be `found on the jq website <https://stedolan.github.io/jq/download/>`_.
+
+.. _start_sandboxes_setup_mkpasswd:
+
+mkpasswd
+~~~~~~~~
+
+Some of the examples require the ``mkpasswd`` command to generate ~random tokens.
+
+The command is a part of the ‘whois’ package, and is available through most package managers.
 
 .. _start_sandboxes_setup_netcat:
 
@@ -135,17 +159,5 @@ Binary distributions of `OpenSSL <https://www.openssl.org/>`_ are available for 
 and in most if not all flavours of Linux.
 
 Windows users can either use an `unofficial binary <https://wiki.openssl.org/index.php/Binaries>`_ or compile from source.
-
-Check for installation instructions specific to your operating system.
-
-.. _start_sandboxes_setup_redis:
-
-redis
-~~~~~
-
-Binary distributions of `Redis <https://redis.io/>`_ are available for Mac OS with `brew <https://brew.sh>`_
-and in most flavours of Linux.
-
-Windows users should check out the `Windows port of Redis <https://github.com/microsoftarchive/redis>`_.
 
 Check for installation instructions specific to your operating system.

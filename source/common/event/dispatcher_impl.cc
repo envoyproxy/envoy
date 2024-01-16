@@ -26,8 +26,6 @@
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/network/tcp_listener_impl.h"
-#include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
@@ -65,13 +63,12 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                api.bootstrap().overload_manager().buffer_factory_config())) {}
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& thread_factory,
-                               TimeSource& time_source, Random::RandomGenerator& random_generator,
+                               TimeSource& time_source, Random::RandomGenerator&,
                                Filesystem::Instance& file_system, Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : name_(name), thread_factory_(thread_factory), time_source_(time_source),
-      random_generator_(random_generator), file_system_(file_system),
-      buffer_factory_(watermark_factory),
+      file_system_(file_system), buffer_factory_(watermark_factory),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
@@ -191,25 +188,6 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, file_system_)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
-                                                    Network::TcpListenerCallbacks& cb,
-                                                    Runtime::Loader& runtime, bool bind_to_port,
-                                                    bool ignore_global_conn_limit) {
-  ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(*this, random_generator_, runtime,
-                                                    std::move(socket), cb, bind_to_port,
-                                                    ignore_global_conn_limit);
-}
-
-Network::UdpListenerPtr
-DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
-                                  Network::UdpListenerCallbacks& cb,
-                                  const envoy::config::core::v3::UdpSocketConfig& config) {
-  ASSERT(isThreadSafe());
-  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource(),
-                                                    config);
-}
-
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
   return createTimerInternal(cb);
@@ -261,12 +239,12 @@ SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb)
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
 
-void DispatcherImpl::post(std::function<void()> callback) {
+void DispatcherImpl::post(PostCb callback) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
     do_post = post_callbacks_.empty();
-    post_callbacks_.push_back(callback);
+    post_callbacks_.push_back(std::move(callback));
   }
 
   if (do_post) {
@@ -359,7 +337,7 @@ void DispatcherImpl::runPostCallbacks() {
   // objects that is being deferred deleted.
   clearDeferredDeleteList();
 
-  std::list<std::function<void()>> callbacks;
+  std::list<PostCb> callbacks;
   {
     // Take ownership of the callbacks under the post_lock_. The lock must be released before
     // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute

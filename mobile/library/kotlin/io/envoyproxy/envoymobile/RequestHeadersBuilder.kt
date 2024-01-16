@@ -1,24 +1,22 @@
 package io.envoyproxy.envoymobile
 
-/**
- * Builder used for constructing instances of RequestHeaders`.
- */
+/** Builder used for constructing instances of RequestHeaders`. */
 class RequestHeadersBuilder : HeadersBuilder {
   /**
    * Initialize a new instance of the builder.
    *
-   * @param method:    Method for the request.
-   * @param scheme:    The URL scheme for the request (i.e., "https").
+   * @param method: Method for the request.
+   * @param scheme: The URL scheme for the request (i.e., "https").
    * @param authority: The URL authority for the request (i.e., "api.foo.com").
-   * @param path:      The URL path for the request (i.e., "/foo").
+   * @param path: The URL path for the request (i.e., "/foo").
    */
   constructor(
     method: RequestMethod,
     scheme: String = "https",
     authority: String,
     path: String
-  ) :
-    super(HeadersContainer(
+  ) : super(
+    HeadersContainer(
       mapOf(
         ":authority" to mutableListOf(authority),
         ":method" to mutableListOf(method.stringValue),
@@ -26,7 +24,7 @@ class RequestHeadersBuilder : HeadersBuilder {
         ":scheme" to mutableListOf(scheme)
       )
     )
-    )
+  )
 
   /**
    * Instantiate a new builder. Used only by RequestHeaders to convert back to
@@ -67,7 +65,6 @@ class RequestHeadersBuilder : HeadersBuilder {
    * Add a retry policy to be used with this request.
    *
    * @param retryPolicy: The retry policy to use.
-   *
    * @return RequestHeadersBuilder, This builder.
    */
   fun addRetryPolicy(retryPolicy: RetryPolicy): RequestHeadersBuilder {
@@ -79,42 +76,22 @@ class RequestHeadersBuilder : HeadersBuilder {
   }
 
   /**
-   * Add an upstream HTTP protocol to use when executing this request.
-   *
-   * @param upstreamHttpProtocol: The protocol to use for this request.
-   *
-   * @return RequestHeadersBuilder, This builder.
-   */
-  fun addUpstreamHttpProtocol(upstreamHttpProtocol: UpstreamHttpProtocol):
-    RequestHeadersBuilder {
-      internalSet(
-        "x-envoy-mobile-upstream-protocol",
-        mutableListOf(upstreamHttpProtocol.stringValue)
-      )
-      return this
-    }
-
-  /**
    * Add a socket tag to be applied to the socket.
    *
    * @param uid: Traffic stats UID to be applied.
    * @param tag: Traffic stats tag to be applied.
    *
-   * See: https://source.android.com/devices/tech/datausage/tags-explained
-   * See: https://developer.android.com/reference/android/net/TrafficStats#setThreadStatsTag(int)
-   * See: https://developer.android.com/reference/android/net/TrafficStats#setThreadStatsUid(int)
-   * See: https://developer.android.com/reference/android/net/TrafficStats#tagSocket(java.net.Socket)
+   * See: https://source.android.com/devices/tech/datausage/tags-explained See:
+   * https://developer.android.com/reference/android/net/TrafficStats#setThreadStatsTag(int) See:
+   * https://developer.android.com/reference/android/net/TrafficStats#setThreadStatsUid(int) See:
+   * https://developer.android.com/reference/android/net/TrafficStats#tagSocket(java.net.Socket)
    *
    * @return RequestHeadersBuilder, This builder.
    */
-  fun addSocketTag(uid: Int, tag: Int):
-    RequestHeadersBuilder {
-      internalSet(
-        "x-envoy-mobile-socket-tag",
-        mutableListOf(uid.toString() + "," + tag.toString())
-      )
-      return this
-    }
+  fun addSocketTag(uid: Int, tag: Int): RequestHeadersBuilder {
+    internalSet("x-envoy-mobile-socket-tag", mutableListOf(uid.toString() + "," + tag.toString()))
+    return this
+  }
 
   /**
    * Build the request headers using the current builder.

@@ -3,10 +3,9 @@ import Foundation
 private let kRestrictedPrefixes = [":", "x-envoy-mobile"]
 
 private func isRestrictedHeader(name: String) -> Bool {
-  let isHostHeader = name.caseInsensitiveCompare("host") == .orderedSame
-  lazy var hasRestrictedPrefix = kRestrictedPrefixes
-    .contains { name.range(of: $0, options: [.caseInsensitive, .anchored]) != nil }
-  return isHostHeader || hasRestrictedPrefix
+  let lowercasedName = name.lowercased()
+  let isHostHeader = lowercasedName == "host"
+  return isHostHeader || kRestrictedPrefixes.contains(where: lowercasedName.starts(with:))
 }
 
 /// Base builder class used to construct `Headers` instances.

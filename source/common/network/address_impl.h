@@ -243,6 +243,7 @@ private:
     uint32_t scopeId() const override;
     uint32_t port() const;
     InstanceConstSharedPtr v4CompatibleAddress() const override;
+    InstanceConstSharedPtr addressWithoutScopeId() const override;
 
     std::string makeFriendlyAddress() const;
 

@@ -1,8 +1,8 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_test(
     name = "client_test",
@@ -12,6 +12,7 @@ envoy_cc_test(
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
+        "//test/common/mocks/common:common_mocks",
         "//test/common/mocks/event:event_mocks",
         "@envoy//source/common/http:context_lib",
         "@envoy//source/common/stats:isolated_store_lib",

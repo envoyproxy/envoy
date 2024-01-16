@@ -10,7 +10,7 @@ if [[ -f "$certificate" && -f "$key" ]]; then
   echo "Using EngFlow RBE"
 else
   echo "EngFlow RBE certificate and key not installed in $certificate and $key"
-  echo "Contact Andrés Felipe Barco Santa <andres@engflow.com> for access to these files"
+  echo "Contact the EngFlow Support Team <support@engflow.com> for access to these files"
   exit 1
 fi
 

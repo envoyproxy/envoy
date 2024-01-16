@@ -9,7 +9,7 @@ class JvmStringAccessorContext {
   public JvmStringAccessorContext(EnvoyStringAccessor accessor) { this.accessor = accessor; }
 
   /**
-   * Invokes getEnvoyString callback. This method signature is used within the jni_interface.cc.
+   * Invokes getEnvoyString callback. This method signature is used within the jni_impl.cc.
    * Changing naming of this class or methods will likely require an audit across the jni usages
    * and proguard rules.
    *

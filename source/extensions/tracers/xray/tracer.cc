@@ -95,17 +95,25 @@ void Span::finishSpan() {
   // `direction` will be either "ingress" or "egress"
   s.mutable_annotations()->insert({std::string(DirectionKey), direction()});
 
-  const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
+  const std::string json = MessageUtil::getJsonStringFromMessageOrError(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
 
   broker_.send(json);
 } // namespace XRay
 
+const Tracing::TraceContextHandler& xRayTraceHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "x-amzn-trace-id");
+}
+
+const Tracing::TraceContextHandler& xForwardedForHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "x-forwarded-for");
+}
+
 void Span::injectContext(Tracing::TraceContext& trace_context,
                          const Upstream::HostDescriptionConstSharedPtr&) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
-  trace_context.setByReferenceKey(XRayTraceHeader, xray_header_value);
+  xRayTraceHeader().setRefKey(trace_context, xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,
@@ -113,7 +121,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::stri
   auto child_span = std::make_unique<XRay::Span>(time_source_, random_, broker_);
   child_span->setName(operation_name);
   child_span->setOperation(operation_name);
-  child_span->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
+  child_span->setDirection(Tracing::TracerUtility::toString(config.operationName()));
   child_span->setStartTime(start_time);
   child_span->setParentId(id());
   child_span->setTraceId(traceId());
@@ -130,7 +138,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   span_ptr->setName(segment_name_);
   span_ptr->setOperation(operation_name);
-  span_ptr->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
+  span_ptr->setDirection(Tracing::TracerUtility::toString(config.operationName()));
   // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
   // more precise value than calling the systemTime() at this point in time.
   span_ptr->setStartTime(start_time);

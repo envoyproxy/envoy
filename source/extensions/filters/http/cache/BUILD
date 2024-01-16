@@ -21,6 +21,7 @@ envoy_cc_library(
         ":cache_entry_utils_lib",
         ":cache_filter_logging_info_lib",
         ":cache_headers_utils_lib",
+        ":cache_insert_queue_lib",
         ":cacheability_utils_lib",
         ":http_cache_lib",
         "//source/common/common:enum_to_int",
@@ -58,6 +59,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cache_insert_queue_lib",
+    srcs = ["cache_insert_queue.cc"],
+    hdrs = ["cache_insert_queue.h"],
+    deps = [
+        ":http_cache_lib",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cache_policy_lib",
     hdrs = ["cache_policy.h"],
     deps = [
@@ -91,7 +102,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
-        "//source/common/protobuf:utility_lib",
+        "//source/common/protobuf:deterministic_hash_lib",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )

@@ -184,6 +184,23 @@ TEST_F(IoHandleImplTest, ReadContent) {
   ASSERT_EQ(0, io_handle_->getWriteBuffer()->length());
 }
 
+TEST_F(IoHandleImplTest, WriteClearsDrainTrackers) {
+  Buffer::OwnedImpl buf_to_write("abcdefg");
+  {
+    bool called = false;
+    // This drain tracker should be called as soon as the write happens; not on read.
+    buf_to_write.addDrainTracker([&called]() { called = true; });
+    io_handle_peer_->write(buf_to_write);
+    EXPECT_TRUE(called);
+  }
+  // Now the drain tracker refers to a stack variable that no longer exists. If the drain tracker
+  // is called subsequently, this will fail in ASan.
+  Buffer::OwnedImpl buf;
+  auto result = io_handle_->read(buf, 10);
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(7, result.return_value_);
+}
+
 // Test read throttling on watermark buffer.
 TEST_F(IoHandleImplTest, ReadThrottling) {
   {
@@ -395,6 +412,26 @@ TEST_F(IoHandleImplTest, ShutDownOptionsNotSupported) {
   ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
 }
 
+// This test is ensure the memory created by BufferFragment won't be released
+// after the write.
+TEST_F(IoHandleImplTest, WriteBufferFragement) {
+  Buffer::OwnedImpl buf("a");
+  bool released = false;
+  auto buf_frag = Buffer::OwnedBufferFragmentImpl::create(
+      std::string(255, 'b'), [&released](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        released = true;
+        delete fragment;
+      });
+  buf.addBufferFragment(*buf_frag.release());
+
+  auto result = io_handle_->write(buf);
+  EXPECT_FALSE(released);
+  EXPECT_EQ(0, buf.length());
+  io_handle_peer_->read(buf, absl::nullopt);
+  buf.drain(buf.length());
+  EXPECT_TRUE(released);
+}
+
 TEST_F(IoHandleImplTest, WriteByMove) {
   Buffer::OwnedImpl buf("0123456789");
   auto result = io_handle_peer_->write(buf);
@@ -476,7 +513,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterShutdown) {
   // Write after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
   EXPECT_EQ(10, buf.length());
 }
 
@@ -485,7 +522,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 // Test writev return error code. Ignoring the side effect of event scheduling.
@@ -541,7 +578,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterShutdown) {
   // Writev after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
@@ -550,7 +587,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevToPeer) {
@@ -1135,7 +1172,7 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   auto object = std::make_shared<TestObject>(1000);
   source_filter_state.push_back(
       {object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection, "object_key"});
+       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "object_key"});
   ASSERT_NE(nullptr, io_handle_->passthroughState());
   io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
 

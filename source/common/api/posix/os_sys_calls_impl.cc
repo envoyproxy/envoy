@@ -5,8 +5,19 @@
 #include <cerrno>
 #include <string>
 
+#include "envoy/network/socket.h"
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/address_impl.h"
+
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wold-style-cast"
+namespace android {
+#include "third_party/android/ifaddrs-android.h"
+} // namespace android
+#pragma clang diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Api {
@@ -51,6 +62,11 @@ SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t 
 SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
                                         off_t offset) const {
   const ssize_t rc = ::pread(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
+  const ssize_t rc = ::send(socket, buffer, length, flags);
   return {rc, rc != -1 ? 0 : errno};
 }
 
@@ -124,8 +140,9 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #endif
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
-#if !defined(__linux__) || !defined(IPV6_TRANSPARENT)
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ip_version) const {
+#if !defined(__linux__)
+  UNREFERENCED_PARAMETER(ip_version);
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
@@ -135,32 +152,27 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
   // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv6/ipv6_sockglue.c?id=6c46862280c5f55eda7750391bc65cd7e08c7535
   //
   // So, almost recent linux kernel supports both IP_TRANSPARENT and IPV6_TRANSPARENT options.
+  // But there are also has ipv4 only or ipv6 only scenarios.
   //
   // And these socket options need CAP_NET_ADMIN capability to be applied.
   // The CAP_NET_ADMIN capability should be applied by root user before call this function.
-  static const bool is_supported = [] {
-    // Check ipv4 case
-    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+
+  static constexpr auto transparent_supported = [](int family) {
+    auto opt_tp = family == AF_INET ? ENVOY_SOCKET_IP_TRANSPARENT : ENVOY_SOCKET_IPV6_TRANSPARENT;
+    int fd = ::socket(family, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     if (fd < 0) {
       return false;
     }
     int val = 1;
-    bool result = (0 == ::setsockopt(fd, IPPROTO_IP, IP_TRANSPARENT, &val, sizeof(val)));
-    ::close(fd);
-    if (!result) {
-      return false;
-    }
-    // Check ipv6 case
-    fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
-    val = 1;
-    result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
+    bool result = (0 == ::setsockopt(fd, opt_tp.level(), opt_tp.option(), &val, sizeof(val)));
     ::close(fd);
     return result;
-  }();
-  return is_supported;
+  };
+  // Check ipv4 case
+  static const bool ipv4_is_supported = transparent_supported(AF_INET);
+  // Check ipv6 case
+  static const bool ipv6_is_supported = transparent_supported(AF_INET6);
+  return ip_version == Network::Address::IpVersion::v4 ? ipv4_is_supported : ipv6_is_supported;
 #endif
 }
 
@@ -346,35 +358,39 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, EOPNOTSUPP};
 }
 
-bool OsSysCallsImpl::supportsGetifaddrs() const {
-// TODO: eliminate this branching by upstreaming an alternative Android implementation
-// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  if (alternate_getifaddrs_.has_value()) {
-    return true;
-  }
-  return false;
-#else
-  // Note: posix defaults to true regardless of whether an alternate getifaddrs has been set or not.
-  // This is because as far as we are aware only Android<24 lacks an implementation and thus another
-  // posix based platform that lacks a native getifaddrs implementation should be a programming
-  // error.
-  //
-  // That being said, if an alternate getifaddrs impl is set, that will be used in calls to
-  // OsSysCallsImpl::getifaddrs as seen below.
-  return true;
-#endif
-}
+bool OsSysCallsImpl::supportsGetifaddrs() const { return true; }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
-  if (alternate_getifaddrs_.has_value()) {
-    return alternate_getifaddrs_.value()(interfaces);
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  struct android::ifaddrs* ifaddr;
+  struct android::ifaddrs* ifa;
+
+  const int rc = android::getifaddrs(&ifaddr);
+  if (rc == -1) {
+    return {rc, errno};
   }
 
-// TODO: eliminate this branching by upstreaming an alternative Android implementation
-// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  PANIC("not implemented");
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+      const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->ifa_addr);
+      size_t ss_len =
+          ifa->ifa_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
+      StatusOr<Network::Address::InstanceConstSharedPtr> address =
+          Network::Address::addressFromSockAddr(*ss, ss_len, ifa->ifa_addr->sa_family == AF_INET6);
+      if (address.ok()) {
+        interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, *address);
+      }
+    }
+  }
+
+  if (ifaddr) {
+    android::freeifaddrs(ifaddr);
+  }
+  return {rc, 0};
 #else
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;

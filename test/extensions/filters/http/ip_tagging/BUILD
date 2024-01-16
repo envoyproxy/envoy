@@ -32,6 +32,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ip_tagging_integration_test",
+    size = "large",
     srcs = ["ip_tagging_integration_test.cc"],
     extension_names = ["envoy.filters.http.ip_tagging"],
     deps = [

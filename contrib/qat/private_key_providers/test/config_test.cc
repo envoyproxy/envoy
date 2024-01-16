@@ -35,7 +35,8 @@ parsePrivateKeyProviderFromV3Yaml(const std::string& yaml_string) {
 class FakeSingletonManager : public Singleton::Manager {
 public:
   FakeSingletonManager(LibQatCryptoSharedPtr libqat) : libqat_(libqat) {}
-  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb,
+                                   bool) override {
     return std::make_shared<QatManager>(libqat_);
   }
 
@@ -48,11 +49,11 @@ public:
   QatConfigTest()
       : api_(Api::createApiForTest(store_, time_system_)),
         libqat_(std::make_shared<FakeLibQatCryptoImpl>()), fsm_(libqat_) {
-    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
     ON_CALL(context_manager_, privateKeyMethodManager())
         .WillByDefault(ReturnRef(private_key_method_manager_));
-    ON_CALL(factory_context_, singletonManager()).WillByDefault(ReturnRef(fsm_));
+    ON_CALL(factory_context_.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm_));
   }
 
   Ssl::PrivateKeyMethodProviderSharedPtr createWithConfig(std::string yaml) {
@@ -87,6 +88,7 @@ TEST_F(QatConfigTest, CreateRsa1024) {
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
   EXPECT_EQ(false, provider->checkFips());
+  EXPECT_EQ(provider->isAvailable(), true);
   Ssl::BoringSslPrivateKeyMethodSharedPtr method = provider->getBoringSslPrivateKeyMethod();
   EXPECT_NE(nullptr, method);
 }
@@ -100,7 +102,9 @@ TEST_F(QatConfigTest, CreateRsa2048) {
         private_key: { "filename": "{{ test_rundir }}/contrib/qat/private_key_providers/test/test_data/rsa-2048.pem" }
 )EOF";
 
-  EXPECT_NE(nullptr, createWithConfig(yaml));
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->isAvailable(), true);
 }
 
 TEST_F(QatConfigTest, CreateRsa3072) {
@@ -112,7 +116,9 @@ TEST_F(QatConfigTest, CreateRsa3072) {
         private_key: { "filename": "{{ test_rundir }}/contrib/qat/private_key_providers/test/test_data/rsa-3072.pem" }
 )EOF";
 
-  EXPECT_NE(nullptr, createWithConfig(yaml));
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->isAvailable(), true);
 }
 
 TEST_F(QatConfigTest, CreateRsa4096) {
@@ -124,7 +130,9 @@ TEST_F(QatConfigTest, CreateRsa4096) {
         private_key: { "filename": "{{ test_rundir }}/contrib/qat/private_key_providers/test/test_data/rsa-4096.pem" }
 )EOF";
 
-  EXPECT_NE(nullptr, createWithConfig(yaml));
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->isAvailable(), true);
 }
 
 TEST_F(QatConfigTest, CreateEcdsaP256) {
@@ -136,7 +144,9 @@ TEST_F(QatConfigTest, CreateEcdsaP256) {
         private_key: { "filename": "{{ test_rundir }}/contrib/qat/private_key_providers/test/test_data/ecdsa-p256.pem" }
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml), EnvoyException, "Only RSA keys are supported.");
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(provider->isAvailable(), false);
 }
 
 TEST_F(QatConfigTest, CreateMissingPrivateKeyFile) {

@@ -6,7 +6,7 @@
 
 #include "source/common/common/hex.h"
 
-#include "nghttp2/nghttp2.h"
+#include "quiche/spdy/core/hpack/hpack_encoder.h"
 
 namespace {
 
@@ -51,10 +51,20 @@ Http2Frame::ResponseStatus Http2Frame::responseStatus() const {
     return ResponseStatus::Ok;
   case StaticHeaderIndex::Status404:
     return ResponseStatus::NotFound;
+  case StaticHeaderIndex::Status500:
+    return ResponseStatus::InternalServerError;
   default:
     break;
   }
   return ResponseStatus::Unknown;
+}
+
+uint32_t Http2Frame::streamId() const {
+  if (empty() || size() <= HeaderSize) {
+    return 0;
+  }
+  return (uint32_t(data_[5]) << 24) + (uint32_t(data_[6]) << 16) + (uint32_t(data_[7]) << 8) +
+         uint32_t(data_[8]);
 }
 
 void Http2Frame::buildHeader(Type type, uint32_t payload_size, uint8_t flags, uint32_t stream_id) {
@@ -112,6 +122,15 @@ void Http2Frame::appendEmptyHeader() {
   data_.push_back(0x40);
   data_.push_back(0x00);
   data_.push_back(0x00);
+}
+
+Http2Frame Http2Frame::makeRawFrame(Type type, uint8_t flags, uint32_t stream_id,
+                                    absl::string_view payload) {
+  Http2Frame frame;
+  frame.buildHeader(type, 0, flags, makeNetworkOrderStreamId(stream_id));
+  frame.appendData(payload);
+  frame.adjustPayloadSize();
+  return frame;
 }
 
 Http2Frame Http2Frame::makePingFrame(absl::string_view data) {
@@ -265,35 +284,28 @@ Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
                                                         const MetadataMap& metadata_map,
                                                         MetadataFlags flags) {
   const int numberOfNameValuePairs = metadata_map.size();
-  absl::FixedArray<nghttp2_nv> nameValues(numberOfNameValuePairs);
-  absl::FixedArray<nghttp2_nv>::iterator iterator = nameValues.begin();
+  spdy::HpackEncoder encoder;
+  encoder.DisableCompression();
+  spdy::HpackEncoder::Representations representations;
+  representations.reserve(numberOfNameValuePairs);
   for (const auto& metadata : metadata_map) {
-    *iterator = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
-                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
-                 metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
-    ++iterator;
+    representations.push_back({metadata.first, metadata.second});
   }
 
-  nghttp2_hd_deflater* deflater;
-  // Note: this has no effect, as metadata frames do not add onto Dynamic table.
-  const int maxDynamicTableSize = 4096;
-  nghttp2_hd_deflate_new(&deflater, maxDynamicTableSize);
-
-  const size_t upperBoundBufferLength =
-      nghttp2_hd_deflate_bound(deflater, nameValues.begin(), numberOfNameValuePairs);
-
-  uint8_t* buffer = new uint8_t[upperBoundBufferLength];
-
-  const size_t numberOfBytesInMetadataPayload = nghttp2_hd_deflate_hd(
-      deflater, buffer, upperBoundBufferLength, nameValues.begin(), numberOfNameValuePairs);
+  auto payload_sequence = encoder.EncodeRepresentations(representations);
+  ASSERT(payload_sequence->HasNext() || numberOfNameValuePairs == 0);
+  // Concatenate all the payload segments to a single string.
+  std::string payload;
+  const size_t maxPayloadSegmentSize = 4 * 1024 * 1024;
+  while (payload_sequence->HasNext()) {
+    absl::StrAppend(&payload, payload_sequence->Next(maxPayloadSegmentSize));
+  }
 
   Http2Frame frame;
-  frame.buildHeader(Type::Metadata, numberOfBytesInMetadataPayload, static_cast<uint8_t>(flags),
+  frame.buildHeader(Type::Metadata, payload.size(), static_cast<uint8_t>(flags),
                     makeNetworkOrderStreamId(stream_index));
-  std::vector<uint8_t> bufferVector(buffer, buffer + numberOfBytesInMetadataPayload);
-  frame.appendDataAfterHeaders(bufferVector);
-  delete[] buffer;
-  nghttp2_hd_deflate_del(deflater);
+  frame.appendDataAfterHeaders(payload);
+  ASSERT(frame.size() == payload.size() + 9);
   return frame;
 }
 
@@ -339,7 +351,11 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
                     makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  if (path.empty() || path == "/") {
+    frame.appendStaticHeader(StaticHeaderIndex::Path);
+  } else {
+    frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  }
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;
@@ -363,7 +379,11 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
                     makeNetworkOrderStreamId(stream_index));
   frame.appendStaticHeader(StaticHeaderIndex::MethodPost);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  if (path.empty() || path == "/") {
+    frame.appendStaticHeader(StaticHeaderIndex::Path);
+  } else {
+    frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  }
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;

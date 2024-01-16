@@ -13,6 +13,7 @@ offers the following features:
 
 * Decode non SSL traffic, ignore SSL traffic.
 * Decode session information.
+* Encode incoming non SSL traffic before forwarding upstream.
 * Capture transaction information, including commits and rollbacks.
 * Expose counters for different types of statements (INSERTs, DELETEs, UPDATEs, etc).
   The counters are updated based on decoding backend CommandComplete messages not by decoding SQL statements sent by a client.

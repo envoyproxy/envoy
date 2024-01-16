@@ -1,9 +1,12 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:android_artifacts.bzl", "android_artifacts")
 load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 load("@rules_detekt//detekt:defs.bzl", "detekt")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 android_artifacts(
     name = "envoy_aar",
@@ -15,6 +18,32 @@ android_artifacts(
         "//conditions:default": ["//library/common/jni:libenvoy_jni.so"],
     }),
     proguard_rules = "//library:proguard_rules",
+    substitutions = {
+        "{pom_artifact_id}": "envoy",
+        "{pom_extra_dependencies}": "",
+    },
+    visibility = ["//visibility:public"],
+)
+
+android_artifacts(
+    name = "envoy_xds_aar",
+    android_library = ":envoy_lib",
+    archive_name = "envoy_xds",
+    manifest = "EnvoyManifest.xml",
+    native_deps = select({
+        "@envoy//bazel:opt_build": ["//library/common/jni:libenvoy_jni.so.debug_info"],
+        "//conditions:default": ["//library/common/jni:libenvoy_jni.so"],
+    }),
+    proguard_rules = "//library:proguard_rules",
+    substitutions = {
+        "{pom_artifact_id}": "envoy-xds",
+        "{pom_extra_dependencies}": """
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-javalite</artifactId>
+            <version>3.24.4</version>
+        </dependency>""",
+    },
     visibility = ["//visibility:public"],
 )
 
@@ -32,6 +61,7 @@ kt_android_library(
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
+        "//library/java/io/envoyproxy/envoymobile/utilities",
     ],
 )
 
@@ -69,7 +99,6 @@ envoy_mobile_kt_library(
         "StreamPrototype.kt",
         "StringAccessor.kt",
         "Trailers.kt",
-        "UpstreamHttpProtocol.kt",
         "filters/*.kt",
         "grpc/*.kt",
         "mocks/*.kt",

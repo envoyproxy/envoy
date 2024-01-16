@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Platform {
 
 ResponseTrailersSharedPtr ResponseTrailersBuilder::build() const {
-  ResponseTrailers* trailers = new ResponseTrailers(this->allHeaders());
+  ResponseTrailers* trailers = new ResponseTrailers(allHeaders());
   return ResponseTrailersSharedPtr(trailers);
 }
 

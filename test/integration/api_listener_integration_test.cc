@@ -86,15 +86,17 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ApiListenerIntegrationTest,
 TEST_P(ApiListenerIntegrationTest, Basic) {
   BaseIntegrationTest::initialize();
   absl::Notification done;
-  test_server_->server().dispatcher().post([this, &done]() -> void {
+  Http::ApiListenerPtr http_api_listener;
+  test_server_->server().dispatcher().post([this, &done, &http_api_listener]() -> void {
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
     ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
-    ASSERT_TRUE(test_server_->server().listenerManager().apiListener()->get().http().has_value());
-    auto& http_api_listener =
-        test_server_->server().listenerManager().apiListener()->get().http()->get();
+    http_api_listener =
+        test_server_->server().listenerManager().apiListener()->get().createHttpApiListener(
+            test_server_->server().dispatcher());
+    ASSERT_TRUE(http_api_listener != nullptr);
 
     ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
-    auto& stream_decoder = http_api_listener.newStream(stream_encoder_);
+    auto stream_decoder = http_api_listener->newStreamHandle(stream_encoder_);
 
     // The AutonomousUpstream responds with 200 OK and a body of 10 bytes.
     // In the http1 codec the end stream is encoded with encodeData and 0 bytes.
@@ -104,12 +106,20 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
     EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
-    stream_decoder.decodeHeaders(
+    stream_decoder->get()->decodeHeaders(
         Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         true);
   });
   ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+
+  absl::Notification cleanup_done;
+  test_server_->server().dispatcher().post([&cleanup_done, &http_api_listener]() {
+    // Must be deleted in same thread.
+    http_api_listener.reset();
+    cleanup_done.Notify();
+  });
+  ASSERT_TRUE(cleanup_done.WaitForNotificationWithTimeout(absl::Seconds(1)));
 }
 
 TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
@@ -120,24 +130,84 @@ TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
   test_server_->server().dispatcher().post([this, &done]() -> void {
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
     ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
-    ASSERT_TRUE(test_server_->server().listenerManager().apiListener()->get().http().has_value());
-    auto& http_api_listener =
-        test_server_->server().listenerManager().apiListener()->get().http()->get();
+    auto http_api_listener =
+        test_server_->server().listenerManager().apiListener()->get().createHttpApiListener(
+            test_server_->server().dispatcher());
+    ASSERT_TRUE(http_api_listener != nullptr);
 
     ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
-    auto& stream_decoder = http_api_listener.newStream(stream_encoder_);
+    auto stream_decoder = http_api_listener->newStreamHandle(stream_encoder_);
 
     // Send a headers-only request
-    stream_decoder.decodeHeaders(
+    stream_decoder->get()->decodeHeaders(
         Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         false);
 
     done.Notify();
+    // http_api_listener is destroyed here with an active stream; thus this test verifies that
+    // there is no crash when this happens.
+    http_api_listener.reset();
   });
   ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
-  // The server should shutdown the ApiListener at the right time during server termination such
-  // that no crashes occur if termination happens when the ApiListener still has ongoing streams.
+}
+
+TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
+  BaseIntegrationTest::initialize();
+
+  absl::Mutex dispatchers_mutex;
+  std::vector<Event::Dispatcher*> dispatchers;
+  absl::Notification has_dispatcher;
+  ThreadLocal::TypedSlotPtr<> slot =
+      ThreadLocal::TypedSlot<>::makeUnique(test_server_->server().threadLocal());
+  slot->set([&dispatchers_mutex, &dispatchers, &has_dispatcher](
+                Event::Dispatcher& dispatcher) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
+    absl::MutexLock ml(&dispatchers_mutex);
+    // A string comparison on thread name seems to be the only way to
+    // distinguish worker threads from the main thread with the slots interface.
+    if (dispatcher.name() != "main_thread") {
+      dispatchers.push_back(&dispatcher);
+      has_dispatcher.Notify();
+    }
+    return nullptr;
+  });
+  ASSERT_TRUE(has_dispatcher.WaitForNotificationWithTimeout(absl::Seconds(1)));
+
+  absl::Notification done;
+  Http::ApiListenerPtr http_api_listener;
+  dispatchers[0]->post([this, &done, &http_api_listener, &dispatchers]() -> void {
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
+    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
+    http_api_listener =
+        test_server_->server().listenerManager().apiListener()->get().createHttpApiListener(
+            *dispatchers[0]);
+    ASSERT_TRUE(http_api_listener != nullptr);
+
+    ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
+    auto stream_decoder = http_api_listener->newStreamHandle(stream_encoder_);
+
+    // The AutonomousUpstream responds with 200 OK and a body of 10 bytes.
+    // In the http1 codec the end stream is encoded with encodeData and 0 bytes.
+    Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
+    EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+    EXPECT_CALL(stream_encoder_, encodeData(_, false));
+    EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
+
+    // Send a headers-only request
+    stream_decoder->get()->decodeHeaders(
+        Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
+        true);
+  });
+  ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+
+  absl::Notification cleanup_done;
+  dispatchers[0]->post([&cleanup_done, &http_api_listener]() {
+    // Must be deleted in same thread.
+    http_api_listener.reset();
+    cleanup_done.Notify();
+  });
+  ASSERT_TRUE(cleanup_done.WaitForNotificationWithTimeout(absl::Seconds(1)));
 }
 
 } // namespace

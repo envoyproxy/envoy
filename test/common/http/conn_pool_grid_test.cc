@@ -16,7 +16,6 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -141,7 +140,7 @@ public:
         dispatcher_, random_,
         Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
         Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-        simTime(), alternate_protocols_, options_, quic_stat_names_, store_,
+        simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
         *quic_connection_persistent_info_);
     host_ = grid_->host();
     grid_->info_ = &info_;
@@ -431,9 +430,6 @@ TEST_F(ConnectivityGridTest, Http3BrokenWithExpiredHttpServerPropertiesCacheEntr
 
 // Test that newStream() with HTTP/3 disabled.
 TEST_F(ConnectivityGridTest, NewStreamWithHttp3Disabled) {
-  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    return;
-  }
   addHttp3AlternateProtocol();
   initialize();
   grid_->immediate_success_ = true;
@@ -450,9 +446,6 @@ TEST_F(ConnectivityGridTest, NewStreamWithHttp3Disabled) {
 
 // Test that newStream() with alternate protocols disabled and TCP connection also fails.
 TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabledFail) {
-  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    return;
-  }
   addHttp3AlternateProtocol();
   initialize();
   grid_->immediate_failure_ = true;
@@ -916,7 +909,7 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
 } // namespace Envoy
 
 #include "test/mocks/server/transport_socket_factory_context.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 namespace Envoy {
 namespace Http {
 namespace {
@@ -937,11 +930,11 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), alternate_protocols_,
-                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
+      *quic_connection_persistent_info_);
   EXPECT_EQ("connection grid", grid.protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
@@ -961,82 +954,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   ASSERT_FALSE(optional_it3.has_value());
 }
 
-TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "false"}});
-  initialize();
-  EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
-
-  testing::InSequence s;
-  dispatcher_.allow_null_callback_ = true;
-  // Set the cluster up to have a quic transport socket.
-  Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
-      .WillOnce(Return(ssl_context));
-  auto factory =
-      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
-  factory->initialize();
-  auto& matcher =
-      static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
-  EXPECT_CALL(matcher, resolve(_))
-      .WillRepeatedly(
-          Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
-
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), alternate_protocols_,
-                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
-
-  // Create the HTTP/3 pool.
-  auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_TRUE(optional_it1.has_value());
-  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
-
-  const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
-  Api::InterfaceAddressVector interfaces{};
-  if (supports_getifaddrs) {
-    ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
-  }
-  Api::MockOsSysCalls os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
-  if (supports_getifaddrs) {
-    EXPECT_CALL(os_sys_calls, getifaddrs(_))
-        .WillOnce(
-            Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
-              interface_vector.insert(interface_vector.begin(), interfaces.begin(),
-                                      interfaces.end());
-              return {0, 0};
-            }));
-  }
-  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
-#if defined(__APPLE__) || defined(WIN32)
-  EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
-      .WillOnce(Return(Api::SysCallIntResult{1, 0}));
-#endif
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
-      .Times(testing::AtLeast(0u))
-      .WillRepeatedly(Return(0));
-  EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
-  EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
-  EXPECT_CALL(callbacks_.pool_failure_, ready());
-  ConnectionPool::Cancellable* cancel = (**optional_it1)
-                                            ->newStream(decoder_, callbacks_,
-                                                        {/*can_send_early_data_=*/false,
-                                                         /*can_use_http3_=*/true});
-  EXPECT_EQ(nullptr, cancel);
-}
-
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.postpone_h3_client_connect_to_next_loop", "true"}});
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
@@ -1057,11 +975,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), alternate_protocols_,
-                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
+      *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);

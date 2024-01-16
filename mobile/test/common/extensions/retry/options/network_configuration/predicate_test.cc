@@ -6,6 +6,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 
+#include "extension_registry.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
@@ -20,10 +21,11 @@ namespace Options {
 namespace {
 
 TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTest) {
+  ExtensionRegistry::registerFactories();
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> mock_stream_info;
   Upstream::RetryExtensionFactoryContextImpl retry_extension_factory_context{
-      *mock_factory_context.singleton_manager_};
+      *mock_factory_context.server_factory_context_.singleton_manager_};
 
   auto connectivity_manager = Network::ConnectivityManagerFactory(mock_factory_context).get();
   ASSERT_NE(nullptr, connectivity_manager);
@@ -40,9 +42,10 @@ TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTest) {
 }
 
 TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTestWithoutConnectivityManager) {
+  ExtensionRegistry::registerFactories();
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
   Upstream::RetryExtensionFactoryContextImpl retry_extension_factory_context{
-      *mock_factory_context.singleton_manager_};
+      *mock_factory_context.server_factory_context_.singleton_manager_};
 
   auto factory = Registry::FactoryRegistry<Upstream::RetryOptionsPredicateFactory>::getFactory(
       "envoy.retry_options_predicates.network_configuration");

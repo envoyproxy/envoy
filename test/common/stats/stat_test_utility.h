@@ -13,6 +13,11 @@
 
 namespace Envoy {
 namespace Stats {
+
+// Helper methods to facilitate using testing::ElementsAre with bucket vectors.
+bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b);
+std::ostream& operator<<(std::ostream& out, const ParentHistogram::Bucket& bucket);
+
 namespace TestUtil {
 
 class TestSymbolTableHelper {
@@ -144,6 +149,12 @@ public:
   GaugeOptConstRef findGaugeByString(const std::string& name) const;
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
   std::vector<uint64_t> histogramValues(const std::string& name, bool clear);
+  // Returns whether the given histogram has recorded any value since it was
+  // created.
+  bool histogramRecordedValues(const std::string& name) const;
+  const TagVector& fixedTags() override { return fixed_tags_; }
+
+  TagVector fixed_tags_;
 
 protected:
   ScopeSharedPtr makeScope(StatName name) override;
@@ -183,6 +194,7 @@ public:
   const TestStore& constStore() const override { return store_; }
 
 private:
+  std::string statNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags);
   static std::string addDot(const std::string& prefix) {
     if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
       return prefix;
@@ -190,7 +202,8 @@ private:
     return prefix + ".";
   }
 
-  void verifyConsistency(StatName ref_stat_name, StatName stat_name);
+  void verifyConsistency(StatName ref_stat_name, StatName stat_name,
+                         StatNameTagVectorOptConstRef tags);
 
   TestStore& store_;
   const std::string prefix_str_;
@@ -238,6 +251,34 @@ std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);
 
 // Serializes a string into a MemBlock and then decodes it.
 void serializeDeserializeString(absl::string_view in);
+
+class TestSinkPredicates : public SinkPredicates {
+public:
+  ~TestSinkPredicates() override = default;
+
+  bool has(StatName name) { return sinked_stat_names_.find(name) != sinked_stat_names_.end(); }
+
+  // Note: The backing store for the StatName needs to live longer than the
+  // TestSinkPredicates object.
+  void add(StatName name) { sinked_stat_names_.insert(name); }
+
+  // SinkPredicates
+  bool includeCounter(const Counter& counter) override {
+    return sinked_stat_names_.find(counter.statName()) != sinked_stat_names_.end();
+  }
+  bool includeGauge(const Gauge& gauge) override {
+    return sinked_stat_names_.find(gauge.statName()) != sinked_stat_names_.end();
+  }
+  bool includeTextReadout(const TextReadout& text_readout) override {
+    return sinked_stat_names_.find(text_readout.statName()) != sinked_stat_names_.end();
+  }
+  bool includeHistogram(const Histogram& histogram) override {
+    return sinked_stat_names_.find(histogram.statName()) != sinked_stat_names_.end();
+  }
+
+private:
+  StatNameHashSet sinked_stat_names_;
+};
 
 } // namespace TestUtil
 } // namespace Stats

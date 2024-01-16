@@ -62,18 +62,25 @@ template <class DataType> class TrieMatcher : public MatchTree<DataType> {
 public:
   TrieMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
               const std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>>& trie)
-      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)), trie_(trie) {}
+      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)), trie_(trie) {
+    auto input_type = data_input_->dataInputType();
+    if (input_type != Envoy::Matcher::DefaultMatchingDataType) {
+      throw EnvoyException(
+          absl::StrCat("Unsupported data input type: ", input_type,
+                       ", currently only string type is supported in trie matcher"));
+    }
+  }
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
-    if (!input.data_) {
+    if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
     const Network::Address::InstanceConstSharedPtr addr =
-        Network::Utility::parseInternetAddressNoThrow(*input.data_);
+        Network::Utility::parseInternetAddressNoThrow(absl::get<std::string>(input.data_));
     if (!addr) {
       return {MatchState::MatchComplete, on_no_match_};
     }

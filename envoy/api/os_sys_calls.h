@@ -39,8 +39,6 @@ struct InterfaceAddress {
 
 using InterfaceAddressVector = std::vector<InterfaceAddress>;
 
-using AlternateGetifaddrs = std::function<SysCallIntResult(InterfaceAddressVector& interfaces)>;
-
 class OsSysCalls {
 public:
   virtual ~OsSysCalls() = default;
@@ -87,6 +85,11 @@ public:
   virtual SysCallSizeResult pread(os_fd_t fd, void* buffer, size_t length, off_t offset) const PURE;
 
   /**
+   * @see send (man 2 send)
+   */
+  virtual SysCallSizeResult send(os_fd_t socket, void* buffer, size_t length, int flags) PURE;
+
+  /**
    * @see recv (man 2 recv)
    */
   virtual SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) PURE;
@@ -118,9 +121,9 @@ public:
   virtual bool supportsUdpGso() const PURE;
 
   /**
-   * return true if the OS support both IP_TRANSPARENT and IPV6_TRANSPARENT options
+   * return true if the OS support IP_TRANSPARENT or IPV6_TRANSPARENT options by the ip version.
    */
-  virtual bool supportsIpTransparent() const PURE;
+  virtual bool supportsIpTransparent(Network::Address::IpVersion version) const PURE;
 
   /**
    * return true if the OS supports multi-path TCP
@@ -278,16 +281,6 @@ public:
   virtual SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) PURE;
 
   /**
-   * allows a platform to override getifaddrs or provide an implementation if one does not exist
-   * natively.
-   *
-   * @arg alternate_getifaddrs function pointer to implementation.
-   */
-  virtual void setAlternateGetifaddrs(AlternateGetifaddrs alternate_getifaddrs) {
-    alternate_getifaddrs_ = alternate_getifaddrs;
-  }
-
-  /**
    * @see man getaddrinfo
    */
   virtual SysCallIntResult getaddrinfo(const char* node, const char* service, const addrinfo* hints,
@@ -297,9 +290,6 @@ public:
    * @see man freeaddrinfo
    */
   virtual void freeaddrinfo(addrinfo* res) PURE;
-
-protected:
-  absl::optional<AlternateGetifaddrs> alternate_getifaddrs_{};
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

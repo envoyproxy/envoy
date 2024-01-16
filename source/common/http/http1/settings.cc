@@ -3,6 +3,7 @@
 #include "envoy/http/header_formatter.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -31,12 +32,21 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
     ret.stateful_header_key_formatter_ = factory.createFromProto(*header_formatter_config);
   }
 
+  if (config.has_use_balsa_parser()) {
+    ret.use_balsa_parser_ = config.use_balsa_parser().value();
+  } else {
+    ret.use_balsa_parser_ =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
+  }
+
+  ret.allow_custom_methods_ = config.allow_custom_methods();
+
   return ret;
 }
 
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const Protobuf::BoolValue& hcm_stream_error,
+                                 const ProtobufWkt::BoolValue& hcm_stream_error,
                                  bool validate_scheme) {
   Http1Settings ret = parseHttp1Settings(config, validation_visitor);
   ret.validate_scheme_ = validate_scheme;

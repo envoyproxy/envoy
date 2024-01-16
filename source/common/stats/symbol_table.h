@@ -396,10 +396,10 @@ private:
   void incRefCount(const StatName& stat_name);
 
   struct SharedSymbol {
-    SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}
+    SharedSymbol(Symbol symbol) : symbol_(symbol) {}
 
     Symbol symbol_;
-    uint32_t ref_count_;
+    uint32_t ref_count_{1};
   };
 
   // This must be held during both encode() and free().
@@ -702,7 +702,7 @@ public:
   StatNameManagedStorage(StatName src, SymbolTable& table) noexcept
       : StatNameStorage(src, table), symbol_table_(table) {}
 
-  ~StatNameManagedStorage() { free(symbol_table_); }
+  ~StatNameManagedStorage() { free(symbol_table_); } // NOLINT(clang-analyzer-unix.Malloc)
 
 private:
   SymbolTable& symbol_table_;

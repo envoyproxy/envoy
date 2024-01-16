@@ -1,6 +1,7 @@
 #include "test/mocks/http/stateful_session.h"
 
 using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {

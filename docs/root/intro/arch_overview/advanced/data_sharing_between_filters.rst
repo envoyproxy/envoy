@@ -73,6 +73,7 @@ convert it into a typed class object that’s stored with the route
 itself. HTTP filters can then query the route-specific filter config during
 request processing.
 
+
 Dynamic State
 ^^^^^^^^^^^^^
 
@@ -88,3 +89,35 @@ the class definition (e.g., HTTP protocol, requested server name, etc.). In
 addition, it provides a facility to store typed objects in a map
 (``map<string, FilterState::Object>``). The state stored per filter can be
 either write-once (immutable), or write-many (mutable).
+
+See :ref:`the well-known dynamic metadata <well_known_dynamic_metadata>` and
+:ref:`the well-known filter state <well_known_filter_state>` for the reference
+list of the dynamic metadata and the filter state objects.
+
+.. _arch_overview_advanced_filter_state_sharing:
+
+Filter state sharing
+--------------------
+
+Filter state objects are bound to the lifespan of the associated parent stream.
+However, by marking a downstream object as shared with the upstream connection
+during creation, the object is shared with the upstream connection filter
+state, and its lifespan is extended beyond the original stream. Any upstream
+TCP or HTTP filter can access the shared object. Upstream transport sockets can
+also read the shared objects and customize the creation of the upstream
+transport. For example, the :ref:`internal upstream transport socket
+<envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport>`
+copies references to the shared objects to the internal connection downstream
+filter state.
+
+The filter state objects that are shared with the upstream also affect the
+connection pooling decisions if they implement a hashing interface. Whenever a
+shared hashable object is added, an upstream connection is created for each
+distinct hash value, which ensures that these objects are not overwritten by
+subsequent downstream requests to the same upstream connection. For example, a
+custom HTTP filter may create a shared hashable object from the value of a
+special header. In this case, a separate upstream connection is created for
+each distinct special header value, so that no two requests with different
+header values share an upstream connection. The same procedure applies to each
+shared hashable object individually, creating a combination matrix of the
+upstream connections per distinct combination of the object values.

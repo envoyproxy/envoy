@@ -12,8 +12,11 @@ namespace Envoy {
 namespace Server {
 
 ApiListenerManagerImpl::ApiListenerManagerImpl(Instance& server) : server_(server) {}
-bool ApiListenerManagerImpl::addOrUpdateListener(
-    const envoy::config::listener::v3::Listener& config, const std::string&, bool added_via_api) {
+
+absl::StatusOr<bool>
+ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                                            const std::string&, bool added_via_api) {
+  ENVOY_LOG(debug, "Creating API listener manager");
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -28,14 +31,14 @@ bool ApiListenerManagerImpl::addOrUpdateListener(
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
   if (config.has_api_listener()) {
     if (config.has_internal_listener()) {
-      throw EnvoyException(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "error adding listener named '{}': api_listener and internal_listener cannot be both set",
           name));
     }
     if (!api_listener_ && !added_via_api) {
-      // TODO(junr03): dispatch to different concrete constructors when there are other
-      // ApiListenerImplBase derived classes.
-      api_listener_ = std::make_unique<HttpApiListener>(config, server_, config.name());
+      auto listener_or_error = HttpApiListener::create(config, server_, config.name());
+      RETURN_IF_STATUS_NOT_OK(listener_or_error);
+      api_listener_ = std::move(listener_or_error.value());
       return true;
     } else {
       ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "

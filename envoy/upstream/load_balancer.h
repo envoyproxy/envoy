@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -44,6 +45,12 @@ public:
    * balancing.
    */
   virtual const Network::Connection* downstreamConnection() const PURE;
+
+  /**
+   * @return const StreamInfo* the incoming request stream info or nullptr to use during load
+   * balancing.
+   */
+  virtual const StreamInfo::StreamInfo* requestStreamInfo() const PURE;
 
   /**
    * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
@@ -89,7 +96,7 @@ public:
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
-  using OverrideHost = absl::string_view;
+  using OverrideHost = std::pair<absl::string_view, bool>;
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
    * the host can be selected directly, the load balancer can bypass the load balancing algorithm
@@ -169,14 +176,13 @@ public:
 
   /**
    * @return LoadBalancerPtr a new worker local load balancer.
-   * TODO(wbpcode): remove this method in the future and used the new method below.
-   */
-  virtual LoadBalancerPtr create() PURE;
-
-  /**
-   * @return LoadBalancerPtr a new worker local load balancer.
    */
   virtual LoadBalancerPtr create(LoadBalancerParams params) PURE;
+
+  /**
+   * @return bool whether the load balancer should be recreated when the host set changes.
+   */
+  virtual bool recreateOnHostChange() const { return true; }
 };
 
 using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;
@@ -228,6 +234,15 @@ public:
 
 using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 
+/*
+ * Parsed load balancer configuration that will be used to create load balancer.
+ */
+class LoadBalancerConfig {
+public:
+  virtual ~LoadBalancerConfig() = default;
+};
+using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
+
 /**
  * Factory config for load balancers. To support a load balancing policy of
  * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
@@ -241,15 +256,57 @@ public:
   /**
    * @return ThreadAwareLoadBalancerPtr a new thread-aware load balancer.
    *
+   * @param lb_config supplies the parsed config of the load balancer.
    * @param cluster_info supplies the cluster info.
-   * @param priority_set supplies the priority set.
+   * @param priority_set supplies the priority set on the main thread.
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
    * @param time_source supplies the time source.
    */
   virtual ThreadAwareLoadBalancerPtr
-  create(const ClusterInfo& cluster_info, const PrioritySet& priority_set, Runtime::Loader& runtime,
-         Random::RandomGenerator& random, TimeSource& time_source) PURE;
+  create(OptRef<const LoadBalancerConfig> lb_config, const ClusterInfo& cluster_info,
+         const PrioritySet& priority_set, Runtime::Loader& runtime, Random::RandomGenerator& random,
+         TimeSource& time_source) PURE;
+
+  /**
+   * This method is used to validate and create load balancer config from typed proto config.
+   *
+   * @return LoadBalancerConfigPtr a new load balancer config.
+   *
+   * @param config supplies the typed proto config of the load balancer. A dynamic_cast could
+   *        be performed on the config to the expected proto type.
+   * @param visitor supplies the validation visitor that will be used to validate the embedded
+   *        Any proto message.
+   */
+  virtual LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
+                                           ProtobufMessage::ValidationVisitor& visitor) PURE;
+
+  std::string category() const override { return "envoy.load_balancing_policies"; }
+};
+
+/**
+ * Factory config for non-thread-aware load balancers. To support a load balancing policy of
+ * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
+ * load_balancing_policy must be registered with Envoy. Envoy will use the first policy for which
+ * it has a registered factory.
+ */
+class NonThreadAwareLoadBalancerFactory : public Config::UntypedFactory {
+public:
+  ~NonThreadAwareLoadBalancerFactory() override = default;
+
+  /**
+   * @return LoadBalancerPtr a new non-thread-aware load balancer.
+   *
+   * @param cluster_info supplies the cluster info.
+   * @param priority_set supplies the priority set.
+   * @param local_priority_set supplies the local priority set.
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
+   * @param time_source supplies the time source.
+   */
+  virtual LoadBalancerPtr create(const ClusterInfo& cluster_info, const PrioritySet& priority_set,
+                                 const PrioritySet* local_priority_set, Runtime::Loader& runtime,
+                                 Random::RandomGenerator& random, TimeSource& time_source) PURE;
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };

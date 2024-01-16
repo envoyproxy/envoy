@@ -9,16 +9,32 @@
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "source/server/connection_handler_impl.h"
+#include "source/common/config/utility.h"
+#include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
 namespace Server {
+namespace {
+
+std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher, uint32_t index,
+                                              OverloadManager& overload_manager) {
+
+  auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
+      "envoy.connection_handler.default");
+  if (factory) {
+    return factory->createConnectionHandler(dispatcher, index, overload_manager);
+  }
+  ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
+  return nullptr;
+}
+
+} // namespace
 
 WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overload_manager,
                                           const std::string& worker_name) {
   Event::DispatcherPtr dispatcher(
       api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
-  auto conn_handler = std::make_unique<ConnectionHandlerImpl>(*dispatcher, index);
+  auto conn_handler = getHandler(*dispatcher, index, overload_manager);
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher), std::move(conn_handler),
                                       overload_manager, api_, stat_names_);
 }
@@ -44,12 +60,13 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                              Network::ListenerConfig& listener, AddListenerCompletion completion,
-                             Runtime::Loader& runtime) {
-  dispatcher_->post([this, overridden_listener, &listener, &runtime, completion]() -> void {
-    handler_->addListener(overridden_listener, listener, runtime);
-    hooks_.onWorkerListenerAdded();
-    completion();
-  });
+                             Runtime::Loader& runtime, Random::RandomGenerator& random) {
+  dispatcher_->post(
+      [this, overridden_listener, &listener, &runtime, &random, completion]() -> void {
+        handler_->addListener(overridden_listener, listener, runtime, random);
+        hooks_.onWorkerListenerAdded();
+        completion();
+      });
 }
 
 uint64_t WorkerImpl::numConnections() const {
@@ -81,7 +98,7 @@ void WorkerImpl::removeFilterChains(uint64_t listener_tag,
       });
 }
 
-void WorkerImpl::start(GuardDog& guard_dog, const Event::PostCb& cb) {
+void WorkerImpl::start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) {
   ASSERT(!thread_);
 
   // In posix, thread names are limited to 15 characters, so contrive to make
@@ -96,7 +113,7 @@ void WorkerImpl::start(GuardDog& guard_dog, const Event::PostCb& cb) {
   // architecture is centralized, resulting in clearer names.
   Thread::Options options{absl::StrCat("wrk:", dispatcher_->name())};
   thread_ = api_.threadFactory().createThread(
-      [this, &guard_dog, cb]() -> void { threadRoutine(guard_dog, cb); }, options);
+      [this, guard_dog, cb]() -> void { threadRoutine(guard_dog, cb); }, options);
 }
 
 void WorkerImpl::initializeStats(Stats::Scope& scope) { dispatcher_->initializeStats(scope); }
@@ -110,28 +127,34 @@ void WorkerImpl::stop() {
   }
 }
 
-void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<void()> completion) {
+void WorkerImpl::stopListener(Network::ListenerConfig& listener,
+                              const Network::ExtraShutdownListenerOptions& options,
+                              std::function<void()> completion) {
   const uint64_t listener_tag = listener.listenerTag();
-  dispatcher_->post([this, listener_tag, completion]() -> void {
-    handler_->stopListeners(listener_tag);
+  dispatcher_->post([this, listener_tag, options, completion]() -> void {
+    handler_->stopListeners(listener_tag, options);
     if (completion != nullptr) {
       completion();
     }
   });
 }
 
-void WorkerImpl::threadRoutine(GuardDog& guard_dog, const Event::PostCb& cb) {
+void WorkerImpl::threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.
   dispatcher_->post([this, &guard_dog, cb]() {
     cb();
-    watch_dog_ = guard_dog.createWatchDog(api_.threadFactory().currentThreadId(),
-                                          dispatcher_->name(), *dispatcher_);
+    if (guard_dog.has_value()) {
+      watch_dog_ = guard_dog->createWatchDog(api_.threadFactory().currentThreadId(),
+                                             dispatcher_->name(), *dispatcher_);
+    }
   });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");
-  guard_dog.stopWatching(watch_dog_);
+  if (guard_dog.has_value()) {
+    guard_dog->stopWatching(watch_dog_);
+  }
   dispatcher_->shutdown();
 
   // We must close all active connections before we actually exit the thread. This prevents any

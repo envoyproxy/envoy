@@ -48,7 +48,7 @@ MockDecoderFilter::MockDecoderFilter() {
 MockDecoderFilter::~MockDecoderFilter() = default;
 
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks()
-    : stats_(SipFilterStats::generateStats("test", store_)) {
+    : stats_(SipFilterStats::generateStats("test", *store_.rootScope())) {
 
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, transactionInfos()).WillByDefault(Return(transaction_infos_));

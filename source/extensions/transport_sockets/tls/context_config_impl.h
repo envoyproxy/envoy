@@ -26,6 +26,7 @@ public:
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
+  const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   tlsCertificates() const override {
@@ -41,11 +42,11 @@ public:
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
-  const Network::Address::IpList& tlsKeyLogLocal() const override { return tls_keylog_local_; };
-  const Network::Address::IpList& tlsKeyLogRemote() const override { return tls_keylog_remote_; };
+  const Network::Address::IpList& tlsKeyLogLocal() const override { return *tls_keylog_local_; };
+  const Network::Address::IpList& tlsKeyLogRemote() const override { return *tls_keylog_remote_; };
   const std::string& tlsKeyLogPath() const override { return tls_keylog_path_; };
   AccessLog::AccessLogManager& accessLogManager() const override {
-    return factory_context_.accessLogManager();
+    return factory_context_.serverFactoryContext().accessLogManager();
   }
 
   bool isReady() const override {
@@ -85,6 +86,7 @@ private:
   const std::string alpn_protocols_;
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
+  const std::string signature_algorithms_;
 
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
@@ -109,8 +111,8 @@ private:
   Ssl::SslCtxCb sslctx_cb_;
   Server::Configuration::TransportSocketFactoryContext& factory_context_;
   const std::string tls_keylog_path_;
-  const Network::Address::IpList tls_keylog_local_;
-  const Network::Address::IpList tls_keylog_remote_;
+  std::unique_ptr<Network::Address::IpList> tls_keylog_local_;
+  std::unique_ptr<Network::Address::IpList> tls_keylog_remote_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
@@ -120,18 +122,13 @@ public:
 
   ClientContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      absl::string_view sigalgs,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
-  ClientContextConfigImpl(
-      const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context)
-      : ClientContextConfigImpl(config, "", secret_provider_context) {}
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
-  const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
+  bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
@@ -139,8 +136,8 @@ private:
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
-  const std::string sigalgs_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ServerContextConfig {
@@ -168,6 +165,9 @@ public:
   bool disableStatelessSessionResumption() const override {
     return disable_stateless_session_resumption_;
   }
+  bool disableStatefulSessionResumption() const override {
+    return disable_stateful_session_resumption_;
+  }
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
 
@@ -193,6 +193,7 @@ private:
 
   absl::optional<std::chrono::seconds> session_timeout_;
   const bool disable_stateless_session_resumption_;
+  const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;
 };
 

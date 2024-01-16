@@ -117,7 +117,7 @@ typed_config:
           - any: true
 )EOF";
 
-const std::string RBAC_CONFIG_HEADER_MATCH_CONDITION = R"EOF(
+constexpr absl::string_view RBAC_CONFIG_HEADER_MATCH_CONDITION = R"EOF(
 name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
@@ -339,11 +339,138 @@ typed_config:
           action: ALLOW
 )EOF";
 
+const std::string RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  matcher:
+    matcher_list:
+      matchers:
+        - predicate:
+            single_predicate:
+              input:
+                name: envoy.matching.inputs.cel_data_input
+                typed_config:
+                  "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+              custom_match:
+                name: envoy.matching.matchers.cel_matcher
+                typed_config:
+                  "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                  expr_match:
+                    parsed_expr:
+                      expr:
+                        id: 3
+                        call_expr:
+                          function: _==_
+                          args:
+                          - id: 2
+                            select_expr:
+                              operand:
+                                id: 1
+                                ident_expr:
+                                  name: request
+                              field: path
+                          - id: 4
+                            const_expr:
+                              string_value: "/test-localhost-deny"
+          on_match:
+            matcher:
+              matcher_tree:
+                input:
+                  name: envoy.matching.inputs.source_ip
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+                custom_match:
+                  name: envoy.matching.matchers.ip
+                  typed_config:
+                    "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+                    range_matchers:
+                      - ranges:
+                          - address_prefix: 127.0.0.1
+                        on_match:
+                          action:
+                            name: envoy.filters.rbac.action
+                            typed_config:
+                              "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                              name: deny-request
+                              action: DENY
+              on_no_match:
+                action:
+                  name: action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                    name: allow-request
+                    action: ALLOW
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow-request
+          action: ALLOW
+)EOF";
+
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
-INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, RBACIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(RBACIntegrationTest, WithHttpAttributesCelMatchInputDenied) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The test request utilizing the path '/test-localhost-deny' is expected to be denied by the RBAC
+  // filter. This denial is based on the CEL expression that matches the request's path as
+  // '/test-localhost-deny' and subsequently restricts all access based on the IP Address, in this
+  // instance pointing to localhost.
+  auto deny_response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test-localhost-deny"},
+          {":scheme", "http"},
+          {":authority", "sni.databricks.com"},
+          {"x-forwarded-for", "10.0.0.2"},
+      },
+      1024);
+  ASSERT_TRUE(deny_response->waitForEndStream());
+  ASSERT_TRUE(deny_response->complete());
+  EXPECT_EQ("403", deny_response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny-request]"));
+}
+
+TEST_P(RBACIntegrationTest, WithHttpAttributesCelMatchInputNoMatch) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The test request utilizing the path '/allow' is expected to be allowed by the RBAC filter as it
+  // doesn't match the CEL expression and hit the catch-all path which allows all the traffic.
+  auto allow_response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/allow"},
+          {":scheme", "http"},
+          {":authority", "sni.databricks.com"},
+          {"x-forwarded-for", "10.0.0.2"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(allow_response->waitForEndStream());
+  ASSERT_TRUE(allow_response->complete());
+  EXPECT_EQ("200", allow_response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("via_upstream"));
+}
 
 TEST_P(RBACIntegrationTest, Allowed) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
@@ -357,7 +484,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -382,7 +509,7 @@ TEST_P(RBACIntegrationTest, Denied) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -405,7 +532,7 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -431,7 +558,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -457,7 +584,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -478,7 +605,7 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
           {":method", "HEAD"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -502,7 +629,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.rbac"].PackFrom(per_route_config);
+        (*config)["rbac"].PackFrom(per_route_config);
       });
   config_helper_.prependFilter(RBAC_CONFIG);
 
@@ -514,7 +641,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -528,6 +655,8 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathWithQueryAndFragmentWithOverride) {
+  // Allow client to send path fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_CONFIG_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");
@@ -543,7 +672,7 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragmentWithOverride) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -557,6 +686,8 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragmentWithOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathWithFragmentRejectedByDefault) {
+  // Prevent UHV in test client from stripping fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_CONFIG_WITH_PATH_EXACT_MATCH);
   initialize();
 
@@ -567,7 +698,7 @@ TEST_P(RBACIntegrationTest, PathWithFragmentRejectedByDefault) {
           {":method", "POST"},
           {":path", "/allow?p1=v1#seg"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -580,6 +711,7 @@ TEST_P(RBACIntegrationTest, PathWithFragmentRejectedByDefault) {
 // This test ensures that the exact match deny rule is not affected by fragment and query
 // when Envoy is configured to strip both fragment and query.
 TEST_P(RBACIntegrationTest, DenyExactMatchIgnoresQueryAndFragment) {
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_CONFIG_DENY_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");
@@ -597,7 +729,7 @@ TEST_P(RBACIntegrationTest, DenyExactMatchIgnoresQueryAndFragment) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -626,7 +758,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -650,7 +782,7 @@ TEST_P(RBACIntegrationTest, LogConnectionAllow) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -674,7 +806,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchCondition) {
           {":method", "POST"},
           {":path", "/path"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"xxx", "yyy"},
       },
       1024);
@@ -699,7 +831,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderNoMatch) {
           {":method", "POST"},
           {":path", "/path"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"xxx", "yyy"},
           {"xxx", "zzz"},
       },
@@ -722,7 +854,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderMatch) {
           {":method", "POST"},
           {":path", "/path"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"xxx", "yyy"},
           {"xxx", "zzz"},
       },
@@ -747,7 +879,7 @@ TEST_P(RBACIntegrationTest, MatcherAllowed) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -772,7 +904,7 @@ TEST_P(RBACIntegrationTest, MatcherDenied) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -795,7 +927,7 @@ TEST_P(RBACIntegrationTest, MatcherDeniedWithDenyAction) {
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -821,7 +953,7 @@ TEST_P(RBACIntegrationTest, MatcherDeniedWithPrefixRule) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -847,7 +979,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePathMatcher) {
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -868,7 +1000,7 @@ TEST_P(RBACIntegrationTest, MatcherDeniedHeadReply) {
           {":method", "HEAD"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -892,7 +1024,7 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.rbac"].PackFrom(per_route_config);
+        (*config)["rbac"].PackFrom(per_route_config);
       });
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG);
 
@@ -904,7 +1036,7 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -918,6 +1050,8 @@ TEST_P(RBACIntegrationTest, MatcherRouteOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathMatcherWithQueryAndFragmentWithOverride) {
+  // Allow client to send path fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");
@@ -933,7 +1067,7 @@ TEST_P(RBACIntegrationTest, PathMatcherWithQueryAndFragmentWithOverride) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -947,6 +1081,8 @@ TEST_P(RBACIntegrationTest, PathMatcherWithQueryAndFragmentWithOverride) {
 }
 
 TEST_P(RBACIntegrationTest, PathMatcherWithFragmentRejectedByDefault) {
+  // Allow client to send path fragment
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG_WITH_PATH_EXACT_MATCH);
   initialize();
 
@@ -957,7 +1093,7 @@ TEST_P(RBACIntegrationTest, PathMatcherWithFragmentRejectedByDefault) {
           {":method", "POST"},
           {":path", "/allow?p1=v1#seg"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -970,6 +1106,7 @@ TEST_P(RBACIntegrationTest, PathMatcherWithFragmentRejectedByDefault) {
 // This test ensures that the exact match deny rule is not affected by fragment and query
 // when Envoy is configured to strip both fragment and query.
 TEST_P(RBACIntegrationTest, MatcherDenyExactMatchIgnoresQueryAndFragment) {
+  disable_client_header_validation_ = true;
   config_helper_.prependFilter(RBAC_MATCHER_CONFIG_DENY_WITH_PATH_EXACT_MATCH);
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                     "false");
@@ -987,7 +1124,7 @@ TEST_P(RBACIntegrationTest, MatcherDenyExactMatchIgnoresQueryAndFragment) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -1016,7 +1153,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCaseMatcher) {
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
-            {":authority", "host"},
+            {":authority", "sni.lyft.com"},
             {"x-forwarded-for", "10.0.0.1"},
         },
         1024);
@@ -1040,7 +1177,7 @@ TEST_P(RBACIntegrationTest, MatcherLogConnectionAllow) {
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
-          {":authority", "host"},
+          {":authority", "sni.lyft.com"},
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
@@ -1088,7 +1225,7 @@ typed_config:
       bootstrap.mutable_dynamic_resources()
           ->mutable_cds_config()
           ->mutable_path_config_source()
-          ->set_path(cds_helper_.cds_path());
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
     });
 

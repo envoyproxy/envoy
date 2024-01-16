@@ -1,5 +1,8 @@
 #pragma once
 
+#include "test/mocks/tcp/mocks.h"
+#include "test/mocks/upstream/host.h"
+
 #include "contrib/generic_proxy/filters/network/source/interface/config.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "gmock/gmock.h"
@@ -8,6 +11,13 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
+
+class MockStreamFrameHandler : public StreamFrameHandler {
+public:
+  MockStreamFrameHandler();
+
+  MOCK_METHOD(void, onStreamFrame, (StreamFramePtr frame));
+};
 
 class MockDecoderFilter : public DecoderFilter {
 public:
@@ -55,6 +65,7 @@ public:
               (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
                ProtobufMessage::ValidationVisitor&));
   MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(absl::Status, validateCodec, (const TypedExtensionConfig&));
   MOCK_METHOD(std::set<std::string>, configTypes, ());
   MOCK_METHOD(bool, isTerminalFilter, ());
 };
@@ -82,16 +93,24 @@ template <class Base> class MockStreamFilterCallbacks : public Base {
 public:
   MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(const CodecFactory&, downstreamCodec, ());
-  MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(Tracing::Span&, activeSpan, ());
+  MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
+  MOCK_METHOD(const Network::Connection*, connection, (), (const));
 };
 
 class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilterCallback> {
 public:
-  MOCK_METHOD(void, sendLocalReply, (Status, ResponseUpdateFunction&&));
+  MockDecoderFilterCallback();
+
+  MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction));
   MOCK_METHOD(void, continueDecoding, ());
-  MOCK_METHOD(void, upstreamResponse, (ResponsePtr response));
+  MOCK_METHOD(void, onResponseStart, (StreamResponsePtr response));
+  MOCK_METHOD(void, onResponseFrame, (StreamFramePtr frame));
+  MOCK_METHOD(void, setRequestFramesHandler, (StreamFrameHandler & handler));
   MOCK_METHOD(void, completeDirectly, ());
 };
 

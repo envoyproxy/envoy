@@ -67,8 +67,7 @@ class DecoderStateMachine : public Logger::Loggable<Logger::Id::thrift> {
 public:
   DecoderStateMachine(Protocol& proto, MessageMetadataSharedPtr& metadata,
                       DecoderEventHandler& handler, DecoderCallbacks& callbacks)
-      : proto_(proto), metadata_(metadata), handler_(handler), callbacks_(callbacks),
-        state_(ProtocolState::MessageBegin) {}
+      : proto_(proto), metadata_(metadata), handler_(handler), callbacks_(callbacks) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -182,7 +181,7 @@ private:
   MessageMetadataSharedPtr metadata_;
   DecoderEventHandler& handler_;
   DecoderCallbacks& callbacks_;
-  ProtocolState state_;
+  ProtocolState state_{ProtocolState::MessageBegin};
   std::vector<Frame> stack_;
   uint32_t body_start_{};
   uint32_t body_bytes_{};

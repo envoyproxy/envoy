@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -40,7 +41,144 @@ private:
 // ENVOY_MAKE_SOCKET_OPTION_NAME is a helper macro to generate a
 // SocketOptionName with a descriptive string name.
 #define ENVOY_MAKE_SOCKET_OPTION_NAME(level, option)                                               \
-  Network::SocketOptionName(level, option, #level "/" #option)
+  ::Envoy::Network::SocketOptionName(level, option, #level "/" #option)
+
+// Moved from source/common/network/socket_option_impl.h to avoid dependency loops.
+#ifdef IP_TRANSPARENT
+#define ENVOY_SOCKET_IP_TRANSPARENT ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_TRANSPARENT)
+#else
+#define ENVOY_SOCKET_IP_TRANSPARENT Network::SocketOptionName()
+#endif
+
+#ifdef IPV6_TRANSPARENT
+#define ENVOY_SOCKET_IPV6_TRANSPARENT ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_TRANSPARENT)
+#else
+#define ENVOY_SOCKET_IPV6_TRANSPARENT Network::SocketOptionName()
+#endif
+
+#ifdef IP_FREEBIND
+#define ENVOY_SOCKET_IP_FREEBIND ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_FREEBIND)
+#else
+#define ENVOY_SOCKET_IP_FREEBIND Network::SocketOptionName()
+#endif
+
+#ifdef IPV6_FREEBIND
+#define ENVOY_SOCKET_IPV6_FREEBIND ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_FREEBIND)
+#else
+#define ENVOY_SOCKET_IPV6_FREEBIND Network::SocketOptionName()
+#endif
+
+#ifdef SO_KEEPALIVE
+#define ENVOY_SOCKET_SO_KEEPALIVE ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_KEEPALIVE)
+#else
+#define ENVOY_SOCKET_SO_KEEPALIVE Network::SocketOptionName()
+#endif
+
+#ifdef SO_MARK
+#define ENVOY_SOCKET_SO_MARK ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_MARK)
+#else
+#define ENVOY_SOCKET_SO_MARK Network::SocketOptionName()
+#endif
+
+#ifdef SO_NOSIGPIPE
+#define ENVOY_SOCKET_SO_NOSIGPIPE ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_NOSIGPIPE)
+#else
+#define ENVOY_SOCKET_SO_NOSIGPIPE Network::SocketOptionName()
+#endif
+
+#ifdef SO_REUSEPORT
+#define ENVOY_SOCKET_SO_REUSEPORT ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT)
+#else
+#define ENVOY_SOCKET_SO_REUSEPORT Network::SocketOptionName()
+#endif
+
+#ifdef SO_ORIGINAL_DST
+#define ENVOY_SOCKET_SO_ORIGINAL_DST ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_IP, SO_ORIGINAL_DST)
+#else
+#define ENVOY_SOCKET_SO_ORIGINAL_DST Network::SocketOptionName()
+#endif
+
+#ifdef IP6T_SO_ORIGINAL_DST
+#define ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST                                                          \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_IPV6, IP6T_SO_ORIGINAL_DST)
+#else
+#define ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST Network::SocketOptionName()
+#endif
+
+#ifdef UDP_GRO
+#define ENVOY_SOCKET_UDP_GRO ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_UDP, UDP_GRO)
+#else
+#define ENVOY_SOCKET_UDP_GRO Network::SocketOptionName()
+#endif
+
+#ifdef TCP_KEEPCNT
+#define ENVOY_SOCKET_TCP_KEEPCNT ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPCNT)
+#else
+#define ENVOY_SOCKET_TCP_KEEPCNT Network::SocketOptionName()
+#endif
+
+#ifdef TCP_KEEPIDLE
+#define ENVOY_SOCKET_TCP_KEEPIDLE ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPIDLE)
+#elif TCP_KEEPALIVE // macOS uses a different name from Linux for just this option.
+#define ENVOY_SOCKET_TCP_KEEPIDLE ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPALIVE)
+#else
+#define ENVOY_SOCKET_TCP_KEEPIDLE Network::SocketOptionName()
+#endif
+
+#ifdef TCP_KEEPINTVL
+#define ENVOY_SOCKET_TCP_KEEPINTVL ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPINTVL)
+#else
+#define ENVOY_SOCKET_TCP_KEEPINTVL Network::SocketOptionName()
+#endif
+
+#ifdef TCP_FASTOPEN
+#define ENVOY_SOCKET_TCP_FASTOPEN ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_FASTOPEN)
+#else
+#define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
+#endif
+
+// Linux uses IP_PKTINFO for both sending source address and receiving destination
+// address.
+// FreeBSD uses IP_RECVDSTADDR for receiving destination address and IP_SENDSRCADDR for sending
+// source address. And these two have same value for convenience purpose.
+#ifdef IP_RECVDSTADDR
+#ifdef IP_SENDSRCADDR
+static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
+#endif
+#define ENVOY_IP_PKTINFO IP_RECVDSTADDR
+#elif IP_PKTINFO
+#define ENVOY_IP_PKTINFO IP_PKTINFO
+#endif
+
+#define ENVOY_SELF_IP_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, ENVOY_IP_PKTINFO)
+
+// Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
+// receiving destination address.
+#define ENVOY_SELF_IPV6_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVPKTINFO)
+
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+#define ENVOY_ATTACH_REUSEPORT_CBPF                                                                \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_ATTACH_REUSEPORT_CBPF)
+#else
+#define ENVOY_ATTACH_REUSEPORT_CBPF Network::SocketOptionName()
+#endif
+
+/**
+ * Interface representing a single filter chain info.
+ */
+class FilterChainInfo {
+public:
+  virtual ~FilterChainInfo() = default;
+
+  /**
+   * @return the name of this filter chain.
+   */
+  virtual absl::string_view name() const PURE;
+};
+
+class ListenerInfo;
+
+using FilterChainInfoConstSharedPtr = std::shared_ptr<const FilterChainInfo>;
 
 /**
  * Interfaces for providing a socket's various addresses. This is split into a getters interface
@@ -107,6 +245,21 @@ public:
    * @return ja3 fingerprint hash of the downstream connection, if any.
    */
   virtual absl::string_view ja3Hash() const PURE;
+
+  /**
+   * @return roundTripTime of the connection
+   */
+  virtual const absl::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
+
+  /**
+   * @return the filter chain info provider backing this socket.
+   */
+  virtual OptRef<const FilterChainInfo> filterChainInfo() const PURE;
+
+  /**
+   * @return the listener info backing this socket.
+   */
+  virtual OptRef<const ListenerInfo> listenerInfo() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {
@@ -168,6 +321,21 @@ public:
    * @param JA3 fingerprint.
    */
   virtual void setJA3Hash(const absl::string_view ja3_hash) PURE;
+
+  /**
+   * @param  milliseconds of round trip time of previous connection
+   */
+  virtual void setRoundTripTime(std::chrono::milliseconds round_trip_time) PURE;
+
+  /**
+   * @param filter_chain_info the filter chain info provider backing this socket.
+   */
+  virtual void setFilterChainInfo(FilterChainInfoConstSharedPtr filter_chain_info) PURE;
+
+  /**
+   * @param listener_info the listener info provider backing this socket.
+   */
+  virtual void setListenerInfo(std::shared_ptr<const ListenerInfo> listener_info) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

@@ -65,14 +65,14 @@ public:
   const std::vector<uint8_t> client_hello_;
 };
 
-static void BM_TlsInspector(benchmark::State& state) {
+static void bmTlsInspector(benchmark::State& state) {
   NiceMock<FastMockOsSysCalls> os_sys_calls(Tls::Test::generateClientHello(
       Config::TLS_MIN_SUPPORTED_VERSION, Config::TLS_MAX_SUPPORTED_VERSION, "example.com",
       "\x02h2\x08http/1.1"));
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  ConfigSharedPtr cfg(std::make_shared<Config>(store, proto_config));
+  ConfigSharedPtr cfg(std::make_shared<Config>(*store.rootScope(), proto_config));
   Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>();
   Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
@@ -100,7 +100,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   }
 }
 
-BENCHMARK(BM_TlsInspector)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bmTlsInspector)->Unit(benchmark::kMicrosecond);
 
 } // namespace TlsInspector
 } // namespace ListenerFilters

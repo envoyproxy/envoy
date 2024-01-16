@@ -1,10 +1,16 @@
-version: "3.8"
 services:
 
   tls-inspector:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ../shared/envoy/Dockerfile
+    depends_on:
+      service-https-http2:
+        condition: service_started
+      service-https-http1.1:
+        condition: service_started
+      service-http:
+        condition: service_started
     ports:
     - "${PORT_PROXY:-10000}:10000"
     - "${PORT_ADMIN:-12345}:12345"
@@ -12,7 +18,7 @@ services:
   service-https-http2:
     build:
       context: .
-      dockerfile: Dockerfile-echo
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-https-http2
     environment:
     - HTTP_PORT=0
@@ -20,7 +26,7 @@ services:
   service-https-http1.1:
     build:
       context: .
-      dockerfile: Dockerfile-echo
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-https-http1.1
     environment:
     - HTTP_PORT=0
@@ -28,7 +34,7 @@ services:
   service-http:
     build:
       context: .
-      dockerfile: Dockerfile-echo
+      dockerfile: ../shared/echo2/Dockerfile
     hostname: service-http
     environment:
     - HTTPS_PORT=0

@@ -7,6 +7,7 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/tracing/trace_context_impl.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -41,13 +42,13 @@ namespace {
 
 class ConstantValues {
 public:
-  const Http::LowerCaseString TRACEPARENT{"traceparent"};
-  const Http::LowerCaseString GRPC_TRACE_BIN{"grpc-trace-bin"};
-  const Http::LowerCaseString X_CLOUD_TRACE_CONTEXT{"x-cloud-trace-context"};
-  const Http::LowerCaseString X_B3_TRACEID{"x-b3-traceid"};
-  const Http::LowerCaseString X_B3_SPANID{"x-b3-spanid"};
-  const Http::LowerCaseString X_B3_SAMPLED{"x-b3-sampled"};
-  const Http::LowerCaseString X_B3_FLAGS{"x-b3-flags"};
+  const Tracing::TraceContextHandler TRACEPARENT{"traceparent"};
+  const Tracing::TraceContextHandler GRPC_TRACE_BIN{"grpc-trace-bin"};
+  const Tracing::TraceContextHandler X_CLOUD_TRACE_CONTEXT{"x-cloud-trace-context"};
+  const Tracing::TraceContextHandler X_B3_TRACEID{"x-b3-traceid"};
+  const Tracing::TraceContextHandler X_B3_SPANID{"x-b3-spanid"};
+  const Tracing::TraceContextHandler X_B3_SAMPLED{"x-b3-sampled"};
+  const Tracing::TraceContextHandler X_B3_FLAGS{"x-b3-flags"};
 };
 
 using Constants = ConstSingleton<ConstantValues>;
@@ -96,7 +97,7 @@ startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContex
     bool found = false;
     switch (incoming) {
     case OpenCensusConfig::TRACE_CONTEXT: {
-      const auto entry = trace_context.getByKey(Constants::get().TRACEPARENT);
+      const auto entry = Constants::get().TRACEPARENT.get(trace_context);
       if (entry.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
@@ -105,7 +106,7 @@ startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContex
       break;
     }
     case OpenCensusConfig::GRPC_TRACE_BIN: {
-      const auto entry = trace_context.getByKey(Constants::get().GRPC_TRACE_BIN);
+      const auto entry = Constants::get().GRPC_TRACE_BIN.get(trace_context);
       if (entry.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
@@ -115,7 +116,7 @@ startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContex
       break;
     }
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT: {
-      const auto entry = trace_context.getByKey(Constants::get().X_CLOUD_TRACE_CONTEXT);
+      const auto entry = Constants::get().X_CLOUD_TRACE_CONTEXT.get(trace_context);
       if (entry.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
@@ -129,19 +130,19 @@ startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContex
       absl::string_view b3_span_id;
       absl::string_view b3_sampled;
       absl::string_view b3_flags;
-      const auto h_b3_trace_id = trace_context.getByKey(Constants::get().X_B3_TRACEID);
+      const auto h_b3_trace_id = Constants::get().X_B3_TRACEID.get(trace_context);
       if (h_b3_trace_id.has_value()) {
         b3_trace_id = h_b3_trace_id.value();
       }
-      const auto h_b3_span_id = trace_context.getByKey(Constants::get().X_B3_SPANID);
+      const auto h_b3_span_id = Constants::get().X_B3_SPANID.get(trace_context);
       if (h_b3_span_id.has_value()) {
         b3_span_id = h_b3_span_id.value();
       }
-      const auto h_b3_sampled = trace_context.getByKey(Constants::get().X_B3_SAMPLED);
+      const auto h_b3_sampled = Constants::get().X_B3_SAMPLED.get(trace_context);
       if (h_b3_sampled.has_value()) {
         b3_sampled = h_b3_sampled.value();
       }
-      const auto h_b3_flags = trace_context.getByKey(Constants::get().X_B3_FLAGS);
+      const auto h_b3_flags = Constants::get().X_B3_FLAGS.get(trace_context);
       if (h_b3_flags.has_value()) {
         b3_flags = h_b3_flags.value();
       }
@@ -209,27 +210,26 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
     case OpenCensusConfig::TRACE_CONTEXT:
-      trace_context.setByReferenceKey(Constants::get().TRACEPARENT,
-                                      ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
+      Constants::get().TRACEPARENT.setRefKey(
+          trace_context, ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
       break;
     case OpenCensusConfig::GRPC_TRACE_BIN: {
       std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
       val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
-      trace_context.setByReferenceKey(Constants::get().GRPC_TRACE_BIN, val);
+      Constants::get().GRPC_TRACE_BIN.setRefKey(trace_context, val);
       break;
     }
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT:
-      trace_context.setByReferenceKey(
-          Constants::get().X_CLOUD_TRACE_CONTEXT,
-          ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx));
+      Constants::get().X_CLOUD_TRACE_CONTEXT.setRefKey(
+          trace_context, ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx));
       break;
     case OpenCensusConfig::B3:
-      trace_context.setByReferenceKey(Constants::get().X_B3_TRACEID,
-                                      ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));
-      trace_context.setByReferenceKey(Constants::get().X_B3_SPANID,
-                                      ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
-      trace_context.setByReferenceKey(Constants::get().X_B3_SAMPLED,
-                                      ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
+      Constants::get().X_B3_TRACEID.setRefKey(
+          trace_context, ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));
+      Constants::get().X_B3_SPANID.setRefKey(
+          trace_context, ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
+      Constants::get().X_B3_SAMPLED.setRefKey(
+          trace_context, ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
       // OpenCensus's trace context propagation doesn't produce the
       // "X-B3-Flags:" header.
       break;
@@ -375,10 +375,11 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, SystemTime start_time,
-                                   const Tracing::Decision tracing_decision) {
-  return std::make_unique<Span>(config, oc_config_, trace_context, operation_name, start_time,
-                                tracing_decision);
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const std::string& operation_name,
+                                   Tracing::Decision tracing_decision) {
+  return std::make_unique<Span>(config, oc_config_, trace_context, operation_name,
+                                stream_info.startTime(), tracing_decision);
 }
 
 } // namespace OpenCensus

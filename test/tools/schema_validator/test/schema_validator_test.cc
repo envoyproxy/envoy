@@ -12,7 +12,7 @@ public:
         absl::StrCat("test/tools/schema_validator/test/config/", config_file));
     // Splitting on ' ' is not always reliable but works fine for these tests.
     const std::vector<std::string> split_command_line =
-        absl::StrSplit(fmt::format(command_line, final_command_line), ' ');
+        absl::StrSplit(fmt::format(fmt::runtime(command_line), final_command_line), ' ');
     std::vector<const char*> c_command_line;
     c_command_line.reserve(split_command_line.size());
     for (auto& part : split_command_line) {

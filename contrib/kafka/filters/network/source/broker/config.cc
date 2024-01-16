@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 
 #include "contrib/kafka/filters/network/source/broker/filter.h"
+#include "contrib/kafka/filters/network/source/broker/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,13 +16,11 @@ namespace Broker {
 Network::FilterFactoryCb KafkaConfigFactory::createFilterFactoryFromProtoTyped(
     const KafkaBrokerProtoConfig& proto_config, Server::Configuration::FactoryContext& context) {
 
-  ASSERT(!proto_config.stat_prefix().empty());
-
-  const std::string& stat_prefix = proto_config.stat_prefix();
-
-  return [&context, stat_prefix](Network::FilterManager& filter_manager) -> void {
-    Network::FilterSharedPtr filter =
-        std::make_shared<KafkaBrokerFilter>(context.scope(), context.timeSource(), stat_prefix);
+  const BrokerFilterConfigSharedPtr filter_config =
+      std::make_shared<BrokerFilterConfig>(proto_config);
+  return [&context, filter_config](Network::FilterManager& filter_manager) -> void {
+    Network::FilterSharedPtr filter = std::make_shared<KafkaBrokerFilter>(
+        context.scope(), context.serverFactoryContext().timeSource(), *filter_config);
     filter_manager.addFilter(filter);
   };
 }

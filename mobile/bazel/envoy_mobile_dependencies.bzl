@@ -1,14 +1,13 @@
-load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
-load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
-load("@rules_jvm_external//:defs.bzl", "maven_install")
-load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
+load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
 load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
-load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
-load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
-load("@rules_python//python:pip.bzl", "pip_parse")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
+load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
+load("@rules_jvm_external//:defs.bzl", "maven_install")
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
+load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
 
 def _default_extra_swift_sources_impl(ctx):
     ctx.file("WORKSPACE", "")
@@ -50,7 +49,6 @@ def envoy_mobile_dependencies(extra_maven_dependencies = []):
 
     swift_dependencies()
     kotlin_dependencies(extra_maven_dependencies)
-    python_dependencies()
 
 def swift_dependencies():
     apple_support_dependencies()
@@ -62,6 +60,8 @@ def kotlin_dependencies(extra_maven_dependencies = []):
     maven_install(
         artifacts = [
             "com.google.code.findbugs:jsr305:3.0.2",
+            # Java Proto Lite
+            "com.google.protobuf:protobuf-javalite:3.24.4",
             # Kotlin
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.6.21",
             "org.jetbrains.kotlin:kotlin-stdlib-common:1.6.21",
@@ -104,14 +104,3 @@ def kotlin_dependencies(extra_maven_dependencies = []):
     rules_proto_grpc_repos()
     rules_proto_dependencies()
     rules_proto_toolchains()
-
-def python_dependencies():
-    # TODO: bifurcate dev deps vs. prod deps
-    # pip_install(
-    #     requirements = ":dev_requirements.txt",
-    # )
-    pip_parse(
-        name = "mobile_pip3",
-        requirements_lock = "//third_party/python:requirements.txt",
-        timeout = 1000,
-    )

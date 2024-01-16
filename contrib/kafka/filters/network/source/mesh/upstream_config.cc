@@ -4,6 +4,7 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -15,6 +16,8 @@ namespace Mesh {
 using KafkaClusterDefinition =
     envoy::extensions::filters::network::kafka_mesh::v3alpha::KafkaClusterDefinition;
 using ForwardingRule = envoy::extensions::filters::network::kafka_mesh::v3alpha::ForwardingRule;
+using KafkaMesh = envoy::extensions::filters::network::kafka_mesh::v3alpha::KafkaMesh;
+using ConsumerProxyMode = KafkaMesh::ConsumerProxyMode;
 
 const std::string DEFAULT_CONSUMER_GROUP_ID = "envoy";
 
@@ -39,18 +42,21 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
                        cluster_name));
     }
 
-    // Upstream client configuration - use all the optional custom configs provided, and then use
-    // the target IPs.
+    // Upstream producer configuration.
     std::map<std::string, std::string> producer_configs = {
         upstream_cluster_definition.producer_config().begin(),
         upstream_cluster_definition.producer_config().end()};
     producer_configs["bootstrap.servers"] = upstream_cluster_definition.bootstrap_servers();
 
-    // TODO (adam.kotwasinski) This needs to read configs just like producer does.
-    std::map<std::string, std::string> consumer_configs = {};
+    // Upstream consumer configuration.
+    std::map<std::string, std::string> consumer_configs = {
+        upstream_cluster_definition.consumer_config().begin(),
+        upstream_cluster_definition.consumer_config().end()};
+    if (consumer_configs.end() == consumer_configs.find("group.id")) {
+      // librdkafka consumer needs a group id, let's use a default one if nothing was provided.
+      consumer_configs["group.id"] = DEFAULT_CONSUMER_GROUP_ID;
+    }
     consumer_configs["bootstrap.servers"] = upstream_cluster_definition.bootstrap_servers();
-    // TODO (adam.kotwasinski) When configs are read, use this only if absent.
-    consumer_configs["group.id"] = DEFAULT_CONSUMER_GROUP_ID;
 
     ClusterConfig cluster_config = {cluster_name, upstream_cluster_definition.partition_count(),
                                     producer_configs, consumer_configs};
@@ -77,13 +83,16 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
     topic_prefix_to_cluster_config_[rule.topic_prefix()] =
         cluster_name_to_cluster_config[target_cluster];
   }
+
+  // The only mode we support right now - embedded librdkafka consumers.
+  ASSERT(config.consumer_proxy_mode() == KafkaMesh::StatefulConsumerProxy);
 }
 
 absl::optional<ClusterConfig>
 UpstreamKafkaConfigurationImpl::computeClusterConfigForTopic(const std::string& topic) const {
   // We find the first matching prefix (this is why ordering is important).
   for (const auto& it : topic_prefix_to_cluster_config_) {
-    if (topic.rfind(it.first, 0) == 0) {
+    if (absl::StartsWith(topic, it.first)) {
       const ClusterConfig cluster_config = it.second;
       return absl::make_optional(cluster_config);
     }

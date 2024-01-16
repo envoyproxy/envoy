@@ -12,6 +12,7 @@
 #include "contrib/kafka/filters/network/source/broker/filter.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/external/responses.h"
+#include "contrib/kafka/filters/network/test/broker/mock_filter_config.h"
 #include "contrib/kafka/filters/network/test/buffer_based_test.h"
 #include "contrib/kafka/filters/network/test/message_utilities.h"
 #include "gtest/gtest.h"
@@ -32,9 +33,10 @@ class KafkaBrokerFilterProtocolTest : public testing::Test,
                                       protected RequestB,
                                       protected ResponseB {
 protected:
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   Event::TestRealTimeSystem time_source_;
-  KafkaBrokerFilter testee_{scope_, time_source_, "prefix"};
+  KafkaBrokerFilter testee_{scope_, time_source_, BrokerFilterConfig{"prefix", false, {}}};
 
   Network::FilterStatus consumeRequestFromBuffer() {
     return testee_.onData(RequestB::buffer_, false);
@@ -66,8 +68,8 @@ TEST_F(KafkaBrokerFilterProtocolTest, ShouldHandleUnknownRequestAndResponseWitho
   // then
   ASSERT_EQ(result1, Network::FilterStatus::Continue);
   ASSERT_EQ(result2, Network::FilterStatus::Continue);
-  ASSERT_EQ(scope_.counter("kafka.prefix.request.unknown").value(), 1);
-  ASSERT_EQ(scope_.counter("kafka.prefix.response.unknown").value(), 1);
+  ASSERT_EQ(store_.counter("kafka.prefix.request.unknown").value(), 1);
+  ASSERT_EQ(store_.counter("kafka.prefix.response.unknown").value(), 1);
 }
 
 TEST_F(KafkaBrokerFilterProtocolTest, ShouldHandleBrokenRequestPayload) {
@@ -145,10 +147,10 @@ TEST_F(KafkaBrokerFilterProtocolTest, ShouldProcessMessages) {
   // Also, assert that every message type has been processed properly.
   for (const int16_t i : MessageUtilities::apiKeys()) {
     // We should have received one request per api version.
-    const Stats::Counter& request_counter = scope_.counter(MessageUtilities::requestMetric(i));
+    const Stats::Counter& request_counter = store_.counter(MessageUtilities::requestMetric(i));
     ASSERT_EQ(request_counter.value(), MessageUtilities::requestApiVersions(i));
     // We should have received one response per api version.
-    const Stats::Counter& response_counter = scope_.counter(MessageUtilities::responseMetric(i));
+    const Stats::Counter& response_counter = store_.counter(MessageUtilities::responseMetric(i));
     ASSERT_EQ(response_counter.value(), MessageUtilities::responseApiVersions(i));
   }
 }

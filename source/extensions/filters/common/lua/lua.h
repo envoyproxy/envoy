@@ -85,7 +85,7 @@ inline absl::string_view getStringViewFromLuaString(lua_State* state, int index)
   // string, since Lua provides automatic conversion between string and number values at run time
   // (https://www.lua.org/manual/5.1/manual.html#2.2.1).
   const char* input = luaL_checklstring(state, index, &input_size);
-  return absl::string_view(input, input_size);
+  return {input, input_size};
 }
 
 /**

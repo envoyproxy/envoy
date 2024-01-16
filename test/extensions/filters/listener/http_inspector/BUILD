@@ -60,6 +60,7 @@ envoy_cc_fuzz_test(
 
 envoy_extension_cc_test(
     name = "http_inspector_integration_test",
+    size = "large",
     srcs = [
         "http_inspector_integration_test.cc",
     ],

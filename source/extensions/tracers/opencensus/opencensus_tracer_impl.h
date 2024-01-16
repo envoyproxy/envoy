@@ -20,12 +20,11 @@ public:
   Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
          const LocalInfo::LocalInfo& localinfo, Api::Api& api);
 
-  /**
-   * Implements the abstract Driver's startSpan operation.
-   */
+  // Tracing::Driver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
-                             const std::string& operation_name, SystemTime start_time,
-                             const Tracing::Decision tracing_decision) override;
+                             const StreamInfo::StreamInfo& stream_info,
+                             const std::string& operation_name,
+                             Tracing::Decision tracing_decision) override;
 
 private:
   void applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& config);

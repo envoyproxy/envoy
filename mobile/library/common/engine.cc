@@ -1,11 +1,11 @@
 #include "library/common/engine.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "library/common/bridge/utility.h"
-#include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
-#include "library/common/network/android.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -20,44 +20,38 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   // registry may lead to crashes at Engine shutdown. To be figured out as part of
   // https://github.com/envoyproxy/envoy-mobile/issues/332
   Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
+  // Envoy Mobile always requires dfp_mixed_scheme for the TLS and cleartext DFP clusters.
+  // While dfp_mixed_scheme defaults to true, some environments force it to false (e.g. within
+  // Google), so we force it back to true in Envoy Mobile.
+  // TODO(abeyad): Remove once this is no longer needed.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-envoy_status_t Engine::run(const std::string config, const std::string log_level,
-                           const std::string admin_address_path) {
+envoy_status_t Engine::run(const std::string config, const std::string log_level) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
-  main_thread_ = std::thread(&Engine::main, this, std::string(config), std::string(log_level),
-                             admin_address_path);
+  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  options->setConfigYaml(config);
+  if (!log_level.empty()) {
+    ENVOY_BUG(options->setLogLevel(log_level.c_str()).ok(), "invalid log level");
+  }
+  options->setConcurrency(1);
+  return run(std::move(options));
+}
+
+envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
+  main_thread_ = std::thread(&Engine::main, this, std::move(options));
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::main(const std::string config, const std::string log_level,
-                            const std::string admin_address_path) {
+envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
-  const std::string name = "envoy";
-  const std::string config_flag = "--config-yaml";
-  const std::string composed_config = absl::StrCat(config_header, config);
-  const std::string log_flag = "-l";
-  const std::string concurrency_option = "--concurrency";
-  const std::string concurrency_arg = "0";
-  std::vector<const char*> envoy_argv = {name.c_str(),
-                                         config_flag.c_str(),
-                                         composed_config.c_str(),
-                                         concurrency_option.c_str(),
-                                         concurrency_arg.c_str(),
-                                         log_flag.c_str(),
-                                         log_level.c_str()};
-  if (!admin_address_path.empty()) {
-    envoy_argv.push_back("--admin-address-path");
-    envoy_argv.push_back(admin_address_path.c_str());
-  }
-  envoy_argv.push_back(nullptr);
   {
     Thread::LockGuard lock(mutex_);
-    try {
+    TRY_NEEDS_AUDIT {
       if (event_tracker_.track != nullptr) {
         assert_handler_registration_ =
             Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
@@ -82,18 +76,14 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
+      main_common = std::make_unique<EngineCommon>(std::move(options));
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
 
       cv_.notifyAll();
-    } catch (const Envoy::NoServingException& e) {
-      PANIC(e.what());
-    } catch (const Envoy::MalformedArgvException& e) {
-      PANIC(e.what());
-    } catch (const Envoy::EnvoyException& e) {
-      PANIC(e.what());
     }
+    END_TRY
+    CATCH(const Envoy::EnvoyException& e, { PANIC(e.what()); });
 
     // Note: We're waiting longer than we might otherwise to drain to the main thread's dispatcher.
     // This is because we're not simply waiting for its availability and for it to have started, but
@@ -106,9 +96,10 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           ASSERT(Thread::MainThread::isMainOrTestThread());
 
-          connectivity_manager_ =
-              Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
-          Envoy::Network::Android::Utility::setAlternateGetifaddrs();
+          Envoy::Server::GenericFactoryContextImpl generic_context(
+              server_->serverFactoryContext(),
+              server_->serverFactoryContext().messageValidationVisitor());
+          connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
@@ -118,9 +109,10 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
           // on-the-fly without risking contention on system with lots of threads.
           // It also comes with ease of programming.
           stat_name_set_ = client_scope_->symbolTable().makeSet("pulse");
-          auto api_listener = server_->listenerManager().apiListener()->get().http();
-          ASSERT(api_listener.has_value());
-          http_client_ = std::make_unique<Http::Client>(api_listener.value(), *dispatcher_,
+          auto api_listener = server_->listenerManager().apiListener()->get().createHttpApiListener(
+              server_->dispatcher());
+          ASSERT(api_listener != nullptr);
+          http_client_ = std::make_unique<Http::Client>(std::move(api_listener), *dispatcher_,
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
@@ -165,6 +157,9 @@ envoy_status_t Engine::terminate() {
     ASSERT(event_dispatcher_);
     ASSERT(dispatcher_);
 
+    // We must destroy the Http::ApiListener in the main thread.
+    dispatcher_->post([this]() { http_client_->shutdownApiListener(); });
+
     // Exit the event loop and finish up in Engine::run(...)
     if (std::this_thread::get_id() == main_thread_.get_id()) {
       // TODO(goaway): figure out some way to support this.
@@ -195,28 +190,6 @@ envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::makeAdminCall(absl::string_view path, absl::string_view method,
-                                     envoy_data& out) {
-  ENVOY_LOG(trace, "admin call {} {}", method, path);
-  if (!server_->admin()) {
-    ENVOY_LOG(warn, "admin support compiled out.");
-    return ENVOY_FAILURE;
-  }
-
-  ASSERT(dispatcher_->isThreadSafe(), "admin calls must be run from the dispatcher's context");
-  auto response_headers = Http::ResponseHeaderMapImpl::create();
-  std::string body;
-  const auto code = server_->admin()->request(path, method, *response_headers, body);
-  if (code != Http::Code::OK) {
-    ENVOY_LOG(warn, "admin call failed with status {} body {}", static_cast<uint64_t>(code), body);
-    return ENVOY_FAILURE;
-  }
-
-  out = Data::Utility::copyToBridgeData(body);
-
-  return ENVOY_SUCCESS;
-}
-
 Event::ProvisionalDispatcher& Engine::dispatcher() { return *dispatcher_; }
 
 Http::Client& Engine::httpClient() {
@@ -231,10 +204,51 @@ Network::ConnectivityManager& Engine::networkConnectivityManager() {
   return *connectivity_manager_;
 }
 
-void Engine::flushStats() {
-  ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
+void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                 const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                 Buffer::Instance& response) {
+  for (const auto& stat : all_stats) {
+    response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
+  }
+  std::map<std::string, std::string> all_histograms;
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
+    if (histogram->used()) {
+      all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+    }
+  }
+  for (const auto& histogram : all_histograms) {
+    response.addFragments({histogram.first, ": ", histogram.second, "\n"});
+  }
+}
 
-  server_->flushStats();
+void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
+  std::map<std::string, uint64_t> all_stats;
+  for (const Stats::CounterSharedPtr& counter : stats.counters()) {
+    if (counter->used()) {
+      all_stats.emplace(counter->name(), counter->value());
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : stats.gauges()) {
+    if (gauge->used()) {
+      all_stats.emplace(gauge->name(), gauge->value());
+    }
+  }
+
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
+  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+      histograms.begin(), histograms.end(),
+      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
+
+  statsAsText(all_stats, histograms, response);
+}
+
+Envoy::Buffer::OwnedImpl Engine::dumpStats() {
+  ASSERT(dispatcher_->isThreadSafe(), "dumpStats must be called from the dispatcher's context");
+
+  Envoy::Buffer::OwnedImpl instance;
+  handlerStats(server_->stats(), instance);
+  return instance;
 }
 
 Upstream::ClusterManager& Engine::getClusterManager() {

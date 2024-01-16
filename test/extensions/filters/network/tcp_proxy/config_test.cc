@@ -6,7 +6,6 @@
 #include "source/extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -60,7 +59,7 @@ TEST(ConfigTest, ConfigTest) {
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
 
-  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.getServerFactoryContext()));
+  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.serverFactoryContext()));
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;

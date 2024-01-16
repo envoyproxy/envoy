@@ -42,14 +42,6 @@ public:
     codec_client_.reset();
   }
 
-  IntegrationCodecClientPtr makeRawHttpConnection(
-      Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
-    IntegrationCodecClientPtr codec =
-        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
-    return codec;
-  }
-
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       const std::string overload_config =
@@ -86,6 +78,7 @@ public:
                       injected_resource_filename_1_, injected_resource_filename_2_);
       *bootstrap.mutable_overload_manager() =
           TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
+      bootstrap.set_enable_dispatcher_stats(true);
     });
 
     updateResource(file_updater_1_, 0);
@@ -156,13 +149,87 @@ TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
   updateResource(file_updater_2_, 0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
 
+  // The call to disable keep alive could take some time to be executed on the worker
+  // even if the stat on the main thread is shows the action is enabled.
+  // Waiting for additional dispatch loops on the worker so that the overload
+  // state will have propagated.
+  auto worker_dispatch_duration_histogram =
+      test_server_->histogram("listener_manager.worker_0.dispatcher.loop_duration_us");
+  const uint64_t num_samples = TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                                            *worker_dispatch_duration_histogram);
+  const uint64_t required_num_samples = num_samples + 2;
+  test_server_->waitForNumHistogramSamplesGe(
+      "listener_manager.worker_0.dispatcher.loop_duration_us", required_num_samples);
+
   upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
   upstream_request_->encodeData(10, true);
 
-  response2->waitForHeaders();
+  EXPECT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(codec_client_->waitForDisconnect());
 
   codec_client_->close();
+}
+
+class ListenerMaxConnectionPerSocketEventTest : public OverloadIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerMaxConnectionPerSocketEventTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ListenerMaxConnectionPerSocketEventTest, AcceptsConnectionsUpToTheMaximumPerSocketEvent) {
+  auto set_max_connections_per_socket_event_to_two =
+      [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        for (auto& listener_config : *bootstrap.mutable_static_resources()->mutable_listeners()) {
+          listener_config.mutable_max_connections_to_accept_per_socket_event()->set_value(2);
+        }
+      };
+  config_helper_.addConfigModifier(set_max_connections_per_socket_event_to_two);
+
+  initialize();
+  // Put envoy in overloaded state and check that it doesn't accept the new client connection.
+  updateResource(file_updater_1_, 0.95);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
+                               1);
+
+  // The TCP stack will accept the connections, but the Envoy listener will not
+  // not yet acknowledge the connection.
+  std::vector<IntegrationCodecClientPtr> client_codecs;
+  for (int i = 0; i < 10; ++i) {
+    client_codecs.push_back(makeHttpConnection(makeClientConnection((lookupPort("http")))));
+    ASSERT_TRUE(client_codecs[i]->connected());
+  }
+
+  const std::string downstream_cx_active = (version_ == Network::Address::IpVersion::v4)
+                                               ? "listener.127.0.0.1_0.downstream_cx_active"
+                                               : "listener.[__1]_0.downstream_cx_active";
+  test_server_->waitForGaugeEq(downstream_cx_active, 0);
+
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "accepted 2 new connections", 5, {
+    // Reduce load a little to allow the connection to be accepted.
+    updateResource(file_updater_1_, 0.8);
+
+    // As we are using level trigger for listeners, all new connections get recognized.
+    test_server_->waitForGaugeEq(downstream_cx_active, 10);
+
+    // Wait for the histogram to be updated as that occurs after the logs we are
+    // expecting.
+    const std::string connections_accepted_per_socket_event =
+        (version_ == Network::Address::IpVersion::v4)
+            ? "listener.127.0.0.1_0.connections_accepted_per_socket_event"
+            : "listener.[__1]_0.connections_accepted_per_socket_event";
+    test_server_->waitUntilHistogramHasSamples(connections_accepted_per_socket_event);
+    auto connections_accepted_histogram =
+        test_server_->histogram(connections_accepted_per_socket_event);
+    EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(),
+                                           *connections_accepted_histogram),
+              5);
+    EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                          *connections_accepted_histogram)),
+              10);
+  });
+
+  std::for_each(client_codecs.begin(), client_codecs.end(),
+                [](IntegrationCodecClientPtr& client_codec) { client_codec->close(); });
 }
 
 } // namespace Envoy

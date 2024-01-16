@@ -56,6 +56,26 @@ TEST_F(HeaderUtilityTest, HasHost) {
   }
 }
 
+TEST_F(HeaderUtilityTest, HostHasPort) {
+  const std::vector<std::pair<std::string, bool>> host_headers{
+      {"localhost", false},      // w/o port part
+      {"localhost:443", true},   // name w/ port
+      {"", false},               // empty
+      {":443", true},            // just port
+      {"192.168.1.1", false},    // ipv4
+      {"192.168.1.1:443", true}, // ipv4 w/ port
+      {"[fc00::1]:443", true},   // ipv6 w/ port
+      {"[fc00::1]", false},      // ipv6
+      {":", false},              // malformed string #1
+      {"]:", false},             // malformed string #2
+      {":abc", false},           // malformed string #3
+  };
+
+  for (const auto& host_pair : host_headers) {
+    EXPECT_EQ(host_pair.second, HeaderUtility::hostHasPort(host_pair.first));
+  }
+}
+
 // Port's part from host header get removed
 TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   const std::vector<std::pair<std::string, std::string>> host_headers{
@@ -1128,6 +1148,18 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsConnectUdpRequest) {
+  EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));
+  // Should use case-insensitive comparison for the upgrade values.
+  EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{"upgrade", "CONNECT-UDP"}}));
+  // Extended CONNECT requests should be normalized to HTTP/1.1.
+  EXPECT_FALSE(HeaderUtility::isConnectUdpRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":protocol", "connect-udp"}}));
+  EXPECT_FALSE(HeaderUtility::isConnectUdpRequest(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderIsValidTest, IsConnectResponse) {
   RequestHeaderMapPtr connect_request{new TestRequestHeaderMapImpl{{":method", "CONNECT"}}};
   RequestHeaderMapPtr get_request{new TestRequestHeaderMapImpl{{":method", "GET"}}};
@@ -1139,6 +1171,62 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   EXPECT_FALSE(HeaderUtility::isConnectResponse(nullptr, success_response));
   EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
 }
+
+TEST(HeaderIsValidTest, RewriteAuthorityForConnectUdp) {
+  TestRequestHeaderMapImpl connect_udp_request{
+      {":path", "/.well-known/masque/udp/foo.lyft.com/80/"}, {":authority", "example.org"}};
+  EXPECT_TRUE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request));
+  EXPECT_EQ(connect_udp_request.getHostValue(), "foo.lyft.com:80");
+
+  TestRequestHeaderMapImpl connect_udp_request_ipv6{
+      {":path", "/.well-known/masque/udp/2001%3A0db8%3A85a3%3A%3A8a2e%3A0370%3A7334/80/"},
+      {":authority", "example.org"}};
+  EXPECT_TRUE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request_ipv6));
+  EXPECT_EQ(connect_udp_request_ipv6.getHostValue(), "[2001:0db8:85a3::8a2e:0370:7334]:80");
+
+  TestRequestHeaderMapImpl connect_udp_request_ipv6_not_escaped{
+      {":path", "/.well-known/masque/udp/2001:0db8:85a3::8a2e:0370:7334/80"},
+      {":authority", "example.org"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request_ipv6_not_escaped));
+
+  TestRequestHeaderMapImpl connect_udp_request_ipv6_zoneid{
+      {":path", "/.well-known/masque/udp/fe80::a%25ee1/80/"}, {":authority", "example.org"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_request_ipv6_zoneid));
+
+  TestRequestHeaderMapImpl connect_udp_malformed1{
+      {":path", "/well-known/masque/udp/foo.lyft.com/80/"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_malformed1));
+
+  TestRequestHeaderMapImpl connect_udp_malformed2{{":path", "/masque/udp/foo.lyft.com/80/"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_malformed2));
+
+  TestRequestHeaderMapImpl connect_udp_no_path{{":authority", "example.org"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_no_path));
+
+  TestRequestHeaderMapImpl connect_udp_empty_host{{":path", "/.well-known/masque/udp//80/"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_empty_host));
+
+  TestRequestHeaderMapImpl connect_udp_empty_port{
+      {":path", "/.well-known/masque/udp/foo.lyft.com//"}};
+  EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_empty_port));
+}
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+TEST(HeaderIsValidTest, IsCapsuleProtocol) {
+  EXPECT_TRUE(
+      HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1"}}));
+  EXPECT_TRUE(HeaderUtility::isCapsuleProtocol(
+      TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1;a=1;b=2;c;d=?0"}}));
+  EXPECT_FALSE(
+      HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{"Capsule-Protocol", "?0"}}));
+  EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(
+      TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1"}, {"Capsule-Protocol", "?1"}}));
+  EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+  EXPECT_TRUE(HeaderUtility::isCapsuleProtocol(
+      TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}}));
+  EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(TestResponseHeaderMapImpl{{":status", "200"}}));
+}
+#endif
 
 TEST(HeaderIsValidTest, ShouldHaveNoBody) {
   const std::vector<std::string> methods{{"CONNECT"}, {"GET"}, {"DELETE"}, {"TRACE"}, {"HEAD"}};
@@ -1289,6 +1377,43 @@ TEST(ValidateHeaders, ContentLength) {
       HeaderUtility::validateContentLength("-1", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 }
+
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST(ValidateHeaders, ForbiddenCharacters) {
+  {
+    // Valid headers
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {"x-foo", "hello world"}};
+    EXPECT_EQ(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
+  }
+
+  {
+    // Mixed case header key is ok
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "foo.com:80"}};
+    Http::HeaderString invalid_key(absl::string_view("x-MiXeD-CaSe"));
+    headers.addViaMove(std::move(invalid_key),
+                       Http::HeaderString(absl::string_view("hello world")));
+    EXPECT_TRUE(HeaderUtility::checkValidRequestHeaders(headers).ok());
+  }
+
+  {
+    // Invalid key
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {"x-foo\r\n", "hello world"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
+  }
+
+  {
+    // Invalid value
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"},
+                                     {":authority", "foo.com:80"},
+                                     {"x-foo", "hello\r\n\r\nGET /evil HTTP/1.1"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
+  }
+}
+#endif
 
 TEST(ValidateHeaders, ParseCommaDelimitedHeader) {
   // Basic case

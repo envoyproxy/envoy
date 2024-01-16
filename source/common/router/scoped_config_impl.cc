@@ -29,14 +29,14 @@ HeaderValueExtractorImpl::HeaderValueExtractorImpl(
       ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::kIndex) {
     if (header_value_extractor_config_.index() != 0 &&
         header_value_extractor_config_.element_separator().empty()) {
-      throw ProtoValidationException("Index > 0 for empty string element separator.",
-                                     header_value_extractor_config_);
+      ProtoExceptionUtil::throwProtoValidationException(
+          "Index > 0 for empty string element separator.", config_);
     }
   }
   if (header_value_extractor_config_.extract_type_case() ==
       ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::EXTRACT_TYPE_NOT_SET) {
-    throw ProtoValidationException("HeaderValueExtractor extract_type not set.",
-                                   header_value_extractor_config_);
+    ProtoExceptionUtil::throwProtoValidationException("HeaderValueExtractor extract_type not set.",
+                                                      config_);
   }
 }
 
@@ -145,24 +145,13 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
   }
 }
 
-Router::ConfigConstSharedPtr
-ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
-  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
+Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const ScopeKeyPtr& scope_key) const {
   if (scope_key == nullptr) {
     return nullptr;
   }
   auto iter = scoped_route_info_by_key_.find(scope_key->hash());
   if (iter != scoped_route_info_by_key_.end()) {
     return iter->second->routeConfig();
-  }
-  return nullptr;
-}
-
-ScopeKeyPtr ScopedConfigImpl::computeScopeKey(const Http::HeaderMap& headers) const {
-  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
-  if (scope_key &&
-      scoped_route_info_by_key_.find(scope_key->hash()) != scoped_route_info_by_key_.end()) {
-    return scope_key;
   }
   return nullptr;
 }

@@ -79,14 +79,15 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "extra_extensions_test",
+    size = "large",
     srcs = ["extra_extensions_test.cc"],
     deps = [
         "//test/test_common:environment_lib",
     ] + select({
         # gcc RBE build has trouble compiling target with all extensions
         "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
-        # This dependency MUST be main_common_lib to meet the purpose of this test
-        "//conditions:default": ["//source/exe:main_common_lib"],
+        # This dependency MUST be main_common_with_all_extensions_lib to meet the purpose of this test
+        "//conditions:default": ["//source/exe:main_common_with_all_extensions_lib"],
     }),
 )
 
@@ -102,6 +103,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "check_extensions_against_registry_test",
+    size = "large",
     srcs = ["check_extensions_against_registry_test.cc"],
     data = [
         "//source/extensions:extensions_metadata.yaml",
@@ -112,7 +114,7 @@ envoy_cc_test(
         # gcc RBE build has trouble compiling target with all extensions
         "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
         # This dependency MUST be main_common_lib to meet the purpose of this test
-        "//conditions:default": ["//source/exe:main_common_lib"],
+        "//conditions:default": ["//source/exe:main_common_with_all_extensions_lib"],
     }),
 )
 
@@ -149,7 +151,7 @@ envoy_cc_test(
     tags = ["manual"],
     deps = [
         "//source/common/api:api_lib",
-        "//source/exe:main_common_lib",
+        "//source/exe:main_common_with_all_extensions_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",

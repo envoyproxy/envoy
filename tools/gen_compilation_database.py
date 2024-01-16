@@ -12,7 +12,8 @@ from pathlib import Path
 def generate_compilation_database(args):
     # We need to download all remote outputs for generated source code. This option lives here to override those
     # specified in bazelrc.
-    bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
+    bazel_startup_options = shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
+    bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", "")) + [
         "--config=compdb",
         "--remote_download_outputs=all",
     ]
@@ -21,13 +22,14 @@ def generate_compilation_database(args):
     if args.exclude_contrib:
         source_dir_targets.remove("//contrib/...")
 
-    subprocess.check_call([args.bazel, "build"] + bazel_options + [
+    subprocess.check_call([args.bazel, *bazel_startup_options, "build"] + bazel_options + [
         "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
     ] + source_dir_targets)
 
-    execroot = subprocess.check_output([args.bazel, "info", "execution_root"]
-                                       + bazel_options).decode().strip()
+    execroot = subprocess.check_output([
+        args.bazel, *bazel_startup_options, "info", *bazel_options, "execution_root", *bazel_options
+    ]).decode().strip()
 
     db_entries = []
     for db in Path(execroot).glob('**/*.compile_commands.json'):
@@ -87,6 +89,10 @@ def modify_compile_command(target, args):
         # old-style "-I".
         options = options.replace("-iquote ", "-I ")
 
+    if args.system_clang:
+        if cc.find("clang"):
+            cc = "clang++"
+
     if is_header(target["file"]):
         options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
         options += " -Wno-unused-function"
@@ -116,6 +122,12 @@ if __name__ == "__main__":
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
     parser.add_argument('--exclude_contrib', action='store_true')
+    parser.add_argument(
+        '--system-clang',
+        action='store_true',
+        help=
+        'Use `clang++` instead of the bazel wrapper for commands. This may help if `clangd` cannot find/run the tools.'
+    )
     parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
         'bazel_targets', nargs='*', default=[

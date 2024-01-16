@@ -1,0 +1,37 @@
+config {
+  providers {
+    key: "\005"
+    value {
+      remote_jwks {
+        http_uri {
+          uri: "https:/pubkey_server/pubkey_phttps:/pubkey_server/pubkey_pathath"
+          cluster: "2"
+          timeout {
+            seconds: 68719476736
+          }
+        }
+        cache_duration {
+        }
+      }
+    }
+  }
+  rules {
+    match {
+      prefix: ""
+    }
+    requires {
+      allow_missing {
+      }
+    }
+  }
+}
+request_data {
+  headers {
+    headers {
+      key: "authorization"
+      value: "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4cGxlLmNvbSIsImF1ZCI6ImV4YW1wbGVfc2VydmljZSIsImV4cCI6MjAwMTAwMTAwMX0.n45uWZfIBZwCIPiL0K8Ca3tmm-ZlsDrC79_vXCspPwk5oxdSn983tuC9GfVWKXWUMHe11DsB02b19Ow-fmoEzooTFn65Ml7G34nW07amyM6lETiMhNzyiunctplOr6xKKJHmzTUhfTirvDeG-q9n24-8lH7GP8GgHvDlgSM9OY7TGp81bRcnZBmxim_UzHoYO3_c8OP4ZX3xG5PfihVk5G0g6wcHrO70w0_64JgkKRCrLHMJSrhIgp9NHel_CNOnL0AjQKe9IGblJrMuouqYYS0zEWwmOVUWUSxQkoLpldQUVefcfjQeGjz8IlvktRa77FYexfP590ACPyXrivtsxg"
+    }
+  }
+}
+remote_jwks: "{\"keys\":[{\"kty\":\"RSA\",\"alg\":\"RS256\",\"use\":\"sig\",\"kid\":\"62a93512c9ee4c7f8067b5a216dade2763d32a47\",\"n\":\"0YWnm_eplO9BFtUUUUUUU\0055H8mYDW11HolzZmTQpRoLV8ZoHbHEaTfqX_aYahIw\",\"e\":\"AQAB\"},{\"kty\":\"RSA\",\"alg\":\"RS256\",\"use\":\"sig\",\"kid\":\"b3319a147514df7ee5e4bcdee51350cc890cc89e\",\"n\":\"qDi7Tx4DhNDDdk0iUtJSPZliUHJBI_pj8M-2Mn_oA8jBuI8YKwBqYkZCN2I95Q\",\"e\":\"AQAB\"}]}"
+num_calls: 4

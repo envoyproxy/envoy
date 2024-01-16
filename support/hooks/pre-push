@@ -65,26 +65,23 @@ do
     # our `relpath` helper.
     SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
 
-    # TODO(hausdorff): We should have a more graceful failure story when the
-    # user does not have all the tools set up correctly. This script assumes
-    # `$CLANG_FORMAT` and `$BUILDIFY` are defined, or that the default values it
-    # assumes for these variables correspond to real binaries on the system. If
-    # either of these things aren't true, the check fails.
-    for i in $(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1); do
-      echo -ne "  Checking format for $i - "
-      "$SCRIPT_DIR"/code_format/check_format.py check "$i" || exit 1
+    _CHANGES=$(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1 | tr '\n' ' ')
+    IFS=' ' read -ra CHANGES <<< "$_CHANGES"
 
-      # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
-      # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
-      # out.
-      # echo "  Checking spelling for $i"
-      # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "$i" || exit 1
-    done
+    echo -ne "  Checking format for ${CHANGES[*]} - "
+    bazel run //tools/code_format:check_format -- check "${CHANGES[@]}" || exit 1
+    # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
+    # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
+    # out.
+    # echo "  Checking spelling for $i"
+    # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "${CHANGES[@]}" || exit 1
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
     "$SCRIPT_DIR"/proto_format/proto_format.sh check || exit 1
 
-    "$SCRIPT_DIR"/code_format/format_python_tools.sh check || exit 1
+    bazel run //tools/code:check -- \
+          -s main \
+          -v warn || exit 1
 
     # Check correctness of repositories definitions.
     echo "  Checking repositories definitions"

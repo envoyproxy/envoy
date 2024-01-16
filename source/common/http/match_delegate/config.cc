@@ -1,20 +1,25 @@
+#include "config.h"
 #include "source/common/http/match_delegate/config.h"
 
 #include <memory>
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/utility.h"
 
 #include "absl/status/status.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Common {
 namespace Http {
 namespace MatchDelegate {
 
-namespace {
+namespace Factory {
 
 class SkipActionFactory
     : public Matcher::ActionFactory<Envoy::Http::Matching::HttpFilterActionContext> {
@@ -92,13 +97,21 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
 
-} // namespace
+} // namespace Factory
 
 void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
     MatchDataUpdateFunc data_update_func) {
-  if (!has_match_tree_ || match_tree_evaluated_) {
+  if (match_tree_evaluated_) {
     return;
   }
+
+  // If no match tree is set, interpret as a skip.
+  if (!has_match_tree_) {
+    skip_filter_ = true;
+    match_tree_evaluated_ = true;
+    return;
+  }
+
   ASSERT(matching_data_ != nullptr);
   data_update_func(*matching_data_);
 
@@ -135,6 +148,18 @@ DelegatingStreamFilter::DelegatingStreamFilter(
 
 Envoy::Http::FilterHeadersStatus
 DelegatingStreamFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool end_stream) {
+  const auto* per_route_config =
+      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+          decoder_callbacks_);
+
+  if (per_route_config != nullptr) {
+    match_state_.setMatchTree(per_route_config->matchTree());
+  } else {
+    ENVOY_LOG(
+        trace,
+        "No per route config found, thus the matcher tree can not be built from per route config");
+  }
+
   match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
     data.onRequestHeaders(headers);
   });
@@ -180,6 +205,7 @@ void DelegatingStreamFilter::decodeComplete() {
 void DelegatingStreamFilter::setDecoderFilterCallbacks(
     Envoy::Http::StreamDecoderFilterCallbacks& callbacks) {
   match_state_.onStreamInfo(callbacks.streamInfo());
+  decoder_callbacks_ = &callbacks;
   decoder_filter_->setDecoderFilterCallbacks(callbacks);
 }
 
@@ -193,7 +219,6 @@ DelegatingStreamFilter::encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers
 
 Envoy::Http::FilterHeadersStatus
 DelegatingStreamFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
-
   match_state_.evaluateMatchTree([&headers](Envoy::Http::Matching::HttpMatchingDataImpl& data) {
     data.onResponseHeaders(headers);
   });
@@ -240,6 +265,7 @@ void DelegatingStreamFilter::encodeComplete() {
 void DelegatingStreamFilter::setEncoderFilterCallbacks(
     Envoy::Http::StreamEncoderFilterCallbacks& callbacks) {
   match_state_.onStreamInfo(callbacks.streamInfo());
+  encoder_callbacks_ = &callbacks;
   encoder_filter_->setEncoderFilterCallbacks(callbacks);
 }
 
@@ -254,34 +280,76 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
 
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), context.messageValidationVisitor(), factory);
-  auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
+  auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, prefix, context);
+  if (!filter_factory_or_error.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(filter_factory_or_error.status().message()));
+  }
+  auto filter_factory = filter_factory_or_error.value();
 
-  MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
+  Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
-  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context};
+  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context,
+                                                                context.serverFactoryContext()};
+
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
-      matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
-  Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb;
+      matcher_factory(action_context, context.serverFactoryContext(), validation_visitor);
+  absl::optional<Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData>> factory_cb =
+      std::nullopt;
   if (proto_config.has_xds_matcher()) {
     factory_cb = matcher_factory.create(proto_config.xds_matcher());
   } else if (proto_config.has_matcher()) {
     factory_cb = matcher_factory.create(proto_config.matcher());
-  } else {
-    throw EnvoyException("one of `matcher` and `matcher_tree` must be set.");
   }
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
-    throw EnvoyException(fmt::format("requirement violation while creating match tree: {}",
-                                     validation_visitor.errors()[0]));
+    throwEnvoyExceptionOrPanic(fmt::format("requirement violation while creating match tree: {}",
+                                           validation_visitor.errors()[0]));
   }
 
-  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = factory_cb();
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr;
+
+  if (factory_cb.has_value()) {
+    match_tree = factory_cb.value()();
+  }
+
   return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
+    Factory::DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
     return filter_factory(delegating_callbacks);
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+MatchDelegateConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config, server_context);
+}
+
+Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
+FilterConfigPerRoute::createFilterMatchTree(
+    const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  auto requirements =
+      std::make_unique<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
+  requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+      envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance().GetTypeName()));
+  requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+      xds::type::matcher::v3::HttpAttributesCelMatchInput::default_instance().GetTypeName()));
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      fmt::format("http.{}.",
+                  server_context.scope().symbolTable().toString(server_context.scope().prefix())),
+      absl::nullopt, server_context};
+
+  Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
+  Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
+                            Envoy::Http::Matching::HttpFilterActionContext>
+      matcher_factory(action_context, server_context, validation_visitor);
+  Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb =
+      matcher_factory.create(proto_config.xds_matcher());
+  return factory_cb();
 }
 
 /**

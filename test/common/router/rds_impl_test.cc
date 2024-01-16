@@ -26,6 +26,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -34,8 +35,8 @@ using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Router {
@@ -56,7 +57,7 @@ class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() {
     // For server_factory_context
-    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(*scope_.rootScope()));
     ON_CALL(server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
     EXPECT_CALL(validation_context_, dynamicValidationVisitor())
@@ -189,9 +190,12 @@ route_config:
       - match: { prefix: "/" }
     typed_per_filter_config:
       filter.unknown:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          seconds: 123
+        "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+        is_optional: true
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            seconds: 123
 codec_type: auto
 stat_prefix: foo
 http_filters:
@@ -241,11 +245,13 @@ TEST_F(RdsImplTest, Basic) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // 2nd request with same response. Based on hash should not reload config.
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Load the config and verified shared count.
@@ -291,7 +297,8 @@ TEST_F(RdsImplTest, Basic) {
 
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
-  rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
                        ->clusterName());
@@ -350,13 +357,14 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+      EXPECT_TRUE(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
 }
 
-// validate the optional unknown factory will be ignored for per virtualhost typed config.
+// Validate the optional unknown factory will be ignored for per virtualhost typed config.
 TEST_F(RdsImplTest, OptionalUnknownFacotryForPerVirtualHostTypedConfig) {
   InSequence s;
   const std::string config_yaml = R"EOF(
@@ -402,7 +410,11 @@ http_filters:
           ],
           "typed_per_filter_config": {
             "filter.unknown": {
-              "@type": "type.googleapis.com/google.protobuf.Struct"
+              "@type": "type.googleapis.com/envoy.config.route.v3.FilterConfig",
+              "is_optional": true,
+              "config": {
+                "@type": "type.googleapis.com/google.protobuf.Struct"
+              }
             }
           }
         }
@@ -417,7 +429,8 @@ http_filters:
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
 }
 
 // validate there will be exception throw when unknown factory found for per route typed config.
@@ -467,74 +480,11 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+      EXPECT_TRUE(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
-}
-
-// validate the optional unknown factory will be ignored for per route typed config.
-TEST_F(RdsImplTest, OptionalUnknownFacotryForPerRouteTypedConfig) {
-  InSequence s;
-  const std::string config_yaml = R"EOF(
-rds:
-  config_source:
-    api_config_source:
-      api_type: REST
-      cluster_names:
-      - foo_cluster
-      refresh_delay: 1s
-  route_config_name: foo_route_config
-codec_type: auto
-stat_prefix: foo
-http_filters:
-- name: filter.unknown
-  is_optional: true
-    )EOF";
-
-  setup(config_yaml);
-
-  const std::string response1_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
-      "name": "foo_route_config",
-      "virtual_hosts": [
-        {
-          "name": "integration",
-          "domains": [
-            "*"
-          ],
-          "routes": [
-            {
-              "match": {
-                "prefix": "/foo"
-              },
-              "route": {
-                "cluster_header": ":authority"
-              },
-              "typed_per_filter_config": {
-                "filter.unknown": {
-                  "@type": "type.googleapis.com/google.protobuf.Struct"
-                }
-              }
-            }
-          ],
-        }
-      ]
-    }
-  ]
-}
-)EOF";
-  auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
-  const auto decoded_resources =
-      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
-
-  EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 }
 
 // Validates behavior when the config is delivered but it fails PGV validation.
@@ -562,13 +512,13 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(valid_json);
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
-  EXPECT_NO_THROW(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   // Sadly the RdsRouteConfigSubscription privately inherited from
   // SubscriptionCallbacks, so we has to use reinterpret_cast here.
   RdsRouteConfigSubscription* rds_subscription =
       reinterpret_cast<RdsRouteConfigSubscription*>(rds_callbacks_);
-  auto config_impl_pointer = rds_subscription->routeConfigProvider().value()->config();
+  auto config_impl_pointer = rds_subscription->routeConfigProvider()->config();
   // Now send an invalid config update.
   const std::string invalid_json =
       R"EOF(
@@ -589,14 +539,13 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()),
-      EnvoyException,
-      "Unexpected RDS configuration (expecting foo_route_config): "
-      "INVALID_NAME_FOR_route_config");
+  EXPECT_EQ(rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info())
+                .message(),
+            "Unexpected RDS configuration (expecting foo_route_config): "
+            "INVALID_NAME_FOR_route_config");
 
   // Verify that the config is still the old value.
-  ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider().value()->config());
+  ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider()->config());
 }
 
 // rds and vhds configurations change together
@@ -652,7 +601,8 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_TRUE(rds_->configCast()->usesVhds());
 
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
@@ -695,7 +645,8 @@ rds:
         parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
 
-    EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+    EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
+        .WillOnce([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); });
     rds->requestVirtualHostsUpdate(
         "testing", local_thread_dispatcher,
         std::make_shared<Http::RouteConfigUpdatedCallback>(
@@ -714,7 +665,7 @@ TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
   EXPECT_CALL(init_watcher_, ready());
   RdsRouteConfigSubscription& subscription =
       dynamic_cast<RdsRouteConfigProviderImpl&>(*rds_).subscription();
-  EXPECT_EQ(rds_.get(), subscription.routeConfigProvider().value());
+  EXPECT_EQ(rds_.get(), subscription.routeConfigProvider());
 }
 
 class RdsRouteConfigSubscriptionTest : public RdsTestBase {
@@ -750,7 +701,7 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
       TestUtility::parseYaml<envoy::extensions::filters::network::http_connection_manager::v3::Rds>(
           rds_config);
   const auto route_config_provider = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds, OptionalHttpFilters(), server_factory_context_, "stat_prefix", outer_init_manager_);
+      rds, server_factory_context_, "stat_prefix", outer_init_manager_);
   RdsRouteConfigSubscription& subscription =
       (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
   init_watcher_.expectReady(); // The parent_init_target_ will call once.
@@ -779,7 +730,7 @@ public:
     rds_.set_route_config_name("foo_route_config");
     rds_.mutable_config_source()->set_path("foo_path");
     provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
-        rds_, OptionalHttpFilters(), server_factory_context_, "foo_prefix.", outer_init_manager_);
+        rds_, server_factory_context_, "foo_prefix.", outer_init_manager_);
     rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -838,8 +789,8 @@ virtual_hosts:
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
-          parseRouteConfigurationFromV3Yaml(config_yaml), OptionalHttpFilters(),
-          server_factory_context_, validation_visitor_);
+          parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_,
+          validation_visitor_);
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       universal_name_matcher);
   const auto& route_config_dump2 =
@@ -887,7 +838,8 @@ dynamic_route_configs:
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       universal_name_matcher);
   const auto& route_config_dump3 =
@@ -984,12 +936,13 @@ virtual_hosts:
 )EOF");
   const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, "1");
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "1")
+                  .ok());
 
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds_, OptionalHttpFilters(), server_factory_context_, "foo_prefix", outer_init_manager_);
+          rds_, server_factory_context_, "foo_prefix", outer_init_manager_);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -1006,10 +959,11 @@ virtual_hosts:
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderSharedPtr provider3 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds2, OptionalHttpFilters(), server_factory_context_, "foo_prefix", outer_init_manager_);
+          rds2, server_factory_context_, "foo_prefix", outer_init_manager_);
   EXPECT_NE(provider3, provider_);
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      decoded_resources.refvec_, "provider3");
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "provider3")
+                  .ok());
   UniversalStringMatcher universal_name_matcher;
   EXPECT_EQ(2UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
                      ->dynamic_route_configs()
@@ -1048,8 +1002,8 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
   Init::ManagerImpl real_init_manager("real");
 
   RouteConfigProviderSharedPtr provider2 =
-      route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds_, OptionalHttpFilters(), mock_factory_context2, "foo_prefix", real_init_manager);
+      route_config_provider_manager_->createRdsRouteConfigProvider(rds_, mock_factory_context2,
+                                                                   "foo_prefix", real_init_manager);
 
   EXPECT_FALSE(provider2->configInfo().has_value());
 
@@ -1069,8 +1023,9 @@ virtual_hosts:
 )EOF");
     const auto decoded_resources = TestUtility::decodeResources({route_config});
 
-    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-        decoded_resources.refvec_, "1");
+    EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                    ->onConfigUpdate(decoded_resources.refvec_, "1")
+                    .ok());
 
     EXPECT_TRUE(provider_->configInfo().has_value());
     EXPECT_TRUE(provider2->configInfo().has_value());
@@ -1084,7 +1039,9 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
               start(_));
   outer_init_manager_.initialize(init_watcher_);
   EXPECT_CALL(init_watcher_, ready());
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate({}, "")
+                  .ok());
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
@@ -1095,10 +1052,10 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   envoy::config::route::v3::RouteConfiguration route_config;
   const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
   EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW_WITH_MESSAGE(
-      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-          decoded_resources.refvec_, ""),
-      EnvoyException, "Unexpected RDS resource length: 2");
+  EXPECT_EQ(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, "")
+                .message(),
+            "Unexpected RDS resource length: 2");
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/7939
@@ -1158,7 +1115,8 @@ resources:
   EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+      EXPECT_TRUE(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
       EnvoyException, "Only a single wildcard domain is permitted in route foo_route_config");
 
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](

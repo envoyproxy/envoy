@@ -17,6 +17,14 @@
 
 namespace Envoy {
 namespace Stats {
+namespace {
+std::regex parseStdRegex(const std::string& regex) {
+  TRY_ASSERT_MAIN_THREAD { return std::regex(regex, std::regex::optimize); }
+  END_TRY
+  CATCH(const std::regex_error& e,
+        { throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what())); });
+}
+} // namespace
 
 const std::vector<absl::string_view>& TagExtractionContext::tokens() {
   if (tokens_.empty()) {
@@ -64,11 +72,11 @@ TagExtractorPtr TagExtractorImplBase::createTagExtractor(absl::string_view name,
                                                          absl::string_view negative_match,
                                                          Regex::Type re_type) {
   if (name.empty()) {
-    throw EnvoyException("tag_name cannot be empty");
+    throwEnvoyExceptionOrPanic("tag_name cannot be empty");
   }
 
   if (regex.empty()) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
   switch (re_type) {
@@ -87,8 +95,7 @@ bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
 
 TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
                                                    absl::string_view substr)
-    : TagExtractorImplBase(name, regex, substr),
-      regex_(Regex::Utility::parseStdRegex(std::string(regex))) {}
+    : TagExtractorImplBase(name, regex, substr), regex_(parseStdRegex(std::string(regex))) {}
 
 std::string& TagExtractorImplBase::addTagReturningValueRef(std::vector<Tag>& tags) const {
   tags.emplace_back();
@@ -153,11 +160,10 @@ bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<
   }
 
   // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
-  re2::StringPiece remove_subexpr, value_subexpr;
+  absl::string_view remove_subexpr, value_subexpr;
 
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (re2::RE2::PartialMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
-                             &remove_subexpr, &value_subexpr) &&
+  if (re2::RE2::PartialMatch(stat_name, regex_, &remove_subexpr, &value_subexpr) &&
       !remove_subexpr.empty()) {
 
     // value_subexpr is the optional second submatch. It is usually inside the first submatch

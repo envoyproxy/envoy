@@ -10,6 +10,8 @@ This could be undesirable for services that require warm up time to serve full p
 Slow start mode is a mechanism that affects load balancing weight of upstream endpoints and can be configured per upstream cluster.
 Currently, slow start is supported in :ref:`Round Robin <envoy_v3_api_field_config.cluster.v3.Cluster.RoundRobinLbConfig.slow_start_config>` and :ref:`Least Request <envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.slow_start_config>` load balancer types.
 
+Slow start mode is most effective for cases where few new endpoints come up e.g. scale event in Kubernetes. When all the endpoints are relatively new e.g. new deployment in Kubernetes, slow start is not very effective as all endpoints end up getting same amount of requests.
+
 Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.SlowStartConfig.slow_start_window>` (in seconds), which is the duration of slow start mode per endpoint.
 During slow start window, load balancing weight of a particular endpoint will be scaled with time factor, e.g.:
 
@@ -59,3 +61,6 @@ Once endpoints E1 and E2 exit slow start mode, their load balancing weight remai
 .. image:: /_static/slow_start_example.svg
    :width: 60%
    :align: center
+
+*Note* in case when multiple priorities are used with slow start and lower priority has just one endpoint A, during cross-priority spillover there will be no progressive increase of traffic to endpoint A, all traffic will shift at once.
+Same applies to locality weighted loadbalancing, when slow start is enabled for the upstream cluster and traffic is routed cross zone to a zone with one endpoint A, there will be no progressive increase of traffic to endpoint A.

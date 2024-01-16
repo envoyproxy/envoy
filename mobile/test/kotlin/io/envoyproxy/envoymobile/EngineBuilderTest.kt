@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
+import io.envoyproxy.envoymobile.engine.JniLibrary
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.mockito.Mockito.mock
@@ -8,6 +9,10 @@ import org.mockito.Mockito.mock
 class EngineBuilderTest {
   private lateinit var engineBuilder: EngineBuilder
   private var envoyEngine: EnvoyEngine = mock(EnvoyEngine::class.java)
+
+  init {
+    JniLibrary.loadTestLibrary()
+  }
 
   @Test
   fun `adding log level builder uses log level for running Envoy`() {
@@ -17,36 +22,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.logLevel).isEqualTo(LogLevel.DEBUG)
-  }
-
-  @Test
-  fun `specifying stats domain overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addGrpcStatsDomain("stats.envoyproxy.io")
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
-  }
-
-  @Test
-  fun `enabling admin interface overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.enableAdminInterface()
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.adminInterfaceEnabled).isTrue()
-  }
-
-  @Test
-  fun `enabling happy eyeballs overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.enableHappyEyeballs(true)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.enableHappyEyeballs).isTrue()
   }
 
   @Test
@@ -136,7 +111,8 @@ class EngineBuilderTest {
     engineBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.h2ConnectionKeepaliveIdleIntervalMilliseconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.h2ConnectionKeepaliveIdleIntervalMilliseconds)
+      .isEqualTo(1234)
   }
 
   @Test
@@ -157,26 +133,6 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.maxConnectionsPerHost).isEqualTo(1234)
-  }
-
-  @Test
-  fun `enabling h2 keepalive extension overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.h2ExtendKeepaliveTimeout(true)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.h2ExtendKeepaliveTimeout).isTrue()
-  }
-
-  @Test
-  fun `specifying stats flush overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addStatsFlushSeconds(1234)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.statsFlushSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -220,16 +176,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `specifying virtual clusters overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addVirtualClusters("[test]")
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.virtualClusters).isEqualTo("[test]")
-  }
-
-  @Test
   fun `specifying native filters overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
@@ -237,5 +183,41 @@ class EngineBuilderTest {
 
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.nativeFilterChain.size).isEqualTo(1)
+  }
+
+  @Test
+  fun `specifying xDS works`() {
+    var xdsBuilder = XdsBuilder("fake_test_address", 0)
+    xdsBuilder
+      .addInitialStreamHeader("x-goog-api-key", "A1B2C3")
+      .addInitialStreamHeader("x-android-package", "com.google.myapp")
+    xdsBuilder.setSslRootCerts("my_root_certs")
+    xdsBuilder.addRuntimeDiscoveryService("some_rtds_resource")
+    xdsBuilder.addClusterDiscoveryService(
+      "xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz"
+    )
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.setXds(xdsBuilder)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.xdsAddress).isEqualTo("fake_test_address")
+    assertThat(engine.envoyConfiguration.xdsGrpcInitialMetadata)
+      .isEqualTo(mapOf("x-goog-api-key" to "A1B2C3", "x-android-package" to "com.google.myapp"))
+    assertThat(engine.envoyConfiguration.xdsRootCerts).isEqualTo("my_root_certs")
+    assertThat(engine.envoyConfiguration.rtdsResourceName).isEqualTo("some_rtds_resource")
+    assertThat(engine.envoyConfiguration.cdsResourcesLocator)
+      .isEqualTo("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
+  }
+
+  @Test
+  fun `specifying runtime guards work`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder
+      .setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false)
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_false"]).isEqualTo("true")
+    assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_true"]).isEqualTo("false")
   }
 }

@@ -3,7 +3,6 @@
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.validate.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/access_log_config.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/assert.h"
@@ -26,31 +25,24 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
   return context.singletonManager().getTyped<GrpcAccessLoggerCacheImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_access_logger_cache), [&context] {
         return std::make_shared<GrpcAccessLoggerCacheImpl>(
-            context.clusterManager().grpcAsyncClientManager(), context.scope(),
+            context.clusterManager().grpcAsyncClientManager(), context.serverScope(),
             context.threadLocal(), context.localInfo());
       });
-}
-
-::Envoy::AccessLog::InstanceSharedPtr AccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
 }
 
 ::Envoy::AccessLog::InstanceSharedPtr
 AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                           ::Envoy::AccessLog::FilterPtr&& filter,
-                                          Server::Configuration::CommonFactoryContext& context) {
+                                          Server::Configuration::FactoryContext& context) {
   validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<AccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                     getAccessLoggerCacheSingleton(context));
+  return std::make_shared<AccessLog>(std::move(filter), proto_config,
+                                     context.serverFactoryContext().threadLocal(),
+                                     getAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {
@@ -63,8 +55,8 @@ std::string AccessLogFactory::name() const { return "envoy.access_loggers.open_t
 /**
  * Static registration for the OpenTelemetry (gRPC) access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(AccessLogFactory, Server::Configuration::AccessLogInstanceFactory){
-    "envoy.open_telemetry_access_log"};
+REGISTER_FACTORY(AccessLogFactory,
+                 Envoy::AccessLog::AccessLogInstanceFactory){"envoy.open_telemetry_access_log"};
 
 } // namespace OpenTelemetry
 } // namespace AccessLoggers

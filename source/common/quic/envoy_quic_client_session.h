@@ -5,6 +5,7 @@
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 
@@ -26,13 +27,13 @@ public:
   EnvoyQuicClientSession(
       const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
       std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
-      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-      quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
+      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
       uint32_t send_buffer_limit,
       EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
       QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
       Stats::Scope& scope,
-      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory);
 
   ~EnvoyQuicClientSession() override;
 
@@ -64,13 +65,23 @@ public:
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+      return quic::HttpDatagramSupport::kRfc;
+    }
+#endif
+    return quic::HttpDatagramSupport::kNone;
+  }
+  std::vector<std::string> GetAlpnsToOffer() const override;
+
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
   // quic::ProofHandler
   void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
   // PacketsToReadDelegate
-  size_t numPacketsExpectedPerEventLoop() override {
+  size_t numPacketsExpectedPerEventLoop() const override {
     // Do one round of reading per active stream, or to see if there's a new
     // active stream.
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
@@ -81,6 +92,9 @@ public:
 
   // Notify any registered connection pool when new streams are available.
   void OnCanCreateNewOutgoingStream(bool) override;
+
+  void OnServerPreferredAddressAvailable(
+      const quic::QuicSocketAddress& server_preferred_address) override;
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
@@ -116,6 +130,8 @@ private:
   Stats::Scope& scope_;
   bool disable_keepalive_{false};
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  OptRef<QuicClientTransportSocketFactory> transport_socket_factory_;
+  std::vector<std::string> configured_alpns_;
 };
 
 } // namespace Quic

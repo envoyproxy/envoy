@@ -7,7 +7,8 @@ namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    const std::shared_ptr<Upstream::UpstreamLocalAddressSelector>& upstream_local_address_selector,
+    const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
+        upstream_local_address_selector,
     UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
@@ -22,6 +23,12 @@ bool HappyEyeballsConnectionProvider::hasNextConnection() {
 }
 
 ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const uint64_t id) {
+  if (first_connection_created_) {
+    // The stats for the first connection are handled in ActiveClient::ActiveClient
+    host_->stats().cx_total_.inc();
+    host_->cluster().trafficStats()->upstream_cx_total_.inc();
+  }
+  first_connection_created_ = true;
   ASSERT(hasNextConnection());
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id,
                   address_list_[next_address_]->asStringView());

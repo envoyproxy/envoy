@@ -22,9 +22,9 @@ envoy_cc_mock(
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
+        ":config_tracker_mocks",
         "//envoy/server:admin_interface",
         "//test/mocks/network:socket_mocks",
-        "//test/mocks/server:config_tracker_mocks",
     ],
 )
 
@@ -100,8 +100,8 @@ envoy_cc_mock(
     srcs = ["guard_dog.cc"],
     hdrs = ["guard_dog.h"],
     deps = [
+        ":watch_dog_mocks",
         "//envoy/server:guarddog_interface",
-        "//test/mocks/server:watch_dog_mocks",
     ],
 )
 
@@ -152,8 +152,8 @@ envoy_cc_mock(
     srcs = ["worker_factory.cc"],
     hdrs = ["worker_factory.h"],
     deps = [
+        ":worker_mocks",
         "//envoy/server:worker_interface",
-        "//test/mocks/server:worker_mocks",
     ],
 )
 
@@ -181,7 +181,34 @@ envoy_cc_mock(
     srcs = ["instance.cc"],
     hdrs = ["instance.h"],
     deps = [
+        ":server_factory_context_mocks",
+        ":transport_socket_factory_context_mocks",
         "//envoy/server:instance_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "main_mocks",
+    hdrs = ["main.h"],
+    deps = [
+        "//envoy/server:configuration_interface",
+        "//envoy/server/overload:overload_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "server_factory_context_mocks",
+    srcs = ["server_factory_context.cc"],
+    hdrs = ["server_factory_context.h"],
+    deps = [
+        ":admin_mocks",
+        ":drain_manager_mocks",
+        ":hot_restart_mocks",
+        ":listener_manager_mocks",
+        ":options_mocks",
+        ":overload_manager_mocks",
+        ":server_lifecycle_notifier_mocks",
+        "//envoy/server:factory_context_interface",
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
         "//source/common/quic:quic_stat_names_lib",
@@ -200,26 +227,9 @@ envoy_cc_mock(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
-        "//test/mocks/server:admin_mocks",
-        "//test/mocks/server:drain_manager_mocks",
-        "//test/mocks/server:hot_restart_mocks",
-        "//test/mocks/server:listener_manager_mocks",
-        "//test/mocks/server:options_mocks",
-        "//test/mocks/server:overload_manager_mocks",
-        "//test/mocks/server:server_lifecycle_notifier_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
-    ],
-)
-
-envoy_cc_mock(
-    name = "main_mocks",
-    hdrs = ["main.h"],
-    deps = [
-        "//envoy/server:configuration_interface",
-        "//envoy/server/overload:overload_manager_interface",
     ],
 )
 
@@ -228,11 +238,11 @@ envoy_cc_mock(
     srcs = ["factory_context.cc"],
     hdrs = ["factory_context.h"],
     deps = [
+        ":drain_manager_mocks",
+        ":instance_mocks",
+        ":overload_manager_mocks",
+        ":server_lifecycle_notifier_mocks",
         "//source/common/router:context_lib",
-        "//test/mocks/server:drain_manager_mocks",
-        "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:overload_manager_mocks",
-        "//test/mocks/server:server_lifecycle_notifier_mocks",
     ],
 )
 
@@ -241,14 +251,10 @@ envoy_cc_mock(
     srcs = ["transport_socket_factory_context.cc"],
     hdrs = ["transport_socket_factory_context.h"],
     deps = [
+        ":server_factory_context_mocks",
         "//envoy/server:tracer_config_interface",
         "//source/common/secret:secret_manager_impl_lib",
         "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/api:api_mocks",
-        "//test/mocks/server:config_tracker_mocks",
-        "//test/mocks/server:options_mocks",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -257,8 +263,8 @@ envoy_cc_mock(
     srcs = ["listener_factory_context.cc"],
     hdrs = ["listener_factory_context.h"],
     deps = [
+        ":factory_context_mocks",
         "//envoy/server:listener_manager_interface",
-        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
@@ -267,8 +273,10 @@ envoy_cc_mock(
     srcs = ["health_checker_factory_context.cc"],
     hdrs = ["health_checker_factory_context.h"],
     deps = [
+        ":factory_context_mocks",
         "//envoy/server:health_checker_config_interface",
         "//test/mocks:common_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -285,9 +293,9 @@ envoy_cc_mock(
     srcs = ["filter_chain_factory_context.cc"],
     hdrs = ["filter_chain_factory_context.h"],
     deps = [
+        ":factory_context_mocks",
         "//envoy/server:filter_config_interface",
         "//source/common/router:context_lib",
-        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
@@ -306,9 +314,9 @@ envoy_cc_mock(
     srcs = ["tracer_factory_context.cc"],
     hdrs = ["tracer_factory_context.h"],
     deps = [
+        ":instance_mocks",
+        ":tracer_factory_mocks",
         "//envoy/server:configuration_interface",
-        "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:tracer_factory_mocks",
     ],
 )
 
@@ -317,30 +325,30 @@ envoy_cc_mock(
     srcs = [],
     hdrs = ["mocks.h"],
     deps = [
-        "//test/mocks/server:admin_mocks",
-        "//test/mocks/server:admin_stream_mocks",
-        "//test/mocks/server:bootstrap_extension_factory_mocks",
-        "//test/mocks/server:config_tracker_mocks",
-        "//test/mocks/server:drain_manager_mocks",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:fatal_action_factory_mocks",
-        "//test/mocks/server:filter_chain_factory_context_mocks",
-        "//test/mocks/server:guard_dog_mocks",
-        "//test/mocks/server:health_checker_factory_context_mocks",
-        "//test/mocks/server:hot_restart_mocks",
-        "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:listener_component_factory_mocks",
-        "//test/mocks/server:listener_factory_context_mocks",
-        "//test/mocks/server:listener_manager_mocks",
-        "//test/mocks/server:main_mocks",
-        "//test/mocks/server:options_mocks",
-        "//test/mocks/server:overload_manager_mocks",
-        "//test/mocks/server:server_lifecycle_notifier_mocks",
-        "//test/mocks/server:tracer_factory_context_mocks",
-        "//test/mocks/server:tracer_factory_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
-        "//test/mocks/server:watch_dog_mocks",
-        "//test/mocks/server:worker_factory_mocks",
-        "//test/mocks/server:worker_mocks",
+        ":admin_mocks",
+        ":admin_stream_mocks",
+        ":bootstrap_extension_factory_mocks",
+        ":config_tracker_mocks",
+        ":drain_manager_mocks",
+        ":factory_context_mocks",
+        ":fatal_action_factory_mocks",
+        ":filter_chain_factory_context_mocks",
+        ":guard_dog_mocks",
+        ":health_checker_factory_context_mocks",
+        ":hot_restart_mocks",
+        ":instance_mocks",
+        ":listener_component_factory_mocks",
+        ":listener_factory_context_mocks",
+        ":listener_manager_mocks",
+        ":main_mocks",
+        ":options_mocks",
+        ":overload_manager_mocks",
+        ":server_lifecycle_notifier_mocks",
+        ":tracer_factory_context_mocks",
+        ":tracer_factory_mocks",
+        ":transport_socket_factory_context_mocks",
+        ":watch_dog_mocks",
+        ":worker_factory_mocks",
+        ":worker_mocks",
     ],
 )

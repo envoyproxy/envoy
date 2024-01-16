@@ -8,7 +8,9 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -18,6 +20,22 @@ namespace Filesystem {
 using FlagSet = std::bitset<5>;
 
 enum class DestinationType { File, Stderr, Stdout, TmpFile };
+
+enum class FileType { Regular, Directory, Other };
+
+struct FileInfo {
+  const std::string name_;
+  // the size of the file in bytes, or `nullopt` if the size could not be determined
+  //         (e.g. for directories, or windows symlinks.)
+  const absl::optional<uint64_t> size_;
+  // Note that if the file represented by name_ is a symlink, type_ will be the file type of the
+  // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
+  // A broken symlink on posix will have `FileType::Regular`.
+  const FileType file_type_;
+  const absl::optional<SystemTime> time_created_;
+  const absl::optional<SystemTime> time_last_accessed_;
+  const absl::optional<SystemTime> time_last_modified_;
+};
 
 /**
  * Abstraction for a basic file on disk.
@@ -58,6 +76,13 @@ public:
    * @return ssize_t number of bytes written, or -1 for failure
    */
   virtual Api::IoCallSizeResult write(absl::string_view buffer) PURE;
+
+  /**
+   * Get additional details about the file. May or may not require a file system operation.
+   *
+   * @return FileInfo the file info.
+   */
+  virtual Api::IoCallResult<FileInfo> info() PURE;
 
   /**
    * Close the file.
@@ -146,6 +171,19 @@ public:
   virtual bool fileExists(const std::string& path) PURE;
 
   /**
+   * @return FileInfo containing information about the file, or an error status.
+   */
+  virtual Api::IoCallResult<FileInfo> stat(absl::string_view path) PURE;
+
+  /**
+   * Attempts to create the given path, recursively if necessary.
+   * @return bool true if one or more directories was created and the path exists,
+   *         false if the path already existed, an error status if the path does
+   *         not exist after the call.
+   */
+  virtual Api::IoCallBoolResult createPath(absl::string_view path) PURE;
+
+  /**
    * @return bool whether a directory exists on disk and can be opened for read.
    */
   virtual bool directoryExists(const std::string& path) PURE;
@@ -158,18 +196,17 @@ public:
   virtual ssize_t fileSize(const std::string& path) PURE;
 
   /**
-   * @return full file content as a string.
-   * @throw EnvoyException if the file cannot be read.
+   * @return full file content as a string or an error if the file can not be read.
    * Be aware, this is not most highly performing file reading method.
    */
-  virtual std::string fileReadToEnd(const std::string& path) PURE;
+  virtual absl::StatusOr<std::string> fileReadToEnd(const std::string& path) PURE;
 
   /**
    * @path file path to split
-   * @return PathSplitResult containing the parent directory of the input path and the file name
-   * @note will throw an exception if path does not contain any path separator character
+   * @return PathSplitResult containing the parent directory of the input path and the file name or
+   * an error status.
    */
-  virtual PathSplitResult splitPathFromFilename(absl::string_view path) PURE;
+  virtual absl::StatusOr<PathSplitResult> splitPathFromFilename(absl::string_view path) PURE;
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This
@@ -184,8 +221,6 @@ public:
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
-
-enum class FileType { Regular, Directory, Other };
 
 struct DirectoryEntry {
   // name_ is the name of the file in the directory, not including the directory path itself
@@ -206,6 +241,9 @@ struct DirectoryEntry {
 };
 
 class DirectoryIteratorImpl;
+
+// Failures during this iteration will be silent; check status() after initialization
+// and after each increment, if error-handling is desired.
 class DirectoryIterator {
 public:
   DirectoryIterator() : entry_({"", FileType::Other, absl::nullopt}) {}
@@ -217,8 +255,11 @@ public:
 
   virtual DirectoryIteratorImpl& operator++() PURE;
 
+  const absl::Status& status() const { return status_; }
+
 protected:
   DirectoryEntry entry_;
+  absl::Status status_;
 };
 
 } // namespace Filesystem

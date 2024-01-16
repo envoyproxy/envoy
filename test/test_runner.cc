@@ -64,9 +64,19 @@ public:
   bool disable_;
 };
 
+bool isDeathTestChild(int argc, char** argv) {
+  for (int i = 0; i < argc; ++i) {
+    if (absl::StartsWith(argv[i], "--gtest_internal_run_death_test")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace
 
-int TestRunner::RunTests(int argc, char** argv) {
+int TestRunner::runTests(int argc, char** argv) {
+  const bool is_death_test_child = isDeathTestChild(argc, argv);
   ::testing::InitGoogleMock(&argc, argv);
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
@@ -140,7 +150,9 @@ int TestRunner::RunTests(int argc, char** argv) {
   std::unique_ptr<Logger::FileSinkDelegate> file_logger;
 
   // Redirect all logs to fake file when --log-path arg is specified in command line.
-  if (!TestEnvironment::getOptions().logPath().empty()) {
+  // However do not redirect to file from death test children as the parent typically
+  // looks for specific output in stderr
+  if (!TestEnvironment::getOptions().logPath().empty() && !is_death_test_child) {
     file_logger = std::make_unique<Logger::FileSinkDelegate>(
         TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
   }

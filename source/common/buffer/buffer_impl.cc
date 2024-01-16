@@ -325,6 +325,10 @@ void OwnedImpl::move(Instance& rhs) {
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
+  move(rhs, length, /*reset_drain_trackers_and_accounting=*/false);
+}
+
+void OwnedImpl::move(Instance& rhs, uint64_t length, bool reset_drain_trackers_and_accounting) {
   ASSERT(&rhs != this);
   // See move() above for why we do the static cast.
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
@@ -340,6 +344,12 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
       other.slices_.front().drain(copy_size);
       other.length_ -= copy_size;
     } else {
+      if (reset_drain_trackers_and_accounting) {
+        // The other slice is owned by a user-space IO handle and its drain trackers may refer to a
+        // connection that can die (and be freed) at any time. Call and clear the drain trackers to
+        // avoid potential use-after-free.
+        other.slices_.front().callAndClearDrainTrackersAndCharges();
+      }
       coalesceOrAddSlice(std::move(other.slices_.front()));
       other.slices_.pop_front();
       other.length_ -= slice_size;

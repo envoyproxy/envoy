@@ -80,8 +80,9 @@ private:
 class CookieHashMethod : public HashMethodImplBase {
 public:
   CookieHashMethod(const std::string& key, const std::string& path,
-                   const absl::optional<std::chrono::seconds>& ttl, bool terminal)
-      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl) {}
+                   const absl::optional<std::chrono::seconds>& ttl, bool terminal,
+                   const CookieAttributeRefVector attributes)
+      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl), attributes_(attributes) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
@@ -90,7 +91,7 @@ public:
     absl::optional<uint64_t> hash;
     std::string value = Utility::parseCookieValue(headers, key_);
     if (value.empty() && ttl_.has_value()) {
-      value = add_cookie(key_, path_, ttl_.value());
+      value = add_cookie(key_, path_, ttl_.value(), attributes_);
       hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
@@ -103,6 +104,7 @@ private:
   const std::string key_;
   const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
+  const CookieAttributeRefVector attributes_;
 };
 
 class IpHashMethod : public HashMethodImplBase {
@@ -140,11 +142,11 @@ public:
 
     const HeaderEntry* header = headers.Path();
     if (header) {
-      Http::Utility::QueryParams query_parameters =
-          Http::Utility::parseQueryString(header->value().getStringView());
-      const auto& iter = query_parameters.find(parameter_name_);
-      if (iter != query_parameters.end()) {
-        hash = HashUtil::xxHash64(iter->second);
+      Http::Utility::QueryParamsMulti query_parameters =
+          Http::Utility::QueryParamsMulti::parseQueryString(header->value().getStringView());
+      const auto val = query_parameters.getFirstValue(parameter_name_);
+      if (val.has_value()) {
+        hash = HashUtil::xxHash64(val.value());
       }
     }
     return hash;
@@ -188,9 +190,17 @@ HashPolicyImpl::HashPolicyImpl(
       if (hash_policy->cookie().has_ttl()) {
         ttl = std::chrono::seconds(hash_policy->cookie().ttl().seconds());
       }
+      std::vector<CookieAttribute> attributes;
+      for (const auto& attribute : hash_policy->cookie().attributes()) {
+        attributes.push_back({attribute.name(), attribute.value()});
+      }
+      CookieAttributeRefVector ref_attributes;
+      for (const auto& attribute : attributes) {
+        ref_attributes.push_back(attribute);
+      }
       hash_impls_.emplace_back(new CookieHashMethod(hash_policy->cookie().name(),
                                                     hash_policy->cookie().path(), ttl,
-                                                    hash_policy->terminal()));
+                                                    hash_policy->terminal(), ref_attributes));
       break;
     }
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
@@ -207,9 +217,9 @@ HashPolicyImpl::HashPolicyImpl(
       hash_impls_.emplace_back(
           new FilterStateHashMethod(hash_policy->filter_state().key(), hash_policy->terminal()));
       break;
-    default:
-      throw EnvoyException(
-          absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
+        POLICY_SPECIFIER_NOT_SET:
+      PANIC("hash policy not set");
     }
   }
 }

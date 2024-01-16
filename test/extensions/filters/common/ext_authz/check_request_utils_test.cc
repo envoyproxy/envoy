@@ -50,7 +50,9 @@ public:
     EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
   }
 
-  void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate) {
+  void callHttpCheckAndValidateRequestAttributes(
+      bool include_peer_certificate,
+      const envoy::service::auth::v3::AttributeContext_TLSSession* want_tls_session) {
     Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                    {":path", "/bar"}};
     envoy::service::auth::v3::CheckRequest request;
@@ -64,10 +66,11 @@ public:
     auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
     (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
 
-    CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                       std::move(metadata_context), request,
-                                       /*max_request_bytes=*/0, /*pack_as_bytes=*/false,
-                                       include_peer_certificate, labels, nullptr);
+    CheckRequestUtils::createHttpCheck(
+        &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
+        envoy::config::core::v3::Metadata(), request, /*max_request_bytes=*/0,
+        /*pack_as_bytes=*/false, include_peer_certificate, want_tls_session != nullptr, labels,
+        nullptr);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -75,7 +78,6 @@ public:
     EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
     EXPECT_EQ("value_1", request.attributes().destination().labels().at("label_1"));
     EXPECT_EQ("value_2", request.attributes().destination().labels().at("label_2"));
-
     EXPECT_EQ("bar", request.attributes()
                          .metadata_context()
                          .filter_metadata()
@@ -83,11 +85,17 @@ public:
                          .fields()
                          .at("foo")
                          .string_value());
+    EXPECT_TRUE(request.attributes().has_route_metadata_context());
 
     if (include_peer_certificate) {
       EXPECT_EQ(cert_data_, request.attributes().source().certificate());
     } else {
       EXPECT_EQ(0, request.attributes().source().certificate().size());
+    }
+
+    EXPECT_EQ(want_tls_session != nullptr, request.attributes().has_tls_session());
+    if (want_tls_session != nullptr) {
+      EXPECT_EQ(want_tls_session->sni(), request.attributes().tls_session().sni());
     }
   }
 
@@ -119,6 +127,7 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Buffer::InstancePtr buffer_;
   const std::string cert_data_{"cert-data"};
+  const std::string sni_{"foo.example.org"};
   const absl::string_view requested_server_name_{"server.name"};
 };
 
@@ -179,11 +188,11 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   expectBasicHttp();
-  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
-                                     Protobuf::Map<std::string, std::string>(),
-                                     envoy::config::core::v3::Metadata(), request_, size,
-                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
-                                     Protobuf::Map<std::string, std::string>(), nullptr);
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
@@ -207,11 +216,11 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   expectBasicHttp();
-  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
-                                     Protobuf::Map<std::string, std::string>(),
-                                     envoy::config::core::v3::Metadata(), request_, size,
-                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
-                                     Protobuf::Map<std::string, std::string>(), nullptr);
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false, /*include_tls_session=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(",foo,bar", request_.attributes().request().http().headers().at("x-duplicate-header"));
@@ -238,8 +247,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderMatchers) {
 
   CheckRequestUtils::createHttpCheck(
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, size,
-      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false, /*include_tls_session=*/false,
       Protobuf::Map<std::string, std::string>(), createRequestHeaderMatchers());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
@@ -259,11 +268,11 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   expectBasicHttp();
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<std::string, std::string>(),
-                                     envoy::config::core::v3::Metadata(), request_, size,
-                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
-                                     Protobuf::Map<std::string, std::string>(), nullptr);
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false, /*include_tls_session=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
@@ -281,8 +290,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/false,
-      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
+      buffer_->length(), /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -313,8 +323,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
   // request_.SerializeToString() still returns "true" when it is failed to serialize the data.
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/true,
-      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
+      buffer_->length(), /*pack_as_bytes=*/true, /*include_peer_certificate=*/false,
+      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
 
   // TODO(dio): Find a way to test this without using function from testing::internal namespace.
   testing::internal::CaptureStderr();
@@ -353,7 +364,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(false, nullptr);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -365,7 +376,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(false, nullptr);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -383,7 +394,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
   Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(false, nullptr);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -401,7 +412,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextSubject) {
   std::string subject_local = "destination";
   EXPECT_CALL(*ssl_, subjectLocalCertificate()).WillOnce(ReturnRef(subject_local));
 
-  callHttpCheckAndValidateRequestAttributes(false);
+  callHttpCheckAndValidateRequestAttributes(false, nullptr);
 }
 
 // Verify that the source certificate is populated correctly.
@@ -413,7 +424,54 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   EXPECT_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(cert_data_));
 
-  callHttpCheckAndValidateRequestAttributes(true);
+  callHttpCheckAndValidateRequestAttributes(true, nullptr);
+}
+
+// Verify that the SNI is populated correctly.
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
+  EXPECT_CALL(callbacks_, connection())
+      .Times(5)
+      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(Const(connection_), ssl()).Times(5).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
+  EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
+  want_tls_session.set_sni(sni_);
+  EXPECT_CALL(*ssl_, sni()).Times(2).WillRepeatedly(ReturnRef(want_tls_session.sni()));
+
+  callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
+}
+
+// Verify that the SNI is populated correctly.
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
+  EXPECT_CALL(callbacks_, connection())
+      .Times(4)
+      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
+  EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  envoy::service::auth::v3::AttributeContext_TLSSession want_tls_session;
+  EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
+
+  callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
 
 } // namespace

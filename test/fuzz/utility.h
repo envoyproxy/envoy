@@ -13,7 +13,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/header_validator.h"
 
 // Strong assertion that applies across all compilation modes and doesn't rely
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
@@ -53,7 +53,7 @@ inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
   for (const char& c : string) {
-    if (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(&c), 1)) {
+    if (http2::adapter::HeaderValidator::IsValidAuthority(absl::string_view(&c, 1))) {
       filtered.push_back(c);
     } else {
       filtered.push_back('0');
@@ -151,7 +151,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           : stream_info.start_time() / 1000;
   test_stream_info->start_time_ = SystemTime(std::chrono::microseconds(start_time));
   if (stream_info.has_response_code()) {
-    test_stream_info->response_code_ = stream_info.response_code().value();
+    test_stream_info->setResponseCode(stream_info.response_code().value());
   }
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
@@ -170,7 +170,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           replaceInvalidHostCharacters(
               stream_info.address().envoy_internal_address().server_listener_name()));
     } else {
-      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address()).value();
     }
   } else {
     address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
@@ -178,6 +178,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   auto upstream_local_address =
       stream_info.has_upstream_local_address()
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
+                .value()
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
   test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =

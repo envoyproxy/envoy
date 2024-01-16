@@ -3,7 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
 #include "source/extensions/tracers/zipkin/tracer_interface.h"

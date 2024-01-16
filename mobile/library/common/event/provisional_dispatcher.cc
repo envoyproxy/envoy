@@ -23,8 +23,9 @@ void ProvisionalDispatcher::drain(Event::Dispatcher& event_dispatcher) {
   drained_ = true;
   event_dispatcher_ = &event_dispatcher;
 
-  for (const Event::PostCb& cb : init_queue_) {
-    event_dispatcher_->post(cb);
+  while (!init_queue_.empty()) {
+    event_dispatcher_->post(std::move(init_queue_.front()));
+    init_queue_.pop_front();
   }
 }
 
@@ -37,11 +38,11 @@ envoy_status_t ProvisionalDispatcher::post(Event::PostCb callback) {
   }
 
   if (drained_) {
-    event_dispatcher_->post(callback);
+    event_dispatcher_->post(std::move(callback));
     return ENVOY_SUCCESS;
   }
 
-  init_queue_.push_back(callback);
+  init_queue_.push_back(std::move(callback));
   return ENVOY_SUCCESS;
 }
 

@@ -2,6 +2,7 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -17,6 +18,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 
@@ -40,10 +42,13 @@ public:
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
-    Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
-    Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_,
-        stats_store_, validation_visitor_);
+
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+
+    ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+
     if (uses_tls) {
       EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
     }
@@ -52,13 +57,17 @@ public:
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    cluster_ = std::make_shared<Cluster>(server_context_, cluster_config, config, runtime_, *this,
-                                         local_info_, factory_context, std::move(scope), false);
+    auto cache = dns_cache_manager_->getCache(config.dns_cache_config()).value();
+    cluster_.reset(
+        new Cluster(cluster_config, std::move(cache), config, factory_context, this->get()));
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
+    ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(lb_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
+    ON_CALL(lb_context_, downstreamConnection()).WillByDefault(Return(&connection_));
 
     member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added,
@@ -103,11 +112,23 @@ public:
     host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
   }
 
-  void refreshLb() { lb_ = lb_factory_->create(); }
+  void refreshLb() { lb_ = lb_factory_->create(lb_params_); }
 
   Upstream::MockLoadBalancerContext* setHostAndReturnContext(const std::string& host) {
     downstream_headers_.remove(":authority");
     downstream_headers_.addCopy(":authority", host);
+    return &lb_context_;
+  }
+
+  Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
+    StreamInfo::FilterState& filter_state =
+        const_cast<StreamInfo::FilterState&>(lb_context_.requestStreamInfo()->filterState());
+
+    filter_state.setData(
+        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+
     return &lb_context_;
   }
 
@@ -133,12 +154,10 @@ public:
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
-  Ssl::MockContextManager ssl_context_manager_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  Ssl::MockContextManager ssl_context_manager_;
+
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   std::shared_ptr<Cluster> cluster_;
@@ -152,6 +171,23 @@ public:
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Network::MockConnection> connection_;
+
+  // Just use this as parameters of create() method but thread aware load balancer will not use it.
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
+
+  const std::string sub_cluster_yaml_config_ = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+)EOF";
 
   const std::string default_yaml_config_ = R"EOF(
 name: name
@@ -179,11 +215,31 @@ cluster_type:
 )EOF";
 };
 
+// createSubClusterConfig twice.
+TEST_F(ClusterTest, CreateSubClusterConfig) {
+  initialize(sub_cluster_yaml_config_, false);
+
+  const std::string cluster_name = "fake_cluster_name";
+  const std::string host = "localhost";
+  const int port = 80;
+  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
+      cluster_->createSubClusterConfig(cluster_name, host, port);
+  EXPECT_EQ(true, sub_cluster_pair.first);
+  EXPECT_EQ(true, sub_cluster_pair.second.has_value());
+
+  // create again, already exists
+  sub_cluster_pair = cluster_->createSubClusterConfig(cluster_name, host, port);
+  EXPECT_EQ(true, sub_cluster_pair.first);
+  EXPECT_EQ(false, sub_cluster_pair.second.has_value());
+}
+
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
   initialize(default_yaml_config_, false);
-  makeTestHost("host1", "1.2.3.4");
+  makeTestHost("host1:0", "1.2.3.4");
   InSequence s;
+
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("")));
 
   // Verify no host LB cases.
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
@@ -191,57 +247,63 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 
   // After changing the address, LB will immediately resolve the new address with a refresh.
-  updateTestHostAddress("host1", "2.3.4.5");
-  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("2.3.4.5:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 
   // Remove the host, LB will immediately fail to find the host in the map.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
-  update_callbacks_->onDnsHostRemove("host1");
+  update_callbacks_->onDnsHostRemove("host1:0");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
 }
 
 // Outlier detection
 TEST_F(ClusterTest, OutlierDetection) {
   initialize(default_yaml_config_, false);
-  makeTestHost("host1", "1.2.3.4");
-  makeTestHost("host2", "5.6.7.8");
+  makeTestHost("host1:0", "1.2.3.4");
+  makeTestHost("host2:0", "5.6.7.8");
   InSequence s;
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host2", host_map_["host2"]);
-  EXPECT_CALL(*host_map_["host2"], touch());
-  EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
+  update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]);
+  EXPECT_CALL(*host_map_["host2:0"], touch());
+  EXPECT_EQ("5.6.7.8:0",
+            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
 
   // Fail outlier check for host1
-  setOutlierFailed("host1");
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
-  // "host2" should not be affected
-  EXPECT_CALL(*host_map_["host2"], touch());
-  EXPECT_EQ("5.6.7.8:0", lb_->chooseHost(setHostAndReturnContext("host2"))->address()->asString());
+  setOutlierFailed("host1:0");
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
+  // "host2:0" should not be affected
+  EXPECT_CALL(*host_map_["host2:0"], touch());
+  EXPECT_EQ("5.6.7.8:0",
+            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
 
   // Clear outlier check failure for host1, it should be available again
-  clearOutlierFailed("host1");
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
+  clearOutlierFailed("host1:0");
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 }
 
 // Various invalid LB context permutations in case the cluster is used outside of HTTP.
@@ -252,10 +314,21 @@ TEST_F(ClusterTest, InvalidLbContext) {
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 }
 
+TEST_F(ClusterTest, FilterStateHostOverride) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setFilterStateHostAndReturnContext("host1:0"))->address()->asString());
+}
+
 // Verify cluster attaches to a populated cache.
 TEST_F(ClusterTest, PopulatedCache) {
-  makeTestHost("host1", "1.2.3.4");
-  makeTestHost("host2", "1.2.3.5");
+  makeTestHost("host1:0", "1.2.3.4");
+  makeTestHost("host2:0", "1.2.3.5");
   initialize(default_yaml_config_, false);
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
@@ -577,22 +650,25 @@ protected:
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
-        ssl_context_manager_, nullptr, true, validation_visitor_);
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        true);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
-    std::tie(cluster_, thread_aware_lb_) =
-        cluster_factory->create(server_context_, cluster_config, cluster_factory_context);
+    auto result = cluster_factory->create(cluster_config, cluster_factory_context);
+    if (result.ok()) {
+      cluster_ = result->first;
+      thread_aware_lb_ = std::move(result->second);
+    } else {
+      throw EnvoyException(std::string(result.status().message()));
+    }
   }
 
 private:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_store_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
 };
@@ -631,6 +707,47 @@ upstream_http_protocol_options: {}
 )EOF");
 
   createCluster(yaml_config);
+}
+
+TEST_F(ClusterFactoryTest, InvalidSubprotocolOptions) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+      lb_policy: CLUSTER_PROVIDED
+)EOF";
+
+  EXPECT_THROW(createCluster(yaml_config), EnvoyException);
+}
+
+TEST(ObjectFactory, DynamicHost) {
+  const std::string name = "envoy.upstream.dynamic_host";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string host = "site.com";
+  auto object = factory->createFromBytes(host);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(host, object->serializeAsString());
+}
+
+TEST(ObjectFactory, DynamicPort) {
+  const std::string name = "envoy.upstream.dynamic_port";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string port = "8080";
+  auto object = factory->createFromBytes(port);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(port, object->serializeAsString());
+  ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
 }
 
 } // namespace DynamicForwardProxy

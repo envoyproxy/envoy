@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -34,7 +35,10 @@ TEST(MutationUtils, TestBuildHeaders) {
   headers.addCopy(LowerCaseString("x-number"), 9999);
 
   envoy::config::core::v3::HeaderMap proto_headers;
-  MutationUtils::headersToProto(headers, proto_headers);
+  // Neither allow_headers nor disallow_headers is set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
                                           {":path", "/foo/the/bar?size=123"},
@@ -46,6 +50,8 @@ TEST(MutationUtils, TestBuildHeaders) {
 }
 
 TEST(MutationUtils, TestApplyMutations) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"},
       {":method", "GET"},
@@ -153,6 +159,8 @@ TEST(MutationUtils, TestApplyMutations) {
 }
 
 TEST(MutationUtils, TestNonAppendableHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
@@ -186,6 +194,79 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
       {":status", "400"},
   };
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+}
+
+TEST(MutationUtils, TestSetHeaderWithInvalidCharacter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  // Test header key contains invalid character.
+  s->mutable_header()->set_key("x-append-this\n");
+  s->mutable_header()->set_value("value");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+
+  mutation.Clear();
+  s = mutation.add_set_headers();
+  // Test header value contains invalid character.
+  s->mutable_header()->set_key("x-append-this");
+  s->mutable_header()->set_value("value\r");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+}
+
+TEST(MutationUtils, TestSetHeaderWithContentLength) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
+  Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"host", "localhost:1000"},
+  };
+  // Use the default mutation rules
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  // Test header key contains content_length.
+  s->mutable_header()->set_key("content-length");
+  s->mutable_header()->set_value("10");
+
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                  /*remove_content_length=*/true)
+                  .ok());
+  // When `remove_content_length` is true, content_length headers is not added.
+  EXPECT_EQ(headers.ContentLength(), nullptr);
+
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                  /*remove_content_length=*/false)
+                  .ok());
+  // When `remove_content_length` is false, content_length headers is added.
+  EXPECT_EQ(headers.getContentLengthValue(), "10");
+}
+
+TEST(MutationUtils, TestRemoveHeaderWithInvalidCharacter) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  mutation.add_remove_headers("host\n");
+  Checker checker(HeaderMutationRules::default_instance());
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
 }
 
 // Ensure that we actually replace the body
@@ -242,6 +323,124 @@ TEST(MutationUtils, TestBodyMutationNothing) {
   BodyMutation mut;
   MutationUtils::applyBodyMutations(mut, buf);
   EXPECT_TRUE(TestUtility::buffersEqual(buf, bufCopy));
+}
+
+TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // allow_headers is set. disallow_headers is not.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":Path");
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // allow_headers is set. disallow_headers is not.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":Path");
+  string_matcher.set_ignore_case(true);
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST(MutationUtils, TestBothAllowAndDisallowHeadersSet) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // Both allow_headers and disallow_headers are set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+
+  // Set allow_headers.
+  string_matcher.set_exact(":method");
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":path");
+  allow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+
+  // Set disallow_headers
+  string_matcher.set_exact(":method");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // allow_headers not set. disallow_headers set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+
+  // Set disallow_headers.
+  string_matcher.set_exact(":method");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+  string_matcher.set_exact(":path");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          string_matcher));
+
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{"content-type", "text/plain; encoding=UTF8"},
+                                          {"x-something-else", "yes"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 
 } // namespace

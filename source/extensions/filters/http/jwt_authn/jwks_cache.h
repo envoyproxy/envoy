@@ -72,6 +72,10 @@ public:
     virtual JwtCache& getJwtCache() PURE;
   };
 
+  // If there is only one provider in the config, return the data for that provider.
+  // It is only used for checking "failed_status_in_metadata" config for now.
+  virtual JwksData* getSingleProvider() PURE;
+
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
   virtual JwksData* findByIssuer(const std::string& issuer) PURE;
 

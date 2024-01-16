@@ -1,71 +1,149 @@
-load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 load("//bazel:android_debug_info.bzl", "android_debug_info")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_mobile_test_extensions.bzl", "TEST_EXTENSIONS")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
-cc_library(
+# Support for JNI, using NDK on Android and Java otherwise, since the JNI APIs
+# differ a bit between the two.
+envoy_cc_library(
+    name = "jni_support_lib",
+    srcs = select({
+        "@envoy//bazel:android": ["ndk_jni_support.cc"],
+        "//conditions:default": ["java_jni_support.cc"],
+    }),
+    hdrs = ["jni_support.h"],
+    linkopts = select({
+        "@envoy//bazel:android": ["-llog"],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    deps = [
+        "//library/common/jni/import:jni_import_lib",
+    ],
+)
+
+# Various JNI helper libraries.
+envoy_cc_library(
     name = "jni_utility_lib",
     srcs = [
         "jni_utility.cc",
-        "jni_version.cc",
     ],
     hdrs = [
-        "jni_support.h",
         "jni_utility.h",
-        "jni_version.h",
     ],
+    repository = "@envoy",
     deps = [
+        ":jni_helper_lib",
+        ":jni_support_lib",
         "//library/common/jni/import:jni_import_lib",
+        "//library/common/jni/types:jni_env_lib",
+        "//library/common/jni/types:jni_exception_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
+        "//library/common/types:matcher_data_lib",
+        "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "jni_helper_lib",
+    srcs = [
+        "jni_helper.cc",
+    ],
+    hdrs = [
+        "jni_helper.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "//library/common/jni/import:jni_import_lib",
         "@envoy//source/common/common:assert_lib",
     ],
 )
 
-cc_library(
-    name = "jni_interface_lib",
+# Implementations of the various "native" Java methods for classes
+# in library/java/io/envoyproxy/envoymobile.
+envoy_cc_library(
+    name = "jni_impl_lib",
     srcs = [
-        "jni_interface.cc",
+        "jni_impl.cc",
     ],
+    repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
-        ":ndk_jni_support",
+        "//library/cc:engine_builder_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        "//library/common/extensions/key_value/platform:config",
+        "//library/common/jni/types:jni_exception_lib",
+        "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:managed_types_lib",
+        "@envoy//source/common/protobuf",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
 )
 
-cc_library(
-    name = "envoy_jni_lib",
+# Cert verification related functions which call into AndroidNetworkLibrary.
+envoy_cc_library(
+    name = "android_network_utility_lib",
     srcs = [
-        "android_jni_interface.cc",
+        "android_network_utility.cc",
     ],
-    linkopts = [
-        "-lm",
-        "-ldl",
-    ] + select({
-        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": [],
-    }) + select({
-        "@envoy//bazel:android": ["-llog"],
-        "//conditions:default": [],
-    }),
+    hdrs = [
+        "android_network_utility.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":jni_utility_lib",
+        "//library/common/api:c_types",
+        "//library/common/data:utility_lib",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        "//library/common/jni/import:jni_import_lib",
+        "//library/common/jni/types:jni_exception_lib",
+        "//library/common/jni/types:jni_javavm_lib",
+        "//library/common/types:c_types_lib",
+        "@envoy//bazel:boringssl",
+    ],
+)
+
+# Implementations of the "native" Java methods for AndroidJniLibrary.java
+envoy_cc_library(
+    name = "android_jni_impl_lib",
+    srcs = [
+        "android_jni_impl.cc",
+    ],
+    repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
-        ":jni_interface_lib",
+        ":jni_impl_lib",
+        ":jni_support_lib",
         ":jni_utility_lib",
-        ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
-        "//library/common/api:c_types",
-        "//library/common/types:managed_types_lib",
+        "//library/common/jni/import:jni_import_lib",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+# Library which contains all the JNI related targets.
+envoy_cc_library(
+    name = "envoy_jni_lib",
+    linkopts = select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    deps = [
+        ":android_jni_impl_lib",
+        ":android_network_utility_lib",
+        ":jni_impl_lib",
+        ":jni_support_lib",
+        ":jni_utility_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -83,12 +161,16 @@ config_setting(
 cc_binary(
     name = "libenvoy_jni.so",
     linkopts = [
+        # Without this option the app crashes when launched
+        # on arm64 emulator which is not covered by CI.
+        "-ldl",
+        # Brotli compressor includes libm, so Envoy itself gets it by default.
+        # Envoy Mobile doesn't include Brotli compressor, so libm doesn't get
+        # included in the build, but several parts of Envoy rely on libm, for
+        # example, for std::pow, so we link it in here.
         "-lm",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": [],
-    }) + select({
-        "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }),
     linkshared = True,
@@ -103,115 +185,7 @@ android_debug_info(
     dep = "libenvoy_jni.so",
 )
 
-## Targets for local execution
-# OS X binary (.jnilib) for NDK testing
-envoy_mobile_so_to_jni_lib(
-    name = "libndk_envoy_jni_jnilib",
-    native_dep = "libndk_envoy_jni.so",
-)
-
-# Base binary (.so) for NDK testing
-cc_binary(
-    name = "libndk_envoy_jni.so",
-    srcs = [
-        "android_test_jni_interface.cc",
-    ],
-    linkopts = [
-    ],
-    linkshared = True,
-    deps = [
-        ":android_network_utility_lib",
-        ":base_java_jni_lib",
-        ":java_jni_support",
-        ":jni_interface_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/api:c_types",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/types:managed_types_lib",
-    ],
-)
-
-# OS X binary (.jnilib) for JVM testing
-envoy_mobile_so_to_jni_lib(
-    name = "java_jni_lib.jnilib",
-    native_dep = "libjava_jni_lib.so",
-)
-
-cc_library(
-    name = "java_jni_base_lib",
-    deps = [
-        ":android_network_utility_lib",
-        ":base_java_jni_lib",
-        ":jni_interface_lib",
-    ],
-    alwayslink = True,
-)
-
-# Base binary (.so) for JVM testing
-cc_binary(
-    name = "libjava_jni_lib.so",
-    linkopts = [
-        "-lm",
-    ],
-    linkshared = True,
-    deps = [
-        ":java_jni_base_lib",
-        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
-    ],
-)
-
-cc_library(
-    name = "base_java_jni_lib",
-    linkopts = [
-        "-lm",
-    ],
-    deps = [
-        ":java_jni_support",
-        ":jni_utility_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/types:c_types_lib",
-        "//library/common/types:managed_types_lib",
-        "@envoy//source/common/common:assert_lib",
-    ] + TEST_EXTENSIONS,
-)
-
-# Utility implementation for Java JNI
-cc_library(
-    name = "java_jni_support",
-    srcs = [
-        "java_jni_support.cc",
-    ],
-    hdrs = ["jni_support.h"],
-    linkopts = [
-        "-lm",
-    ],
-    deps = [
-        "//library/common/jni/import:jni_import_lib",
-    ],
-)
-
-# Utility implementation for NDK JNI
-cc_library(
-    name = "ndk_jni_support",
-    srcs = [
-    ] + select({
-        "@envoy//bazel:android": ["ndk_jni_support.cc"],
-        "//conditions:default": [],
-    }),
-    hdrs = ["jni_support.h"],
-    linkopts = [
-        "-lm",
-    ] + select({
-        "@envoy//bazel:android": ["-llog"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//library/common/jni/import:jni_import_lib",
-    ],
-)
-
-cc_library(
+envoy_cc_library(
     name = "android_jni_utility_lib",
     srcs = [
         "android_jni_utility.cc",
@@ -219,36 +193,17 @@ cc_library(
     hdrs = [
         "android_jni_utility.h",
     ],
+    repository = "@envoy",
     deps = [
-        "@envoy//source/common/common:assert_lib",
         "//library/common/types:c_types_lib",
+        "@envoy//source/common/common:assert_lib",
     ] + select({
         "@envoy//bazel:android": [
-            ":ndk_jni_support",
+            ":jni_support_lib",
             ":jni_utility_lib",
             "//library/common/data:utility_lib",
             "//library/common/jni/import:jni_import_lib",
         ],
         "//conditions:default": [],
     }),
-)
-
-cc_library(
-    name = "android_network_utility_lib",
-    srcs = [
-        "android_network_utility.cc",
-    ],
-    hdrs = [
-        "android_network_utility.h",
-    ],
-    deps = [
-        ":jni_utility_lib",
-        "//library/common/api:c_types",
-        "//library/common/data:utility_lib",
-        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/types:c_types_lib",
-        "@envoy//bazel:boringssl",
-        "@envoy//source/common/common:assert_lib",
-    ],
 )

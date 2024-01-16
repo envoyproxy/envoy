@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/documentation_url.h"
 #include "source/common/common/fmt.h"
+#include "source/common/protobuf/deterministic_hash.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/visitor.h"
@@ -20,7 +21,6 @@
 #include "udpa/annotations/status.pb.h"
 #include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
-#include "yaml-cpp/yaml.h"
 
 using namespace std::chrono_literals;
 
@@ -28,97 +28,11 @@ namespace Envoy {
 namespace {
 
 absl::string_view filenameFromPath(absl::string_view full_path) {
-  size_t index = full_path.rfind("/");
+  size_t index = full_path.rfind('/');
   if (index == std::string::npos || index == full_path.size()) {
     return full_path;
   }
   return full_path.substr(index + 1, full_path.size());
-}
-
-void blockFormat(YAML::Node node) {
-  node.SetStyle(YAML::EmitterStyle::Block);
-
-  if (node.Type() == YAML::NodeType::Sequence) {
-    for (const auto& it : node) {
-      blockFormat(it);
-    }
-  }
-  if (node.Type() == YAML::NodeType::Map) {
-    for (const auto& it : node) {
-      blockFormat(it.second);
-    }
-  }
-}
-
-ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
-  ProtobufWkt::Value value;
-  switch (node.Type()) {
-  case YAML::NodeType::Null:
-    value.set_null_value(ProtobufWkt::NULL_VALUE);
-    break;
-  case YAML::NodeType::Scalar: {
-    if (node.Tag() == "!") {
-      value.set_string_value(node.as<std::string>());
-      break;
-    }
-    bool bool_value;
-    if (YAML::convert<bool>::decode(node, bool_value)) {
-      value.set_bool_value(bool_value);
-      break;
-    }
-    int64_t int_value;
-    if (YAML::convert<int64_t>::decode(node, int_value)) {
-      if (std::numeric_limits<int32_t>::min() <= int_value &&
-          std::numeric_limits<int32_t>::max() >= int_value) {
-        // We could convert all integer values to string but it will break some stuff relying on
-        // ProtobufWkt::Struct itself, only convert small numbers into number_value here.
-        value.set_number_value(int_value);
-      } else {
-        // Proto3 JSON mapping allows use string for integer, this still has to be converted from
-        // int_value to support hexadecimal and octal literals.
-        value.set_string_value(std::to_string(int_value));
-      }
-      break;
-    }
-    // Fall back on string, including float/double case. When protobuf parse the JSON into a message
-    // it will convert based on the type in the message definition.
-    value.set_string_value(node.as<std::string>());
-    break;
-  }
-  case YAML::NodeType::Sequence: {
-    auto& list_values = *value.mutable_list_value()->mutable_values();
-    for (const auto& it : node) {
-      *list_values.Add() = parseYamlNode(it);
-    }
-    break;
-  }
-  case YAML::NodeType::Map: {
-    auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
-    for (const auto& it : node) {
-      if (it.first.Tag() != "!ignore") {
-        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
-      }
-    }
-    break;
-  }
-  case YAML::NodeType::Undefined:
-    throw EnvoyException("Undefined YAML value");
-  }
-  return value;
-}
-
-void jsonConvertInternal(const Protobuf::Message& source,
-                         ProtobufMessage::ValidationVisitor& validation_visitor,
-                         Protobuf::Message& dest) {
-  Protobuf::util::JsonPrintOptions json_options;
-  json_options.preserve_proto_field_names = true;
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
-  if (!status.ok()) {
-    throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
-                                     status.ToString(), source.DebugString()));
-  }
-  MessageUtil::loadFromJson(json, dest, validation_visitor);
 }
 
 // Logs a warning for use of a deprecated field or runtime-overridden use of an
@@ -201,135 +115,52 @@ uint64_t fractionalPercentDenominatorToInt(
 
 } // namespace ProtobufPercentHelper
 
-MissingFieldException::MissingFieldException(const std::string& field_name,
-                                             const Protobuf::Message& message)
-    : EnvoyException(
-          fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString())) {}
-
-ProtoValidationException::ProtoValidationException(const std::string& validation_error,
-                                                   const Protobuf::Message& message)
-    : EnvoyException(fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                 message.DebugString())) {
-  ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
-}
-
 void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_name,
                                                     const Protobuf::Message& message) {
-  throw MissingFieldException(field_name, message);
+  std::string error =
+      fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString());
+  throwEnvoyExceptionOrPanic(error);
 }
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
-  throw ProtoValidationException(validation_error, message);
+  std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
+                                  message.DebugString());
+  throwEnvoyExceptionOrPanic(error);
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
-  std::string text_format;
-
-  {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
+    return DeterministicProtoHash::hash(message);
+  } else {
+    std::string text_format;
     Protobuf::TextFormat::Printer printer;
     printer.SetExpandAny(true);
     printer.SetUseFieldNumber(true);
     printer.SetSingleLineMode(true);
     printer.SetHideUnknownFields(true);
     printer.PrintToString(message, &text_format);
+    return HashUtil::xxHash64(text_format);
   }
-
-  return HashUtil::xxHash64(text_format);
+#else
+  return HashUtil::xxHash64(message.SerializeAsString());
+#endif
 }
 
-void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor) {
-  bool has_unknown_field;
-  auto status = loadFromJsonNoThrow(json, message, has_unknown_field);
-  if (status.ok()) {
-    return;
-  }
-  if (has_unknown_field) {
-    // If the parsing failure is caused by the unknown fields.
-    validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                      status.ToString());
-  } else {
-    // If the error has nothing to do with unknown field.
-    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
-  }
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+// NOLINTNEXTLINE(readability-identifier-naming)
+bool MessageLiteDifferencer::Equals(const Protobuf::Message& message1,
+                                    const Protobuf::Message& message2) {
+  return MessageUtil::hash(message1) == MessageUtil::hash(message2);
 }
 
-Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
-                                                        Protobuf::Message& message,
-                                                        bool& has_unknown_fileld) {
-  has_unknown_fileld = false;
-  Protobuf::util::JsonParseOptions options;
-  options.case_insensitive_enum_parsing = true;
-  // Let's first try and get a clean parse when checking for unknown fields;
-  // this should be the common case.
-  options.ignore_unknown_fields = false;
-  const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-  if (strict_status.ok()) {
-    // Success, no need to do any extra work.
-    return strict_status;
-  }
-  // If we fail, we see if we get a clean parse when allowing unknown fields.
-  // This is essentially a workaround
-  // for https://github.com/protocolbuffers/protobuf/issues/5967.
-  // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
-  // detection directly.
-  options.ignore_unknown_fields = true;
-  const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-  // If we still fail with relaxed unknown field checking, the error has nothing
-  // to do with unknown fields.
-  if (relaxed_status.ok()) {
-    has_unknown_fileld = true;
-    return strict_status;
-  }
-  return relaxed_status;
+// NOLINTNEXTLINE(readability-identifier-naming)
+bool MessageLiteDifferencer::Equivalent(const Protobuf::Message& message1,
+                                        const Protobuf::Message& message2) {
+  return Equals(message1, message2);
 }
-
-void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
-  // No need to validate if converting to a Struct, since there are no unknown
-  // fields possible.
-  loadFromJson(json, message, ProtobufMessage::getNullValidationVisitor());
-}
-
-void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor) {
-  ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml);
-  if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
-      value.kind_case() == ProtobufWkt::Value::kListValue) {
-    jsonConvertInternal(value, validation_visitor, message);
-    return;
-  }
-  throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
-}
-
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
-  const std::string contents = api.fileSystem().fileReadToEnd(path);
-  // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
-    // Attempt to parse the binary format.
-    if (message.ParseFromString(contents)) {
-      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
-    }
-    return;
-  }
-
-  // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
-    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
-    }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                         message.GetTypeName() + ")");
-  }
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
-      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
-    loadFromYaml(contents, message, validation_visitor);
-  } else {
-    loadFromJson(contents, message, validation_visitor);
-  }
-}
+#endif
 
 namespace {
 
@@ -342,9 +173,11 @@ void checkForDeprecatedNonRepeatedEnumValue(
     return;
   }
 
-  bool default_value = !reflection->HasField(message, field);
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
+  bool default_value = !reflection->HasField(*reflectable_message, field);
 
-  const Protobuf::EnumValueDescriptor* enum_value_descriptor = reflection->GetEnum(message, field);
+  const Protobuf::EnumValueDescriptor* enum_value_descriptor =
+      reflection->GetEnum(*reflectable_message, field);
   if (!enum_value_descriptor->options().deprecated()) {
     return;
   }
@@ -374,7 +207,8 @@ public:
       : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
   void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
-    const Protobuf::Reflection* reflection = message.GetReflection();
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
+    const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     absl::string_view filename = filenameFromPath(field.file()->name());
 
     // Before we check to see if the field is in use, see if there's a
@@ -383,8 +217,8 @@ public:
                                            validation_visitor_);
 
     // If this field is not in use, continue.
-    if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
-        (!field.is_repeated() && !reflection->HasField(message, &field))) {
+    if ((field.is_repeated() && reflection->FieldSize(*reflectable_message, &field) == 0) ||
+        (!field.is_repeated() && !reflection->HasField(*reflectable_message, &field))) {
       return;
     }
 
@@ -410,7 +244,8 @@ public:
 
   void onMessage(const Protobuf::Message& message,
                  absl::Span<const Protobuf::Message* const> parents, bool) override {
-    if (message.GetDescriptor()
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
+    if (reflectable_message->GetDescriptor()
             ->options()
             .GetExtension(xds::annotations::v3::message_status)
             .work_in_progress()) {
@@ -419,17 +254,20 @@ public:
     }
 
     const auto& udpa_file_options =
-        message.GetDescriptor()->file()->options().GetExtension(udpa::annotations::file_status);
+        reflectable_message->GetDescriptor()->file()->options().GetExtension(
+            udpa::annotations::file_status);
     const auto& xds_file_options =
-        message.GetDescriptor()->file()->options().GetExtension(xds::annotations::v3::file_status);
+        reflectable_message->GetDescriptor()->file()->options().GetExtension(
+            xds::annotations::v3::file_status);
     if (udpa_file_options.work_in_progress() || xds_file_options.work_in_progress()) {
-      validation_visitor_.onWorkInProgress(
-          fmt::format("message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
-                      message.GetTypeName(), message.GetDescriptor()->file()->name(), WipWarning));
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
+          message.GetTypeName(), reflectable_message->GetDescriptor()->file()->name(), WipWarning));
     }
 
     // Reject unknown fields.
-    const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
+    const auto& unknown_fields =
+        reflectable_message->GetReflection()->GetUnknownFields(*reflectable_message);
     if (!unknown_fields.empty()) {
       std::string error_msg;
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
@@ -472,12 +310,14 @@ class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
                  bool was_any_or_top_level) override {
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     std::string err;
     // PGV verification is itself recursive up to the point at which it hits an Any message. As
     // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
     // at which PGV would have stopped because it does not itself check within Any messages.
-    if (was_any_or_top_level && !pgv::BaseValidator::AbstractCheckMessage(message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, message);
+    if (was_any_or_top_level &&
+        !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
+      ProtoExceptionUtil::throwProtoValidationException(err, *reflectable_message);
     }
   }
 
@@ -491,115 +331,55 @@ void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
   ProtobufMessage::traverseMessage(visitor, message, true);
 }
 
-std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
-                                                  const bool block_print,
-                                                  const bool always_print_primitive_fields) {
-
-  auto json_or_error = getJsonStringFromMessage(message, false, always_print_primitive_fields);
-  if (!json_or_error.ok()) {
-    throw EnvoyException(json_or_error.status().ToString());
-  }
-  YAML::Node node;
-  TRY_ASSERT_MAIN_THREAD { node = YAML::Load(json_or_error.value()); }
-  END_TRY
-  catch (YAML::ParserException& e) {
-    throw EnvoyException(e.what());
-  }
-  catch (YAML::BadConversion& e) {
-    throw EnvoyException(e.what());
-  }
-  catch (std::exception& e) {
-    // Catch unknown YAML parsing exceptions.
-    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
-  }
-  if (block_print) {
-    blockFormat(node);
-  }
-  YAML::Emitter out;
-  out << node;
-  return out.c_str();
-}
-
-ProtobufUtil::StatusOr<std::string>
-MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bool pretty_print,
-                                      const bool always_print_primitive_fields) {
-  Protobuf::util::JsonPrintOptions json_options;
-  // By default, proto field names are converted to camelCase when the message is converted to JSON.
-  // Setting this option makes debugging easier because it keeps field names consistent in JSON
-  // printouts.
-  json_options.preserve_proto_field_names = true;
-  if (pretty_print) {
-    json_options.add_whitespace = true;
-  }
-  // Primitive types such as int32s and enums will not be serialized if they have the default value.
-  // This flag disables that behavior.
-  if (always_print_primitive_fields) {
-    json_options.always_print_primitive_fields = true;
-  }
-  std::string json;
-  if (auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
-      !status.ok()) {
-    return status;
-  }
-  return json;
-}
-
-std::string MessageUtil::getJsonStringFromMessageOrError(const Protobuf::Message& message,
-                                                         bool pretty_print,
-                                                         bool always_print_primitive_fields) {
-  auto json_or_error =
-      getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
-  return json_or_error.ok() ? std::move(json_or_error).value()
-                            : fmt::format("Failed to convert protobuf message to JSON string: {}",
-                                          json_or_error.status().ToString());
+void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  any_message.PackFrom(message);
+#else
+  any_message.set_type_url(message.GetTypeName());
+  any_message.set_value(message.SerializeAsString());
+#endif
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
-    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                     message.GetDescriptor()->full_name(),
-                                     any_message.DebugString()));
+    throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
+                                           message.GetDescriptor()->full_name(),
+                                           any_message.DebugString()));
+#else
+  if (!message.ParseFromString(any_message.value())) {
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
+#endif
   }
 }
 
 absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
                                           Protobuf::Message& message) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     return absl::InternalError(absl::StrCat("Unable to unpack as ",
                                             message.GetDescriptor()->full_name(), ": ",
                                             any_message.DebugString()));
+#else
+  if (!message.ParseFromString(any_message.value())) {
+    return absl::InternalError(
+        absl::StrCat("Unable to unpack as ", message.GetTypeName(), ": ", any_message.type_url()));
+#endif
   }
   // Ok Status is returned if `UnpackTo` succeeded.
   return absl::OkStatus();
 }
 
-void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {
-  // Any proto3 message can be transformed to Struct, so there is no need to check for unknown
-  // fields. There is one catch; Duration/Timestamp etc. which have non-object canonical JSON
-  // representations don't work.
-  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
-}
-
-void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
-                              ProtobufMessage::ValidationVisitor& validation_visitor,
-                              Protobuf::Message& dest) {
-  jsonConvertInternal(source, validation_visitor, dest);
-}
-
-bool MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
-  Protobuf::util::JsonPrintOptions json_options;
-  json_options.preserve_proto_field_names = true;
-  std::string json;
-  auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
-  if (!status.ok()) {
-    return false;
-  }
-  bool has_unknow_field;
-  status = MessageUtil::loadFromJsonNoThrow(json, dest, has_unknow_field);
-  if (status.ok() || has_unknow_field) {
-    return true;
-  }
-  return false;
+std::string MessageUtil::convertToStringForLogs(const Protobuf::Message& message, bool pretty_print,
+                                                bool always_print_primitive_fields) {
+#ifdef ENVOY_ENABLE_YAML
+  return getJsonStringFromMessageOrError(message, pretty_print, always_print_primitive_fields);
+#else
+  UNREFERENCED_PARAMETER(pretty_print);
+  UNREFERENCED_PARAMETER(always_print_primitive_fields);
+  return message.DebugString();
+#endif
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -620,8 +400,10 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
   return struct_obj;
 }
 
-std::string MessageUtil::codeEnumToString(ProtobufUtil::StatusCode code) {
-  return ProtobufUtil::Status(code, "").ToString();
+std::string MessageUtil::codeEnumToString(absl::StatusCode code) {
+  std::string result = absl::StatusCodeToString(code);
+  // This preserves the behavior of the `ProtobufUtil::Status(code, "").ToString();`
+  return !result.empty() ? result : "UNKNOWN: ";
 }
 
 namespace {
@@ -641,29 +423,31 @@ using Transform = std::function<void(Protobuf::Message*, const Protobuf::Reflect
 bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
                   absl::string_view opaque_type_name, Transform unpack, Transform repack) {
   // Ensure this message has the opaque type we're expecting.
-  const auto* opaque_descriptor = message->GetDescriptor();
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
+  const auto* opaque_descriptor = reflectable_message->GetDescriptor();
   if (opaque_descriptor->full_name() != opaque_type_name) {
     return false;
   }
 
   // Find descriptors for the `type_url` and `value` fields. The `type_url` field must not be
   // empty, but `value` may be (in which case our work is done).
-  const auto* reflection = message->GetReflection();
+  const auto* reflection = reflectable_message->GetReflection();
   const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
   const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
   ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr);
-  if (!reflection->HasField(*message, type_url_field_descriptor) &&
-      !reflection->HasField(*message, value_field_descriptor)) {
+  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor) &&
+      !reflection->HasField(*reflectable_message, value_field_descriptor)) {
     return true;
   }
-  if (!reflection->HasField(*message, type_url_field_descriptor) ||
-      !reflection->HasField(*message, value_field_descriptor)) {
+  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor) ||
+      !reflection->HasField(*reflectable_message, value_field_descriptor)) {
     return false;
   }
 
   // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
   // correct concrete type.
-  const std::string type_url(reflection->GetString(*message, type_url_field_descriptor));
+  const std::string type_url(
+      reflection->GetString(*reflectable_message, type_url_field_descriptor));
   const std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
   const auto* concrete_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
@@ -679,7 +463,15 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
       message_factory.GetPrototype(concrete_descriptor)->New());
 
   // Finally we can unpack, redact, and repack the opaque message using the provided callbacks.
-  unpack(typed_message.get(), reflection, value_field_descriptor);
+
+  // Note: the content of opaque types may contain illegal content that mismatches the type_url
+  // which may cause unpacking to fail. We catch the exception here to avoid crashing Envoy.
+  TRY_ASSERT_MAIN_THREAD { unpack(typed_message.get(), reflection, value_field_descriptor); }
+  END_TRY CATCH(const EnvoyException& e, {
+    ENVOY_LOG_MISC(warn, "Could not unpack {} with type URL {}: {}", opaque_type_name, type_url,
+                   e.what());
+    return false;
+  });
   redact(typed_message.get(), ancestor_is_sensitive);
   repack(typed_message.get(), reflection, value_field_descriptor);
   return true;
@@ -690,13 +482,17 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
       message, ancestor_is_sensitive, "google.protobuf.Any",
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
+        Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To unpack an `Any`, parse the serialized proto.
-        typed_message->ParseFromString(reflection->GetString(*message, field_descriptor));
+        typed_message->ParseFromString(
+            reflection->GetString(*reflectable_message, field_descriptor));
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
+        Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To repack an `Any`, reserialize its proto.
-        reflection->SetString(message, field_descriptor, typed_message->SerializeAsString());
+        reflection->SetString(&(*reflectable_message), field_descriptor,
+                              typed_message->SerializeAsString());
       });
 }
 
@@ -707,15 +503,31 @@ bool redactTypedStruct(Protobuf::Message* message, const char* typed_struct_type
       message, ancestor_is_sensitive, typed_struct_type,
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
+#ifdef ENVOY_ENABLE_YAML
         // To unpack a `TypedStruct`, convert the struct from JSON.
-        jsonConvertInternal(reflection->GetMessage(*message, field_descriptor),
-                            ProtobufMessage::getNullValidationVisitor(), *typed_message);
+        MessageUtil::jsonConvert(reflection->GetMessage(*message, field_descriptor),
+                                 *typed_message);
+#else
+        UNREFERENCED_PARAMETER(message);
+        UNREFERENCED_PARAMETER(typed_message);
+        UNREFERENCED_PARAMETER(reflection);
+        UNREFERENCED_PARAMETER(field_descriptor);
+        IS_ENVOY_BUG("redaction requested with JSON/YAML support removed");
+#endif
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
-        // To repack a `TypedStruct`, convert the message back to JSON.
-        jsonConvertInternal(*typed_message, ProtobufMessage::getNullValidationVisitor(),
-                            *(reflection->MutableMessage(message, field_descriptor)));
+  // To repack a `TypedStruct`, convert the message back to JSON.
+#ifdef ENVOY_ENABLE_YAML
+        MessageUtil::jsonConvert(*typed_message,
+                                 *(reflection->MutableMessage(message, field_descriptor)));
+#else
+        UNREFERENCED_PARAMETER(message);
+        UNREFERENCED_PARAMETER(typed_message);
+        UNREFERENCED_PARAMETER(reflection);
+        UNREFERENCED_PARAMETER(field_descriptor);
+        IS_ENVOY_BUG("redaction requested with JSON/YAML support removed");
+#endif
       });
 }
 
@@ -727,8 +539,9 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     return;
   }
 
-  const auto* descriptor = message->GetDescriptor();
-  const auto* reflection = message->GetReflection();
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
+  const auto* descriptor = reflectable_message->GetDescriptor();
+  const auto* reflection = reflectable_message->GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
     const auto* field_descriptor = descriptor->field(i);
 
@@ -741,43 +554,46 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
       if (field_descriptor->is_map()) {
         // Redact values of maps only. Redacting both leaves the map with multiple "[redacted]"
         // keys.
-        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        const int field_size = reflection->FieldSize(*reflectable_message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
-          Protobuf::Message* map_pair =
-              reflection->MutableRepeatedMessage(message, field_descriptor, i);
+          Protobuf::Message* map_pair_base =
+              reflection->MutableRepeatedMessage(&(*reflectable_message), field_descriptor, i);
+          Protobuf::ReflectableMessage map_pair = createReflectableMessage(*map_pair_base);
           auto* value_field_desc = map_pair->GetDescriptor()->FindFieldByName("value");
           if (sensitive && (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
                             value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_BYTES)) {
-            map_pair->GetReflection()->SetString(map_pair, value_field_desc, "[redacted]");
+            map_pair->GetReflection()->SetString(&(*map_pair), value_field_desc, "[redacted]");
           } else if (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
-            redact(map_pair->GetReflection()->MutableMessage(map_pair, value_field_desc),
+            redact(map_pair->GetReflection()->MutableMessage(&(*map_pair), value_field_desc),
                    sensitive);
           } else if (sensitive) {
-            map_pair->GetReflection()->ClearField(map_pair, value_field_desc);
+            map_pair->GetReflection()->ClearField(&(*map_pair), value_field_desc);
           }
         }
       } else if (field_descriptor->is_repeated()) {
-        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        const int field_size = reflection->FieldSize(*reflectable_message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
-          redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);
+          redact(reflection->MutableRepeatedMessage(&(*reflectable_message), field_descriptor, i),
+                 sensitive);
         }
-      } else if (reflection->HasField(*message, field_descriptor)) {
-        redact(reflection->MutableMessage(message, field_descriptor), sensitive);
+      } else if (reflection->HasField(*reflectable_message, field_descriptor)) {
+        redact(reflection->MutableMessage(&(*reflectable_message), field_descriptor), sensitive);
       }
     } else if (sensitive) {
       // Base case: replace strings and bytes with "[redacted]" and clear all others.
       if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
           field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_BYTES) {
         if (field_descriptor->is_repeated()) {
-          const int field_size = reflection->FieldSize(*message, field_descriptor);
+          const int field_size = reflection->FieldSize(*reflectable_message, field_descriptor);
           for (int i = 0; i < field_size; ++i) {
-            reflection->SetRepeatedString(message, field_descriptor, i, "[redacted]");
+            reflection->SetRepeatedString(&(*reflectable_message), field_descriptor, i,
+                                          "[redacted]");
           }
-        } else if (reflection->HasField(*message, field_descriptor)) {
-          reflection->SetString(message, field_descriptor, "[redacted]");
+        } else if (reflection->HasField(*reflectable_message, field_descriptor)) {
+          reflection->SetString(&(*reflectable_message), field_descriptor, "[redacted]");
         }
       } else {
-        reflection->ClearField(message, field_descriptor);
+        reflection->ClearField(&(*reflectable_message), field_descriptor);
       }
     }
   }
@@ -793,25 +609,7 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
   // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
   // this can fail.
   if (!dst.ParseFromString(src.SerializeAsString())) {
-    throw EnvoyException("Unable to deserialize during wireCast()");
-  }
-}
-
-ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
-  TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
-  END_TRY
-  catch (YAML::ParserException& e) {
-    throw EnvoyException(e.what());
-  }
-  catch (YAML::BadConversion& e) {
-    throw EnvoyException(e.what());
-  }
-  catch (std::exception& e) {
-    // There is a potentially wide space of exceptions thrown by the YAML parser,
-    // and enumerating them all may be difficult. Envoy doesn't work well with
-    // unhandled exceptions, so we capture them and record the exception name in
-    // the Envoy Exception text.
-    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
+    throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
   }
 }
 
@@ -919,14 +717,22 @@ ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& v
 
 namespace {
 
-void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
+absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
+                                     int64_t max_seconds_value) {
   if (duration.seconds() < 0 || duration.nanos() < 0) {
-    throw DurationUtil::OutOfRangeException(
+    return absl::OutOfRangeError(
         fmt::format("Expected positive duration: {}", duration.DebugString()));
   }
   if (duration.nanos() > 999999999 || duration.seconds() > max_seconds_value) {
-    throw DurationUtil::OutOfRangeException(
-        fmt::format("Duration out-of-range: {}", duration.DebugString()));
+    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
+  }
+  return absl::OkStatus();
+}
+
+void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
+  const auto result = validateDurationNoThrow(duration, max_seconds_value);
+  if (!result.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(result.message()));
   }
 }
 
@@ -943,10 +749,25 @@ void validateDurationAsMilliseconds(const ProtobufWkt::Duration& duration) {
   validateDuration(duration, kMaxInt64Nanoseconds);
 }
 
+absl::Status validateDurationAsMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
+  constexpr int64_t kMaxInt64Nanoseconds =
+      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+  return validateDurationNoThrow(duration, kMaxInt64Nanoseconds);
+}
+
 } // namespace
 
 uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
   validateDurationAsMilliseconds(duration);
+  return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
+}
+
+absl::StatusOr<uint64_t>
+DurationUtil::durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
+  const auto result = validateDurationAsMillisecondsNoThrow(duration);
+  if (!result.ok()) {
+    return result;
+  }
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 

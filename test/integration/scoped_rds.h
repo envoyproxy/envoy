@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -131,6 +133,43 @@ fragments:
           grpc_service = srds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
         });
+
+    if (add_listener_) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        // Copy from old listener and modify the scope key builder.
+        auto* old_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+        new_listener->CopyFrom(*old_listener);
+        new_listener->set_name("listener_1");
+        auto* filter_chain = new_listener->mutable_filter_chains(0);
+        envoy::config::listener::v3::Filter* filter_config = nullptr;
+        for (ssize_t i = 0; i < filter_chain->filters_size(); i++) {
+          if (filter_chain->mutable_filters(i)->name() == "http") {
+            filter_config = filter_chain->mutable_filters(i);
+          }
+        }
+        ASSERT(filter_config != nullptr);
+        auto* config = filter_config->mutable_typed_config();
+        auto filter =
+            MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager>(*config);
+        // changing separator to ,
+        const std::string& scope_key_builder_config_yaml = R"EOF(
+fragments:
+  - header_value_extractor:
+      name: Addr
+      element_separator: ;
+      element:
+        key: x-foo-key
+        separator: ","
+)EOF";
+        envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
+            ScopeKeyBuilder scope_key_builder;
+        TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
+        *filter.mutable_scoped_routes()->mutable_scope_key_builder() = scope_key_builder;
+        config->PackFrom(filter);
+      });
+    }
     modifications_set_up_ = true;
   }
 
@@ -288,6 +327,7 @@ fragments:
   FakeUpstreamInfo rds_upstream_info_;
   std::string srds_resources_locator_;
   bool modifications_set_up_ = false;
+  bool add_listener_ = false;
 };
 
 } // namespace Envoy

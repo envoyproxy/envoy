@@ -39,14 +39,14 @@ Change to the ``examples/cors/frontend`` directory, and start the containers:
 
   $ pwd
   envoy/examples/cors/frontend
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
-            Name                          Command              State               Ports
-  ------------------------------------------------------------------------------------------------------
-  frontend_front-envoy_1        /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
-  frontend_frontend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
+            Name                          Command              State                    Ports
+  -----------------------------------------------------------------------------------------------------------
+  frontend_front-envoy_1        /docker-entrypoint.sh /bin ... Up           10000/tcp, 0.0.0.0:8000->8000/tcp
+  frontend_frontend-service_1   python3 /code/service.py   ... Up (healthy)
 
 Now, switch to the ``backend`` directory in the ``cors`` example, and start the containers:
 
@@ -54,14 +54,14 @@ Now, switch to the ``backend`` directory in the ``cors`` example, and start the 
 
   $ pwd
   envoy/examples/cors/backend
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
             Name                         Command             State                            Ports
-  ----------------------------------------------------------------------------------------------------------------------------
-  backend_backend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
-  backend_front-envoy_1       /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
+  -----------------------------------------------------------------------------------------------------------------------------------
+  backend_backend-service_1   python3 /code/service.py   ... Up (healthy)
+  backend_front-envoy_1       /docker-entrypoint.sh /bin ... Up             10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
 
 Step 2: Test Envoy's CORS capabilities
 **************************************

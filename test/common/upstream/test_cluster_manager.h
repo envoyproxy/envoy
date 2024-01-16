@@ -21,7 +21,6 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-#include "source/common/upstream/subset_lb.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -63,6 +62,7 @@ namespace Upstream {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
+
     ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
@@ -70,11 +70,14 @@ public:
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  server_context_, cluster, cm, stats_,
+                  cluster, server_context_, cm,
                   [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-                  ssl_context_manager_, outlier_event_logger, added_via_api, validation_visitor_);
+                  ssl_context_manager_, outlier_event_logger, added_via_api);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
-              return std::make_pair(result.first, result.second.release());
+              if (!result.ok()) {
+                throw EnvoyException(std::string(result.status().message()));
+              }
+              return std::make_pair(result->first, result->second.release());
             }));
     ON_CALL(server_context_, singletonManager()).WillByDefault(ReturnRef(singleton_manager_));
   }
@@ -101,7 +104,7 @@ public:
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
-  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
@@ -137,7 +140,7 @@ public:
   MOCK_METHOD(CdsApi*, createCds_, ());
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Stats::TestUtil::TestStore stats_;
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
   NiceMock<ThreadLocal::MockInstance>& tls_ = server_context_.thread_local_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
@@ -156,22 +159,50 @@ public:
   Server::MockOptions& options_ = server_context_.options_;
 };
 
-// Helper to intercept calls to postThreadLocalClusterUpdate.
-class MockLocalClusterUpdate {
-public:
-  MOCK_METHOD(void, post,
-              (uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed));
-};
-
-class MockLocalHostsRemoved {
-public:
-  MOCK_METHOD(void, post, (const HostVector&));
-};
-
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
+  static std::unique_ptr<TestClusterManagerImpl>
+  createAndInit(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                ClusterManagerFactory& factory, Stats::Store& stats, ThreadLocal::Instance& tls,
+                Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+                Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context,
+                Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+                Router::Context& router_context, Server::Instance& server) {
+    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
+        bootstrap, factory, stats, tls, runtime, local_info, log_manager, main_thread_dispatcher,
+        admin, validation_context, api, http_context, grpc_context, router_context, server)};
+    THROW_IF_NOT_OK(cluster_manager->init(bootstrap));
+    return cluster_manager;
+  }
+
+  std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
+    std::map<std::string, std::reference_wrapper<Cluster>> clusters;
+    for (auto& cluster : active_clusters_) {
+      clusters.emplace(cluster.first, *cluster.second->cluster_);
+    }
+    return clusters;
+  }
+
+  const ClusterInitializationMap& clusterInitializationMap() const {
+    return cluster_initialization_map_;
+  }
+
+  OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
+    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
+  }
+
+  void notifyExpiredDiscovery(absl::string_view name) {
+    ClusterManagerImpl::notifyExpiredDiscovery(name);
+  }
+
+  ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name) {
+    return ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::move(thread_name));
+  }
+
+protected:
   using ClusterManagerImpl::ClusterManagerImpl;
 
   TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
@@ -186,63 +217,6 @@ public:
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                            main_thread_dispatcher, admin, validation_context, api, http_context,
                            grpc_context, router_context, server) {}
-
-  std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
-    std::map<std::string, std::reference_wrapper<Cluster>> clusters;
-    for (auto& cluster : active_clusters_) {
-      clusters.emplace(cluster.first, *cluster.second->cluster_);
-    }
-    return clusters;
-  }
-
-  OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
-    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
-  }
-
-  void notifyExpiredDiscovery(absl::string_view name) {
-    ClusterManagerImpl::notifyExpiredDiscovery(name);
-  }
-
-  ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name) {
-    return ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::move(thread_name));
-  }
-};
-
-// Override postThreadLocalClusterUpdate so we can test that merged updates calls
-// it with the right values at the right times.
-class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
-public:
-  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  ClusterManagerFactory& factory, Stats::Store& stats,
-                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                  const LocalInfo::LocalInfo& local_info,
-                                  AccessLog::AccessLogManager& log_manager,
-                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                  ProtobufMessage::ValidationContext& validation_context,
-                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-                                  MockLocalHostsRemoved& local_hosts_removed,
-                                  Http::Context& http_context, Grpc::Context& grpc_context,
-                                  Router::Context& router_context, Server::Instance& server)
-      : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
-                               main_thread_dispatcher, admin, validation_context, api, http_context,
-                               grpc_context, router_context, server),
-        local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
-
-protected:
-  void postThreadLocalClusterUpdate(ClusterManagerCluster&,
-                                    ThreadLocalClusterUpdateParams&& params) override {
-    for (const auto& per_priority : params.per_priority_update_params_) {
-      local_cluster_update_.post(per_priority.priority_, per_priority.hosts_added_,
-                                 per_priority.hosts_removed_);
-    }
-  }
-
-  void postThreadLocalRemoveHosts(const Cluster&, const HostVector& hosts_removed) override {
-    local_hosts_removed_.post(hosts_removed);
-  }
-
-  MockLocalClusterUpdate& local_cluster_update_;
-  MockLocalHostsRemoved& local_hosts_removed_;
 };
 
 } // namespace Upstream

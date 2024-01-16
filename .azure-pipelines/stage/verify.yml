@@ -1,0 +1,75 @@
+
+parameters:
+
+# Auth
+- name: authGCP
+  type: string
+  default: ""
+
+
+jobs:
+- job: packages_x64
+  displayName: Debs (x64)
+  condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+  timeoutInMinutes: 120
+  pool: envoy-x64-small
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "distribution"
+      itemPattern: "distribution/x64/packages.x64.tar.gz"
+      downloadType: single
+      targetPath: $(Build.StagingDirectory)
+  - template: ../ci.yml
+    parameters:
+      ciTarget: verify_distro
+      cacheName: verify_distro
+      publishTestResults: false
+      tmpfsDockerDisabled: true
+      env:
+        ENVOY_DOCKER_IN_DOCKER: 1
+
+- job: packages_arm64
+  displayName: Debs (arm64)
+  condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
+  timeoutInMinutes: 120
+  pool: "envoy-arm-small"
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "distribution"
+      itemPattern: "distribution/arm64/packages.arm64.tar.gz"
+      downloadType: single
+      targetPath: $(Build.StagingDirectory)
+  - template: ../ci.yml
+    parameters:
+      managedAgent: false
+      ciTarget: verify_distro
+      cacheName: verify_distro
+      rbe: false
+      artifactSuffix: ".arm64"
+      publishTestResults: false
+      tmpfsDockerDisabled: true
+      env:
+        ENVOY_DOCKER_IN_DOCKER: 1
+
+- job: verified
+  displayName: Verification complete
+  dependsOn: ["packages_x64", "packages_arm64"]
+  pool:
+    vmImage: $(agentUbuntu)
+  # This condition ensures that this (required) check passes if all of
+  # the preceding checks either pass or are skipped
+  # adapted from:
+  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  condition: |
+    and(
+      eq(variables['Build.Reason'], 'PullRequest'),
+      in(dependencies.packages_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.packages_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+  steps:
+  - checkout: none
+  - bash: |
+      echo "checks complete"

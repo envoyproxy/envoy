@@ -19,7 +19,8 @@ public:
     m_ = std::make_unique<Matcher>(std::move(ranges), stat_prefix_, scope_);
   }
 
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   std::string stat_prefix_{"ipmatcher.test"};
   std::unique_ptr<Matcher> m_;
 };
@@ -68,7 +69,7 @@ TEST_F(MatcherTest, EmptyIP) {
   ranges.emplace_back(Network::Address::CidrRange::create("192.0.2.0", 24));
   initialize(std::move(ranges));
   EXPECT_FALSE(m_->match(""));
-  EXPECT_FALSE(m_->match(absl::optional<absl::string_view>{}));
+  EXPECT_FALSE(m_->match(absl::monostate()));
 }
 
 TEST_F(MatcherTest, InvalidIP) {

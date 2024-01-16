@@ -19,6 +19,7 @@ envoy_proto_library(
 envoy_cc_extension(
     name = "config",
     srcs = [
+        "cache_eviction_thread.cc",
         "config.cc",
         "file_system_http_cache.cc",
         "insert_context.cc",
@@ -26,6 +27,7 @@ envoy_cc_extension(
         "stats.cc",
     ],
     hdrs = [
+        "cache_eviction_thread.h",
         "file_system_http_cache.h",
         "insert_context.h",
         "lookup_context.h",

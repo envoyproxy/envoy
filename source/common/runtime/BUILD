@@ -10,12 +10,37 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "runtime_keys_lib",
+    srcs = [
+        "runtime_keys.cc",
+    ],
+    hdrs = [
+        "runtime_keys.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "runtime_features_lib",
     srcs = [
         "runtime_features.cc",
     ],
     hdrs = [
         "runtime_features.h",
+    ],
+    # ABSL_FLAGS_STRIP_NAMES controls the behavior of the ABSL_FLAG
+    # macro. By default, it is defined on mobile platforms and false elsewhere.
+    # When defined, it causes flags to be registered in the global flag registry,
+    # which is required for Envoy runtime flags to work. By forcing this to be
+    # defined in source/common/runtime:runtime_features_lib, we ensure that
+    # even on mobile, runtime features work correctly since the ABSL_FLAGS
+    # which control them live in that target. This does NOT cause ABSL_FLAGS
+    # defined in other targets to be added to the registry, but that does not
+    # affect Envoy's usage.
+    copts = [
+        "-DABSL_FLAGS_STRIP_NAMES=0",
     ],
     deps = [
         # AVOID ADDING TO THESE DEPENDENCIES IF POSSIBLE

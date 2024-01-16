@@ -101,20 +101,13 @@ Specify the interval at which Envoy should timeout a DNS query.
 ``addDNSPreresolveHostnames``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. attention::
-
-  This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
-  project.
-  :issue:`#1581 <1581>` tracks enhancing this API.
-
 Add a list of hostnames to preresolve on Engine startup.
-The configuration is expected as a JSON list.
 
   // Kotlin
-  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
+  builder.addDNSPreresolveHostnames(listOf("lyft.com", "google.com"))
 
   // Swift
-  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
+  builder.addDNSPreresolveHostnames(["lyft.com", "google.com"])
 
 ~~~~~~~~~~~~~~~
 ``addLogLevel``
@@ -129,44 +122,6 @@ Specify the log level to be used when running the underlying Envoy engine.
 
   // Swift
   builder.addLogLevel(.warn)
-
-~~~~~~~~~~~~~~~~~~~~~~
-``addGrpcStatsDomain``
-~~~~~~~~~~~~~~~~~~~~~~
-
-Specify a domain which implements the
-:tree:`stats endpoint <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L139-L145>`
-in order to take advantage of the
-`stats emitted by Envoy <https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cluster_stats>`_
-(and subsequently Envoy Mobile).
-
-Note that only stats specified in the configuration's
-:tree:`inclusion list <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L146-L167>`
-will be emitted.
-
-Passing ``nil``/``null`` disables stats emission, and this is the default value.
-
-**Example**::
-
-  // Kotlin
-  builder.addGrpcStatsDomain("envoy-mobile.envoyproxy.io")
-
-  // Swift
-  builder.addGrpcStatsDomain("envoy-mobile.envoyproxy.io")
-
-~~~~~~~~~~~~~~~~~~~~~~~~
-``addStatsFlushSeconds``
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify the rate at which Envoy Mobile should flush its queued stats.
-
-**Example**::
-
-  // Kotlin
-  builder.addStatsFlushSeconds(5L)
-
-  // Swift
-  builder.addStatsFlushSeconds(5)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``addStreamIdleTimeoutSeconds``
@@ -207,7 +162,6 @@ for further information.
 ~~~~~~~~~~~~~~~~~
 
 Specify the version of the app using Envoy Mobile.
-This information is sent as metadata when flushing stats.
 
 **Example**::
 
@@ -222,7 +176,6 @@ This information is sent as metadata when flushing stats.
 ~~~~~~~~~~~~
 
 Specify the version of the app using Envoy Mobile.
-This information is sent as metadata when flushing stats.
 
 **Example**::
 
@@ -232,45 +185,27 @@ This information is sent as metadata when flushing stats.
   // Swift
   builder.addAppId("com.mydomain.myapp)
 
-~~~~~~~~~~~~~~~~~~~~~~
-``addVirtualClusters``
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
+``addNativeFilter``
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Specify the virtual clusters config for Envoy Mobile's configuration.
-The configuration is expected as a JSON list.
-This functionality is used for stat segmentation.
+Add a C++ filter to the Envoy Mobile filter chain
 
 .. attention::
 
-    This API is non-ideal as it exposes lower-level internals of Envoy than desired by this project.
-    :issue:`#770 <770>` tracks enhancing this API.
+    This will only work if the C++ filter specified is linked into your Envoy Mobile build.
+    For C++ and Android testing, calling addNativeFilter and linking the Envoy library by adding the
+    library to ``envoy_build_config/extensions_build_config.bzl`` is sufficient.
+    For iOS, due to enthusiastic garbage collection, and for upstream CI, to catch bugs, you will
+    also need to forceRegister the filter in ``envoy_build_config/extension_registry.cc``
 
 **Example**::
 
   // Kotlin
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
   // Swift
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
-
-~~~~~~~~~~~~~~~~~~~~~~~~~
-``enableAdminInterface``
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Enable admin interface on 127.0.0.1:9901 address.
-
-.. attention::
-
-    Admin interface is intended to be used for development/debugging purposes only.
-    Enabling it in production may open your app to security vulnerabilities.
-
-**Example**::
-
-  // Kotlin
-  builder.enableAdminInterface()
-
-  // Swift
-  builder.enableAdminInterface()
+  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
 
 ~~~~~~~~~~~~~~~~~~~~~~
 ``setOnEngineRunning``
@@ -354,47 +289,88 @@ Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachabil
   // Swift
   builder.setNetworkMonitoringMode(.pathMonitor)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableHappyEyeballs``
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to true.
-
-**Example**::
-
-  // Kotlin
-  builder.enableHappyEyeballs(true)
-
-  // Swift
-  builder.enableHappyEyeballs(true)
-
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableGzip``
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableGzipDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Gzip decompression. Defaults to true.
 
 **Example**::
 
   // Kotlin
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
   // Swift
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableBrotli``
-~~~~~~~~~~~~~~~~~~~~~~~
+Default values from the `gzip decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/decompressor/v3/gzip.proto>`_
+are used.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableBrotliDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Brotli decompression. Defaults to false.
 
 **Example**::
 
   // Kotlin
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
 
   // Swift
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
+
+Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
+are used.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableHttp3``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable HTTP/3. Defaults to true. Only available when the Envoy Mobile build has HTTP/3 included.
+When HTTP/3 is enabled, the client will first talk HTTP/2 with the servers and upon receiving alt-svc in the response,
+following traffic will be sent via HTTP/3.
+
+**Example**::
+
+  // Kotlin
+  builder.enableHttp3(true)
+
+  // Swift
+  builder.enableHttp3(true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addQuicHint``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a host port pair that's known to support QUIC. Only available when HTTP/3 is enabled.
+It can be called multiple times to append a list of QUIC hints.
+This allows HTTP/3 to be used for the first request to the hosts and avoid the HTTP/2 -> HTTP/3 switch as mentioned in enableHttp3.
+
+**Example**::
+
+  // Kotlin
+  builder.addQuicHint("www.example.com", 443)
+
+  // Swift
+  builder.addQuicHint("www.example.com", 443)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addQuicCanonicalSuffix``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a canonical suffix that's known to speak QUIC.
+This feature works as a extension to QUIC hints in such way that:
+if `.abc.com` is added to canonical suffix, and `foo.abc.com` is added to QUIC hint, then all requests to
+`*.abc.com` will be considered QUIC ready.
+
+**Example**::
+
+  // Kotlin
+  builder.addQuicCanonicalSuffix(".example.com")
+
+  // Swift
+  builder.addQuicCanonicalSuffix(".example.com")
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``
@@ -420,22 +396,6 @@ Specify whether sockets may attempt to bind to a specific interface, based on ne
 
   // Swift
   builder.enableInterfaceBinding(true)
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``h2ExtendKeepaliveTimeout``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Extend the keepalive timeout when *any* frame is received on the owning HTTP/2 connection.
-
-This can help negate the effect of head-of-line (HOL) blocking for slow connections.
-
-**Example**::
-
-  // Kotlin
-  builder.h2ExtendKeepaliveTimeout(true)
-
-  // Swift
-  builder.h2ExtendKeepaliveTimeout(true)
 
 
 ~~~~~~~~~~~~~~~~~~~~
@@ -507,6 +467,118 @@ Available on Android only.
     builder.enableProxying(true)
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableDNSCache``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable DNS cache. Note that DNS cache requires an addition of
+a key value store named 'reserved.platform_store'.
+
+The interval at which results are saved to the key value store defaults to 1s
+but can also be set explicitly.
+
+A maximum of 100 entries will be stored.
+
+**Example**::
+
+  // Kotlin
+  builder.enableDNSCache(true, saveInterval: 60)
+
+  // Swift
+  builder.enableDNSCache(true, saveInterval: 60)
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setRuntimeGuard``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adds a runtime guard key value pair to envoy configuration.  The guard is of the short form "feature"
+rather than the fully qualified "envoy.reloadable_features.feature"
+Note that Envoy will fail to start up in debug mode if an unknown guard is specified.
+
+**Example**::
+
+  // Kotlin
+  builder.setRuntimeGuard("feature", true)
+
+  // Swift
+  builder.setRuntimeGuard("feature", true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setXds``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the Bootstrap configuration up with `xDS <https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/xds_api#config-overview-ads>`_
+to fetch dynamic configuration from an xDS management server. The xDS management server must
+support the ADS protocol. At this moment, only the State-of-the-World (SotW) xDS protocol is
+supported, not the Delta protocol. The Envoy Mobile client will communicate with the configured
+xDS management server over gRPC.
+
+Use the XdsBuilder class to configure the xDS for the Envoy Mobile engine.  For example, the
+`addRuntimeDiscoveryService()` method can be used to configure the
+`Runtime Discovery Service (RTDS) <https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/runtime/v3/rtds.proto>`_
+and the `addClusterDiscoveryService()` method to configure the
+`Cluster Discovery Service (CDS) <https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds>`_.
+
+Parameters:
+xds_builder
+
+**Example**::
+
+  // Kotlin
+  val xdsBuilder = new XdsBuilder(address = "my_xds_server.com", port = 443)
+                       .addRuntimeDiscoveryService("my_rtds_resource")
+                       .addClusterDiscoveryService()
+  builder.setXds(xdsBuilder)
+
+  // Swift
+  var xdsBuilder = XdsBuilder(address: "my_xds_server.com", port: 443)
+                       .addRuntimeDiscoveryService("my_rtds_resource")
+                       .addClusterDiscoveryService()
+  builder.setXds(xdsBuilder)
+
+  // C++
+  XdsBuilder xds_builder(/*address=*/"my_xds_server.com", /*port=*/443);
+  xds_builder.addRuntimeDiscoveryService("my_rtds_resource")
+      .addClusterDiscoveryService();
+  builder.setXds(std::move(xds_builder));
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeId``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.id field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeId(nodeId = "my_test_node")
+
+  // Swift
+  builder.setNodeID("my_test_node")
+
+  // C++
+  builder.setNodeId("my_test_node")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``setNodeLocality``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sets the node.locality field. See the following link for details:
+https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-node
+
+**Example**::
+
+  // Kotlin
+  builder.setNodeLocality(region = "us-west-1", zone = "some_zone", subZone = "some_sub_zone")
+
+  // Swift
+  builder.setNodeLocality(region: "us-west-1", zone: "some_zone", subZone: "some_sub_zone")
+
+  // C++
+  builder.setNodeLocality("us-west-1", "some_zone", "some_sub_zone");
+
 ----------------------
 Advanced configuration
 ----------------------
@@ -522,7 +594,6 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
   val streamClient = AndroidEngineBuilder(baseContext, Yaml(yamlFileString))
     .addLogLevel(LogLevel.WARN)
-    .addStatsFlushSeconds(60)
     ...
     .build()
     .streamClient()
@@ -531,7 +602,6 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
   let streamClient = try EngineBuilder(yaml: yamlFileString)
     .addLogLevel(.warn)
-    .addStatsFlushSeconds(60)
     ...
     .build()
     .streamClient()

@@ -24,38 +24,20 @@ void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& h
                           Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
-// Helper method to get filter parameter, or report an error for an invalid regex.
-bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
-                 std::shared_ptr<std::regex>& regex) {
-  auto p = params.find("filter");
-  if (p != params.end()) {
-    const std::string& pattern = p->second;
-    if (!pattern.empty()) {
-      TRY_ASSERT_MAIN_THREAD { regex = std::make_shared<std::regex>(pattern); }
-      END_TRY
-      catch (std::regex_error& error) {
-        // Include the offending pattern in the log, but not the error message.
-        response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
-        ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 // Helper method to get the histogram_buckets parameter. Returns false if histogram_buckets query
 // param is found and value is not "cumulative" or "disjoint", true otherwise.
-absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
+absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params,
                                    HistogramBucketsMode& histogram_buckets_mode) {
   absl::optional<std::string> histogram_buckets_query_param =
-      queryParam(params, "histogram_buckets");
+      params.getFirstValue("histogram_buckets");
   histogram_buckets_mode = HistogramBucketsMode::NoBuckets;
   if (histogram_buckets_query_param.has_value()) {
     if (histogram_buckets_query_param.value() == "cumulative") {
       histogram_buckets_mode = HistogramBucketsMode::Cumulative;
     } else if (histogram_buckets_query_param.value() == "disjoint") {
       histogram_buckets_mode = HistogramBucketsMode::Disjoint;
+    } else if (histogram_buckets_query_param.value() == "detailed") {
+      histogram_buckets_mode = HistogramBucketsMode::Detailed;
     } else if (histogram_buckets_query_param.value() != "none") {
       return absl::InvalidArgumentError(
           "usage: /stats?histogram_buckets=(cumulative|disjoint|none)\n");
@@ -65,21 +47,8 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParams& params,
 }
 
 // Helper method to get the format parameter.
-absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
-  return queryParam(params, "format");
-}
-
-// Helper method to get a query parameter.
-absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
-                                       const std::string& key) {
-  const auto iter = params.find(key);
-  if (iter != params.end()) {
-    const std::string& value = iter->second;
-    if (!value.empty()) {
-      return value;
-    }
-  }
-  return absl::nullopt;
+absl::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params) {
+  return params.getFirstValue("format");
 }
 
 } // namespace Utility

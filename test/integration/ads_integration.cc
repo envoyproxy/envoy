@@ -47,17 +47,18 @@ AdsIntegrationTest::AdsIntegrationTest()
 
 void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
 
-envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name,
-                                                                     const std::string& lb_policy) {
+envoy::config::cluster::v3::Cluster
+AdsIntegrationTest::buildCluster(const std::string& name,
+                                 envoy::config::cluster::v3::Cluster::LbPolicy lb_policy) {
   return ConfigHelper::buildCluster(name, lb_policy);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildTlsCluster(const std::string& name) {
-  return ConfigHelper::buildTlsCluster(name, "ROUND_ROBIN");
+  return ConfigHelper::buildTlsCluster(name, envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "MAGLEV");
+  return ConfigHelper::buildCluster(name, envoy::config::cluster::v3::Cluster::MAGLEV);
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
@@ -134,8 +135,6 @@ void AdsIntegrationTest::makeSingleRequest() {
 void AdsIntegrationTest::initialize() { initializeAds(false); }
 
 void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                    oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
   config_helper_.addConfigModifier([this, &rate_limiting](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();

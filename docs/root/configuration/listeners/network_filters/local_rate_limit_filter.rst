@@ -29,6 +29,9 @@ be immediately closed without further filter iteration.
 
 .. _config_network_filters_local_rate_limit_stats:
 
+**Planned future enhancements**:
+* rate limit on specific `requestedApplicationProtocols`` or `detectedTransportProtocol`
+
 Statistics
 ----------
 
@@ -47,3 +50,4 @@ Runtime
 The local rate limit filter can be runtime feature flagged via the :ref:`enabled
 <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.runtime_enabled>`
 configuration field.
+

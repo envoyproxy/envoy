@@ -1,18 +1,22 @@
 #!/bin/bash -e
 
 export NAME=mysql
-export DELAY=10
 export PORT_ADMIN="${MYSQL_PORT_ADMIN:-11300}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+
 _mysql () {
     local mysql_client
-    # TODO(phlax): pin mysql client
-    mysql_client=(docker run --network mysql_default mysql:5.7 mysql -h proxy -P 1999 -u root)
+    mysql_client=(docker run --rm --network mysql_default mysql:latest mysql -h proxy -P 1999 -u root)
+
     "${mysql_client[@]}" "${@}"
 }
+
+export -f _mysql
+
+wait_for 40 bash -c "_mysql -e 'SHOW DATABASES;'"
 
 run_log "Create a mysql database"
 _mysql -e "CREATE DATABASE test;"

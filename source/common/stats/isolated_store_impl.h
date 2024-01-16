@@ -26,10 +26,17 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
-  using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
-  using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
-  using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
+  using CounterAllocator = std::function<RefcountPtr<Base>(
+      const TagUtility::TagStatNameJoiner& joiner, StatNameTagVectorOptConstRef tags)>;
+  using GaugeAllocator =
+      std::function<RefcountPtr<Base>(const TagUtility::TagStatNameJoiner& joiner,
+                                      StatNameTagVectorOptConstRef tags, Gauge::ImportMode)>;
+  using HistogramAllocator =
+      std::function<RefcountPtr<Base>(const TagUtility::TagStatNameJoiner& joiner,
+                                      StatNameTagVectorOptConstRef tags, Histogram::Unit)>;
+  using TextReadoutAllocator =
+      std::function<RefcountPtr<Base>(const TagUtility::TagStatNameJoiner& joiner,
+                                      StatNameTagVectorOptConstRef tags, TextReadout::Type)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
@@ -37,46 +44,58 @@ public:
   IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
   IsolatedStatsCache(TextReadoutAllocator alloc) : text_readout_alloc_(alloc) {}
 
-  Base& get(StatName name) {
+  Base& get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
+            SymbolTable& symbol_table) {
+    TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
+    StatName name = joiner.nameWithTags();
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = counter_alloc_(name);
+    RefcountPtr<Base> new_stat = counter_alloc_(joiner, tags);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
-  Base& get(StatName name, Gauge::ImportMode import_mode) {
+  Base& get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
+            SymbolTable& symbol_table, Gauge::ImportMode import_mode) {
+    TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
+    StatName name = joiner.nameWithTags();
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = gauge_alloc_(name, import_mode);
+    RefcountPtr<Base> new_stat = gauge_alloc_(joiner, tags, import_mode);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
-  Base& get(StatName name, Histogram::Unit unit) {
+  Base& get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
+            SymbolTable& symbol_table, Histogram::Unit unit) {
+    TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
+    StatName name = joiner.nameWithTags();
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = histogram_alloc_(name, unit);
+    RefcountPtr<Base> new_stat = histogram_alloc_(joiner, tags, unit);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
-  Base& get(StatName name, TextReadout::Type type) {
+  Base& get(StatName prefix, StatName basename, StatNameTagVectorOptConstRef tags,
+            SymbolTable& symbol_table, TextReadout::Type type) {
+    TagUtility::TagStatNameJoiner joiner(prefix, basename, tags, symbol_table);
+    StatName name = joiner.nameWithTags();
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = text_readout_alloc_(name, type);
+    RefcountPtr<Base> new_stat = text_readout_alloc_(joiner, tags, type);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -196,6 +215,11 @@ public:
     forEachTextReadout(f_size, f_stat);
   }
 
+  void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    UNREFERENCED_PARAMETER(f_size);
+    UNREFERENCED_PARAMETER(f_stat);
+  }
+
   NullCounterImpl& nullCounter() override { return *null_counter_; }
   NullGaugeImpl& nullGauge() override { return *null_gauge_; }
 
@@ -209,6 +233,10 @@ public:
   bool iterate(const IterateFn<TextReadout>& fn) const override {
     return constRootScope()->iterate(fn);
   }
+
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {}
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {}
+  const TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(TagVector); }
 
 protected:
   /**
@@ -265,31 +293,24 @@ public:
   const SymbolTable& constSymbolTable() const override { return store_.symbolTable(); }
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override {
-    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
-    Counter& counter = store_.counters_.get(joiner.nameWithTags());
-    return counter;
+    return store_.counters_.get(prefix(), name, tags, symbolTable());
   }
   ScopeSharedPtr createScope(const std::string& name) override;
   ScopeSharedPtr scopeFromStatName(StatName name) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
-    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
-    Gauge& gauge = store_.gauges_.get(joiner.nameWithTags(), import_mode);
+    Gauge& gauge = store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode);
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
-    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
-    Histogram& histogram = store_.histograms_.get(joiner.nameWithTags(), unit);
-    return histogram;
+    return store_.histograms_.get(prefix(), name, tags, symbolTable(), unit);
   }
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) override {
-    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
-    TextReadout& text_readout =
-        store_.text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
-    return text_readout;
+    return store_.text_readouts_.get(prefix(), name, tags, symbolTable(),
+                                     TextReadout::Type::Default);
   }
   CounterOptConstRef findCounter(StatName name) const override {
     return store_.counters_.find(name);

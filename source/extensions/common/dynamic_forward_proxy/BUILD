@@ -29,7 +29,6 @@ envoy_cc_library(
     deps = [
         ":dns_cache_impl",
         "//source/common/protobuf",
-        "//source/server:factory_context_base_impl_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -50,6 +49,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -67,5 +67,16 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:resource_manager_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cluster_store",
+    srcs = ["cluster_store.cc"],
+    hdrs = ["cluster_store.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:upstream_interface",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )

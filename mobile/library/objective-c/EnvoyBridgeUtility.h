@@ -1,3 +1,5 @@
+#pragma once
+
 #import <Foundation/Foundation.h>
 
 #import "library/common/types/c_types.h"

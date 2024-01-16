@@ -13,7 +13,7 @@ ThreadSynchronizer::getOrCreateEntry(absl::string_view event_name) {
   absl::MutexLock lock(&data_->mutex_);
   auto& existing_entry = data_->entries_[event_name];
   if (existing_entry == nullptr) {
-    ENVOY_LOG(debug, "thread synchronzier: creating entry: {}", event_name);
+    ENVOY_LOG(debug, "thread synchronizer: creating entry: {}", event_name);
     existing_entry = std::make_unique<SynchronizerEntry>();
   }
   return *existing_entry;

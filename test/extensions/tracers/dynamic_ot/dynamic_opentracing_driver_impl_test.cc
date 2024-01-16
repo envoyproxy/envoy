@@ -5,6 +5,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 
@@ -21,7 +22,8 @@ namespace {
 class DynamicOpenTracingDriverTest : public testing::Test {
 public:
   void setup(const std::string& library, const std::string& tracer_config) {
-    driver_ = std::make_unique<DynamicOpenTracingDriver>(stats_, library, tracer_config);
+    driver_ =
+        std::make_unique<DynamicOpenTracingDriver>(*stats_.rootScope(), library, tracer_config);
   }
 
   void setupValidDriver() { setup(library_path_, tracer_config_); }
@@ -39,10 +41,11 @@ public:
   Stats::IsolatedStoreImpl stats_;
 
   const std::string operation_name_{"test"};
-  Http::TestRequestHeaderMapImpl request_headers_{
+  Tracing::TestTraceContextImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  SystemTime start_time_;
+
   NiceMock<Tracing::MockConfig> config_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(DynamicOpenTracingDriverTest, FormatErrorMessage) {
@@ -76,8 +79,9 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   setupValidDriver();
 
   {
-    Tracing::SpanPtr first_span = driver_->startSpan(
-        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr first_span =
+        driver_->startSpan(config_, request_headers_, stream_info_, operation_name_,
+                           {Tracing::Reason::Sampling, true});
     first_span->finishSpan();
     driver_->tracer().Close();
   }

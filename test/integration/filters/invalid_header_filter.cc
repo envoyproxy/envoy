@@ -25,6 +25,35 @@ public:
     if (!headers.get(Http::LowerCaseString("remove-path")).empty()) {
       headers.removePath();
     }
+
+    if (!headers.get(Http::LowerCaseString("x-add-invalid-header-key")).empty()) {
+      // Insert invalid characters by bypassing assert(valid()) checks, which would not run
+      // in release mode
+      headers.addCopy(Http::LowerCaseString("x-foo"), "hello  x-oops: yes");
+      absl::string_view value =
+          headers.get(Http::LowerCaseString("x-foo"))[0]->value().getStringView();
+      char* data = const_cast<char*>(value.data());
+      data[5] = '\r';
+      data[6] = '\n';
+    }
+
+    if (!headers.get(Http::LowerCaseString("x-add-invalid-header-value")).empty()) {
+      // Insert invalid characters by bypassing assert(valid()) checks, which would not run
+      // in release mode
+      headers.addCopy(Http::LowerCaseString("x-foo"), "hello  GET /evil HTTP/1.1");
+      absl::string_view value =
+          headers.get(Http::LowerCaseString("x-foo"))[0]->value().getStringView();
+      char* data = const_cast<char*>(value.data());
+      data[5] = '\r';
+      data[6] = '\n';
+    }
+
+    if (!headers.get(Http::LowerCaseString("x-add-mixed-case-header-key")).empty()) {
+      // Insert a header key with mixed case. This should be allowed by Envoy.
+      headers.addViaMove(Http::HeaderString(absl::string_view("x-MiXeD-CaSe")),
+                         Http::HeaderString(absl::string_view("some value here")));
+    }
+
     if (Http::HeaderUtility::isConnect(headers)) {
       headers.removeHost();
     }

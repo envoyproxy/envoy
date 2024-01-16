@@ -1,4 +1,5 @@
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -17,7 +18,7 @@ class QuicServerTransportSocketFactoryConfigTest : public Event::TestUsingSimula
 public:
   QuicServerTransportSocketFactoryConfigTest()
       : server_api_(Api::createApiForTest(server_stats_store_, simTime())) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*server_api_));
+    ON_CALL(context_.server_context_, api()).WillByDefault(ReturnRef(*server_api_));
   }
 
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
@@ -116,7 +117,6 @@ public:
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
         .WillOnce(testing::SaveArg<0>(&update_callback_));
     factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
-    factory_->initialize();
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
@@ -127,7 +127,15 @@ public:
   std::function<void()> update_callback_;
 };
 
+TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {
+  context_config_->alpn_ = "h3,h3-draft29";
+  factory_->initialize();
+  EXPECT_THAT(factory_->supportedAlpnProtocols(), testing::ElementsAre("h3", "h3-draft29"));
+}
+
 TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
+  factory_->initialize();
+  EXPECT_TRUE(factory_->supportedAlpnProtocols().empty());
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
 
   Ssl::ClientContextSharedPtr ssl_context1{new Ssl::MockClientContext()};

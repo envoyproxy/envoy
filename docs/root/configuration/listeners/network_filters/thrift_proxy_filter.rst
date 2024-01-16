@@ -25,6 +25,7 @@ Every configured Thrift proxy filter emits the following statistics:
   request_invalid_type, Counter, Total number of requests with an invalid type
   request_oneway, Counter, Total number of requests of type oneway
   request_passthrough, Counter, Total number of requests with payload passthrough enabled
+  request_internal_error, Counter, Total number of requests that caused an internal error
   response, Counter, Total number of responses
   response_decoding_error, Counter, Total number of responses with a decoding error
   response_error, Counter, Total number of responses with an error

@@ -7,10 +7,10 @@ The following examples use the :ref:`official Envoy Docker image <start_install_
 
 These instructions are known to work for the ``x86_64`` and ``arm64`` architectures.
 
-Running Envoy with docker-compose
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Running Envoy with ``docker compose``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you would like to use Envoy with docker-compose you can overwrite the provided configuration file
+If you would like to use Envoy with ``docker compose`` you can overwrite the provided configuration file
 by using a volume.
 
 .. substitution-code-block:: yaml

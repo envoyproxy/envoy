@@ -23,7 +23,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FuzzedDataProvider provider(buf, len);
   ZlibCompressorImpl compressor;
   Stats::IsolatedStoreImpl stats_store;
-  Decompressor::ZlibDecompressorImpl decompressor{stats_store, "test", 4096, 100};
+  Decompressor::ZlibDecompressorImpl decompressor{*stats_store.rootScope(), "test", 4096, 100};
 
   // Select target compression level. We can't use ConsumeEnum() since the range
   // is non-contiguous.

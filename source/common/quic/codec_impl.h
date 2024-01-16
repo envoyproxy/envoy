@@ -22,8 +22,7 @@ public:
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& /*data*/) override {
-    // Bypassed. QUIC connection already hands all data to streams.
-    PANIC("not implemented");
+    PANIC("not implemented"); // QUIC connection already hands all data to streams.
   }
   Http::Protocol protocol() override { return Http::Protocol::Http3; }
   // Returns true if the session has data to send but queued in connection or

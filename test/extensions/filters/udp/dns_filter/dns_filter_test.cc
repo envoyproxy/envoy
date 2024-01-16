@@ -75,9 +75,10 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto store = stats_store_.createScope("dns_scope");
     ON_CALL(listener_factory_, scope()).WillByDefault(ReturnRef(*store));
-    ON_CALL(listener_factory_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(listener_factory_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(random_, random()).WillByDefault(Return(3));
-    ON_CALL(listener_factory_, random()).WillByDefault(ReturnRef(random_));
+    ON_CALL(listener_factory_.server_factory_context_.api_, randomGenerator())
+        .WillByDefault(ReturnRef(random_));
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();
     NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
@@ -219,7 +220,7 @@ server_config:
             - "10.0.0.1"
 )EOF";
 
-  const std::string external_dns_table_config = R"EOF(
+  static constexpr absl::string_view external_dns_table_config = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -237,7 +238,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_not_set = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_not_set = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -255,7 +256,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_set_false = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_set_false = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -276,7 +277,7 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolver_options_config_set_true = R"EOF(
+  static constexpr absl::string_view dns_resolver_options_config_set_true = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -645,7 +646,7 @@ TEST_F(DnsFilterTest, RepeatedTypeAQuerySuccess) {
   for (size_t i = 0; i < loopCount; i++) {
 
     // Generate a changing, non-zero query ID for each lookup
-    const uint16_t query_id = (random_.random() + i) & 0xFFFF;
+    const uint16_t query_id = (random_.random() + i) % 0xFFFF + 1;
     const std::string query =
         Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, query_id);
     ASSERT_FALSE(query.empty());
@@ -1722,7 +1723,7 @@ TEST_F(DnsFilterTest, InvalidQueryNameTest2) {
   EXPECT_FALSE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
 
-  // TODO(abaptiste): underflow/overflow stats
+  // TODO(suniltheta): underflow/overflow stats
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
 }
 
@@ -2233,7 +2234,7 @@ TEST_F(DnsFilterTest, DnsResolverOptionsSetFalse) {
 }
 
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DnsResolutionConfigExist)) {
-  const std::string dns_resolution_config_exist = R"EOF(
+  constexpr absl::string_view dns_resolution_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2271,7 +2272,7 @@ server_config:
 
 // test typed_dns_resolver_config exits which overrides dns_resolution_config.
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(TypedDnsResolverConfigOverrideDnsResolutionConfig)) {
-  const std::string typed_dns_resolver_config_exist = R"EOF(
+  constexpr absl::string_view typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2319,7 +2320,7 @@ server_config:
 
 // test typed_dns_resolver_config exits.
 TEST_F(DnsFilterTest, TypedDnsResolverConfigExist) {
-  const std::string typed_dns_resolver_config_exist = R"EOF(
+  constexpr absl::string_view typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -2359,7 +2360,7 @@ server_config:
 
 // test when no DNS related config exists, an empty typed_dns_resolver_config is the parameter.
 TEST_F(DnsFilterTest, NoDnsConfigExist) {
-  const std::string no_dns_config_exist = R"EOF(
+  constexpr absl::string_view no_dns_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s

@@ -6,6 +6,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
@@ -13,16 +14,34 @@
 
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
+using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
+UpstreamProxyProtocolStats generateUpstreamProxyProtocolStats(Stats::Scope& stats_scope) {
+  const char prefix[]{"upstream.proxyprotocol."};
+  return {ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(POOL_COUNTER_PREFIX(stats_scope, prefix))};
+}
+
 UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketPtr&& transport_socket,
-    Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig_Version version)
-    : PassthroughSocket(std::move(transport_socket)), options_(options), version_(version) {}
+    Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig config,
+    Stats::Scope& scope)
+    : PassthroughSocket(std::move(transport_socket)), options_(options), version_(config.version()),
+      stats_(generateUpstreamProxyProtocolStats(scope)),
+      pass_all_tlvs_(config.has_pass_through_tlvs() ? config.pass_through_tlvs().match_type() ==
+                                                          ProxyProtocolPassThroughTLVs::INCLUDE_ALL
+                                                    : false) {
+  if (config.has_pass_through_tlvs() &&
+      config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE) {
+    for (const auto& tlv_type : config.pass_through_tlvs().tlv_type()) {
+      pass_through_tlvs_.insert(0xFF & tlv_type);
+    }
+  }
+}
 
 void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
     Network::TransportSocketCallbacks& callbacks) {
@@ -66,13 +85,26 @@ void UpstreamProxyProtocolSocket::generateHeaderV1() {
   Common::ProxyProtocol::generateV1Header(*src_addr->ip(), *dst_addr->ip(), header_buffer_);
 }
 
+namespace {
+std::string toHex(const Buffer::Instance& buffer) {
+  std::string bufferStr = buffer.toString();
+  return Hex::encode(reinterpret_cast<uint8_t*>(bufferStr.data()), bufferStr.length());
+}
+} // namespace
+
 void UpstreamProxyProtocolSocket::generateHeaderV2() {
   if (!options_ || !options_->proxyProtocolOptions().has_value()) {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
     const auto options = options_->proxyProtocolOptions().value();
-    Common::ProxyProtocol::generateV2Header(*options.src_addr_->ip(), *options.dst_addr_->ip(),
-                                            header_buffer_);
+    if (!Common::ProxyProtocol::generateV2Header(options, header_buffer_, pass_all_tlvs_,
+                                                 pass_through_tlvs_)) {
+      // There is a warn log in generateV2Header method.
+      stats_.v2_tlvs_exceed_max_length_.inc();
+    }
+
+    ENVOY_LOG(trace, "generated proxy protocol v2 header, length: {}, buffer: {}",
+              header_buffer_.length(), toHex(header_buffer_));
   }
 }
 
@@ -108,8 +140,9 @@ void UpstreamProxyProtocolSocket::onConnected() {
 }
 
 UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
-    Network::UpstreamTransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config)
-    : PassthroughFactory(std::move(transport_socket_factory)), config_(config) {}
+    Network::UpstreamTransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config,
+    Stats::Scope& scope)
+    : PassthroughFactory(std::move(transport_socket_factory)), config_(config), scope_(scope) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options,
@@ -118,8 +151,8 @@ Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportS
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options,
-                                                       config_.version());
+  return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options, config_,
+                                                       scope_);
 }
 
 void UpstreamProxyProtocolSocketFactory::hashKey(

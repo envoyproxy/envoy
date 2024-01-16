@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
 import java.util.Map;
 
@@ -23,26 +24,35 @@ public interface EnvoyEngine {
   void terminate();
 
   /**
+   * Performs any registrations necessary before running Envoy.
+   *
+   * The envoyConfiguration is used to determined what to register.
+   *
+   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
+   */
+  void performRegistration(EnvoyConfiguration envoyConfiguration);
+
+  /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
-   * The envoyConfiguration is used to resolve the configurationYAML.
+   * This does not perform registration, and performRegistration() may need to be called first.
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
-   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
-                      String logLevel);
+  EnvoyStatus runWithYaml(String configurationYAML, String logLevel);
 
   /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
+   *
+   * This automatically performs any necessary registrations.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
+  EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
 
   /**
    * Increments a counter with the given count.
@@ -55,13 +65,6 @@ public interface EnvoyEngine {
   int recordCounterInc(String elements, Map<String, String> tags, int count);
 
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
-
-  /**
-   * Flush the stats sinks outside of a flushing interval.
-   * Note: stat flushing is done asynchronously, this function will never block.
-   * This is a noop if called before the underlying EnvoyEngine has started.
-   */
-  void flushStats();
 
   String dumpStats();
 
@@ -86,4 +89,16 @@ public interface EnvoyEngine {
    * @param port The proxy port.
    */
   void setProxySettings(String host, int port);
+
+  /*
+   * These are the available log levels for Envoy Mobile.
+   */
+  public enum LogLevel { TRACE, DEBUG, INFO, WARN, ERR, CRITICAL, OFF }
+
+  /**
+   * Set the log level for Envoy mobile
+   *
+   * @param log_level the verbosity of logging Envoy should use.
+   */
+  public void setLogLevel(LogLevel log_level);
 }

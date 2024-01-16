@@ -6,8 +6,14 @@ MANUAL="${MANUAL:-}"
 NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
 UPARGS="${UPARGS:-}"
+ENVOY_EXAMPLES_DEBUG="${ENVOY_EXAMPLES_DEBUG:-}"
 
-DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker-compose}"
+
+if [[ -n "$DOCKER_COMPOSE" ]]; then
+    read -ra DOCKER_COMPOSE <<< "$DOCKER_COMPOSE"
+else
+    DOCKER_COMPOSE=(docker compose)
+fi
 
 run_log () {
     echo -e "\n> [${NAME}] ${*}"
@@ -17,15 +23,26 @@ bring_up_example_stack () {
     local args path up_args
     args=("${UPARGS[@]}")
     path="$1"
-    read -ra up_args <<< "up --quiet-pull --build -d ${args[*]}"
+    read -ra up_args <<< "up --quiet-pull --pull missing --build --wait -d ${args[*]}"
 
     if [[ -z "$DOCKER_NO_PULL" ]]; then
         run_log "Pull the images ($path)"
-        "$DOCKER_COMPOSE" pull -q
+        "${DOCKER_COMPOSE[@]}" pull -q
         echo
     fi
     run_log "Bring up services ($path)"
-    "$DOCKER_COMPOSE" "${up_args[@]}" || return 1
+    "${DOCKER_COMPOSE[@]}" "${up_args[@]}" || return 1
+
+    if [[ -n "$ENVOY_EXAMPLES_DEBUG" ]]; then
+        echo "----------------------------------------------"
+        docker system df -v
+        echo
+        sudo du -ch / | grep "[0-9]G"
+        echo
+        df -h
+        echo
+        echo "----------------------------------------------"
+    fi
     echo
 }
 
@@ -47,30 +64,71 @@ bring_up_example () {
     fi
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
-        "$DOCKER_COMPOSE" ps
-        "$DOCKER_COMPOSE" logs
+        "${DOCKER_COMPOSE[@]}" ps
+        "${DOCKER_COMPOSE[@]}" logs
         popd > /dev/null || return 1
     done
 }
 
-cleanup_stack () {
-    local path
-    path="$1"
-    run_log "Cleanup ($path)"
-    "$DOCKER_COMPOSE" down --remove-orphans
-}
-
-cleanup () {
+bring_down_example () {
     local path paths
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
         cleanup_stack "$path" || {
             echo "ERROR: cleanup ${NAME} ${path}" >&2
-            return 1
         }
         popd > /dev/null
     done
+}
+
+cleanup_stack () {
+    local path down_args
+    path="$1"
+    down_args=(--remove-orphans)
+
+    if [[ -n "$DOCKER_RMI_CLEANUP" ]]; then
+        down_args+=(--rmi all)
+    fi
+
+    # Remove sandbox volumes by default
+    if [[ -z "$DOCKER_SAVE_VOLUMES" ]]; then
+        down_args+=(--volumes)
+    fi
+
+    run_log "Cleanup ($path)"
+    "${DOCKER_COMPOSE[@]}" down "${down_args[@]}"
+}
+
+debug_failure () {
+    >&2 echo "FAILURE DEBUG"
+    >&2 echo "DISK SPACE"
+    df -h
+    >&2 echo "DOCKER COMPOSE LOGS"
+    "${DOCKER_COMPOSE[@]}" logs
+    >&2 echo "DOCKER COMPOSE PS"
+    "${DOCKER_COMPOSE[@]}" ps
+}
+
+cleanup () {
+    local code="$?"
+
+    if [[ "$code" -ne 0 ]]; then
+        debug_failure
+    fi
+
+    bring_down_example
+
+    if type -t finally &> /dev/null; then
+        finally
+    fi
+
+    if [[ "$code" -ne 0 ]]; then
+        run_log Failed
+    else
+        run_log Success
+    fi
+    echo
 }
 
 _curl () {
@@ -88,14 +146,23 @@ _curl () {
     }
 }
 
+move_if_exists () {
+    if [ -e "$1" ]; then
+        mv "$1" "$2"
+    else
+        echo "Warning: $1 does not exist. Skipping move operation."
+    fi
+}
+
 responds_with () {
     local expected response
     expected="$1"
     shift
     response=$(_curl "${@}")
-    grep -s "$expected" <<< "$response" || {
+    grep -Fs "$expected" <<< "$response" || {
         echo "ERROR: curl (${*})" >&2
-        echo "EXPECTED: $expected" >&2
+        echo "EXPECTED:" >&2
+        echo "$expected" >&2
         echo "RECEIVED:" >&2
         echo "$response" >&2
         return 1
@@ -124,7 +191,8 @@ responds_with_header () {
     response=$(_curl --head "${@}")
     grep -s "$expected" <<< "$response"  || {
         echo "ERROR: curl (${*})" >&2
-        echo "EXPECTED HEADER: $expected" >&2
+        echo "EXPECTED HEADER:" >&2
+        echo "$expected" >&2
         echo "RECEIVED:" >&2
         echo "$response" >&2
         return 1

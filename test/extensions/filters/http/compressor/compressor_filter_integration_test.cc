@@ -151,7 +151,7 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{
-      stats_store_, "test", 4096, 100};
+      *stats_store_.rootScope(), "test", 4096, 100};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CompressorIntegrationTest,

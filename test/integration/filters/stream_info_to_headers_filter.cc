@@ -38,6 +38,10 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       toUsec(stream_info.downstreamTiming().getValue(dns_end).value()));
     }
+    if (stream_info.downstreamAddressProvider().roundTripTime().has_value()) {
+      headers.addCopy(Http::LowerCaseString("round_trip_time"),
+                      stream_info.downstreamAddressProvider().roundTripTime().value().count());
+    }
     if (conn_stream_info.downstreamTiming().has_value() &&
         conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().has_value()) {
       headers.addCopy(
@@ -87,6 +91,10 @@ public:
       if (upstream_timing.first_upstream_rx_byte_received_.has_value()) {
         headers.addCopy(Http::LowerCaseString("response_begin"),
                         toUsec(upstream_timing.first_upstream_rx_byte_received_.value()));
+      }
+      if (upstream_timing.connectionPoolCallbackLatency().has_value()) {
+        headers.addCopy(Http::LowerCaseString("connection_pool_latency"),
+                        upstream_timing.connectionPoolCallbackLatency().value().count());
       }
     }
     return Http::FilterHeadersStatus::Continue;

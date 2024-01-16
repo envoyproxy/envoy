@@ -37,8 +37,8 @@
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
-* Triage build and CI issues. Monitor #envoy-ci and #test-flaky and file issues for failing builds,
-  flaky tests or new bugs, and either fix or find someone to fix any main build breakages.
+* Triage build and CI issues. Monitor #envoy-ci and file issues for flaking or failing builds,
+  or new bugs, and either fix or find someone to fix any main build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are

@@ -82,8 +82,8 @@ public:
   void setupTest(const std::string& yaml) {
     envoy::config::route::v3::RouteConfiguration route_config;
     TestUtility::loadFromYaml(yaml, route_config);
-    config_ = std::make_unique<ConfigImpl>(route_config, OptionalHttpFilters(), factory_context_,
-                                           any_validation_visitor_, true);
+    config_ =
+        std::make_unique<ConfigImpl>(route_config, factory_context_, any_validation_visitor_, true);
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
   }
 
@@ -292,14 +292,15 @@ virtual_hosts:
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(
-        parseRateLimitFromV3Yaml(yaml), ProtobufMessage::getStrictValidationVisitor());
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml),
+                                                                   factory_context_);
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
@@ -313,14 +314,15 @@ public:
 class RateLimitPolicyEntryIpv6Test : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(
-        parseRateLimitFromV3Yaml(yaml), ProtobufMessage::getStrictValidationVisitor());
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml),
+                                                                   factory_context_);
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
@@ -856,10 +858,14 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
   EXPECT_TRUE(local_descriptors_.empty());
 }
-// Tests that no descriptor is generated when both the metadata_key and default_value are empty.
+
+// Tests that no descriptors are generated when both the metadata_key and default_value are empty.
 TEST_F(RateLimitPolicyEntryTest, MetaDataAndDefaultValueEmpty) {
   const std::string yaml = R"EOF(
 actions:
+- generic_key:
+    descriptor_key: fake_key
+    descriptor_value: fake_value
 - metadata:
     descriptor_key: fake_key
     default_value: ""
@@ -885,6 +891,44 @@ filter_metadata:
 
   EXPECT_TRUE(descriptors_.empty());
   EXPECT_TRUE(local_descriptors_.empty());
+}
+
+// Tests that no descriptor is generated when both the metadata_key and default_value are empty,
+// and skip_if_absent is set to true.
+TEST_F(RateLimitPolicyEntryTest, MetaDataAndDefaultValueEmptySkipIfAbsent) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: fake_key
+    descriptor_value: fake_value
+- metadata:
+    descriptor_key: fake_key
+    default_value: ""
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    skip_if_absent: true
+  )EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  envoy.xxx:
+    another_key:
+      prop: ""
+  )EOF";
+
+  TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(local_descriptors_));
 }
 
 TEST_F(RateLimitPolicyEntryTest, MetaDataNonStringNoMatch) {

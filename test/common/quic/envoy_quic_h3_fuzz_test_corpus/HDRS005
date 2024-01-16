@@ -1,0 +1,71 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "https"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "options"
+            }
+            headers {
+              key: "grpc-message"
+              value: "empty"
+            }
+            headers {
+              key: "x-forwarded-proto"
+              value: "empty"
+            }
+            headers {
+              key: "-is-timeout-retry"
+              value: "empty"
+            }
+            headers {
+              key: "transfer-encoding"
+              value: "br"
+            }
+            headers {
+              key: "user-agent"
+              value: "Envoy/HC"
+            }
+            headers {
+              key: "cache-control"
+              value: "no-transform"
+            }
+            headers {
+              key: "-upstream-host-address"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

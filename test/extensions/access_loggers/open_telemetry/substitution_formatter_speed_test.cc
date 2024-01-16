@@ -3,6 +3,7 @@
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
 #include "test/common/stream_info/test_util.h"
+#include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -71,15 +72,9 @@ static void BM_OpenTelemetryAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<OpenTelemetryFormatter> otel_formatter = makeOpenTelemetryFormatter();
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
+
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        otel_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .ByteSize();
+    output_bytes += otel_formatter->format({}, *stream_info).ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }

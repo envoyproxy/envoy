@@ -130,7 +130,7 @@ protected:
   CallbackNotInvokedAfterDeletionTest() : slot_(TypedSlot<>::makeUnique(tls_)) {
     EXPECT_CALL(thread_dispatcher_, post(_)).Times(4).WillRepeatedly(Invoke([&](Event::PostCb cb) {
       // Holds the posted callback.
-      holder_.push_back(cb);
+      holder_.push_back(std::move(cb));
     }));
 
     slot_->set([this](Event::Dispatcher&) {

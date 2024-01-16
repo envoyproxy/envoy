@@ -4,7 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
@@ -12,7 +12,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
-#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
@@ -35,37 +34,6 @@ static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
 static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
                                         const char* default_value) {
   return header ? header->value().getStringView() : default_value;
-}
-
-const std::string HttpTracerUtility::IngressOperation = "ingress";
-const std::string HttpTracerUtility::EgressOperation = "egress";
-
-const std::string& HttpTracerUtility::toString(OperationName operation_name) {
-  switch (operation_name) {
-  case OperationName::Ingress:
-    return IngressOperation;
-  case OperationName::Egress:
-    return EgressOperation;
-  }
-
-  return EMPTY_STRING; // Make the compiler happy.
-}
-
-Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_info) {
-  // Exclude health check requests immediately.
-  if (stream_info.healthCheck()) {
-    return {Reason::HealthCheck, false};
-  }
-
-  const Tracing::Reason trace_reason = stream_info.traceReason();
-  switch (trace_reason) {
-  case Reason::ClientForced:
-  case Reason::ServiceForced:
-  case Reason::Sampling:
-    return {trace_reason, true};
-  default:
-    return {trace_reason, false};
-  }
 }
 
 static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
@@ -250,11 +218,12 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
-  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster,
-                stream_info.upstreamInfo()->upstreamHost()->cluster().name());
+  // Cluster info.
+  if (auto cluster_info = stream_info.upstreamClusterInfo();
+      cluster_info.has_value() && cluster_info.value() != nullptr) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
     span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                stream_info.upstreamInfo()->upstreamHost()->cluster().observabilityName());
+                cluster_info.value()->observabilityName());
   }
 
   // Post response data.
@@ -270,37 +239,15 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
 
-  CustomTagContext ctx{stream_info.getRequestHeaders(), stream_info};
+  ReadOnlyHttpTraceContext trace_context{stream_info.getRequestHeaders() != nullptr
+                                             ? *stream_info.getRequestHeaders()
+                                             : *Http::StaticEmptyHeaders::get().request_headers};
+  CustomTagContext ctx{trace_context, stream_info};
   if (const CustomTagMap* custom_tag_map = tracing_config.customTags(); custom_tag_map) {
     for (const auto& it : *custom_tag_map) {
       it.second->applySpan(span, ctx);
     }
   }
-}
-
-HttpTracerImpl::HttpTracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
-    : driver_(std::move(driver)), local_info_(local_info) {}
-
-SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
-                                  const StreamInfo::StreamInfo& stream_info,
-                                  const Tracing::Decision tracing_decision) {
-  std::string span_name = HttpTracerUtility::toString(config.operationName());
-
-  if (config.operationName() == OperationName::Egress) {
-    span_name.append(" ");
-    span_name.append(std::string(request_headers.getHostValue()));
-  }
-
-  SpanPtr active_span = driver_->startSpan(config, request_headers, span_name,
-                                           stream_info.startTime(), tracing_decision);
-
-  // Set tags related to the local environment
-  if (active_span) {
-    active_span->setTag(Tracing::Tags::get().NodeId, local_info_.nodeName());
-    active_span->setTag(Tracing::Tags::get().Zone, local_info_.zoneName());
-  }
-
-  return active_span;
 }
 
 } // namespace Tracing

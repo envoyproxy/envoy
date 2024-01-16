@@ -1,11 +1,12 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
+    "envoy_select_enable_http_datagrams",
 )
 
 licenses(["notice"])  # Apache 2
@@ -107,6 +108,7 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
@@ -138,16 +140,6 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         ":quic_ssl_connection_info_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "spdy_server_push_utils_for_envoy_lib",
-    srcs = ["spdy_server_push_utils_for_envoy.cc"],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quic_core_http_spdy_server_push_utils_header",
     ],
 )
 
@@ -277,11 +269,14 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
+        ":quic_stats_gatherer",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -311,7 +306,9 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "@com_github_google_quiche//:quic_core_http_client_lib",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -330,7 +327,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//envoy/network:connection_interface",
-        "//source/common/network:listen_socket_lib",
     ],
 )
 
@@ -342,6 +338,8 @@ envoy_cc_library(
     deps = [
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
+        "//source/common/network:generic_listener_filter_impl_base_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
     ],
@@ -398,6 +396,7 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_factory_interface",
         ":envoy_quic_proof_source_lib",
+        ":envoy_quic_server_preferred_address_config_factory_interface",
         ":envoy_quic_utils_lib",
         "//envoy/network:listener_interface",
         "//source/common/network:listener_lib",
@@ -426,7 +425,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
-        "//source/common/network:listen_socket_lib",
+        "//source/common/network:connection_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "@com_github_google_quiche//:quic_core_config_lib",
@@ -438,11 +437,42 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_transport_socket_factory_lib",
-    srcs = ["quic_transport_socket_factory.cc"],
-    hdrs = ["quic_transport_socket_factory.h"],
+    srcs = [
+        "quic_client_transport_socket_factory.cc",
+        "quic_transport_socket_factory.cc",
+    ],
+    hdrs = [
+        "quic_client_transport_socket_factory.h",
+        "quic_transport_socket_factory.h",
+    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_lib",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/server:transport_socket_config_interface",
+        "//envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+    alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "quic_server_transport_socket_factory_lib",
+    srcs = [
+        "quic_server_transport_socket_factory.cc",
+    ],
+    hdrs = [
+        "quic_server_transport_socket_factory.h",
+    ],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_verifier_lib",
+        ":quic_transport_socket_factory_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_config_interface",
@@ -499,8 +529,8 @@ envoy_cc_library(
         "//bazel:boringssl_fips": [],
         "//bazel:boringssl_disabled": [],
         "//conditions:default": [
-            ":server_codec_lib",
             ":quic_transport_socket_factory_lib",
+            ":server_codec_lib",
             "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
             "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         ],
@@ -534,8 +564,10 @@ envoy_cc_library(
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib",
-    ],
+    ] + select({
+        "//bazel:linux": ["@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
@@ -544,6 +576,7 @@ envoy_cc_library(
     hdrs = ["send_buffer_monitor.h"],
     tags = ["nofips"],
     deps = [
+        "//source/common/common:assert_lib",
         "@com_github_google_quiche//:quic_core_session_lib",
     ],
 )
@@ -553,7 +586,9 @@ envoy_cc_library(
     hdrs = ["envoy_quic_client_crypto_stream_factory.h"],
     tags = ["nofips"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/config:typed_config_interface",
+        "//envoy/network:transport_socket_interface",
         "@com_github_google_quiche//:quic_client_session_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
     ],
@@ -588,5 +623,43 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "@com_github_google_quiche//:quic_core_connection_id_generator_interface_lib",
         "@com_github_google_quiche//:quic_load_balancer_encoder_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_server_preferred_address_config_factory_interface",
+    hdrs = ["envoy_quic_server_preferred_address_config_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/network:address_interface",
+        "@com_github_google_quiche//:quic_platform_socket_address",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_stats_gatherer",
+    srcs = ["quic_stats_gatherer.cc"],
+    hdrs = ["quic_stats_gatherer.h"],
+    tags = ["nofips"],
+    deps = [
+        "//envoy/access_log:access_log_interface",
+        "//envoy/http:codec_interface",
+        "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http_datagram_handler",
+    srcs = ["http_datagram_handler.cc"],
+    hdrs = ["http_datagram_handler.h"],
+    deps = [
+        "//envoy/http:codec_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+        "@com_github_google_quiche//:quic_core_types_lib",
     ],
 )

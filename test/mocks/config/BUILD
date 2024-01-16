@@ -32,6 +32,16 @@ envoy_cc_mock(
     srcs = ["custom_config_validators.cc"],
     hdrs = ["custom_config_validators.h"],
     deps = [
-        "//source/common/config:custom_config_validators_interface",
+        "//envoy/config:config_validator_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "eds_resources_cache_mocks",
+    srcs = ["eds_resources_cache.cc"],
+    hdrs = ["eds_resources_cache.h"],
+    deps = [
+        "//envoy/config:eds_resources_cache_interface",
+        "//source/common/common:logger_lib",
     ],
 )

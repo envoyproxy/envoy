@@ -38,8 +38,8 @@ protected:
     drainBuffer(buffer);
 
     Stats::IsolatedStoreImpl stats_store{};
-    Compression::Brotli::Decompressor::BrotliDecompressorImpl decompressor{stats_store, "test.",
-                                                                           4096, false};
+    Compression::Brotli::Decompressor::BrotliDecompressorImpl decompressor{*stats_store.rootScope(),
+                                                                           "test.", 4096, false};
 
     decompressor.decompress(accumulation_buffer, buffer);
     std::string decompressed_text{buffer.toString()};

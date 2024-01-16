@@ -6,12 +6,12 @@
 #include "source/common/filesystem/directory.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 #include "test/extensions/common/async_files/mocks.h"
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
@@ -27,7 +27,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
-namespace {
 
 using Common::AsyncFiles::AsyncFileHandle;
 using Common::AsyncFiles::MockAsyncFileContext;
@@ -37,6 +36,7 @@ using Common::AsyncFiles::MockAsyncFileManagerFactory;
 using ::envoy::extensions::filters::http::cache::v3::CacheConfig;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
 
 absl::string_view yaml_config = R"(
@@ -62,12 +62,16 @@ public:
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
+    ON_CALL(context_.server_factory_context_.api_, threadFactory())
+        .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   }
 
   void initCache() {
     cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
         http_cache_factory_->getCache(cacheConfig(testConfig()), context_));
   }
+
+  void waitForEvictionThreadIdle() { cache_->cache_eviction_thread_.waitForIdle(); }
 
   ConfigProto testConfig() {
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
@@ -116,15 +120,107 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_2_contents, true);
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
   EXPECT_EQ(cache_->stats().size_limit_bytes_.value(), max_size);
   EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() + file_2_contents.size());
   EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+}
+
+TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCountLimit) {
+  const std::string file_contents = "XXXXX";
+  const uint64_t max_count = 2;
+  ConfigProto cfg = testConfig();
+  cfg.mutable_max_cache_entry_count()->set_value(max_count);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
+  // TODO(#24994): replace this with backdating the files when that's possible.
+  sleep(1); // NO_CHECK_FORMAT(real_time)
+  cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-d"), file_contents, true);
+  cache_->trackFileAdded(file_contents.size());
+  cache_->trackFileAdded(file_contents.size());
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-d")));
+  // There may have been one or two eviction runs here, because there's a race
+  // between the eviction and the second file being added. Either amount of runs
+  // is valid, as the eventual consistency is achieved either way.
+  EXPECT_THAT(cache_->stats().eviction_runs_.value(), testing::AnyOf(1, 2));
+}
+
+TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSizeLimit) {
+  const std::string file_contents = "XXXXX";
+  const std::string large_file_contents = "XXXXXXXXXXXX";
+  const uint64_t max_size = large_file_contents.size();
+  ConfigProto cfg = testConfig();
+  cfg.mutable_max_cache_size_bytes()->set_value(max_size);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
+  // TODO(#24994): replace this with backdating the files when that's possible.
+  sleep(1); // NO_CHECK_FORMAT(real_time)
+  cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  cache_->trackFileAdded(large_file_contents.size());
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), large_file_contents.size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 1);
 }
 
 class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::testing::Test {
   void SetUp() override { initCache(); }
 };
+
+MATCHER_P2(IsStatTag, name, value, "") {
+  if (!ExplainMatchResult(name, arg.name_, result_listener) ||
+      !ExplainMatchResult(value, arg.value_, result_listener)) {
+    *result_listener << "\nexpected {name: \"" << name << "\", value: \"" << value
+                     << "\"},\n but got {name: \"" << arg.name_ << "\", value: \"" << arg.value_
+                     << "\"}\n";
+    return false;
+  }
+  return true;
+}
+
+TEST_F(FileSystemHttpCacheTest, StatsAreConstructedCorrectly) {
+  std::string cache_path_no_periods = absl::StrReplaceAll(cache_path_, {{".", "_"}});
+  // Validate that a gauge has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().size_bytes_.tagExtractedName(), "cache.size_bytes");
+  EXPECT_THAT(cache_->stats().size_bytes_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  // Validate that a counter has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().eviction_runs_.tagExtractedName(), "cache.eviction_runs");
+  EXPECT_THAT(cache_->stats().eviction_runs_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods)));
+  EXPECT_EQ(cache_->stats().cache_hit_.tagExtractedName(), "cache.event");
+  EXPECT_EQ(cache_->stats().cache_miss_.tagExtractedName(), "cache.event");
+  EXPECT_THAT(cache_->stats().cache_hit_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods),
+                                     IsStatTag("event_type", "hit")));
+  EXPECT_THAT(cache_->stats().cache_miss_.tags(),
+              ::testing::ElementsAre(IsStatTag("cache_path", cache_path_no_periods),
+                                     IsStatTag("event_type", "miss")));
+}
 
 TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
   cache_->trackFileAdded(1);
@@ -168,23 +264,25 @@ class MockSingletonManager : public Singleton::ManagerImpl {
 public:
   MockSingletonManager() : Singleton::ManagerImpl(Thread::threadFactoryForTest()) {
     // By default just act like a real SingletonManager, but allow overrides.
-    ON_CALL(*this, get(_, _))
+    ON_CALL(*this, get(_, _, _))
         .WillByDefault(std::bind(&MockSingletonManager::realGet, this, std::placeholders::_1,
-                                 std::placeholders::_2));
+                                 std::placeholders::_2, std::placeholders::_3));
   }
 
   MOCK_METHOD(Singleton::InstanceSharedPtr, get,
-              (const std::string& name, Singleton::SingletonFactoryCb cb));
-  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb) {
-    return Singleton::ManagerImpl::get(name, cb);
+              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin));
+  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb,
+                                       bool pin) {
+    return Singleton::ManagerImpl::get(name, cb, pin);
   }
 };
 
 class FileSystemHttpCacheTestWithMockFiles : public FileSystemHttpCacheTest {
 public:
   FileSystemHttpCacheTestWithMockFiles() {
-    ON_CALL(context_, singletonManager()).WillByDefault(ReturnRef(mock_singleton_manager_));
-    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _))
+    ON_CALL(context_.server_factory_context_, singletonManager())
+        .WillByDefault(ReturnRef(mock_singleton_manager_));
+    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _, _))
         .WillByDefault(Return(mock_async_file_manager_factory_));
     ON_CALL(*mock_async_file_manager_factory_, getAsyncFileManager(_, _))
         .WillByDefault(Return(mock_async_file_manager_));
@@ -380,56 +478,6 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, DuplicateInsertWhileInsertInProgres
   EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
 }
 
-// The documentation for cache_filter suggests it will wait for ready_for_next_chunk to be
-// called before sending another chunk, but it does not. This test verifies that the cache
-// doesn't rely on the documented behavior, and can cope with receiving two insertBody
-// calls without completion callbacks being called in between.
-TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallbackWorks) {
-  auto inserter = testInserter();
-  absl::Cleanup destroy_inserter{[&inserter]() { inserter->onDestroy(); }};
-  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
-  inserter->insertHeaders(response_headers_, metadata_, expect_true_callback_, false);
-  absl::string_view body1 = "herp";
-  absl::string_view body2 = "derp";
-  inserter->insertBody(Buffer::OwnedImpl(body1), expect_true_callback_, false);
-  inserter->insertBody(Buffer::OwnedImpl(body2), expect_true_callback_, false);
-  inserter->insertTrailers(response_trailers_, expect_true_callback_);
-  EXPECT_EQ(0, true_callbacks_called_);
-  EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(6);
-  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
-  EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
-  EXPECT_CALL(*mock_async_file_handle_, createHardLink(_, _));
-  // Open file
-  mock_async_file_manager_->nextActionCompletes(
-      absl::StatusOr<AsyncFileHandle>{mock_async_file_handle_});
-  // Empty pre-header
-  mock_async_file_manager_->nextActionCompletes(
-      absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
-  // Headers
-  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size_));
-  // Body1
-  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body1.size()));
-  // Body2
-  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body2.size()));
-  // Trailers
-  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size_));
-  // Updated pre-header (which triggers stat/unlink/createHardLink sequence)
-  mock_async_file_manager_->nextActionCompletes(
-      absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
-  // Stat
-  mock_async_file_manager_->nextActionCompletes(
-      absl::StatusOr<struct stat>{absl::UnknownError("intentionally failed stat")});
-  // Unlink
-  mock_async_file_manager_->nextActionCompletes(absl::UnknownError("intentionally failed unlink"));
-  // createHardLink
-  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
-  // Should have been 4 callbacks; insertHeaders, insertBody, insertBody, insertTrailers.
-  EXPECT_EQ(true_callbacks_called_, 4);
-  EXPECT_EQ(cache_->stats().size_bytes_.value(), headers_size_ + body1.size() + body2.size() +
-                                                     trailers_size_ + CacheFileFixedBlock::size());
-  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
-}
-
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
   auto lookup = testLookupContext();
   absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
@@ -441,6 +489,8 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
   // File handle didn't get used but is expected to be closed.
   EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
+  EXPECT_EQ(cache_->stats().cache_miss_.value(), 1);
+  EXPECT_EQ(cache_->stats().cache_hit_.value(), 0);
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesTheCacheEntry) {
@@ -468,6 +518,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesT
   // unlink
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
+  waitForEvictionThreadIdle();
   // Should have deducted the size of the file that got deleted. Since we started at 2 * 12345,
   // this should make the value 12345.
   EXPECT_EQ(cache_->stats().size_bytes_.value(), 12345);
@@ -653,21 +704,17 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles,
   EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
 }
 
-TEST_F(FileSystemHttpCacheTestWithMockFiles,
-       InsertAbortsOnFailureToWriteEmptyHeaderBlockAndCancelsEntireQueue) {
+TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToWriteEmptyHeaderBlock) {
   auto inserter = testInserter();
   absl::Cleanup destroy_inserter([&inserter]() { inserter->onDestroy(); });
   EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _));
   inserter->insertHeaders(response_headers_, metadata_, expect_false_callback_, false);
-  inserter->insertBody(Buffer::OwnedImpl("woop"), expect_false_callback_, false);
-  inserter->insertBody(Buffer::OwnedImpl("woop"), expect_false_callback_, false);
-  inserter->insertBody(Buffer::OwnedImpl("woop"), expect_false_callback_, true);
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(
       absl::UnknownError("intentionally failed write to empty header block")));
-  EXPECT_EQ(false_callbacks_called_, 4);
+  EXPECT_EQ(false_callbacks_called_, 1);
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToWriteHeaderChunk) {
@@ -691,12 +738,13 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToWriteBodyChu
   EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(3);
   inserter->insertHeaders(response_headers_, metadata_, expect_true_callback_, false);
-  inserter->insertBody(Buffer::OwnedImpl("woop"), expect_false_callback_, false);
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size_));
+  EXPECT_EQ(true_callbacks_called_, 1);
+  inserter->insertBody(Buffer::OwnedImpl("woop"), expect_false_callback_, false);
   // Intentionally undersized write of body chunk.
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(1));
   EXPECT_EQ(false_callbacks_called_, 1);
@@ -709,14 +757,16 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToWriteTrailer
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(4);
   inserter->insertHeaders(response_headers_, metadata_, expect_true_callback_, false);
   const absl::string_view body = "woop";
-  inserter->insertBody(Buffer::OwnedImpl(body), expect_true_callback_, false);
-  inserter->insertTrailers(response_trailers_, expect_false_callback_);
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size_));
+  EXPECT_EQ(true_callbacks_called_, 1);
+  inserter->insertBody(Buffer::OwnedImpl(body), expect_true_callback_, false);
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body.size()));
+  EXPECT_EQ(true_callbacks_called_, 2);
+  inserter->insertTrailers(response_trailers_, expect_false_callback_);
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(absl::UnknownError("intentionally failed write of trailer chunk")));
   EXPECT_EQ(false_callbacks_called_, 1);
@@ -728,15 +778,17 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToWriteUpdated
   EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(5);
   inserter->insertHeaders(response_headers_, metadata_, expect_true_callback_, false);
-  const absl::string_view body = "woop";
-  inserter->insertBody(Buffer::OwnedImpl(body), expect_true_callback_, false);
-  inserter->insertTrailers(response_trailers_, expect_false_callback_);
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size_));
+  EXPECT_EQ(true_callbacks_called_, 1);
+  const absl::string_view body = "woop";
+  inserter->insertBody(Buffer::OwnedImpl(body), expect_true_callback_, false);
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body.size()));
+  EXPECT_EQ(true_callbacks_called_, 2);
+  inserter->insertTrailers(response_trailers_, expect_false_callback_);
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size_));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(
       absl::UnknownError("intentionally failed write of updated header block")));
@@ -752,15 +804,17 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToLinkFile) {
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   EXPECT_CALL(*mock_async_file_handle_, createHardLink(_, _));
   inserter->insertHeaders(response_headers_, metadata_, expect_true_callback_, false);
-  const absl::string_view body = "woop";
-  inserter->insertBody(Buffer::OwnedImpl(body), expect_true_callback_, false);
-  inserter->insertTrailers(response_trailers_, expect_false_callback_);
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size_));
+  EXPECT_EQ(true_callbacks_called_, 1);
+  const absl::string_view body = "woop";
+  inserter->insertBody(Buffer::OwnedImpl(body), expect_true_callback_, false);
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body.size()));
+  EXPECT_EQ(true_callbacks_called_, 2);
+  inserter->insertTrailers(response_trailers_, expect_false_callback_);
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
@@ -1198,6 +1252,8 @@ TEST(Registration, GetCacheFromFactory) {
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ON_CALL(factory_context.server_factory_context_.api_, threadFactory())
+      .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.file_system_http_cache");
@@ -1209,7 +1265,6 @@ TEST(Registration, GetCacheFromFactory) {
             "/tmp/");
 }
 
-} // namespace
 } // namespace FileSystemHttpCache
 } // namespace Cache
 } // namespace HttpFilters

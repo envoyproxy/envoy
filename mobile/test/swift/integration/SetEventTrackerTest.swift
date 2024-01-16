@@ -5,9 +5,12 @@ import TestExtensions
 import XCTest
 
 final class SetEventTrackerTest: XCTestCase {
-  func testEmitEventWithoutSettingEventTracker() throws {
+  override static func setUp() {
+    super.setUp()
     register_test_extensions()
+  }
 
+  func testEmitEventWithoutSettingEventTracker() throws {
     let eventExpectation =
       self.expectation(description: "Passed event tracker receives an event")
 

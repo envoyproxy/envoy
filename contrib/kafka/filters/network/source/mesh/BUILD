@@ -25,6 +25,7 @@ envoy_cc_contrib_extension(
         "//bazel:windows": [],
         "//conditions:default": [
             ":filter_lib",
+            ":shared_consumer_manager_impl_lib",
             ":upstream_config_lib",
             ":upstream_kafka_facade_lib",
         ],
@@ -41,6 +42,7 @@ envoy_cc_library(
     deps = [
         ":abstract_command_lib",
         ":request_processor_lib",
+        ":shared_consumer_manager_lib",
         ":upstream_config_lib",
         ":upstream_kafka_facade_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
@@ -68,7 +70,9 @@ envoy_cc_library(
         ":upstream_kafka_facade_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
+        "//contrib/kafka/filters/network/source/mesh:shared_consumer_manager_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:api_versions_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:fetch_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:list_offsets_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:metadata_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:produce_lib",
@@ -88,6 +92,7 @@ envoy_cc_library(
     deps = [
         "//contrib/kafka/filters/network/source:kafka_response_lib",
         "//contrib/kafka/filters/network/source:tagged_fields_lib",
+        "//envoy/event:dispatcher_interface",
     ],
 )
 
@@ -112,32 +117,25 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "shared_consumer_manager_lib",
-    srcs = [
-    ],
-    hdrs = [
-        "shared_consumer_manager.h",
-    ],
+    srcs = [],
+    hdrs = ["shared_consumer_manager.h"],
     tags = ["skip_on_windows"],
     deps = [
+        ":upstream_config_lib",
         ":upstream_kafka_consumer_lib",
-        "//source/common/common:minimal_logger_lib",
     ],
 )
 
 envoy_cc_library(
     name = "shared_consumer_manager_impl_lib",
-    srcs = [
-        "shared_consumer_manager_impl.cc",
-    ],
-    hdrs = [
-        "shared_consumer_manager_impl.h",
-    ],
+    srcs = ["shared_consumer_manager_impl.cc"],
+    hdrs = ["shared_consumer_manager_impl.h"],
     tags = ["skip_on_windows"],
     deps = [
-        ":librdkafka_utils_lib",
         ":shared_consumer_manager_lib",
         ":upstream_config_lib",
         ":upstream_kafka_consumer_impl_lib",
+        ":upstream_kafka_consumer_lib",
         "//contrib/kafka/filters/network/source:kafka_types_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -223,6 +221,7 @@ envoy_cc_library(
     deps = [
         ":librdkafka_utils_impl_lib",
         ":upstream_kafka_consumer_lib",
+        "//contrib/kafka/filters/network/source:kafka_types_lib",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -238,6 +237,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:exception_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg_cc_proto",
@@ -253,6 +253,8 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:pure_lib",
+        "@com_google_absl//absl/strings",
         envoy_external_dep_path("librdkafka"),
     ],
 )

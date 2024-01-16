@@ -52,9 +52,9 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   GradientControllerSharedPtr makeController(const std::string& yaml_config) {
-    const auto config = std::make_shared<GradientController>(makeConfig(yaml_config, runtime_),
-                                                             *dispatcher_, runtime_, "test_prefix.",
-                                                             stats_, random_, time_system_);
+    const auto config = std::make_shared<GradientController>(
+        makeConfig(yaml_config, runtime_), *dispatcher_, runtime_, "test_prefix.",
+        *stats_.rootScope(), random_, time_system_);
 
     // Advance time so that the latency sample calculations don't underflow if monotonic time is 0.
     time_system_.advanceTimeAndRun(std::chrono::hours(42), *dispatcher_,
@@ -667,9 +667,9 @@ min_rtt_calc_params:
       .WillOnce(Return(rtt_timer))
       .WillOnce(Return(sample_timer));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
-  auto controller =
-      std::make_shared<GradientController>(makeConfig(yaml, runtime_), fake_dispatcher, runtime_,
-                                           "test_prefix.", stats_, random_, time_system_);
+  auto controller = std::make_shared<GradientController>(
+      makeConfig(yaml, runtime_), fake_dispatcher, runtime_, "test_prefix.", *stats_.rootScope(),
+      random_, time_system_);
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
 
@@ -712,9 +712,9 @@ min_rtt_calc_params:
       .WillOnce(Return(rtt_timer))
       .WillOnce(Return(sample_timer));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
-  auto controller =
-      std::make_shared<GradientController>(makeConfig(yaml, runtime_), fake_dispatcher, runtime_,
-                                           "test_prefix.", stats_, random_, time_system_);
+  auto controller = std::make_shared<GradientController>(
+      makeConfig(yaml, runtime_), fake_dispatcher, runtime_, "test_prefix.", *stats_.rootScope(),
+      random_, time_system_);
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));

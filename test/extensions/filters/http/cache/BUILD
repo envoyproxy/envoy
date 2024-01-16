@@ -10,11 +10,9 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test_library(
-    name = "common",
-    srcs = ["common.cc"],
-    hdrs = ["common.h"],
+    name = "mocks",
+    hdrs = ["mocks.h"],
     deps = [
-        "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
     ],
 )
@@ -24,7 +22,6 @@ envoy_extension_cc_test(
     srcs = ["cache_headers_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     deps = [
-        ":common",
         "//envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
@@ -56,11 +53,11 @@ envoy_extension_cc_test(
     srcs = ["http_cache_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     deps = [
-        ":common",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/http/cache/simple_http_cache:config",
         "//test/mocks/http:http_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -70,7 +67,6 @@ envoy_extension_cc_test(
     srcs = ["range_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     deps = [
-        ":common",
         "//source/extensions/filters/http/cache:range_utils_lib",
         "//test/test_common:utility_lib",
     ],
@@ -81,7 +77,7 @@ envoy_extension_cc_test(
     srcs = ["cache_filter_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     deps = [
-        ":common",
+        ":mocks",
         "//source/extensions/filters/http/cache:cache_filter_lib",
         "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
         "//source/extensions/http/cache/simple_http_cache:config",
@@ -120,11 +116,11 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "cache_filter_integration_test",
+    size = "large",
     srcs = [
         "cache_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.cache"],
-    shard_count = 2,
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache:http_cache_lib",
@@ -153,7 +149,6 @@ envoy_extension_cc_test_library(
     deps = [
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "//test/extensions/filters/http/cache:common",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",

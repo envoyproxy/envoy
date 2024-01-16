@@ -15,7 +15,8 @@ namespace {
 
 TEST(SslContextManager, createStub) {
   Event::SimulatedTimeSystem time_system;
-  Stats::MockStore scope;
+  Stats::MockStore store;
+  Stats::Scope& scope(*store.rootScope());
   Ssl::MockClientContextConfig client_config;
   Ssl::MockServerContextConfig server_config;
   std::vector<std::string> server_names;

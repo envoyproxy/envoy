@@ -21,8 +21,8 @@ std::string createHeader(const std::string& format, uint32_t version) {
   source::extensions::tracers::xray::daemon::Header header;
   header.set_format(format);
   header.set_version(version);
-  return MessageUtil::getJsonStringFromMessageOrDie(header, false /* pretty_print  */,
-                                                    false /* always_print_primitive_fields */);
+  return MessageUtil::getJsonStringFromMessageOrError(header, false /* pretty_print  */,
+                                                      false /* always_print_primitive_fields */);
 }
 
 } // namespace
@@ -43,7 +43,7 @@ void DaemonBrokerImpl::send(const std::string& data) const {
                                                   nullptr /*local_ip*/, *address_);
 
   if (rc.return_value_ != payload.length()) {
-    // TODO(marcomagdy): report this in stats
+    // TODO(suniltheta): report this in stats
     ENVOY_LOG_TO_LOGGER(logger, debug, "Failed to send trace payload to the X-Ray daemon.");
   }
 }

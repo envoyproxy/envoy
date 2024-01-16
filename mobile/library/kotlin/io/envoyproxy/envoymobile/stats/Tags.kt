@@ -5,8 +5,7 @@ package io.envoyproxy.envoymobile
  * To instantiate new instances, see `TagsBuilder`.
  */
 class Tags {
-  @Suppress("MemberNameEqualsClassName")
-  val tags: Map<String, String>
+  @Suppress("MemberNameEqualsClassName") val tags: Map<String, String>
 
   /**
    * Internal constructor used by builders.
@@ -21,7 +20,6 @@ class Tags {
    * Get the value for the provided tag name.
    *
    * @param name: Tag name for which to get the current value.
-   *
    * @return String?, The current tags specified for the provided name.
    */
   fun value(name: String): String? {

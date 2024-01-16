@@ -1,0 +1,123 @@
+diff --git a/eval/public/cel_value.cc b/eval/public/cel_value.cc
+index 6aeff6d..c43864c 100644
+--- a/eval/public/cel_value.cc
++++ b/eval/public/cel_value.cc
+@@ -107,7 +107,7 @@ struct DebugStringVisitor {
+ 
+ }  // namespace
+ 
+-const absl::string_view kPayloadUrlMissingAttributePath =
++ABSL_CONST_INIT const absl::string_view kPayloadUrlMissingAttributePath =
+     cel::runtime_internal::kPayloadUrlMissingAttributePath;
+ 
+ CelValue CelValue::CreateDuration(absl::Duration value) {
+diff --git a/eval/public/containers/container_backed_map_impl.h b/eval/public/containers/container_backed_map_impl.h
+index 6092eef..7548bbf 100644
+--- a/eval/public/containers/container_backed_map_impl.h
++++ b/eval/public/containers/container_backed_map_impl.h
+@@ -30,6 +30,7 @@ class CelMapBuilder : public CelMap {
+     return values_map_.contains(cel_key);
+   }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override {
+     return &key_list_;
+   }
+diff --git a/eval/public/containers/internal_field_backed_map_impl.h b/eval/public/containers/internal_field_backed_map_impl.h
+index ec773d9..caa2f3a 100644
+--- a/eval/public/containers/internal_field_backed_map_impl.h
++++ b/eval/public/containers/internal_field_backed_map_impl.h
+@@ -43,6 +43,7 @@ class FieldBackedMapImpl : public CelMap {
+   // Presence test function.
+   absl::StatusOr<bool> Has(const CelValue& key) const override;
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override;
+ 
+  protected:
+diff --git a/eval/public/structs/cel_proto_lite_wrap_util.cc b/eval/public/structs/cel_proto_lite_wrap_util.cc
+index 4cb21e5..35fdf7f 100644
+--- a/eval/public/structs/cel_proto_lite_wrap_util.cc
++++ b/eval/public/structs/cel_proto_lite_wrap_util.cc
+@@ -172,6 +172,7 @@ class DynamicMap : public CelMap {
+ 
+   int size() const override { return values_->fields_size(); }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override {
+     return &key_list_;
+   }
+diff --git a/eval/public/structs/cel_proto_wrap_util.cc b/eval/public/structs/cel_proto_wrap_util.cc
+index fabb594..86a314c 100644
+--- a/eval/public/structs/cel_proto_wrap_util.cc
++++ b/eval/public/structs/cel_proto_wrap_util.cc
+@@ -137,6 +137,7 @@ class DynamicMap : public CelMap {
+ 
+   int size() const override { return values_->fields_size(); }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override {
+     return &key_list_;
+   }
+diff --git a/internal/strings.cc b/internal/strings.cc
+index dc5a118..24457ab 100644
+--- a/internal/strings.cc
++++ b/internal/strings.cc
+@@ -53,12 +53,12 @@ bool CheckForClosingString(absl::string_view source,
+   if (closing_str.empty()) return true;
+ 
+   const char* p = source.data();
+-  const char* end = source.end();
++  const char* end = p + source.size();
+ 
+   bool is_closed = false;
+   while (p + closing_str.length() <= end) {
+     if (*p != '\\') {
+-      size_t cur_pos = p - source.begin();
++      size_t cur_pos = p - source.data();
+       bool is_closing =
+           absl::StartsWith(absl::ClippedSubstr(source, cur_pos), closing_str);
+       if (is_closing && p + closing_str.length() < end) {
+@@ -132,7 +132,7 @@ bool UnescapeInternal(absl::string_view source, absl::string_view closing_str,
+   dest->reserve(source.size());
+ 
+   const char* p = source.data();
+-  const char* end = source.end();
++  const char* end = p + source.size();
+   const char* last_byte = end - 1;
+ 
+   while (p < end) {
+@@ -446,7 +446,9 @@ std::string EscapeInternal(absl::string_view src, bool escape_all_bytes,
+   // byte.
+   dest.reserve(src.size() * 4);
+   bool last_hex_escape = false;  // true if last output char was \xNN.
+-  for (const char* p = src.begin(); p < src.end(); ++p) {
++  const char* p = src.data();
++  const char* end = p + src.size();
++  for (; p < end; ++p) {
+     unsigned char c = static_cast<unsigned char>(*p);
+     bool is_hex_escape = false;
+     switch (c) {
+@@ -552,7 +554,9 @@ std::string EscapeString(absl::string_view str) {
+ std::string EscapeBytes(absl::string_view str, bool escape_all_bytes,
+                         char escape_quote_char) {
+   std::string escaped_bytes;
+-  for (const char* p = str.begin(); p < str.end(); ++p) {
++  const char* p = str.data();
++  const char* end = p + str.size();
++  for (; p < end; ++p) {
+     unsigned char c = *p;
+     if (escape_all_bytes || !absl::ascii_isprint(c)) {
+       escaped_bytes += "\\x";
+diff --git a/tools/flatbuffers_backed_impl.cc b/tools/flatbuffers_backed_impl.cc
+index 10c0b1c..45ba72f 100644
+--- a/tools/flatbuffers_backed_impl.cc
++++ b/tools/flatbuffers_backed_impl.cc
+@@ -130,6 +130,7 @@ class ObjectStringIndexedMapImpl : public CelMap {
+     return absl::nullopt;
+   }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override { return &keys_; }
+ 
+  private:

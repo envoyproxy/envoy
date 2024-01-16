@@ -83,7 +83,7 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
@@ -142,6 +142,7 @@ common_properties:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
+  access_log_type: NotSet
   upstream_local_address:
     socket_address:
       address: "127.1.2.3"
@@ -154,7 +155,7 @@ request:
 response: {{}}
     )EOF",
                           request_method, request_method.length() + 7));
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log({&request_headers}, stream_info);
   }
 
   Stats::IsolatedStoreImpl scope_;
@@ -214,6 +215,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -245,7 +247,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log({}, stream_info);
   }
 
   {
@@ -263,6 +265,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -282,7 +285,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log({}, stream_info);
   }
 
   {
@@ -313,10 +316,11 @@ response: {}
     stream_info.protocol_ = Http::Protocol::Http10;
     stream_info.addBytesReceived(10);
     stream_info.addBytesSent(20);
-    stream_info.response_code_ = 200;
+    stream_info.setResponseCode(200);
     stream_info.response_code_details_ = "via_upstream";
-    absl::string_view route_name_view("route-name-test");
-    stream_info.setRouteName(route_name_view);
+    const std::string route_name("route-name-test");
+    ON_CALL(stream_info, getRouteName()).WillByDefault(ReturnRef(route_name));
+
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
     stream_info.onRequestComplete();
@@ -340,6 +344,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -400,7 +405,7 @@ response:
   response_body_bytes: 20
   response_code_details: "via_upstream"
 )EOF");
-    access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
+    access_log_->log({&request_headers, &response_headers}, stream_info);
   }
 
   {
@@ -420,6 +425,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -440,7 +446,7 @@ request:
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log({&request_headers}, stream_info);
   }
 
   {
@@ -455,6 +461,8 @@ response: {}
     ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
     const std::string peerSubject = "peerSubject";
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(peerSubject));
+    const std::string peerIssuer = "peerIssuer";
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(peerIssuer));
     const std::string localSubject = "localSubject";
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(localSubject));
     const std::string sessionId =
@@ -477,6 +485,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -505,13 +514,14 @@ common_properties:
       - uri: peerSan1
       - uri: peerSan2
       subject: peerSubject
+      issuer: peerIssuer
     tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
 request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+    access_log_->log({&request_headers}, stream_info);
   }
 
   // TLSv1.2
@@ -523,6 +533,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.2";
@@ -542,6 +553,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -566,7 +578,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log({}, stream_info);
   }
 
   // TLSv1.1
@@ -578,6 +590,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.1";
@@ -597,6 +610,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -621,7 +635,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log({}, stream_info);
   }
 
   // TLSv1
@@ -633,6 +647,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1";
@@ -652,6 +667,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -676,7 +692,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log({}, stream_info);
   }
 
   // Unknown TLS version (TLSv1.4)
@@ -688,6 +704,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.4";
@@ -707,6 +724,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -731,7 +749,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log({}, stream_info);
   }
 
   // Intermediate log entry.
@@ -767,6 +785,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -798,7 +817,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+    access_log_->log({}, stream_info);
   }
 }
 
@@ -859,6 +878,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.3"
@@ -893,7 +913,90 @@ response:
     "x-logged-trailer": "value,response_trailer_value"
     "x-empty-trailer": ""
 )EOF");
-    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
+    access_log_->log({&request_headers, &response_headers, &response_trailers}, stream_info);
+  }
+}
+
+// Test sanitizing non-UTF-8 header values.
+TEST_F(HttpGrpcAccessLogTest, SanitizeUTF8) {
+  InSequence s;
+
+  config_.add_additional_request_headers_to_log("X-Request");
+  config_.add_additional_response_headers_to_log("X-Response");
+  config_.add_additional_response_trailers_to_log("X-Trailer");
+
+  init();
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+    stream_info.start_time_ = SystemTime(1h);
+    std::string non_utf8("prefix");
+    non_utf8.append(1, char(0xc3));
+    non_utf8.append(1, char(0xc7));
+    non_utf8.append("suffix");
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":scheme", "scheme_value"},
+        {":authority", "authority_value"},
+        {":path", non_utf8},
+        {":method", "POST"},
+        {"x-envoy-max-retries", "3"}, // test inline header not
+                                      // otherwise logged
+        {"x-request", non_utf8},
+        {"x-request", non_utf8},
+    };
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "200"},
+        {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
+        {"x-response", non_utf8},
+        {"x-response", non_utf8},
+    };
+
+    Http::TestResponseTrailerMapImpl response_trailers{
+        {"x-trailer", non_utf8},
+        {"x-trailer", non_utf8},
+    };
+
+    stream_info.onRequestComplete();
+    expectLog(fmt::format(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  access_log_type: NotSet
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.3"
+      port_value: 63443
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
+  start_time:
+    seconds: 3600
+request:
+  scheme: "scheme_value"
+  authority: "authority_value"
+  path: "{0}"
+  request_method: "POST"
+  request_headers_bytes: 140
+  request_headers:
+    "x-request": "{0},{0}"
+response:
+  response_headers_bytes: 97
+  response_headers:
+    "x-response": "{0},{0}"
+  response_trailers:
+    "x-trailer": "{0},{0}"
+)EOF",
+                          "prefix!!suffix"));
+    access_log_->log({&request_headers, &response_headers, &response_trailers}, stream_info);
   }
 }
 
@@ -930,6 +1033,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -954,7 +1058,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log({}, stream_info);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadata) {
@@ -988,6 +1092,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"
@@ -1012,7 +1117,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log({}, stream_info);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadataDefaultValue) {
@@ -1043,6 +1148,7 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  access_log_type: NotSet
   upstream_remote_address:
     socket_address:
       address: "10.0.0.1"
@@ -1067,7 +1173,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  access_log_->log({}, stream_info);
 }
 
 } // namespace

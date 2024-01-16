@@ -25,6 +25,8 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/servercert_info.h"
+#include "test/config/integration/certs/server2cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
@@ -109,6 +111,9 @@ public:
 
   Network::Address::IpVersion ipVersion() const override { return GetParam().ip_version; }
   Grpc::ClientType clientType() const override { return GetParam().sds_grpc_type; }
+  virtual std::unique_ptr<FakeUpstream>& sdsUpstream() { return fake_upstreams_[0]; }
+  // Index in fake_upstreams_ vector of the data plane upstream.
+  int dataPlaneUpstreamIndex() { return 1; }
 
 protected:
   void createSdsStream(FakeUpstream&) {
@@ -128,7 +133,7 @@ protected:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, "sds_cluster.lyft.com", fake_upstreams_.back()->localAddress());
+    setGrpcService(*grpc_service, "sds_cluster.lyft.com", sdsUpstream()->localAddress());
   }
 
   envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
@@ -189,7 +194,7 @@ protected:
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
-  void PrintServerCounters() {
+  void printServerCounters() {
     std::cerr << "all counters" << std::endl;
     for (const auto& c : test_server_->counters()) {
       std::cerr << "counter: " << c->name() << ", value: " << c->value() << std::endl;
@@ -197,6 +202,7 @@ protected:
   }
 
   const std::string server_cert_rsa_{"server_cert_rsa"};
+  const std::string server2_cert_rsa_{"server2_cert_rsa"};
   const std::string server_cert_ecdsa_{"server_cert_ecdsa"};
   const std::string validation_secret_{"validation_secret"};
   const std::string client_cert_{"client_cert"};
@@ -227,10 +233,14 @@ public:
     });
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add a static sds cluster
-      auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      // Add a static SDS cluster as the first cluster in the list.
+      // The SDS cluster needs to appear before the cluster that uses it for secrets, so that it
+      // gets initialized first.
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          bootstrap.static_resources().clusters(0));
+      auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       sds_cluster->set_name("sds_cluster.lyft.com");
+      sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster.lyft.com");
       ConfigHelper::setHttp2(*sds_cluster);
     });
 
@@ -254,12 +264,12 @@ public:
 
     // Add an additional SDS config for an EC cert (the base test has SDS config for an RSA cert).
     // This is done via the filesystem instead of gRPC to simplify the test setup.
-    if (dual_cert_) {
+    if (dual_cert_ || multi_cert_) {
       auto* secret_config_ecdsa = common_tls_context.add_tls_certificate_sds_secret_configs();
 
       secret_config_ecdsa->set_name(server_cert_ecdsa_);
       auto* config_source = secret_config_ecdsa->mutable_sds_config();
-      const std::string sds_template =
+      constexpr absl::string_view sds_template =
           R"EOF(
 ---
 version_info: "0"
@@ -283,11 +293,45 @@ resources:
       config_source->mutable_path_config_source()->set_path(sds_path);
       config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     }
+
+    // Add one more additional SDS config to test multiple(>2) certs.
+    // This is done via the filesystem instead of gRPC to simplify the test setup.
+    if (multi_cert_) {
+      auto* secret_config_rsa_2 = common_tls_context.add_tls_certificate_sds_secret_configs();
+
+      secret_config_rsa_2->set_name(server2_cert_rsa_);
+      auto* config_source = secret_config_rsa_2->mutable_sds_config();
+      constexpr absl::string_view sds_template =
+          R"EOF(
+---
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "{}"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF";
+
+      const std::string sds_content = fmt::format(
+          sds_template, server2_cert_rsa_,
+          TestEnvironment::runfilesPath("test/config/integration/certs/server2cert.pem"),
+          TestEnvironment::runfilesPath("test/config/integration/certs/server2key.pem"));
+
+      auto sds_path =
+          TestEnvironment::writeStringToFileForTest("server2_cert_rsa.sds.yaml", sds_content);
+      config_source->mutable_path_config_source()->set_path(sds_path);
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    }
   }
 
   void createUpstreams() override {
-    create_xds_upstream_ = true;
-    HttpIntegrationTest::createUpstreams();
+    // SDS cluster is H2, while the data cluster is H1.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP1);
+    xds_upstream_ = fake_upstreams_.front().get();
   }
 
   void waitForSdsUpdateStats(size_t times) {
@@ -317,6 +361,7 @@ resources:
 protected:
   Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
   bool dual_cert_{false};
+  bool multi_cert_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
@@ -350,7 +395,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
       {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
 
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getCurrentServerSecret());
   };
   initialize();
@@ -362,7 +407,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
     return makeSslClientConnection();
   };
   // First request with server{cert,key}.pem.
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
   cleanupUpstreamAndDownstream();
   // Rotate.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/new"),
@@ -373,7 +418,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   // First request with server_ecdsa{cert,key}.pem.
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 
 // Validate that rotating to a directory with missing certs is handled.
@@ -383,7 +428,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
       {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
 
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getCurrentServerSecret());
   };
   initialize();
@@ -395,7 +440,7 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
     return makeSslClientConnection();
   };
   // First request with server{cert,key}.pem.
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
   cleanupUpstreamAndDownstream();
 
   // Rotate to an empty directory, this should fail.
@@ -408,14 +453,14 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   // Requests continue to work with key/cert pair.
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getServerSecretRsa());
   };
   initialize();
@@ -423,7 +468,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
@@ -432,7 +477,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
 
 TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getServerSecretRsa());
   };
 
@@ -448,7 +493,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   cleanupUpstreamAndDownstream();
   client_ssl_ctx_ = createClientSslTransportSocketFactory(
@@ -456,7 +501,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
           .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
           .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
       context_manager_, *api_);
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
@@ -476,12 +521,71 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
   }
 }
 
+// A test that multiple(>2) sds configs are provided. More than one RSA/ECDSA cert
+// is allowed if they has different server name pattern(DNS SAN or subject name),
+// different server name patterns will be used to match SNI in cert selection.
+// Detailed behaviors of cert selection are tested in SslSocketTest with static
+// tls_certificates config. This test is to verify multiple certificates can be loaded
+// via sds and give a simple case of selecting cert based on SNI.
+TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getServerSecretRsa());
+  };
+
+  multi_cert_ = true;
+  initialize();
+
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions()
+          .setSni("www.lyft.com")
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
+      context_manager_, *api_);
+  auto ssl_client1 = makeSslClientConnection();
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client1), absl::nullopt);
+  EXPECT_TRUE(codec_client_->connected());
+  codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
+  // peer certificate is not present when using QUIC
+  if (!test_quic_) {
+    EXPECT_EQ(TEST_SERVER_CERT_1_HASH,
+              codec_client_->connection()->ssl()->sha1PeerCertificateDigest());
+    EXPECT_EQ("www.lyft.com", codec_client_->connection()->ssl()->sni());
+  }
+
+  cleanupUpstreamAndDownstream();
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions()
+          .setSni("www.lyft2.com")
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
+      context_manager_, *api_);
+  auto ssl_client2 = makeSslClientConnection();
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client2), absl::nullopt);
+  EXPECT_TRUE(codec_client_->connected());
+  codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
+  // peer certificate is not present when using QUIC
+  if (!test_quic_) {
+    EXPECT_EQ(TEST_SERVER2_CERT_1_HASH,
+              codec_client_->connection()->ssl()->sha1PeerCertificateDigest());
+    EXPECT_EQ("www.lyft2.com", codec_client_->connection()->ssl()->sni());
+  }
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server2_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server2_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_ecdsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_ecdsa.update_rejected")->value());
+}
+
 // A test that SDS server send a bad secret for a static listener,
 // The first ssl request should fail at connecting.
 // then SDS send a good server secret,  the second request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getWrongSecret(server_cert_rsa_));
   };
   initialize();
@@ -503,7 +607,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
@@ -526,10 +630,14 @@ public:
             configureInlinedCerts(&common_tls_context);
           });
 
-      // Add a static sds cluster
-      auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      // Add a static SDS cluster as the first cluster in the list.
+      // The SDS cluster needs to appear before the cluster that uses it for secrets, so that it
+      // gets initialized first.
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          bootstrap.static_resources().clusters(0));
+      auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       sds_cluster->set_name("sds_cluster.lyft.com");
+      sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster.lyft.com");
       ConfigHelper::setHttp2(*sds_cluster);
 
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context;
@@ -546,8 +654,9 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
       upstream_tls_certificate->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
-      auto* upstream_transport_socket =
-          bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+      auto* upstream_transport_socket = bootstrap.mutable_static_resources()
+                                            ->mutable_clusters(dataPlaneUpstreamIndex())
+                                            ->mutable_transport_socket();
       upstream_transport_socket->set_name("envoy.transport_sockets.tls");
       upstream_transport_socket->mutable_typed_config()->PackFrom(upstream_tls_context);
     });
@@ -586,9 +695,11 @@ public:
   }
 
   void createUpstreams() override {
-    // Fake upstream with SSL/TLS for the first cluster.
+    // SDS cluster for the first cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // Fake upstream with SSL/TLS for the second cluster.
     addFakeUpstream(createUpstreamSslContext(), upstreamProtocol(), /*autonomous_upstream=*/false);
-    create_xds_upstream_ = true;
+    xds_upstream_ = fake_upstreams_.front().get();
   }
 
   Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext() {
@@ -604,7 +715,8 @@ public:
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   }
 
   void TearDown() override {
@@ -630,7 +742,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidatio
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getCvcSecret());
   };
   initialize();
@@ -638,7 +750,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -651,7 +763,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
 TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationContextSuccess) {
   enableCombinedValidationContext(true);
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getCvcSecretWithOnlyTrustedCa());
   };
   initialize();
@@ -659,7 +771,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationCont
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -671,7 +783,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationCont
 TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicWithSharedSecret) {
   shareValidationSecret(true);
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getCvcSecret());
   };
   initialize();
@@ -685,7 +797,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicWithSharedSecret) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -698,7 +810,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
   enableCombinedValidationContext(true);
   shareValidationSecret(true);
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getCvcSecretWithOnlyTrustedCa());
   };
   initialize();
@@ -712,7 +824,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedValidationContextW
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.validation_secret.update_success")->value());
@@ -730,20 +842,25 @@ public:
       setUpstreamProtocol(Http::CodecType::HTTP3);
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // add sds cluster first.
-      auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      // Add a static SDS cluster as the first cluster in the list.
+      // The SDS cluster needs to appear before the cluster that uses it for secrets, so that it
+      // gets initialized first.
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          bootstrap.static_resources().clusters(0));
+      auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       sds_cluster->set_name("sds_cluster.lyft.com");
+      sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster.lyft.com");
       ConfigHelper::setHttp2(*sds_cluster);
 
-      // Unwind Quic for sds cluster.
+      // Unwind Quic for SDS cluster.
       if (test_quic_) {
         sds_cluster->clear_transport_socket();
       }
 
       // change the first cluster with ssl and sds.
-      auto* transport_socket =
-          bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+      auto* transport_socket = bootstrap.mutable_static_resources()
+                                   ->mutable_clusters(dataPlaneUpstreamIndex())
+                                   ->mutable_transport_socket();
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       tls_context.set_sni("lyft.com");
       auto* secret_config =
@@ -776,10 +893,12 @@ public:
   }
 
   void createUpstreams() override {
-    // This is for backend with ssl
+    // SDS cluster for the first cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // FakeUpstream with SSL/TLS for the second cluster.
     addFakeUpstream(createUpstreamSslContext(context_manager_, *api_, test_quic_),
                     upstreamProtocol(), /*autonomous_upstream=*/false);
-    create_xds_upstream_ = true;
+    xds_upstream_ = fake_upstreams_.front().get();
   }
 };
 
@@ -790,7 +909,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
 // The first request should work.
 TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getClientSecret());
   };
 
@@ -806,19 +925,19 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
-  testRouterHeaderOnlyRequestAndResponse();
+  testRouterHeaderOnlyRequestAndResponse(/*create_connection=*/nullptr, dataPlaneUpstreamIndex());
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.client_cert.update_rejected")->value());
 }
 
-// To test a static cluster with sds. SDS send a bad client secret first.
-// The first request should fail with 503,  then SDS sends a good client secret,
-// the second request should work.
+// Tests a static cluster with SDS.
+// SDS sends a bad client secret first, so the request fails with a 503.
+// Then, SDS sends a good client secret, so the second request is successful.
 TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getWrongSecret(client_cert_));
   };
   initialize();
@@ -832,7 +951,8 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   // Wait for the raw TCP connection with bad credentials and close it.
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
     FakeRawConnectionPtr fake_upstream_connection;
-    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+    ASSERT_TRUE(
+        fake_upstreams_[dataPlaneUpstreamIndex()]->waitForRawConnection(fake_upstream_connection));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
@@ -847,7 +967,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
 
   // Verify the update succeeded.
-  testRouterHeaderOnlyRequestAndResponse();
+  testRouterHeaderOnlyRequestAndResponse(/*create_connection=*/nullptr, dataPlaneUpstreamIndex());
 }
 
 // Test CDS with SDS. A cluster provided by CDS raises new SDS request for upstream cert.
@@ -856,8 +976,34 @@ class SdsCdsIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Create the dynamic cluster. This cluster will be using sds.
-      dynamic_cluster_ = bootstrap.mutable_static_resources()->clusters(0);
+      // The 1st cluster, which already exists in the Bootstrap config, will be the CDS cluster.
+      // The 2nd cluster, which will be added, will be the SDS cluster.
+      // The 3rd cluster, which will be added after that, will be the dynamic cluster, which will
+      // use SDS.
+      // The xDS clusters need to appear before the cluster that uses it, so that they get
+      // initialized first.
+
+      // The SDS cluster.
+      auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      sds_cluster->MergeFrom(bootstrap.static_resources().clusters(0));
+      // The static cluster.
+      auto* static_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      static_cluster->MergeFrom(bootstrap.static_resources().clusters(0));
+      // Make a copy of the static cluster to create and set up the dynamic cluster.
+      dynamic_cluster_ = *static_cluster;
+
+      // Set up the first cluster, the CDS cluster.
+      auto* cds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cds_cluster->set_name("cds_cluster");
+      cds_cluster->mutable_load_assignment()->set_cluster_name("cds_cluster");
+      ConfigHelper::setHttp2(*cds_cluster);
+
+      // Set up the second cluster, the SDS cluster.
+      sds_cluster->set_name("sds_cluster.lyft.com");
+      sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster.lyft.com");
+      ConfigHelper::setHttp2(*sds_cluster);
+
+      // Set up the dynamic cluster to use SDS.
       dynamic_cluster_.set_name("dynamic");
       dynamic_cluster_.mutable_connect_timeout()->MergeFrom(
           ProtobufUtil::TimeUtil::MillisecondsToDuration(500000));
@@ -870,17 +1016,7 @@ public:
       transport_socket->set_name("envoy.transport_sockets.tls");
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
-      // Add cds cluster first.
-      auto* cds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      cds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      cds_cluster->set_name("cds_cluster");
-      ConfigHelper::setHttp2(*cds_cluster);
-      // Then add sds cluster.
-      auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      sds_cluster->set_name("sds_cluster.lyft.com");
-      ConfigHelper::setHttp2(*sds_cluster);
-
+      // Set up the Bootstrap's CDS config to fetch from the CDS cluster.
       const std::string cds_yaml = R"EOF(
     resource_api_version: V3
     api_config_source:
@@ -914,13 +1050,17 @@ public:
   }
 
   void createUpstreams() override {
+    // CDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // SDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Static cluster.
     addFakeUpstream(Http::CodecType::HTTP1);
-    // Cds Cluster.
-    addFakeUpstream(Http::CodecType::HTTP2);
-    // Sds Cluster.
-    addFakeUpstream(Http::CodecType::HTTP2);
+    xds_upstream_ = fake_upstreams_.front().get();
   }
+
+  std::unique_ptr<FakeUpstream>& cdsUpstream() { return fake_upstreams_[0]; }
+  std::unique_ptr<FakeUpstream>& sdsUpstream() override { return fake_upstreams_[1]; }
 
   void sendCdsResponse() {
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -936,6 +1076,7 @@ public:
     discovery_response.add_resources()->PackFrom(secret);
     sds_stream.sendGrpcMessage(discovery_response);
   }
+
   envoy::config::cluster::v3::Cluster dynamic_cluster_;
   FakeHttpConnectionPtr sds_connection_;
   FakeStreamPtr sds_stream_;
@@ -948,8 +1089,7 @@ TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
     {
       // CDS.
-      AssertionResult result =
-          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
       RELEASE_ASSERT(result, result.message());
       result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
       RELEASE_ASSERT(result, result.message());
@@ -958,8 +1098,7 @@ TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
     }
     {
       // SDS.
-      AssertionResult result =
-          fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, sds_connection_);
+      AssertionResult result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
       RELEASE_ASSERT(result, result.message());
 
       result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
@@ -1026,7 +1165,7 @@ TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
       test_private_key_method_factory(test_factory);
 
   on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
+    createSdsStream(*sdsUpstream());
     sendSdsResponse(getCurrentServerPrivateKeyProviderSecret());
   };
   initialize();
@@ -1037,7 +1176,7 @@ TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
   cleanupUpstreamAndDownstream();
 }
@@ -1088,8 +1227,7 @@ TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
   on_server_init_function_ = [this]() {
     {
       // CDS.
-      AssertionResult result =
-          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
       EXPECT_TRUE(result);
       result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
       EXPECT_TRUE(result);
@@ -1098,8 +1236,7 @@ TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
     }
     {
       // SDS.
-      AssertionResult result =
-          fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, sds_connection_);
+      AssertionResult result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
       EXPECT_TRUE(result);
 
       result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
@@ -1120,5 +1257,6 @@ TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }
+
 } // namespace Ssl
 } // namespace Envoy

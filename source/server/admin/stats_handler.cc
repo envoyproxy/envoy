@@ -96,13 +96,21 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     server_.flushStats();
   }
 
-  return makeRequest(server_.stats(), params,
-                     [this]() -> Admin::UrlHandler { return statsHandler(); });
+  bool active_mode;
+#ifdef ENVOY_ADMIN_HTML
+  active_mode = params.format_ == StatsFormat::ActiveHtml;
+#else
+  active_mode = false;
+#endif
+  return makeRequest(
+      server_.stats(), params, server_.clusterManager(),
+      [this, active_mode]() -> Admin::UrlHandler { return statsHandler(active_mode); });
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
+                                            const Upstream::ClusterManager& cluster_manager,
                                             StatsRequest::UrlHandlerFn url_handler_fn) {
-  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
+  return std::make_unique<StatsRequest>(stats, params, cluster_manager, url_handler_fn);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&,
@@ -131,17 +139,19 @@ void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::I
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
-  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
+  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
+                   params, response);
 }
 
 void StatsHandler::prometheusRender(Stats::Store& stats,
                                     const Stats::CustomStatNamespaces& custom_namespaces,
+                                    const Upstream::ClusterManager& cluster_manager,
                                     const StatsParams& params, Buffer::Instance& response) {
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params,
+                                              text_readouts_vec, cluster_manager, response, params,
                                               custom_namespaces);
 }
 
@@ -163,27 +173,42 @@ Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_hea
   return Http::Code::OK;
 }
 
-Admin::UrlHandler StatsHandler::statsHandler() {
+Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
+  Admin::ParamDescriptor usedonly{
+      Admin::ParamDescriptor::Type::Boolean, "usedonly",
+      "Only include stats that have been written by system since restart"};
+  Admin::ParamDescriptor histogram_buckets{Admin::ParamDescriptor::Type::Enum,
+                                           "histogram_buckets",
+                                           "Histogram bucket display mode",
+                                           {"cumulative", "disjoint", "detailed", "none"}};
+  Admin::ParamDescriptor format{Admin::ParamDescriptor::Type::Enum,
+                                "format",
+                                "Format to use",
+                                {"html", "active-html", "text", "json"}};
+  Admin::ParamDescriptor filter{Admin::ParamDescriptor::Type::String, "filter",
+                                "Regular expression (Google re2) for filtering stats"};
+  Admin::ParamDescriptor type{Admin::ParamDescriptor::Type::Enum,
+                              "type",
+                              "Stat types to include.",
+                              {StatLabels::All, StatLabels::Counters, StatLabels::Histograms,
+                               StatLabels::Gauges, StatLabels::TextReadouts}};
+
+  Admin::ParamDescriptorVec params{usedonly, filter};
+  if (!active_mode) {
+    params.push_back(format);
+  }
+  params.push_back(type);
+  if (!active_mode) {
+    params.push_back(histogram_buckets);
+  }
+
   return {
       "/stats",
       "print server stats",
       [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
       false,
       false,
-      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-        "Only include stats that have been written by system since restart"},
-       {Admin::ParamDescriptor::Type::String, "filter",
-        "Regular expression (Google re2) for filtering stats"},
-       {Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "text", "json"}},
-       {Admin::ParamDescriptor::Type::Enum,
-        "type",
-        "Stat types to include.",
-        {StatLabels::All, StatLabels::Counters, StatLabels::Histograms, StatLabels::Gauges,
-         StatLabels::TextReadouts}},
-       {Admin::ParamDescriptor::Type::Enum,
-        "histogram_buckets",
-        "Histogram bucket display mode",
-        {"cumulative", "disjoint", "none"}}}};
+      params};
 }
 
 } // namespace Server

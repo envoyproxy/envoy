@@ -29,7 +29,7 @@ namespace Http {
 namespace {
 
 absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
-  if (HeaderUtility::schemeIsValid(forwarded_proto)) {
+  if (Utility::schemeIsValid(forwarded_proto)) {
     return forwarded_proto;
   }
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
@@ -61,17 +61,18 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
         connection, stats, callbacks, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   }
 }
 
@@ -88,24 +89,12 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
-  if (Utility::isUpgrade(request_headers)) {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_skip_adding_content_length_to_upgrade")) {
-      // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
-      // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
-      // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
-      // content-length both do not exist this means there is no request body. After
-      // transfer-encoding is stripped here, the upstream request becomes invalid. We can fix it by
-      // explicitly adding a "content-length: 0" request header here.
-      const bool no_body =
-          (!request_headers.TransferEncoding() && !request_headers.ContentLength());
-      if (no_body) {
-        request_headers.setContentLength(uint64_t(0));
-      }
-    }
-  } else {
+  if (!Utility::isUpgrade(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
+      request_headers.removeTE();
+    }
   }
 
   // Clean proxy headers.
@@ -117,8 +106,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // Sanitize referer field if exists.
   auto result = request_headers.get(Http::CustomHeaders::get().Referer);
   if (!result.empty()) {
-    Utility::Url url;
-    if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+    if (result.size() > 1 || !Utility::isValidRefererValue(result[0]->value().getStringView())) {
       // A request header shouldn't have multiple referer field.
       request_headers.remove(Http::CustomHeaders::get().Referer);
     }
@@ -222,6 +210,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lowercase_scheme")) {
+    request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
+  }
 
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:
@@ -305,11 +296,17 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
     const std::list<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
+    // Headers to be stripped from edge requests, i.e. to sanitize so
+    // clients can't inject values.
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
+    request_headers.removeEnvoyOriginalPath();
   }
 
+  // Headers to be stripped from edge *and* intermediate-hop external requests.
+  // TODO: some of these should only be stripped at edge, i.e. moved into
+  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();
@@ -571,11 +568,7 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
       return NormalizePathAction::Reject;
     }
     // Check runtime override and throw away fragment from URI path
-    // TODO(yanavlasov): remove this override after deprecation period.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
-      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
-    }
+    request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

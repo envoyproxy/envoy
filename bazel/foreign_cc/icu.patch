@@ -1,6 +1,9 @@
+diff --git a/WORKSPACE b/WORKSPACE
+deleted file mode 100644
+index e69de29..0000000
 diff --git a/icu4c/source/common/BUILD.bazel b/icu4c/source/common/BUILD.bazel
 deleted file mode 100644
-index e385d3b243..0000000000
+index e385d3b..0000000
 --- a/icu4c/source/common/BUILD.bazel
 +++ /dev/null
 @@ -1,1213 +0,0 @@
@@ -1219,7 +1222,7 @@ index e385d3b243..0000000000
 -)
 diff --git a/icu4c/source/data/unidata/norm2/BUILD.bazel b/icu4c/source/data/unidata/norm2/BUILD.bazel
 deleted file mode 100644
-index 049e19bd41..0000000000
+index 049e19b..0000000
 --- a/icu4c/source/data/unidata/norm2/BUILD.bazel
 +++ /dev/null
 @@ -1,13 +0,0 @@
@@ -1238,7 +1241,7 @@ index 049e19bd41..0000000000
 -])
 diff --git a/icu4c/source/i18n/BUILD.bazel b/icu4c/source/i18n/BUILD.bazel
 deleted file mode 100644
-index 2d85cdb180..0000000000
+index 2d85cdb..0000000
 --- a/icu4c/source/i18n/BUILD.bazel
 +++ /dev/null
 @@ -1,130 +0,0 @@
@@ -1373,26 +1376,9 @@ index 2d85cdb180..0000000000
 -    ],
 -)
 diff --git a/icu4c/source/icudefs.mk.in b/icu4c/source/icudefs.mk.in
-index 2c358167a8..b30f33b292 100644
+index 2c35816..4ad6f52 100644
 --- a/icu4c/source/icudefs.mk.in
 +++ b/icu4c/source/icudefs.mk.in
-@@ -50,13 +50,13 @@ SO_TARGET_VERSION_MAJOR = @LIB_VERSION_MAJOR@
- # The ICU data external name is usually icudata; the entry point name is
- # the version-dependent name (for no particular reason except it was easier
- # to change the build this way). When building in common mode, the data
--# name is the versioned platform-dependent one. 
-+# name is the versioned platform-dependent one.
- 
- ICUDATA_DIR = @pkgicudatadir@/$(PACKAGE)$(ICULIBSUFFIX)/$(VERSION)
- 
- ICUDATA_BASENAME_VERSION = $(ICUPREFIX)dt@LIB_VERSION_MAJOR@
--# the entry point is almost like the basename, but has the lib suffix.  
--ICUDATA_ENTRY_POINT = $(ICUPREFIX)dt@ICULIBSUFFIXCNAME@@LIB_VERSION_MAJOR@ 
-+# the entry point is almost like the basename, but has the lib suffix.
-+ICUDATA_ENTRY_POINT = $(ICUPREFIX)dt@ICULIBSUFFIXCNAME@@LIB_VERSION_MAJOR@
- ICUDATA_CHAR = @ICUDATA_CHAR@
- ICUDATA_PLATFORM_NAME = $(ICUDATA_BASENAME_VERSION)$(ICUDATA_CHAR)
- PKGDATA_LIBSTATICNAME = -L $(STATIC_PREFIX)$(ICUPREFIX)$(DATA_STUBNAME)$(ICULIBSUFFIX)
 @@ -117,7 +117,7 @@ EXEEXT = @EXEEXT@
  CC = @CC@
  CXX = @CXX@
@@ -1402,18 +1388,9 @@ index 2c358167a8..b30f33b292 100644
  RANLIB = @RANLIB@
  COMPILE_LINK_ENVVAR = @COMPILE_LINK_ENVVAR@
  UCLN_NO_AUTO_CLEANUP = @UCLN_NO_AUTO_CLEANUP@
-@@ -215,7 +215,7 @@ LIBICU = $(LIBPREFIX)$(ICUPREFIX)
- ifneq ($(ENABLE_SHARED),YES)
- STATIC_PREFIX_WHEN_USED = s
- else
--STATIC_PREFIX_WHEN_USED = 
-+STATIC_PREFIX_WHEN_USED =
- endif
- 
- # Static library prefix and file extension
 diff --git a/icu4c/source/stubdata/BUILD.bazel b/icu4c/source/stubdata/BUILD.bazel
 deleted file mode 100644
-index 20344ef499..0000000000
+index 20344ef..0000000
 --- a/icu4c/source/stubdata/BUILD.bazel
 +++ /dev/null
 @@ -1,24 +0,0 @@
@@ -1443,7 +1420,7 @@ index 20344ef499..0000000000
 -)
 diff --git a/icu4c/source/tools/gennorm2/BUILD.bazel b/icu4c/source/tools/gennorm2/BUILD.bazel
 deleted file mode 100644
-index c602897baf..0000000000
+index c602897..0000000
 --- a/icu4c/source/tools/gennorm2/BUILD.bazel
 +++ /dev/null
 @@ -1,39 +0,0 @@
@@ -1488,7 +1465,7 @@ index c602897baf..0000000000
 -)
 diff --git a/icu4c/source/tools/toolutil/BUILD.bazel b/icu4c/source/tools/toolutil/BUILD.bazel
 deleted file mode 100644
-index 276c857f12..0000000000
+index 276c857..0000000
 --- a/icu4c/source/tools/toolutil/BUILD.bazel
 +++ /dev/null
 @@ -1,126 +0,0 @@
@@ -1618,3 +1595,124 @@ index 276c857f12..0000000000
 -        "//icu4c/source/i18n:headers",
 -    ],
 -)
+diff --git a/tools/unicode/c/genprops/BUILD.bazel b/tools/unicode/c/genprops/BUILD.bazel
+deleted file mode 100644
+index a7c3b27..0000000
+--- a/tools/unicode/c/genprops/BUILD.bazel
++++ /dev/null
+@@ -1,50 +0,0 @@
+-# © 2021 and later: Unicode, Inc. and others.
+-# License & terms of use: http://www.unicode.org/copyright.html
+-
+-# This Bazel build file defines a target representing the binary executable
+-# `genprops`, which is used for generating headers needed for bootstrapping
+-# the ICU4C build process in a way that integrates core Unicode properties data.
+-
+-# Defining a binary executable (done in Bazel using `cc_binary`)
+-# enables the use of the output file from executing the binary as a part of
+-# other Bazel targets defined using `genrule`.
+-
+-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+-
+-package(
+-    default_visibility = ["//visibility:public"],
+-)
+-
+-cc_binary(
+-    name = "genprops",
+-    srcs = glob([
+-        "*.cpp",
+-        "*.h",   # cannot have hdrs section in cc_binary
+-    ]),
+-    deps = [
+-        "//icu4c/source/common:uhash",
+-        "//icu4c/source/common:umutablecptrie",
+-        "//icu4c/source/common:ucptrie",
+-        "//icu4c/source/common:utrie2",
+-        "//icu4c/source/common:utrie2_builder",
+-        "//icu4c/source/common:bytestrie",
+-        "//icu4c/source/common:bytestriebuilder",
+-        "//icu4c/source/common:propsvec",
+-        "//icu4c/source/common:errorcode",
+-        "//icu4c/source/common:ucharstriebuilder",
+-        "//icu4c/source/common:uniset",
+-        "//icu4c/source/common:uvector32",
+-
+-        "//icu4c/source/common:platform",
+-        "//icu4c/source/common:headers",
+-
+-        "//icu4c/source/tools/toolutil:ppucd",
+-        "//icu4c/source/tools/toolutil:unewdata",
+-        "//icu4c/source/tools/toolutil:writesrc",
+-        "//icu4c/source/tools/toolutil:uoptions",
+-        "//icu4c/source/tools/toolutil:uparse",
+-        "//icu4c/source/tools/toolutil:toolutil",
+-        "//icu4c/source/tools/toolutil:denseranges",
+-    ],
+-    linkopts = ["-pthread"],
+-)
+diff --git a/tools/unicode/c/genuca/BUILD.bazel b/tools/unicode/c/genuca/BUILD.bazel
+deleted file mode 100644
+index 7da631d..0000000
+--- a/tools/unicode/c/genuca/BUILD.bazel
++++ /dev/null
+@@ -1,52 +0,0 @@
+-# © 2021 and later: Unicode, Inc. and others.
+-# License & terms of use: http://www.unicode.org/copyright.html
+-
+-# This Bazel build file defines a target representing the binary executable
+-# `genuca`, which is used for generating ICU root collation data files.
+-
+-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+-
+-package(
+-    default_visibility = ["//visibility:public"],
+-)
+-
+-cc_binary(
+-    name = "genuca",
+-    srcs = glob([
+-        "*.cpp",
+-        "*.h",   # cannot have hdrs section in cc_binary
+-    ]),
+-    deps = [
+-        "//icu4c/source/common:headers",
+-        "//icu4c/source/common:platform",
+-        "//icu4c/source/i18n:collation_builder",
+-        "//icu4c/source/i18n:headers",
+-        "//icu4c/source/tools/toolutil:collationinfo",
+-        "//icu4c/source/tools/toolutil:toolutil",
+-        "//icu4c/source/tools/toolutil:unewdata",
+-        "//icu4c/source/tools/toolutil:uoptions",
+-        "//icu4c/source/tools/toolutil:uparse",
+-        "//icu4c/source/tools/toolutil:writesrc",
+-    ],
+-    # Markus 2021-06-16:
+-    # The pthread library is not linked in automatically.
+-    # See https://docs.bazel.build/versions/main/cpp-use-cases.html
+-    # When pthread is absent, then we get runtime errors instead of compile/link errors.
+-    # See https://stackoverflow.com/questions/51584960/stdcall-once-throws-stdsystem-error-unknown-error-1
+-    #
+-    # My first genuca build crashed with
+-    #   terminate called after throwing an instance of 'std::system_error'
+-    #   what():  Unknown error -1
+-    #
+-    #   Program received signal SIGABRT, Aborted.
+-    #   ...
+-    #   #4  0x00007ffff7e809d1 in std::terminate() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+-    #   #5  0x00007ffff7e80c65 in __cxa_throw () from /lib/x86_64-linux-gnu/libstdc++.so.6
+-    #   #6  0x00007ffff7e78458 in std::__throw_system_error(int) () from /lib/x86_64-linux-gnu/libstdc++.so.6
+-    #   #7  0x0000555555601c75 in std::call_once<void (&)()> (__once=..., __f=@0x55555560156c: {void (void)} 0x55555560156c <icu_70::umtx_init()>)
+-    #       at /usr/include/c++/10/mutex:743
+-    #   #8  0x00005555556017ca in icu_70::umtx_initImplPreInit (uio=...) at icu4c/source/common/umutex.cpp:146
+-    #   #9  0x0000555555592236 in icu_70::umtx_initOnce (uio=..., fp=0x5555555e0716 <icu_70::initNFCSingleton(UErrorCode&)>,
+-    #   errCode=@0x7fffffffd738: U_ZERO_ERROR) at icu4c/source/common/umutex.h:143
+-    linkopts = ["-pthread"],
+-)
+diff --git a/vendor/double-conversion/upstream/WORKSPACE b/vendor/double-conversion/upstream/WORKSPACE
+deleted file mode 100644
+index 52106e7..0000000
+--- a/vendor/double-conversion/upstream/WORKSPACE
++++ /dev/null
+@@ -1 +0,0 @@
+-# Bazel (http://bazel.io/) WORKSPACE file for double-conversion.

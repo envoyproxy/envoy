@@ -112,9 +112,9 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
         parent_.onResponseHandleForPendingList(
             message_type, item.first,
             [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-              // TODO For skey case, no need to add to local cache. This will be controlled by
+              // TODO For x-skey case, no need to add to local cache. This will be controlled by
               // config cache->add_query_to_cache.
-              if (message_type != "skey") {
+              if (message_type != "x-skey") {
                 cache_manager_.insertCache(message_type, item.first, item.second);
               }
               metadata->setDestination(item.second);

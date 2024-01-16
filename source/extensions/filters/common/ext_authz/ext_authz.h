@@ -9,7 +9,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
@@ -55,6 +55,8 @@ public:
   const Http::LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
   const Http::LowerCaseString EnvoyAuthHeadersToRemove{
       absl::StrCat(prefix(), "-auth-headers-to-remove")};
+  const Http::LowerCaseString EnvoyAuthFailureModeAllowed{
+      absl::StrCat(prefix(), "-auth-failure-mode-allowed")};
 };
 
 using Headers = ConstSingleton<HeaderValues>;

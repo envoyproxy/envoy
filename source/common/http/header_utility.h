@@ -126,18 +126,18 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
-   * Validates the provided scheme is valid (either http or https)
-   * @param scheme the scheme to validate
-   * @return bool true if the scheme is valid.
-   */
-  static bool schemeIsValid(const absl::string_view scheme);
-
-  /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
    */
   static bool headerValueIsValid(const absl::string_view header_value);
+
+  /**
+   * Validates that a header name is valid, according to RFC 7230, section 3.2.
+   * http://tools.ietf.org/html/rfc7230#section-3.2
+   * @return bool true if the header name is valid, according to the aforementioned RFC.
+   */
+  static bool headerNameIsValid(const absl::string_view header_key);
 
   /**
    * Checks if header name contains underscore characters.
@@ -165,10 +165,34 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
+   */
+  static bool isConnectUdpRequest(const RequestHeaderMap& headers);
+
+  /**
+   * @brief a helper function to determine if the headers represent a CONNECT-UDP response.
+   */
+  static bool isConnectUdpResponse(const ResponseHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.
    */
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
+
+  /**
+   * @brief Rewrites the authority header field by parsing the path using the default CONNECT-UDP
+   * URI template. Returns true if the parsing was successful, otherwise returns false.
+   */
+  static bool rewriteAuthorityForConnectUdp(RequestHeaderMap& headers);
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  /**
+   * @brief Returns true if the Capsule-Protocol header field (RFC 9297) is set to true. If the
+   * header field is included multiple times, returns false as per RFC 9297.
+   */
+  static bool isCapsuleProtocol(const RequestOrResponseHeaderMap& headers);
+#endif
 
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
@@ -201,6 +225,11 @@ public:
   static void stripTrailingHostDot(RequestHeaderMap& headers);
 
   /**
+   * @return bool true if the provided host has a port, false otherwise.
+   */
+  static bool hostHasPort(absl::string_view host);
+
+  /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
    * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.
@@ -230,6 +259,14 @@ public:
    * missing.
    */
   static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
+
+  /* Does a common header check ensuring that header keys and values are valid and do not contain
+   * forbidden characters (e.g. valid HTTP header keys/values should never contain embedded NULLs
+   * or new lines.)
+   * @return Status containing the result. If failed, message includes details on which header key
+   * or value was invalid.
+   */
+  static Http::Status checkValidRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional
@@ -290,6 +327,24 @@ public:
    */
   static std::string addEncodingToAcceptEncoding(absl::string_view accept_encoding_header,
                                                  absl::string_view encoding);
+
+  /**
+   * Return `true` if the request is a standard HTTP CONNECT.
+   * HTTP/1 RFC: https://datatracker.ietf.org/doc/html/rfc9110#section-9.3.6
+   * HTTP/2 RFC: https://datatracker.ietf.org/doc/html/rfc9113#section-8.5
+   */
+  static bool isStandardConnectRequest(const Http::RequestHeaderMap& headers);
+
+  /**
+   * Return `true` if the request is an extended HTTP/2 CONNECT.
+   * according to https://datatracker.ietf.org/doc/html/rfc8441#section-4
+   */
+  static bool isExtendedH2ConnectRequest(const Http::RequestHeaderMap& headers);
+
+  /**
+   * Return true if the given header name is a pseudo header.
+   */
+  static bool isPseudoHeader(absl::string_view header_name);
 };
 
 } // namespace Http

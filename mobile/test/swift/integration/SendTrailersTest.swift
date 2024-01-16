@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class SendTrailersTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testSendTrailers() throws {
     // swiftlint:disable:next line_length
     let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
@@ -13,6 +19,10 @@ final class SendTrailersTests: XCTestCase {
     let matcherTrailerValue = "test.code"
     let config =
 """
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: base_api_listener
@@ -63,7 +73,6 @@ static_resources:
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
-      .addUpstreamHttpProtocol(.http2)
       .build()
     let body = try XCTUnwrap("match_me".data(using: .utf8))
     let requestTrailers = RequestTrailersBuilder()
@@ -84,7 +93,7 @@ static_resources:
       .sendData(body)
       .close(trailers: requestTrailers)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
 
     engine.terminate()
   }

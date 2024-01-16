@@ -35,9 +35,9 @@ port ``80``.
 
   $ pwd
   envoy/examples/tls-inspector
-  $ docker-compose pull
-  $ docker-compose up --build -d
-  $ docker-compose ps
+  $ docker compose pull
+  $ docker compose up --build -d
+  $ docker compose ps
 
                 Name                               Command               State                         Ports
   ---------------------------------------------------------------------------------------------------------------------------------

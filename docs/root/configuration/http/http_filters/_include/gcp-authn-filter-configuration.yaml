@@ -24,13 +24,11 @@ static_resources:
           http_filters:
           - name: "envoy.filters.http.gcp_authn"
             typed_config:
-              "@type": type.googleapis.com/net.envoy.source.extensions.filters.http.metadata.GcpAuthnFilterConfig
-            http_uri:
-              uri: "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
-              cluster: "gcp_authn"
-              timeout:
-                seconds: 10
-          http_filters:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig
+              http_uri:
+                uri: "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
+                cluster: "gcp_authn"
+                timeout: 10s
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

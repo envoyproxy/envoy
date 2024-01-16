@@ -1,89 +1,107 @@
 ARG BUILD_OS=ubuntu
-ARG BUILD_TAG=20.04
-ARG ENVOY_VRP_BASE_IMAGE=envoy
+ARG BUILD_TAG=22.04@sha256:6042500cf4b44023ea1894effe7890666b0c5c7871ed83a97c36c76ae560bb9b
+ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
 FROM scratch AS binary
-
-ARG TARGETPLATFORM
-ENV TARGETPLATFORM=${TARGETPLATFORM:-linux/amd64}
-ARG ENVOY_BINARY=envoy
-ARG ENVOY_BINARY_SUFFIX=_stripped
-ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release${ENVOY_BINARY_SUFFIX}/envoy* /usr/local/bin/
-ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
-COPY --chown=0:0 ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /usr/local/bin/
-COPY ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/schema_validator_tool /usr/local/bin/schema_validator_tool
 COPY ci/docker-entrypoint.sh /
+ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
+# See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
+ARG TARGETPLATFORM
+ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
+ADD "${TARGETPLATFORM}/release.tar.zst" /usr/local/bin/
+
+
+# STAGE: envoy-base
+FROM ${BUILD_OS}:${BUILD_TAG} AS envoy-base
+ENV DEBIAN_FRONTEND=noninteractive
+EXPOSE 10000
+CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+RUN mkdir -p /etc/envoy \
+    && adduser --group --system envoy
+ENTRYPOINT ["/docker-entrypoint.sh"]
+# NB: Adding this here means that following steps, for example updating the system packages, are run
+#   when the version file changes. This should mean that a release version will always update.
+#   In PRs this will just use cached layers unless either this file changes or the version has changed.
+ADD VERSION.txt /etc/envoy
+RUN --mount=type=tmpfs,target=/var/cache/apt \
+    --mount=type=tmpfs,target=/var/lib/apt/lists \
+    apt-get -qq update \
+    && apt-get -qq upgrade -y \
+    && apt-get -qq install --no-install-recommends -y ca-certificates \
+    && apt-get -qq autoremove -y
 
 
 # STAGE: envoy
-FROM ${BUILD_OS}:${BUILD_TAG} AS envoy
+FROM envoy-base AS envoy
+COPY --from=binary --chown=0:0 --chmod=644 \
+    /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
+COPY --from=binary --chown=0:0 --chmod=755 \
+    /docker-entrypoint.sh /
+COPY --from=binary --chown=0:0 --chmod=755 \
+    /usr/local/bin/utils/su-exec /usr/local/bin/
+ARG ENVOY_BINARY=envoy
+ARG ENVOY_BINARY_PREFIX=
+COPY --from=binary --chown=0:0 --chmod=755 \
+    "/usr/local/bin/${ENVOY_BINARY_PREFIX}${ENVOY_BINARY}" /usr/local/bin/envoy
+COPY --from=binary --chown=0:0 --chmod=755 \
+    /usr/local/bin/${ENVOY_BINARY_PREFIX}${ENVOY_BINARY}\.* /usr/local/bin/
 
-RUN apt-get update && apt-get upgrade -y \
-    && apt-get install --no-install-recommends -y ca-certificates \
-    && apt-get autoremove -y && apt-get clean \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /etc/envoy
-
-COPY --from=binary /usr/local/bin/envoy* /usr/local/bin/
-COPY --from=binary /usr/local/bin/su-exec /usr/local/bin/
-COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
-COPY --from=binary /docker-entrypoint.sh /
-
-RUN adduser --group --system envoy
-
-EXPOSE 10000
-
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+# STAGE: envoy-tools
+FROM envoy AS envoy-tools
+# See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
+ARG TARGETPLATFORM
+ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
+COPY --chown=0:0 --chmod=755 \
+    "${TARGETPLATFORM}/schema_validator_tool" /usr/local/bin/schema_validator_tool
 
 
 # STAGE: envoy-distroless
-# gcr.io/distroless/base-nossl-debian11:nonroot
-FROM gcr.io/distroless/base-nossl-debian11:nonroot@sha256:036581b558e56cb548d4472f7758814a8c71ece287c8e3a37a83529f908e59eb AS envoy-distroless
-
-COPY --from=binary /usr/local/bin/envoy* /usr/local/bin/
-COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
-
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:8c957f0c06030921ee439d028b5778dd1cee9e095092833fe8e4ee795d3a2298 AS envoy-distroless
 EXPOSE 10000
-
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
+COPY --from=binary --chown=0:0 --chmod=644 \
+    /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
+COPY --from=binary --chown=0:0 --chmod=755 \
+    /usr/local/bin/envoy /usr/local/bin/
+
+
+# STAGE: envoy-google-vrp-base
+FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp-base
+EXPOSE 10000
+EXPOSE 10001
+CMD ["supervisord", "-c", "/etc/supervisor.conf"]
+ENTRYPOINT []
+ADD --chown=0:0 --chmod=644 \
+    configs/google-vrp/*.yaml /etc/envoy/
+ADD --chown=0:0 --chmod=755 \
+    configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
+ADD --chown=0:0 --chmod=644 \
+    test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
+ADD --chown=0:0 --chmod=644 \
+    test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
+RUN --mount=type=tmpfs,target=/var/cache/apt \
+    --mount=type=tmpfs,target=/var/lib/apt/lists \
+    apt-get -qq update \
+    && apt-get -qq upgrade -y \
+    && apt-get -qq install -y libc++1 supervisor gdb strace tshark \
+    && apt-get autoremove -y \
+    && chmod 777 /var/log/supervisor
+ADD --chown=0:0 --chmod=755 configs/google-vrp/supervisor.conf /etc/supervisor.conf
 
 
 # STAGE: envoy-google-vrp
-FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp
+FROM envoy-google-vrp-base as envoy-google-vrp
+COPY  --from=binary --chown=0:0 --chmod=755 \
+    /usr/local/bin/envoy /usr/local/bin/envoy
 
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y libc++1 supervisor gdb strace tshark \
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/*
 
-ADD configs/google-vrp/envoy-edge.yaml /etc/envoy/envoy-edge.yaml
-ADD configs/google-vrp/envoy-origin.yaml /etc/envoy/envoy-origin.yaml
-ADD configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
-ADD configs/google-vrp/supervisor.conf /etc/supervisor.conf
-ADD test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
-ADD test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
-# ADD %local envoy bin% /usr/local/bin/envoy
-RUN chmod 777 /var/log/supervisor
-RUN chmod a+r /etc/supervisor.conf /etc/envoy/* /etc/envoy/certs/*
-RUN chmod a+rx /usr/local/bin/launch_envoy.sh
-
-EXPOSE 10000
-EXPOSE 10001
-
-CMD ["supervisord", "-c", "/etc/supervisor.conf"]
-
-# STAGE: envoy-tools
-FROM ${BUILD_OS}:${BUILD_TAG} AS envoy-tools
-
-COPY --from=binary /usr/local/bin/schema_validator_tool /usr/local/bin/
+# STAGE: envoy-google-vrp-custom
+FROM envoy-google-vrp-base as envoy-google-vrp-custom
+ARG ENVOY_CTX_BINARY_PATH
+ADD "${ENVOY_CTX_BINARY_PATH}" /usr/local/bin/envoy
 
 
 # Make envoy image as last stage so it is built by default

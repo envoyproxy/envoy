@@ -75,9 +75,13 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
             out, absl::StrJoin(
                      toListOfSpans(zipkin_span, replacements), ",",
                      [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
-                       const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
-                           span, /* pretty_print */ false,
-                           /* always_print_primitive_fields */ true);
+                       absl::StatusOr<std::string> json_or_error =
+                           MessageUtil::getJsonStringFromMessage(span, false, true);
+                       ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+                       if (json_or_error.ok()) {
+                         absl::StrAppend(element, absl::StrReplaceAll(json_or_error.value(),
+                                                                      replacement_values));
+                       }
 
                        // The Zipkin API V2 specification mandates to store timestamp value as int64
                        // https://github.com/openzipkin/zipkin-api/blob/228fabe660f1b5d1e28eac9df41f7d1deed4a1c2/zipkin2-api.yaml#L447-L463
@@ -99,7 +103,6 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
                        // serializing double in protobuf DoubleToBuffer function, and make it
                        // available to be controlled at caller site.
                        // https://github.com/envoyproxy/envoy/issues/10411).
-                       absl::StrAppend(element, absl::StrReplaceAll(json, replacement_values));
                      }));
       });
   return absl::StrCat("[", serialized_elements, "]");

@@ -24,7 +24,6 @@ constexpr absl::string_view DEFAULT_SERVICE_AND_INSTANCE = "EnvoyProxy";
 
 using cpp2sky::createSpanContext;
 using cpp2sky::SpanContextPtr;
-using cpp2sky::TracerException;
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
@@ -46,12 +45,12 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
-                                   const std::string&, Envoy::SystemTime,
-                                   const Tracing::Decision decision) {
+                                   const StreamInfo::StreamInfo&, const std::string&,
+                                   Tracing::Decision decision) {
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.
-  auto propagation_header = trace_context.getByKey(skywalkingPropagationHeaderKey());
+  auto propagation_header = skywalkingPropagationHeaderKey().get(trace_context);
   if (!propagation_header.has_value()) {
     // Although a sampling flag can be added to the propagation header, it will be ignored by most
     // of SkyWalking agent. The agent will enable tracing anyway if it see the propagation header.
@@ -63,13 +62,25 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
     tracing_context = tracing_context_factory_->create();
   } else {
     auto header_value_string = propagation_header.value();
-    try {
+
+    // TODO(wbpcode): catching all exceptions is not a good practice. But the cpp2sky library may
+    // throw exception that not be wrapped by TracerException. See
+    // https://github.com/SkyAPM/cpp2sky/issues/117. So, we need to catch all exceptions here to
+    // avoid Envoy crash in the runtime.
+    TRY_NEEDS_AUDIT {
       SpanContextPtr span_context =
           createSpanContext(toStdStringView(header_value_string)); // NOLINT(std::string_view)
       tracing_context = tracing_context_factory_->create(span_context);
-    } catch (TracerException& e) {
-      ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());
-      return std::make_unique<Tracing::NullSpan>();
+    }
+    END_TRY catch (std::exception& e) {
+      ENVOY_LOG(
+          warn,
+          "New SkyWalking Span/Segment with previous span context cannot be created for error: {}",
+          e.what());
+      if (!decision.traced) {
+        return std::make_unique<Tracing::NullSpan>();
+      }
+      tracing_context = tracing_context_factory_->create();
     }
   }
 

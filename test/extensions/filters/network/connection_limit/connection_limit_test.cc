@@ -26,7 +26,7 @@ public:
   void initialize(const std::string& filter_yaml) {
     envoy::extensions::filters::network::connection_limit::v3::ConnectionLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
-    config_ = std::make_shared<Config>(proto_config, stats_store_, runtime_);
+    config_ = std::make_shared<Config>(proto_config, *stats_store_.rootScope(), runtime_);
   }
 
   Thread::ThreadSynchronizer& synchronizer() { return config_->synchronizer_; }

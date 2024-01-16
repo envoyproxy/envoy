@@ -9,11 +9,27 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "substitution_formatter_interface",
-    hdrs = ["substitution_formatter.h"],
+    name = "http_formatter_context_interface",
+    hdrs = [
+        "http_formatter_context.h",
+    ],
     deps = [
+        "//envoy/http:header_map_interface",
+        "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "substitution_formatter_interface",
+    hdrs = [
+        "substitution_formatter.h",
+        "substitution_formatter_base.h",
+    ],
+    deps = [
+        ":http_formatter_context_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/stream_info:stream_info_interface",
     ],
 )

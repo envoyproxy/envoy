@@ -157,6 +157,7 @@ private:
   const std::string descriptor_key_;
   const std::string default_value_;
   const envoy::config::route::v3::RateLimit::Action::MetaData::Source source_;
+  const bool skip_if_absent_;
 };
 
 /**
@@ -210,7 +211,7 @@ private:
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
   RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config,
-                           ProtobufMessage::ValidationVisitor& validator);
+                           Server::Configuration::CommonFactoryContext& context);
 
   // Router::RateLimitPolicyEntry
   uint64_t stage() const override { return stage_; }
@@ -238,7 +239,7 @@ public:
   RateLimitPolicyImpl();
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-      ProtobufMessage::ValidationVisitor& validator);
+      Server::Configuration::CommonFactoryContext& context);
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&

@@ -90,7 +90,8 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext& context) override {
     return [&context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
+      filter_manager.addReadFilter(
+          std::make_shared<TestFilter>(context.serverFactoryContext().clusterManager()));
     };
   }
 
@@ -122,6 +123,7 @@ public:
       - filters:
         - name: envoy.test.router
           typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
       )EOF");
   }
 

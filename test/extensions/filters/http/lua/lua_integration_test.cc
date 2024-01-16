@@ -15,7 +15,9 @@ namespace {
 class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  LuaIntegrationTest() : LuaIntegrationTest(Http::CodecType::HTTP1) {}
+  LuaIntegrationTest(Http::CodecType downstream_protocol)
+      : HttpIntegrationTest(downstream_protocol, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -250,11 +252,8 @@ typed_config:
   initializeFilter(FILTER_AND_CODE, "foo");
   std::string response;
 
-#ifndef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
-#endif
 
   response = "";
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
@@ -312,6 +311,8 @@ typed_config:
           request_handle:streamInfo():downstreamLocalAddress())
         request_handle:headers():add("request_downstream_directremote_address_value",
           request_handle:streamInfo():downstreamDirectRemoteAddress())
+        request_handle:headers():add("request_downstream_remote_address_value",
+          request_handle:streamInfo():downstreamRemoteAddress())
         request_handle:headers():add("request_requested_server_name",
           request_handle:streamInfo():requestedServerName())
       end
@@ -420,6 +421,12 @@ typed_config:
           ->value()
           .getStringView(),
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+  EXPECT_EQ("10.0.0.1:0",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("request_downstream_remote_address_value"))[0]
+                ->value()
+                .getStringView());
 
   EXPECT_EQ("", upstream_request_->headers()
                     .get(Http::LowerCaseString("request_requested_server_name"))[0]
@@ -865,7 +872,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         disabled: true
   - match:
@@ -873,7 +880,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: hello.lua
   - match:
@@ -881,7 +888,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: byebye.lua
   - match:
@@ -889,7 +896,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -901,7 +908,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: nocode.lua
 )EOF";
@@ -918,7 +925,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -930,7 +937,7 @@ virtual_hosts:
     route:
       cluster: lua_cluster
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -1258,6 +1265,61 @@ typed_config:
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 400 Slow Down\r\n") == 0);
+}
+
+// Lua tests that need HTTP2.
+class Http2LuaIntegrationTest : public LuaIntegrationTest {
+protected:
+  Http2LuaIntegrationTest() : LuaIntegrationTest(Http::CodecType::HTTP2) {}
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2LuaIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test sending local reply due to too much data. HTTP2 is needed as it
+// will propagate the end stream from the downstream in the same decodeData
+// call the filter receives the downstream request body.
+TEST_P(Http2LuaIntegrationTest, LocalReplyWhenWaitingForBodyFollowedByHttpRequest) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local initial_req_body = request_handle:body()
+        local headers, body = request_handle:httpCall(
+        "lua_cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "lua_cluster"
+        },
+        "hello world",
+        1000)
+        request_handle:headers():replace("x-code", headers["code"] or "")
+      end
+)EOF";
+
+  // Set low buffer limits to allow us to trigger local reply easy.
+  const int buffer_limit = 65535;
+  config_helper_.setBufferLimits(buffer_limit, buffer_limit);
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder, buffer_limit + 1, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
 }
 
 } // namespace

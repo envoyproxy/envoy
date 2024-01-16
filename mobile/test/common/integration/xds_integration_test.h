@@ -21,10 +21,10 @@ public:
   XdsIntegrationTest();
   virtual ~XdsIntegrationTest() = default;
   void initialize() override;
+  void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
 protected:
   void SetUp() override;
-  void TearDown() override;
 
   void createEnvoy() override;
 
@@ -43,6 +43,9 @@ protected:
   // a fake upstream on the loopback address.
   envoy::config::cluster::v3::Cluster
   createSingleEndpointClusterConfig(const std::string& cluster_name);
+
+  // Gets the upstream cert for the xDS cluster's TLS over the `base` cluster.
+  std::string getUpstreamCert();
 };
 
 } // namespace Envoy

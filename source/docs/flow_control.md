@@ -334,7 +334,11 @@ watermark path is as follows:
     `DownstreamWatermarkCallbacks::onAboveWriteBufferHighWatermark()` for all
     filters which registered to receive watermark events
  * `Envoy::Router::Filter` receives `onAboveWriteBufferHighWatermark()` and calls
-   `readDisable(true)` on the upstream request.
+   `readDisable(true)` on the upstream request if response headers have arrived
+   already, otherwise defer the call till it arrives.
+ * Upon upstream `decode1xxHeaders()` or `decodeHeaders()`, if `readDisable(true)` has been
+   deferred and is still outstanding (which means no `onBelowWriteBufferLowWatermark()` has
+   been called on the filter), call `readDisable(true)` on the upstream stream.
 
 The low watermark path is as follows:
 
@@ -349,7 +353,9 @@ The low watermark path is as follows:
     `DownstreamWatermarkCallbacks::onBelowWriteBufferLowWatermark()` for all
     filters which registered to receive watermark events.
  * `Envoy::Router::Filter` receives `onBelowWriteBufferLowWatermark()` and calls
-   `readDisable(false)` on the upstream request.
+   `readDisable(false)` on the upstream request if response headers have arrived
+   already, otherwise cancel out a deferred `readDisable(true)` on the upstream
+   request.
 
 # HTTP/2 network downstream network buffer
 

@@ -1,10 +1,14 @@
-version: "3.8"
 services:
 
   proxy:
     build:
       context: .
-      dockerfile: Dockerfile-proxy
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_VARIANT: contrib-dev
+    depends_on:
+      mysql:
+        condition: service_started
     ports:
     - "${PORT_ADMIN:-8001}:8001"
 

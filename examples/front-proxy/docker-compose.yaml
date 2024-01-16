@@ -1,37 +1,54 @@
-version: "3.8"
 services:
 
-  # base images
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
-  # front-proxy
   front-envoy:
     build:
       context: .
-      dockerfile: Dockerfile-frontenvoy
+      dockerfile: ../shared/envoy/Dockerfile
+    depends_on:
+      service-envoy-1:
+        condition: service_healthy
+      service-envoy-2:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-8080}:8080"
     - "${PORT_HTTPS:-8443}:8443"
     - "${PORT_STATS:-8001}:8001"
 
+  service-envoy-1:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-admin
+      args:
+        ENVOY_CONFIG: ./service-envoy.yaml
+        ENVOY_ADMIN_PORT: 8001
+    depends_on:
+      service1:
+        condition: service_healthy
+
   service1:
     build:
-      context: ../shared/tracing
-    volumes:
-    - ./service-envoy.yaml:/etc/service-envoy.yaml
+      context: ../shared/python
+      target: aiohttp-tracing-service2
     environment:
     - SERVICE_NAME=1
 
+  service-envoy-2:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-admin
+      args:
+        ENVOY_ADMIN_PORT: 8001
+        ENVOY_CONFIG: ./service-envoy-2.yaml
+
+    depends_on:
+      service2:
+        condition: service_healthy
+
   service2:
     build:
-      context: ../shared/tracing
-    volumes:
-    - ./service-envoy.yaml:/etc/service-envoy.yaml
+      context: ../shared/python
+      target: aiohttp-tracing-service2
     environment:
     - SERVICE_NAME=2

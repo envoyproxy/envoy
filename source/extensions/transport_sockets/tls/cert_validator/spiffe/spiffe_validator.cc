@@ -104,8 +104,10 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 }
 
 void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
-  bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
-      [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+  // Use a generic lambda to be compatible with BoringSSL before and after
+  // https://boringssl-review.googlesource.com/c/boringssl/+/56190
+  bssl::UniquePtr<STACK_OF(X509_NAME)> list(
+      sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
 
   for (auto& ca : ca_certs_) {
     X509_NAME* name = X509_get_subject_name(ca.get());
@@ -139,23 +141,6 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
 
 int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-}
-
-int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
-                                                  Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                                                  X509& leaf_cert,
-                                                  const Network::TransportSocketOptions*) {
-  STACK_OF(X509)* cert_chain = X509_STORE_CTX_get0_untrusted(store_ctx);
-  X509_VERIFY_PARAM* verify_param = X509_STORE_CTX_get0_param(store_ctx);
-  std::string error_details;
-  bool verified =
-      verifyCertChainUsingTrustBundleStore(leaf_cert, cert_chain, verify_param, error_details);
-  if (ssl_extended_info) {
-    ssl_extended_info->setCertificateValidationStatus(
-        verified ? Envoy::Ssl::ClientValidationStatus::Validated
-                 : Envoy::Ssl::ClientValidationStatus::Failed);
-  }
-  return verified ? 1 : 0;
 }
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,

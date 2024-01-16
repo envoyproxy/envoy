@@ -104,7 +104,7 @@ InternalSocketFactory::InternalSocketFactory(
     const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
         config_proto,
     Network::UpstreamTransportSocketFactoryPtr&& inner_factory)
-    : PassthroughFactory(std::move(inner_factory)), config_(config_proto, context.scope()) {}
+    : PassthroughFactory(std::move(inner_factory)), config_(config_proto, context.statsScope()) {}
 
 Network::TransportSocketPtr
 InternalSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,

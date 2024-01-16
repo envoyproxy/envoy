@@ -15,7 +15,6 @@ using envoy::extensions::filters::common::dependency::v3::Dependency;
 using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
 using Envoy::Server::Configuration::FilterDependenciesPtr;
 using Envoy::Server::Configuration::NamedHttpFilterConfigFactory;
-using testing::Eq;
 
 namespace Envoy {
 namespace Extensions {
@@ -83,10 +82,9 @@ TEST_F(HttpConnectionManagerConfigTest, UnregisteredFilterException) {
   hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException, "Didn't find a registered implementation for name: 'test.pantry'");
 }
 
@@ -103,7 +101,7 @@ TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, http_tracer_manager_,
+                              scoped_routes_config_provider_manager_, tracer_manager_,
                               filter_config_provider_manager_);
 }
 
@@ -117,7 +115,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
 
   HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, http_tracer_manager_,
+                              scoped_routes_config_provider_manager_, tracer_manager_,
                               filter_config_provider_manager_);
 }
 
@@ -131,10 +129,9 @@ TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException,
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -153,10 +150,9 @@ TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException,
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -173,10 +169,9 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException,
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -195,7 +190,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_, http_tracer_manager_,
+                              scoped_routes_config_provider_manager_, tracer_manager_,
                               filter_config_provider_manager_);
 }
 
@@ -217,10 +212,9 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException,
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -245,10 +239,9 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
+      HttpConnectionManagerConfig(
+          hcm_config, context_, date_provider_, route_config_provider_manager_,
+          scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_),
       EnvoyException,
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }

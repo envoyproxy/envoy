@@ -36,6 +36,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
@@ -81,8 +82,8 @@ public:
   TestRequestHeaderMapImpl headers_{};
   RequestMessagePtr message_{new RequestMessageImpl()};
   Stats::MockIsolatedStatsStore stats_store_;
-  MockAsyncClientCallbacks callbacks_;
-  MockAsyncClientStreamCallbacks stream_callbacks_;
+  NiceMock<MockAsyncClientCallbacks> callbacks_;
+  NiceMock<MockAsyncClientStreamCallbacks> stream_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<MockRequestEncoder> stream_encoder_;
   ResponseDecoder* response_decoder_{};
@@ -99,6 +100,12 @@ public:
 
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
+  AsyncClientImplTracingTest() {
+    ON_CALL(stream_info_, upstreamClusterInfo())
+        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
+            cm_.thread_local_cluster_.cluster_.info_)));
+  }
+
   Tracing::MockSpan parent_span_;
   const std::string child_span_name_{"Test Child Span Name"};
 
@@ -126,6 +133,14 @@ TEST_F(AsyncClientImplTest, BasicStream) {
       .WillOnce(Invoke(
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            // The backing object of 'decoder' should also implemented the
+            // Router::UpstreamToDownstream.
+            const auto* upstream_to_downstream =
+                dynamic_cast<Router::UpstreamToDownstream*>(&decoder);
+            EXPECT_NE(nullptr, upstream_to_downstream);
+            // Ensure the route() is populated and valid.
+            EXPECT_NE(nullptr, upstream_to_downstream->route().routeEntry());
+
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
                                   stream_info_, {});
             response_decoder_ = &decoder;
@@ -201,6 +216,157 @@ TEST_F(AsyncClientImplTest, Basic) {
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                      .counter("internal.upstream_rq_200")
                      .value());
+}
+
+TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  TestRequestHeaderMapImpl headers_copy = *headers;
+
+  Buffer::OwnedImpl data("test data");
+  const Buffer::OwnedImpl data_copy(data.toString());
+
+  auto trailers = std::make_unique<TestRequestTrailerMapImpl>();
+  trailers->addCopy("some", "trailer");
+  const TestRequestTrailerMapImpl trailers_copy = *trailers;
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  headers_copy.addCopy("x-envoy-internal", "true");
+  headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers_copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
+  EXPECT_CALL(stream_encoder_, encodeTrailers(HeaderMapEqualRef(&trailers_copy)));
+
+  AsyncClient::OngoingRequest* request =
+      client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  request->sendData(data, false);
+  request->captureAndSendTrailers(std::move(trailers));
+
+  expectSuccess(request, 200);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  Buffer::OwnedImpl response_data("test data");
+  response_decoder_->decodeData(response_data, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("internal.upstream_rq_200")
+                     .value());
+}
+
+TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  TestRequestHeaderMapImpl headers_copy = *headers;
+  headers_copy.addCopy("x-envoy-internal", "true");
+  headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
+
+  Buffer::OwnedImpl data("test data");
+  const Buffer::OwnedImpl data_copy(data.toString());
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            // Pretend like the connection is already backed up.
+            dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers_copy), false));
+
+  auto* request =
+      client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  // Registering a new watermark callback should note that the high watermark has already been hit.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  request->setWatermarkCallbacks(watermark_callbacks);
+
+  // Upstream gets unblocked.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  dynamic_cast<MockStream&>(stream_encoder_.getStream()).runLowWatermarkCallbacks();
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
+  request->sendData(data, false);
+  // Blocked again.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
+
+  // Clear the callback, which calls the low watermark function.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  request->removeWatermarkCallbacks();
+  // Add the callback back.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  request->setWatermarkCallbacks(watermark_callbacks);
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
+  Buffer::OwnedImpl empty;
+  request->sendData(empty, true);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  // On request end, we expect to run the low watermark callbacks.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  TestRequestHeaderMapImpl headers_copy = *headers;
+  headers_copy.addCopy("x-envoy-internal", "true");
+  headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
+
+  Buffer::OwnedImpl data("test data");
+  const Buffer::OwnedImpl data_copy(data.toString());
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers_copy), false));
+
+  auto* request =
+      client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  request->setWatermarkCallbacks(watermark_callbacks);
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
+  request->sendData(data, false);
+  // Upstream is blocked.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
+
+  // Reset the stream, which will call the low watermark callbacks.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  expectSuccess(request, 503);
+  stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
 
 TEST_F(AsyncClientImplTracingTest, Basic) {
@@ -1120,7 +1286,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
   stream->sendData(*body, false);
 
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false, "details");
   dispatcher_.clearDeferredDeleteList();
@@ -1661,7 +1827,7 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -1677,7 +1843,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
   auto route = filter_callbacks->route();
   ASSERT_NE(nullptr, route);
   auto route_entry = route->routeEntry();
@@ -1688,7 +1854,6 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   const auto& route_config = route_entry->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
-  EXPECT_EQ(nullptr, route_config.route(headers_, stream_info_, 0));
   auto cluster_info = filter_callbacks->clusterInfo();
   ASSERT_NE(nullptr, cluster_info);
   EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_, cluster_info);
@@ -1698,7 +1863,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
 TEST_F(AsyncClientImplTest, DumpState) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
 
   std::stringstream out;
   filter_callbacks->scope().dumpState(out);
@@ -1713,20 +1878,20 @@ TEST_F(AsyncClientImplTest, DumpState) {
 // Must not be in anonymous namespace for friend to work.
 class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
-  std::unique_ptr<AsyncStreamImpl::RouteImpl> route_impl_{new AsyncStreamImpl::RouteImpl(
-      client_, absl::nullopt,
+  std::unique_ptr<NullRouteImpl> route_impl_{new NullRouteImpl(
+      client_.cluster_->name(), client_.singleton_manager_, absl::nullopt,
       Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
       absl::nullopt)};
-  AsyncStreamImpl::NullVirtualHost vhost_;
-  AsyncStreamImpl::NullConfig config_;
+  NullVirtualHost vhost_;
+  NullCommonConfig config_;
 
   void setupRouteImpl(const std::string& yaml_config) {
     envoy::config::route::v3::RetryPolicy retry_policy;
 
     TestUtility::loadFromYaml(yaml_config, retry_policy);
 
-    route_impl_ = std::make_unique<AsyncStreamImpl::RouteImpl>(
-        client_, absl::nullopt,
+    route_impl_ = std::make_unique<NullRouteImpl>(
+        client_.cluster_->name(), client_.singleton_manager_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
         std::move(retry_policy));
   }

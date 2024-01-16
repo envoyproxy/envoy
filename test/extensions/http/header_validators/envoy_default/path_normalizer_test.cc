@@ -2,6 +2,7 @@
 
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -20,7 +21,8 @@ protected:
     envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
-    return std::make_unique<PathNormalizer>(typed_config);
+    ConfigOverrides overrides(scoped_runtime_.loader().snapshot());
+    return std::make_unique<PathNormalizer>(typed_config, overrides);
   }
 
   static constexpr absl::string_view empty_config = "{}";
@@ -53,9 +55,11 @@ protected:
       path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
       skip_merging_slashes: true
     )EOF";
+  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "x%7ex";
 
   auto normalizer = create(empty_config);
@@ -67,6 +71,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetNormalized) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%ffX";
 
   auto normalizer = create(empty_config);
@@ -94,6 +99,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetInvalid) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepNotSet) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(empty_config);
@@ -104,6 +110,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepNotSet) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepImplDefault) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(impl_specific_slash_handling_config);
@@ -114,6 +121,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepImplDefault) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepUnchanged) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(keep_encoded_slash_config);
@@ -124,6 +132,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepUnchanged) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRejectEncodedSlash) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(reject_encoded_slash_config);
@@ -134,6 +143,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRejectEncodedSlash) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRedirectEncodedSlash) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(redirect_encoded_slash_config);
@@ -145,6 +155,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRedirectEncodedSlash) {
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecodedEncodedSlash) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   std::string valid = "%2fx";
 
   auto normalizer = create(decode_encoded_slash_config);
@@ -161,7 +172,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRoot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/");
+  EXPECT_EQ(headers.getPathValue(), "/");
   EXPECT_TRUE(result.ok());
 }
 
@@ -171,7 +182,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveQueryFragment) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root/child?x=1#anchor");
+  EXPECT_EQ(headers.getPathValue(), "/root/child?x=1#anchor");
   EXPECT_TRUE(result.ok());
 }
 
@@ -181,7 +192,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveFragment) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root/child#anchor");
+  EXPECT_EQ(headers.getPathValue(), "/root/child#anchor");
   EXPECT_TRUE(result.ok());
 }
 
@@ -191,7 +202,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDotDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir2");
   EXPECT_TRUE(result.ok());
 }
 
@@ -201,7 +212,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2");
   EXPECT_TRUE(result.ok());
 }
 
@@ -211,7 +222,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriTrailingDotDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/");
+  EXPECT_EQ(headers.getPathValue(), "/");
   EXPECT_TRUE(result.ok());
 }
 
@@ -221,7 +232,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriEncodedDotDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir2");
   EXPECT_TRUE(result.ok());
 }
 
@@ -231,7 +242,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriTrailingDot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/");
   EXPECT_TRUE(result.ok());
 }
 
@@ -241,7 +252,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDotInSegments) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/.dir2/..dir3/dir.4/dir..5");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/.dir2/..dir3/dir.4/dir..5");
   EXPECT_TRUE(result.ok());
 }
 
@@ -251,17 +262,18 @@ TEST_F(PathNormalizerTest, NormalizePathUriMergeSlashes) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root/child/");
+  EXPECT_EQ(headers.getPathValue(), "/root/child/");
   EXPECT_TRUE(result.ok());
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriPercentDecodeNormalized) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/%ff"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/%FF");
+  EXPECT_EQ(headers.getPathValue(), "/%FF");
   EXPECT_TRUE(result.ok());
 }
 
@@ -271,7 +283,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriPercentDecoded) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/~/dir1");
+  EXPECT_EQ(headers.getPathValue(), "/~/dir1");
   EXPECT_TRUE(result.ok());
 }
 
@@ -281,7 +293,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashes) {
   auto normalizer = create(skip_merging_slashes_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "//root//child//");
+  EXPECT_EQ(headers.getPathValue(), "//root//child//");
   EXPECT_TRUE(result.ok());
 }
 
@@ -291,17 +303,18 @@ TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashesWithDecodeSlashes) 
   auto normalizer = create(skip_merging_slashes_with_decode_slashes_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root//child//");
+  EXPECT_EQ(headers.getPathValue(), "/root//child//");
   EXPECT_TRUE(result.ok());
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriDecodeSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%2f/dir3"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "/dir1%2fdir2%2f/dir3%5Cdeleted%5C%2F..%2F%5cdir4"}};
 
   auto normalizer = create(decode_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/dir1/dir2/dir3");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2/dir3/dir4");
   EXPECT_TRUE(result.ok());
 }
 
@@ -315,45 +328,59 @@ TEST_F(PathNormalizerTest, NormalizePathUriRejectEncodedSlashes) {
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
+TEST_F(PathNormalizerTest, NormalizePathUriRejectEncodedBackSlashes) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%5Cdir2"}};
+
+  auto normalizer = create(reject_encoded_slash_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
 TEST_F(PathNormalizerTest, NormalizePathUriRedirectEncodedSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(redirect_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Redirect);
-  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
-  EXPECT_EQ(headers.path(), "/dir1/dir2");
+  EXPECT_EQ(result.details(), "uhv.path_normalization_redirect");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2/dir3");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesDefault) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_TRUE(result.ok());
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2");
+  // By default slashes are not decoded
+  EXPECT_EQ(headers.getPathValue(), "/dir1%2Fdir2%5Cdir3");
 }
 
-TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKeep) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
+TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesKept) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2%5cdir3"}};
 
   auto normalizer = create(keep_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_TRUE(result.ok());
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%2Fdir2%5Cdir3");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriNormalizeEncodedSlashesImplDefault) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%2fdir2"}};
 
   auto normalizer = create(impl_specific_slash_handling_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_TRUE(result.ok());
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%2Fdir2");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriInvalidBeyondRoot) {
@@ -377,13 +404,27 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidRelative) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriInvalidEncoding) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/%x"}};
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_allow_malformed_url_encoding", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path%Z%30with%xYbad%7Jencoding%A"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(PathNormalizerTest, MalformedUrlEncodingAllowed) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.uhv_allow_malformed_url_encoding", "true"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path%Z%30with%xYbad%7Jencoding%A"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.getPathValue(), "/path%Z0with%xYbad%7Jencoding%A");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormConnect) {
@@ -394,7 +435,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormConnect) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "");
+  EXPECT_EQ(headers.getPathValue(), "");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormWithPathConnect) {
@@ -427,7 +468,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormOptions) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "*");
+  EXPECT_EQ(headers.getPathValue(), "*");
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
@@ -439,6 +480,50 @@ TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(PathNormalizerTest, BackslashTranslatedToSlashByDefault) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "/path\\with/back\\/slash%5c?key=val\\ue"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  // In query backslash is untouched
+  EXPECT_EQ(headers.getPathValue(), "/path/with/back/slash%5c?key=val\\ue");
+}
+
+TEST_F(PathNormalizerTest, BackslashPreservedWithOverride) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/path\\with/back\\/slash%5C"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.getPathValue(), "/path\\with/back\\/slash%5C");
+}
+
+TEST_F(PathNormalizerTest, PreservePercentEncodedCaseByDefault) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%Abdir2%3a%fF%5a"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.getPathValue(), "/dir1%Abdir2%3a%fFZ");
+}
+
+TEST_F(PathNormalizerTest, NormalizePercentEncodedCase) {
+  scoped_runtime_.mergeValues({{"envoy.uhv.preserve_url_encoded_case", "false"}});
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1%Abdir2%3a%fF%5a"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.getPathValue(), "/dir1%ABdir2%3A%FFZ");
 }
 
 } // namespace EnvoyDefault

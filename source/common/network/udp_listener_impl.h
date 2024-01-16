@@ -22,9 +22,8 @@ class UdpListenerImpl : public BaseListenerImpl,
                         public UdpPacketProcessor,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
-  UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                  UdpListenerCallbacks& cb, TimeSource& time_source,
-                  const envoy::config::core::v3::UdpSocketConfig& config);
+  UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr socket, UdpListenerCallbacks& cb,
+                  TimeSource& time_source, const envoy::config::core::v3::UdpSocketConfig& config);
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
 
@@ -32,6 +31,7 @@ public:
   void disable() override;
   void enable() override;
   void setRejectFraction(UnitFloat) override {}
+  void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
 
   // Network::UdpListener
   Event::Dispatcher& dispatcher() override;

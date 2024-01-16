@@ -197,6 +197,7 @@ envoy_cc_test(
         "//test/common/network:listener_impl_test_base_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
@@ -302,7 +303,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "socket_option_test",
-    srcs = ["socket_option_test.h"],
+    hdrs = ["socket_option_test.h"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -450,6 +451,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

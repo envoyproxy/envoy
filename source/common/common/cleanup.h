@@ -10,8 +10,12 @@ namespace Envoy {
 // RAII cleanup via functor.
 class Cleanup {
 public:
-  Cleanup(std::function<void()> f) : f_(std::move(f)), cancelled_(false) {}
+  Cleanup(std::function<void()> f) : f_(std::move(f)) {}
   ~Cleanup() { f_(); }
+
+  // Copying leads to cleanup multiple times, so only allow move.
+  Cleanup(const Cleanup&) = delete;
+  Cleanup(Cleanup&&) = default;
 
   void cancel() {
     cancelled_ = true;
@@ -22,14 +26,14 @@ public:
 
 private:
   std::function<void()> f_;
-  bool cancelled_;
+  bool cancelled_{false};
 };
 
 // RAII helper class to add an element to an std::list on construction and erase
 // it on destruction, unless the cancel method has been called.
 template <class T> class RaiiListElement {
 public:
-  RaiiListElement(std::list<T>& container, T element) : container_(container), cancelled_(false) {
+  RaiiListElement(std::list<T>& container, T element) : container_(container) {
     it_ = container.emplace(container.begin(), element);
   }
   virtual ~RaiiListElement() {
@@ -52,7 +56,7 @@ public:
 private:
   std::list<T>& container_;
   typename std::list<T>::iterator it_;
-  bool cancelled_;
+  bool cancelled_{false};
 };
 
 // RAII helper class to add an element to a std::list held inside an absl::flat_hash_map on
@@ -64,7 +68,7 @@ public:
 
   template <typename ConvertibleToKey>
   RaiiMapOfListElement(MapOfList& map, const ConvertibleToKey& key, Value value)
-      : map_(map), key_(key), cancelled_(false) {
+      : map_(map), key_(key) {
     // The list reference itself cannot be saved because it is not stable in the event of a
     // absl::flat_hash_map rehash.
     std::list<Value>& list = map_.try_emplace(key).first->second;
@@ -96,6 +100,6 @@ private:
   // Because of absl::flat_hash_map iterator instability we have to keep a copy of the key.
   const Key key_;
   typename MapOfList::mapped_type::iterator it_;
-  bool cancelled_;
+  bool cancelled_{false};
 };
 } // namespace Envoy

@@ -1,3 +1,5 @@
+#pragma once
+
 #import <Foundation/Foundation.h>
 
 #import "library/objective-c/EnvoyAliases.h"
@@ -20,7 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param endStream whether the response is headers-only.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onHeaders)
+@property (nonatomic, copy, nullable) void (^onHeaders)
     (EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /**
@@ -30,7 +32,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param endStream whether the data is the last data frame.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onData)
+@property (nonatomic, copy, nullable) void (^onData)
     (NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /**
@@ -39,8 +41,8 @@ NS_ASSUME_NONNULL_BEGIN
  * @param trailers the trailers received.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onTrailers)(EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel)
-    ;
+@property (nonatomic, copy, nullable) void (^onTrailers)
+    (EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
 
 /**
  * Called to signal there is buffer space available for continued request body upload.
@@ -50,14 +52,14 @@ NS_ASSUME_NONNULL_BEGIN
  * to sendData.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onSendWindowAvailable)(EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy, nullable) void (^onSendWindowAvailable)(EnvoyStreamIntel streamIntel);
 
 /**
  * Called when the async HTTP stream has an error.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onError)
+@property (nonatomic, copy, nullable) void (^onError)
     (uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel,
      EnvoyFinalStreamIntel finalStreamIntel);
 
@@ -69,7 +71,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onCancel)
+@property (nonatomic, copy, nullable) void (^onCancel)
     (EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
 /**
@@ -79,7 +81,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onComplete)
+@property (nonatomic, copy, nullable) void (^onComplete)
     (EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
 @end

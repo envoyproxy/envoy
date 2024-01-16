@@ -16,10 +16,10 @@ ENVOY_FILTER_EXAMPLE_TESTS=(
 
 if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
   rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  git clone -q https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
 fi
 
-(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f "${ENVOY_FILTER_EXAMPLE_GITSHA}")
+(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch -q origin && git checkout -q -f "${ENVOY_FILTER_EXAMPLE_GITSHA}")
 sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
@@ -28,6 +28,6 @@ ln -sf "${ENVOY_SRCDIR}"/bazel/platform_mappings "${ENVOY_FILTER_EXAMPLE_SRCDIR}
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 rm -f "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-cp -f "$(bazel info workspace)"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export FILTER_WORKSPACE_SET=1

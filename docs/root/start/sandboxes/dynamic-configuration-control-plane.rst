@@ -34,9 +34,9 @@ The control plane has not yet been started.
 
     $ pwd
     envoy/examples/dynamic-config-cp
-    $ docker-compose pull
-    $ docker-compose up --build -d proxy
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d proxy
+    $ docker compose ps
 
            Name                            Command                State                     Ports
     ------------------------------------------------------------------------------------------------------------------------
@@ -82,8 +82,8 @@ You may need to wait a moment or two for it to become ``healthy``.
 
 .. code-block:: console
 
-    $ docker-compose up --build -d go-control-plane
-    $ docker-compose ps
+    $ docker compose up --build -d go-control-plane
+    $ docker compose ps
 
             Name                                Command                  State                    Ports
     -------------------------------------------------------------------------------------------------------------------------------------
@@ -134,7 +134,7 @@ Stop the ``go-control-plane`` service:
 
 .. code-block:: console
 
-    $ docker-compose stop go-control-plane
+    $ docker compose stop go-control-plane
 
 The Envoy proxy should continue proxying responses from ``service1``.
 
@@ -158,7 +158,7 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
    :lines: 34-43
-   :lineno-start: 34
+   :lineno-start: 35
    :emphasize-lines: 6
    :linenos:
 
@@ -167,7 +167,7 @@ Further down in this file you must also change the configuration snapshot versio
 
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
-   :lineno-start: 164
+   :lineno-start: 175
    :lines: 174-186
    :emphasize-lines: 3
    :linenos:
@@ -176,7 +176,7 @@ Now rebuild and restart the control plane:
 
 .. code-block:: console
 
-    $ docker-compose up --build -d go-control-plane
+    $ docker compose up --build -d go-control-plane
 
 You may need to wait a moment or two for the ``go-control-plane`` service to become ``healthy`` again.
 
@@ -201,6 +201,12 @@ is configured to proxy to ``service2``:
 .. literalinclude:: _include/dynamic-config-cp/response-config-active-clusters-updated.json
    :language: json
    :emphasize-lines: 3, 11, 19-20
+
+.. note::
+   In this example we increment the version for simplicity.
+
+   Any change to the version will trigger an update in Envoy, and ordering is not significant
+   (see :ref:`xDS protocol docs for further information about updates <xds_ack_nack>`).
 
 .. seealso::
 

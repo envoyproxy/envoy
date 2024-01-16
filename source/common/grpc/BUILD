@@ -1,13 +1,13 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_google_grpc_external_deps",
     "envoy_package",
     "envoy_select_google_grpc",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -22,6 +22,7 @@ envoy_cc_library(
         ":codec_lib",
         ":context_lib",
         "//envoy/grpc:async_client_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
     ],
@@ -36,6 +37,7 @@ envoy_cc_library(
         ":context_lib",
         ":typed_async_client_lib",
         "//envoy/grpc:async_client_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -53,6 +55,7 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ] + envoy_select_google_grpc([":google_async_client_lib"]),
 )
 
@@ -98,6 +101,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:codec_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
@@ -174,6 +178,7 @@ envoy_cc_library(
         ":typed_async_client_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:google_grpc_creds_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/thread:thread_interface",
         "//envoy/thread_local:thread_local_object",
         "//source/common/common:base64_lib",

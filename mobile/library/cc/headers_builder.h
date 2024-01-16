@@ -11,7 +11,7 @@ public:
 
   HeadersBuilder& add(std::string name, std::string value);
   HeadersBuilder& set(std::string name, std::vector<std::string> values);
-  HeadersBuilder& remove(const std::string& name);
+  HeadersBuilder& remove(absl::string_view name);
 
 protected:
   HeadersBuilder();

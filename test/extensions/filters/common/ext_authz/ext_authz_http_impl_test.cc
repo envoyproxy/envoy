@@ -139,12 +139,22 @@ public:
     client_->onSuccess(async_request_, std::move(http_response));
   }
 
-  Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
+  Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers,
+                                      const std::string body_content = EMPTY_STRING,
+                                      bool use_raw_body = false) {
     envoy::service::auth::v3::CheckRequest request{};
     auto mutable_headers =
         request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
     for (const auto& header : headers) {
       (*mutable_headers)[header.first] = header.second;
+    }
+
+    if (use_raw_body) {
+      *request.mutable_attributes()->mutable_request()->mutable_http()->mutable_raw_body() =
+          body_content;
+    } else {
+      *request.mutable_attributes()->mutable_request()->mutable_http()->mutable_body() =
+          body_content;
     }
 
     Http::RequestMessagePtr message_ptr;
@@ -235,6 +245,22 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
 
   EXPECT_EQ(message_ptr->headers().getPathValue(), "/bar/foo");
+}
+
+// Verify request body is set correctly when the normal body is empty and raw body is set.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRawBody) {
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/foo"}, {"foo", "bar"}}, "raw_body", true);
+
+  EXPECT_EQ(message_ptr->bodyAsString(), "raw_body");
+}
+
+// Verify request body is set correctly when the normal body is set and raw body is empty.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithBody) {
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/foo"}, {"foo", "bar"}}, "body", false);
+
+  EXPECT_EQ(message_ptr->bodyAsString(), "body");
 }
 
 // Test the client when a request contains Content-Length greater than 0.
@@ -348,7 +374,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
                           expected_header.second);
 
   StreamInfo::MockStreamInfo stream_info;
-  EXPECT_CALL(stream_info, getRequestHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+  EXPECT_CALL(stream_info, getRequestHeaders()).WillOnce(Return(&request_headers));
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info);

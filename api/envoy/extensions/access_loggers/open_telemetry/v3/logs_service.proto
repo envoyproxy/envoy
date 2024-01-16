@@ -22,9 +22,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // populate `opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto>`_.
 // In addition, the request start time is set in the dedicated field.
 // [#extension: envoy.access_loggers.open_telemetry]
+// [#next-free-field: 6]
 message OpenTelemetryAccessLogConfig {
   // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
   grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+
+  // If specified, Envoy will not generate built-in resource labels
+  // like ``log_name``, ``zone_name``, ``cluster_name``, ``node_name``.
+  bool disable_builtin_labels = 5;
 
   // OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto#L51>`_
   // attributes are filled with Envoy node info.

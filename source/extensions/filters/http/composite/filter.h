@@ -4,16 +4,21 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/json/json_loader.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/composite/action.h"
 #include "source/extensions/filters/http/composite/factory_wrapper.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
+
+constexpr absl::string_view MatchedActionsFilterStateKey =
+    "envoy.extensions.filters.http.composite.matched_actions";
 
 struct FactoryCallbacksWrapper;
 
@@ -23,6 +28,28 @@ struct FactoryCallbacksWrapper;
 
 struct FilterStats {
   ALL_COMPOSITE_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class MatchedActionInfo : public StreamInfo::FilterState::Object {
+public:
+  MatchedActionInfo(const std::string& filter, const std::string& action) {
+    actions_[filter] = action;
+  }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
+
+  absl::optional<std::string> serializeAsString() const override {
+    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
+  }
+
+  void setFilterAction(const std::string& filter, const std::string& action) {
+    actions_[filter] = action;
+  }
+
+private:
+  std::unique_ptr<ProtobufWkt::Struct> buildProtoStruct() const;
+
+  absl::flat_hash_map<std::string, std::string> actions_;
 };
 
 class Filter : public Http::StreamFilter,
@@ -64,20 +91,29 @@ public:
     }
   }
 
+  void onStreamComplete() override {
+    if (delegated_filter_) {
+      // We need to explicitly specify which base class to the conversion via due
+      // to the diamond inheritance between StreamFilter and StreamFilterBase.
+      static_cast<Http::StreamDecoderFilter&>(*delegated_filter_).onStreamComplete();
+    }
+  }
+
   void onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override {
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info) override {
     for (const auto& log : access_loggers_) {
-      log->log(request_headers, response_headers, response_trailers, stream_info);
+      log->log(log_context, info);
     }
   }
 
 private:
   friend FactoryCallbacksWrapper;
+
+  void updateFilterState(Http::StreamFilterCallbacks* callback, const std::string& filter_name,
+                         const std::string& action_name);
 
   Event::Dispatcher& dispatcher_;
   // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
@@ -117,6 +153,7 @@ private:
 
     // Http::StreamFilterBase
     void onDestroy() override;
+    void onStreamComplete() override;
 
   private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;

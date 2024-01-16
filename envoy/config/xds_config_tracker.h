@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
@@ -99,8 +100,8 @@ public:
    */
   virtual XdsConfigTrackerPtr
   createXdsConfigTracker(const ProtobufWkt::Any& config,
-                         ProtobufMessage::ValidationVisitor& validation_visitor,
-                         Event::Dispatcher& dispatcher, Stats::Scope& stats) PURE;
+                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                         Event::Dispatcher& dispatcher) PURE;
 
   std::string category() const override { return "envoy.config.xds_tracker"; }
 };

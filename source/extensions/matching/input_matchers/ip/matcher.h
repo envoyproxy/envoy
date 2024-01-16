@@ -24,7 +24,7 @@ class Matcher : public Envoy::Matcher::InputMatcher, Logger::Loggable<Logger::Id
 public:
   Matcher(std::vector<Network::Address::CidrRange> const& ranges, absl::string_view stat_prefix,
           Stats::Scope& stat_scope);
-  bool match(absl::optional<absl::string_view> input) override;
+  bool match(const Envoy::Matcher::MatchingDataType& input) override;
   absl::optional<const MatcherStats> stats() const { return stats_; }
 
 private:

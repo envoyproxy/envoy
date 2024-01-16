@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load(
     "@envoy//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
@@ -6,7 +6,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_extension_cc_test(
     name = "network_configuration_retry_options_test",
@@ -19,5 +19,6 @@ envoy_extension_cc_test(
         "@envoy//source/common/upstream:retry_factory_lib",
         "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/mocks/stream_info:stream_info_mocks",
+        "@envoy_build_config//:extension_registry",
     ],
 )

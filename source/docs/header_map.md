@@ -12,9 +12,7 @@ The Envoy header map implementation (`HeaderMapImpl`) has the following properti
 * Custom headers can be registered statically against a specific implementation (request headers,
   request trailers, response headers, and response trailers) via core code and extensions
   (`CustomInlineHeaderRegistry`). Each registered header increases the size of the table by the size of a single pointer.
-* Operations that search, replace, etc. for a header by name that is not one of the O(1) headers
-  will either incur an O(N) search through the linked list if the number of headers is below `envoy.http.headermap.lazy_map_min_size`,
-  and O(1) map access otherwise.
+* Operations that search, replace, etc. for a header by name will be O(1).
 
 ## Implementation details
 

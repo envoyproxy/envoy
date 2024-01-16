@@ -28,7 +28,8 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectYaml) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -40,7 +41,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -50,9 +51,9 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProtoUpstreamFactory) {
   envoy::extensions::filters::http::buffer::v3::Buffer config;
   config.mutable_max_request_bytes()->set_value(1028);
 
-  NiceMock<Server::Configuration::MockUpstreamHttpFactoryContext> context;
+  NiceMock<Server::Configuration::MockUpstreamFactoryContext> context;
   BufferFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -67,7 +68,7 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   config.mutable_max_request_bytes()->set_value(1028);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -80,7 +81,7 @@ TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
       *dynamic_cast<envoy::extensions::filters::http::buffer::v3::Buffer*>(empty_proto.get());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats", context),
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats", context).value(),
                           EnvoyException, "Proto constraint validation failed");
 }
 

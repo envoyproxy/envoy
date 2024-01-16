@@ -8,6 +8,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "extension_registry.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -16,38 +17,26 @@ using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
 using ::testing::AssertionSuccess;
 
-XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
-  override_builder_config_ = true; // The builder does not yet have RTDS support.
-  expect_dns_ = false;             // TODO(alyssawilk) debug.
+XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {}
+
+void XdsIntegrationTest::initialize() {
   create_xds_upstream_ = true;
+  tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
+
+  // Register the extensions required for Envoy Mobile.
+  ExtensionRegistry::registerFactories();
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
   }
 
-  // Set up the basic bootstrap config for xDS.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    // The default stats config has overenthusiastic filters.
-    bootstrap.clear_stats_config();
-
-    // Add two clusters by default:
-    //  - base_h2: An HTTP2 cluster with one fake upstream endpoint, for accepting requests from EM.
-    //  - xds_cluster.lyft.com: An xDS management server cluster, with one fake upstream endpoint.
-    bootstrap.mutable_static_resources()->clear_clusters();
-    bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
-        createSingleEndpointClusterConfig("base_h2"));
-    bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
-        createSingleEndpointClusterConfig(std::string(XDS_CLUSTER)));
-  });
-
   // xDS upstream is created separately in the test infra, and there's only one non-xDS cluster.
   setUpstreamCount(1);
-}
 
-void XdsIntegrationTest::initialize() {
   BaseClientIntegrationTest::initialize();
+
   default_request_headers_.setScheme("https");
 }
 
@@ -62,11 +51,6 @@ Grpc::SotwOrDelta XdsIntegrationTest::sotwOrDelta() const { return std::get<2>(G
 void XdsIntegrationTest::SetUp() {
   // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
   setUpstreamProtocol(Http::CodecType::HTTP2);
-}
-
-void XdsIntegrationTest::TearDown() {
-  cleanup();
-  BaseClientIntegrationTest::TearDown();
 }
 
 void XdsIntegrationTest::createEnvoy() {
@@ -104,6 +88,11 @@ XdsIntegrationTest::createSingleEndpointClusterConfig(const std::string& cluster
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
           .PackFrom(options);
   return config;
+}
+
+std::string XdsIntegrationTest::getUpstreamCert() {
+  return TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
 }
 
 } // namespace Envoy

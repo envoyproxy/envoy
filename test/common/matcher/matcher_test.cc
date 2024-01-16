@@ -134,6 +134,180 @@ matcher_tree:
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
 }
 
+TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  prefix_match_map:
+    map:
+      3.14:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: match!!
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+  auto inner_input_factory = TestDataInputBoolFactory("foo");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
+
+  auto match_tree = factory_.create(matcher);
+  std::string error_message = absl::StrCat(
+      "Unsupported data input type: float, currently only string type is supported in map matcher");
+
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
+TEST_F(MatcherTest, TestInvalidFloatExactMapMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  exact_match_map:
+    map:
+      3.14:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: match!!
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+  auto inner_input_factory = TestDataInputBoolFactory("foo");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
+  auto match_tree = factory_.create(matcher);
+  std::string error_message = absl::StrCat(
+      "Unsupported data input type: float, currently only string type is supported in map matcher");
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
+TEST_F(MatcherTest, InvalidDataInput) {
+  const std::string yaml = R"EOF(
+matcher_list:
+  matchers:
+  - on_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: match!!
+    predicate:
+      single_predicate:
+        input:
+          name: generic
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.FloatValue
+        value_match:
+          exact: 3.14
+
+  )EOF";
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
+  auto match_tree = factory_.create(matcher);
+  std::string error_message = absl::StrCat("Unsupported data input type: float.",
+                                           " The matcher supports input type: string");
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
+TEST_F(MatcherTest, InvalidDataInputInAndMatcher) {
+  const std::string yaml = R"EOF(
+  matcher_list:
+    matchers:
+    - on_match:
+        action:
+          name: test_action
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: match!!
+      predicate:
+        and_matcher:
+          predicate:
+          - single_predicate:
+              input:
+                name: inner_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.FloatValue
+              value_match:
+                exact: 3.14
+          - single_predicate:
+              input:
+                name: inner_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.FloatValue
+              value_match:
+                exact: 3.14
+
+  )EOF";
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"))
+      .Times(2);
+
+  std::string error_message = absl::StrCat("Unsupported data input type: float.",
+                                           " The matcher supports input type: string");
+  EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException, error_message);
+}
+
 TEST_F(MatcherTest, TestAnyMatcher) {
   const std::string yaml = R"EOF(
 on_no_match:

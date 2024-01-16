@@ -12,11 +12,14 @@
 namespace Envoy {
 namespace Quic {
 
+// Limits the max number of sockets created.
+constexpr uint8_t kMaxNumSocketSwitches = 5;
+
 class PacketsToReadDelegate {
 public:
   virtual ~PacketsToReadDelegate() = default;
 
-  virtual size_t numPacketsExpectedPerEventLoop() PURE;
+  virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };
 
 // A client QuicConnection instance managing its own file events.
@@ -24,6 +27,29 @@ class EnvoyQuicClientConnection : public quic::QuicConnection,
                                   public QuicNetworkConnection,
                                   public Network::UdpPacketProcessor {
 public:
+  // Holds all components needed for a QUIC connection probing/migration.
+  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
+  public:
+    EnvoyQuicPathValidationContext(const quic::QuicSocketAddress& self_address,
+                                   const quic::QuicSocketAddress& peer_address,
+                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
+                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
+
+    ~EnvoyQuicPathValidationContext() override;
+
+    quic::QuicPacketWriter* WriterToUse() override;
+
+    EnvoyQuicPacketWriter* releaseWriter();
+
+    Network::ConnectionSocket& probingSocket();
+
+    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
+
+  private:
+    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+    Network::ConnectionSocketPtr socket_;
+  };
+
   // A connection socket will be created with given |local_addr|. If binding
   // port not provided in |local_addr|, pick up a random port.
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
@@ -55,7 +81,7 @@ public:
   }
   size_t numPacketsExpectedPerEventLoop() const override {
     if (delegate_.has_value()) {
-      return delegate_.value().get().numPacketsExpectedPerEventLoop();
+      return delegate_->numPacketsExpectedPerEventLoop();
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
@@ -82,30 +108,12 @@ public:
 
   void setNumPtosForPortMigration(uint32_t num_ptos_for_path_degrading);
 
+  // Probes the given peer address. If the probing succeeds, start sending packets to this address
+  // instead.
+  void
+  probeAndMigrateToServerPreferredAddress(const quic::QuicSocketAddress& server_preferred_address);
+
 private:
-  // Holds all components needed for a QUIC connection probing/migration.
-  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
-  public:
-    EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address,
-                                   quic::QuicSocketAddress& peer_address,
-                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
-                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
-
-    ~EnvoyQuicPathValidationContext() override;
-
-    quic::QuicPacketWriter* WriterToUse() override;
-
-    EnvoyQuicPacketWriter* releaseWriter();
-
-    Network::ConnectionSocket& probingSocket();
-
-    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
-
-  private:
-    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
-    Network::ConnectionSocketPtr socket_;
-  };
-
   // Receives notifications from the Quiche layer on path validation results.
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
   public:
@@ -131,10 +139,14 @@ private:
 
   void maybeMigratePort();
 
+  void probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+                        quic::PathValidationReason reason);
+
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
   bool migrate_port_on_path_degrading_{false};
+  uint8_t num_socket_switches_{0};
 };
 
 } // namespace Quic

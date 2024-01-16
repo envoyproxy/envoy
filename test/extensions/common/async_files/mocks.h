@@ -1,3 +1,5 @@
+#pragma once
+
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
@@ -103,6 +105,17 @@ public:
               (const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
                Api::OsSysCalls* substitute_posix_file_operations));
 };
+
+// Add deduction guides for comping with the ctad-maybe-unsupported warning
+TypedMockAsyncFileAction(std::function<void(absl::Status)>)
+    ->TypedMockAsyncFileAction<std::function<void(absl::Status)>>;
+TypedMockAsyncFileAction(std::function<void(absl::StatusOr<Buffer::InstancePtr>)>)
+    ->TypedMockAsyncFileAction<std::function<void(absl::StatusOr<Buffer::InstancePtr>)>>;
+TypedMockAsyncFileAction(std::function<void(absl::StatusOr<size_t>)>)
+    ->TypedMockAsyncFileAction<std::function<void(absl::StatusOr<size_t>)>>;
+TypedMockAsyncFileAction(std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>)
+    ->TypedMockAsyncFileAction<
+        std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>>;
 
 } // namespace AsyncFiles
 } // namespace Common

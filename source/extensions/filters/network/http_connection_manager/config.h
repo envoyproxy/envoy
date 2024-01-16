@@ -18,7 +18,8 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
-#include "envoy/tracing/http_tracer_manager.h"
+#include "envoy/router/scopes.h"
+#include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/filter/config_discovery_impl.h"
@@ -26,6 +27,7 @@
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/date_provider_impl.h"
 #include "source/common/http/dependency_manager.h"
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -107,15 +109,15 @@ public:
 
     // TODO: cleanup isInternalAddress and default to initializing cidr_ranges_
     // based on RFC1918 / RFC4193, if config is unset.
-    if (cidr_ranges_.getIpListSize() != 0 && address.type() == Network::Address::Type::Ip) {
-      return cidr_ranges_.contains(address);
+    if (cidr_ranges_->getIpListSize() != 0 && address.type() == Network::Address::Type::Ip) {
+      return cidr_ranges_->contains(address);
     }
     return Network::Utility::isInternalAddress(address);
   }
 
 private:
   const bool unix_sockets_;
-  const Network::Address::IpList cidr_ranges_;
+  std::unique_ptr<Network::Address::IpList> cidr_ranges_;
 };
 
 /**
@@ -131,13 +133,14 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager,
+      Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager, bool = false) const override;
-  using FilterFactoriesList =
-      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
+  bool createFilterChain(
+      Http::FilterChainManager& manager, bool = false,
+      const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
+  using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
@@ -151,9 +154,17 @@ public:
     return request_id_extension_;
   }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
+    return flush_log_on_tunnel_successfully_established_;
+  }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+    return access_log_flush_interval_;
+  }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
@@ -181,6 +192,9 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_routes_config_provider_.get();
   }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    return scope_key_builder_ ? *scope_key_builder_ : OptRef<const Router::ScopeKeyBuilder>{};
+  }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
@@ -200,7 +214,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
-  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
+  Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
     return tracing_config_.get();
   }
@@ -239,27 +253,23 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
+  Http::ServerHeaderValidatorPtr
+  makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
 #ifdef ENVOY_ENABLE_UHV
-    return header_validator_factory_
-               ? header_validator_factory_->create(protocol, getHeaderValidatorStats(protocol))
-               : nullptr;
+    return header_validator_factory_ ? header_validator_factory_->createServerHeaderValidator(
+                                           protocol, getHeaderValidatorStats(protocol))
+                                     : nullptr;
 #else
     return nullptr;
 #endif
   }
   bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
+  bool addProxyProtocolConnectionState() const override {
+    return add_proxy_protocol_connection_state_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  void
-  processDynamicFilterConfig(const std::string& name,
-                             const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-                             FilterFactoriesList& filter_factories,
-                             const std::string& filter_chain_type,
-                             bool last_filter_in_current_config);
-  void createFilterChainForFactories(Http::FilterChainManager& manager,
-                                     const FilterFactoriesList& filter_factories);
 
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 
@@ -276,6 +286,9 @@ private:
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  bool flush_access_log_on_new_request_;
+  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
+  bool flush_log_on_tunnel_successfully_established_{false};
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
@@ -300,7 +313,7 @@ private:
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   absl::optional<std::string> scheme_to_set_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
+  Tracing::TracerSharedPtr tracer_{std::make_shared<Tracing::NullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
@@ -312,6 +325,9 @@ private:
   std::chrono::milliseconds request_timeout_;
   std::chrono::milliseconds request_headers_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;
+  // used to get scope key, then scoped_routes_config_provider_ should be used to get the scoped
+  // routes
+  Router::ScopeKeyBuilderPtr scope_key_builder_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
@@ -344,6 +360,7 @@ private:
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
   const bool append_x_forwarded_port_;
+  const bool add_proxy_protocol_connection_state_;
 };
 
 /**
@@ -351,11 +368,11 @@ private:
  */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
+  static std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+  createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
-      bool clear_hop_by_hop_headers);
+      Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
 };
 
 /**
@@ -367,7 +384,7 @@ public:
     std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
     Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
     Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
-    Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
+    Tracing::TracerManagerSharedPtr tracer_manager_;
     std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
   };
 
@@ -395,7 +412,7 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager,
+      Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 };
 

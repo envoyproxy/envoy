@@ -13,12 +13,13 @@ namespace Formatter {
 class TestFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class TestCommandParser : public CommandParser {
@@ -29,7 +30,9 @@ public:
 
 class TestCommandFactory : public CommandParserFactory {
 public:
-  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override;
+  CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message&,
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
@@ -38,12 +41,13 @@ public:
 class AdditionalFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class AdditionalCommandParser : public CommandParser {
@@ -54,7 +58,9 @@ public:
 
 class AdditionalCommandFactory : public CommandParserFactory {
 public:
-  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override;
+  CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message&,
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
@@ -62,7 +68,9 @@ public:
 
 class FailCommandFactory : public CommandParserFactory {
 public:
-  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override;
+  CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message&,
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;

@@ -66,7 +66,7 @@ public:
         codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", method},
                                                                    {":path", "/test/long/url"},
                                                                    {":scheme", "http"},
-                                                                   {":authority", "host"}});
+                                                                   {":authority", "sni.lyft.com"}});
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     AssertionResult result =
@@ -86,7 +86,7 @@ public:
         Http::TestRequestHeaderMapImpl{{":method", method},
                                        {":path", "/test/long/url"},
                                        {":scheme", "http"},
-                                       {":authority", "host"}});
+                                       {":authority", "sni.lyft.com"}});
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -118,7 +118,7 @@ public:
 
   // TODO(htuch): This might require scaling for TSAN/ASAN/Valgrind/etc. Bump if
   // this is the cause of flakes.
-  static constexpr uint64_t IdleTimeoutMs = 400;
+  static constexpr uint64_t IdleTimeoutMs = 300 * TSAN_TIMEOUT_FACTOR;
   static constexpr uint64_t RequestTimeoutMs = 200;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
@@ -489,8 +489,8 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
-  // Omitting \r\n\r\n does not indicate incomplete request in HTTP2
-  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
+  // Omitting \r\n\r\n does not indicate incomplete request in HTTP2/3
+  if (downstreamProtocol() != Envoy::Http::CodecType::HTTP1) {
     return;
   }
   enable_request_timeout_ = true;
@@ -503,7 +503,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequestWithHeaders) {
-  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Envoy::Http::CodecType::HTTP1) {
     return;
   }
   enable_request_timeout_ = true;

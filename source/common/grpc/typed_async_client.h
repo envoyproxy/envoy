@@ -50,6 +50,7 @@ public:
   }
   bool operator==(RawAsyncStream* stream) const { return stream_ == stream; }
   bool operator!=(RawAsyncStream* stream) const { return stream_ != stream; }
+  const StreamInfo::StreamInfo& streamInfo() const { return stream_->streamInfo(); }
 
 private:
   RawAsyncStream* stream_{};

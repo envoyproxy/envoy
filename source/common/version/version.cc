@@ -12,6 +12,10 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
+#ifdef ENVOY_SSL_FIPS
+#include "openssl/crypto.h"
+#endif
+
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
 
@@ -38,6 +42,7 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
 
 bool VersionInfo::sslFipsCompliant() {
 #ifdef ENVOY_SSL_FIPS
+  RELEASE_ASSERT(FIPS_mode() == 1, "FIPS mode must be enabled in Envoy FIPS configuration.");
   return true;
 #else
   return false;

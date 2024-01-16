@@ -65,6 +65,8 @@ envoy_cc_library(
         ],
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     ),
+    external_deps = ["ssl"],
+    tags = ["notidy"],
     deps = [
         ":version_includes",
         "//source/common/common:macros",

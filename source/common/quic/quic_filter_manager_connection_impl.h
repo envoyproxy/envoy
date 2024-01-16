@@ -51,15 +51,28 @@ public:
     IS_ENVOY_BUG("unexpected call to addBytesSentCallback");
   }
   void enableHalfClose(bool enabled) override;
-  bool isHalfCloseEnabled() override;
+  bool isHalfCloseEnabled() const override;
   void close(Network::ConnectionCloseType type) override;
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  void close(Network::ConnectionCloseType type, absl::string_view details) override {
+    if (!details.empty()) {
+      local_close_reason_ = std::string(details);
+    }
+    close(type);
+  }
+
+  Network::DetectedCloseType detectedCloseType() const override {
+    return Network::DetectedCloseType::Normal;
+  }
+  Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   // No-op. TCP_NODELAY doesn't apply to UDP.
   void noDelay(bool /*enable*/) override {}
   // Neither readDisable nor detectEarlyCloseWhenReadDisabled are supported for QUIC.
   // Crash in debug mode if they are called.
-  void readDisable(bool /*disable*/) override { IS_ENVOY_BUG("Unexpected call to readDisable"); }
+  ReadDisableStatus readDisable(bool /*disable*/) override {
+    IS_ENVOY_BUG("Unexpected call to readDisable");
+    return ReadDisableStatus::NoTransition;
+  }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {
     IS_ENVOY_BUG("Unexpected call to detectEarlyCloseWhenReadDisabled");
   }
@@ -158,12 +171,16 @@ public:
     max_headers_count_ = max_headers_count;
   }
 
+  bool fix_quic_lifetime_issues() const { return fix_quic_lifetime_issues_; }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
                               quic::ConnectionCloseSource source,
                               const quic::ParsedQuicVersion& version);
 
+  // Apply delay close policy if there is any.
+  void maybeApplyDelayedClose();
   void closeConnectionImmediately() override;
 
   virtual bool hasDataToWrite() PURE;
@@ -192,10 +209,10 @@ private:
   // Called when aggregated buffered bytes across all the streams declines to low watermark.
   void onSendBufferLowWatermark();
 
-  // Currently ConnectionManagerImpl is the one and only filter. If more network
-  // filters are added, ConnectionManagerImpl should always be the last one.
-  // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
-  // and the rest incoming data bypasses these filters.
+  // ConnectionManagerImpl should always be the last filter. Its onRead() is only called once to
+  // trigger ReadFilter::onNewConnection() and the rest incoming data bypasses these filters.
+  // It has the same life time as this connection, so do all the filters. If the connection gets
+  // defer-deleted, they will be defer-deleted together.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
@@ -209,6 +226,7 @@ private:
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
   absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
+  bool fix_quic_lifetime_issues_{false};
 };
 
 } // namespace Quic

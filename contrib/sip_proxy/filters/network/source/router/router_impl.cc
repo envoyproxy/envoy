@@ -137,6 +137,29 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
   std::string host;
   QueryStatus ret = QueryStatus::Stop;
 
+  auto handle_no_query = [&]() {
+    auto header_type = HeaderType::Route;
+
+    if (metadata->header(HeaderType::Route).empty()) {
+      header_type = HeaderType::TopLine;
+    }
+
+    if (!header.empty()) {
+      header_type = HeaderTypes::get().str2Header(header);
+    }
+
+    metadata->parseHeader(header_type);
+    if (metadata->header(header_type).hasParam(type)) {
+      host = std::string(metadata->header(header_type).param(type));
+    }
+
+    if (!host.empty()) {
+      return QueryStatus::Continue;
+    } else {
+      return QueryStatus::Stop;
+    }
+  };
+
   if (type == "ep") {
     // For REGISTER, ep comes from Authorization header with opaque, and opaque is set when parse
     // Authorization
@@ -144,23 +167,7 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
       host = std::string(metadata->opaque().value());
     } else {
       // Handler other Requests except REGISTER
-      if (metadata->header(HeaderType::Route).empty()) {
-        metadata->parseHeader(HeaderType::TopLine);
-        if (metadata->header(HeaderType::TopLine).hasParam("ep")) {
-          host = std::string(metadata->header(HeaderType::TopLine).param("ep"));
-        }
-      } else {
-        metadata->parseHeader(HeaderType::Route);
-        if (metadata->header(HeaderType::Route).hasParam("ep")) {
-          host = std::string(metadata->header(HeaderType::Route).param("ep"));
-        }
-      }
-    }
-
-    if (!host.empty()) {
-      ret = QueryStatus::Continue;
-    } else {
-      ret = QueryStatus::Stop;
+      ret = handle_no_query();
     }
   } else if (type == "text") {
     auto header_type = HeaderTypes::get().str2Header(header);
@@ -168,6 +175,10 @@ QueryStatus Router::handleCustomizedAffinity(const std::string& header, const st
     ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(
         header, std::string(metadata->header(header_type).text()), metadata->traContext(),
         *callbacks_, host);
+  } else if (!(metadata->affinityIteration()->query())) {
+    // query == false, eg. inst-ip=192.168.0.1, use value as host;
+    // query == true, eg. lskpmc=S2F3, use value as key to query local cache or TRA.
+    ret = handle_no_query();
   } else {
     ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(
         type, key, metadata->traContext(), *callbacks_, host);
@@ -267,9 +278,9 @@ FilterStatus Router::handleAffinity() {
       }
     }
 
-    // NOTE: After constructed metadata->affinity(), must invoke metadata->resetAffinityIteration()
-    // to set the iterator correctly. otherwise affinityIteration can't point to the changed
-    // affinity correctly.
+    // NOTE: After constructed metadata->affinity(), must invoke
+    // metadata->resetAffinityIteration() to set the iterator correctly. otherwise
+    // affinityIteration can't point to the changed affinity correctly.
     metadata->resetAffinityIteration();
   }
 
@@ -392,35 +403,43 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   if (!metadata->affinity().empty() &&
       metadata->affinityIteration() != metadata->affinity().end()) {
     std::string host;
-    metadata->resetDestination();
 
     ENVOY_STREAM_LOG(debug, "handle affinity of header:{} type:{} key:{}", *callbacks_,
                      metadata->affinityIteration()->header(), metadata->affinityIteration()->type(),
                      metadata->affinityIteration()->key());
-    auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header(),
-                                               metadata->affinityIteration()->type(),
-                                               metadata->affinityIteration()->key(), metadata);
 
-    if (QueryStatus::Continue == handle_ret) {
-      // has already get the destination from affinity
+    if (!metadata->destination().empty()) {
+      // TRA query get result, and set destintion.
       host = metadata->destination();
-      ENVOY_STREAM_LOG(debug, "has already get destination {} from affinity", *callbacks_, host);
-    } else if (QueryStatus::Pending == handle_ret) {
-      ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_,
-                       metadata->affinityIteration()->key());
-      // Need to wait remote query response,
-      // after response back, still back with current affinity
-      metadata->setState(State::HandleAffinity);
-      return FilterStatus::StopIteration;
+      ENVOY_STREAM_LOG(debug, "has already set destination {} from affinity", *callbacks_, host);
     } else {
-      ENVOY_STREAM_LOG(debug, "no existing destintion for {}", *callbacks_,
-                       metadata->affinityIteration()->key());
-      // Need to try next affinity
-      metadata->nextAffinityIteration();
-      metadata->setState(State::HandleAffinity);
-      return FilterStatus::Continue;
+      auto handle_ret = handleCustomizedAffinity(metadata->affinityIteration()->header(),
+                                                 metadata->affinityIteration()->type(),
+                                                 metadata->affinityIteration()->key(), metadata);
+
+      if (QueryStatus::Continue == handle_ret) {
+        // has already get the destination from affinity
+        host = metadata->destination();
+        ENVOY_STREAM_LOG(debug, "has already get destination {} from affinity", *callbacks_, host);
+      } else if (QueryStatus::Pending == handle_ret) {
+        ENVOY_STREAM_LOG(debug, "do remote query for {}", *callbacks_,
+                         metadata->affinityIteration()->key());
+        // Need to wait remote query response,
+        // after response back, still back with current affinity
+        metadata->setState(State::HandleAffinity);
+        return FilterStatus::StopIteration;
+      } else {
+        ENVOY_STREAM_LOG(debug, "no existing destintion for {}", *callbacks_,
+                         metadata->affinityIteration()->key());
+        // Need to try next affinity
+        metadata->nextAffinityIteration();
+        metadata->setState(State::HandleAffinity);
+        return FilterStatus::Continue;
+      }
     }
 
+    // Already get destintion for current affinity, try to get or create new connection for this
+    // destination. If this destintion is invalid, try next affinity.
     if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
         upstream_request != nullptr) {
       // There is action connection, reuse it.
@@ -466,7 +485,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       return messageHandlerWithLoadBalancer(transaction_info, metadata, "",
                                             upstream_request_started);
     } else {
-      ENVOY_STREAM_LOG(debug, "no destination without load balance", *callbacks_);
+      ENVOY_STREAM_LOG(debug, "no destination and stop load balance", *callbacks_);
       throw AppException(AppExceptionType::UnknownMethod, "envoy no endpoint found");
       return FilterStatus::StopIteration;
     }

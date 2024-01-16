@@ -16,10 +16,7 @@ Encoder::Encoder() = default;
 
 void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& output) {
   output[0] = flags;
-  output[1] = static_cast<uint8_t>(length >> 24);
-  output[2] = static_cast<uint8_t>(length >> 16);
-  output[3] = static_cast<uint8_t>(length >> 8);
-  output[4] = static_cast<uint8_t>(length);
+  absl::big_endian::Store32(&output[1], length);
 }
 
 void Encoder::prependFrameHeader(uint8_t flags, Buffer::Instance& buffer) {
@@ -74,7 +71,8 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
   uint64_t delta = 0;
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
-    for (uint64_t j = 0; j < slice.len_;) {
+    uint8_t* end = mem + slice.len_;
+    while (mem < end) {
       uint8_t c = *mem;
       switch (state_) {
       case State::FhFlag:
@@ -85,28 +83,25 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         delta += 1;
         state_ = State::FhLen0;
         mem++;
-        j++;
         break;
       case State::FhLen0:
-        length_ = static_cast<uint32_t>(c) << 24;
+        length_as_bytes_[0] = c;
         state_ = State::FhLen1;
         mem++;
-        j++;
         break;
       case State::FhLen1:
-        length_ |= static_cast<uint32_t>(c) << 16;
+        length_as_bytes_[1] = c;
         state_ = State::FhLen2;
         mem++;
-        j++;
         break;
       case State::FhLen2:
-        length_ |= static_cast<uint32_t>(c) << 8;
+        length_as_bytes_[2] = c;
         state_ = State::FhLen3;
         mem++;
-        j++;
         break;
       case State::FhLen3:
-        length_ |= static_cast<uint32_t>(c);
+        length_as_bytes_[3] = c;
+        length_ = absl::big_endian::Load32(length_as_bytes_);
         frameDataStart();
         if (length_ == 0) {
           frameDataEnd();
@@ -115,19 +110,16 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
           state_ = State::Data;
         }
         mem++;
-        j++;
         break;
       case State::Data:
-        uint64_t remain_in_buffer = slice.len_ - j;
+        uint64_t remain_in_buffer = end - mem;
         if (remain_in_buffer <= length_) {
           frameData(mem, remain_in_buffer);
           mem += remain_in_buffer;
-          j += remain_in_buffer;
           length_ -= remain_in_buffer;
         } else {
           frameData(mem, length_);
           mem += length_;
-          j += length_;
           length_ = 0;
         }
         if (length_ == 0) {

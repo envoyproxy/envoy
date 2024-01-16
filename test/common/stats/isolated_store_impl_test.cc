@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -34,6 +35,7 @@ protected:
 };
 
 TEST_F(StatsIsolatedStoreImplTest, All) {
+  EXPECT_TRUE(store_->fixedTags().empty());
   ScopeSharedPtr scope1 = scope_->createScope("scope1.");
   Counter& c1 = scope_->counterFromString("c1");
   Counter& c2 = scope1->counterFromString("c2");
@@ -187,6 +189,79 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(4UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->gauges().size());
   EXPECT_EQ(2UL, store_->textReadouts().size());
+}
+
+TEST_F(StatsIsolatedStoreImplTest, CounterWithTag) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
+  StatNameTagVector tags2{{makeStatName("tag1"), makeStatName("tag1Value2")}};
+  StatName base = makeStatName("counter");
+  Counter& c1 = scope_->counterFromStatNameWithTags(base, tags);
+  Counter& c2 = scope_->counterFromStatNameWithTags(base, tags2);
+  EXPECT_EQ("counter.tag1.tag1Value", c1.name());
+  EXPECT_EQ("counter", c1.tagExtractedName());
+  EXPECT_THAT(c1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
+  EXPECT_EQ("counter.tag1.tag1Value2", c2.name());
+  EXPECT_EQ("counter", c2.tagExtractedName());
+  EXPECT_THAT(c2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
+  // Verify that counterFromStatNameWithTags with the same params returns
+  // the existing stat object.
+  EXPECT_EQ(&c1, &scope_->counterFromStatNameWithTags(base, tags));
+}
+
+TEST_F(StatsIsolatedStoreImplTest, GaugeWithTags) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")},
+                         {makeStatName("tag2"), makeStatName("tag2Value")}};
+  // tags2 being a subset of tags to ensure no collision in that case.
+  StatNameTagVector tags2{{makeStatName("tag2"), makeStatName("tag2Value")}};
+  StatName base = makeStatName("gauge");
+  Gauge& g1 = scope_->gaugeFromStatNameWithTags(base, tags, Gauge::ImportMode::Accumulate);
+  Gauge& g2 = scope_->gaugeFromStatNameWithTags(base, tags2, Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("gauge.tag1.tag1Value.tag2.tag2Value", g1.name());
+  EXPECT_EQ("gauge", g1.tagExtractedName());
+  EXPECT_THAT(g1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}, Tag{"tag2", "tag2Value"}));
+  EXPECT_EQ("gauge.tag2.tag2Value", g2.name());
+  EXPECT_EQ("gauge", g2.tagExtractedName());
+  EXPECT_THAT(g2.tags(), testing::ElementsAre(Tag{"tag2", "tag2Value"}));
+  // Verify that gaugeFromStatNameWithTags with the same params returns
+  // the existing stat object.
+  EXPECT_EQ(&g1, &scope_->gaugeFromStatNameWithTags(base, tags, Gauge::ImportMode::Accumulate));
+}
+
+TEST_F(StatsIsolatedStoreImplTest, TextReadoutWithTag) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
+  StatNameTagVector tags2{{makeStatName("tag1"), makeStatName("tag1Value2")}};
+  StatName base = makeStatName("textreadout");
+  TextReadout& b1 = scope_->textReadoutFromStatNameWithTags(base, tags);
+  TextReadout& b2 = scope_->textReadoutFromStatNameWithTags(base, tags2);
+  EXPECT_EQ("textreadout.tag1.tag1Value", b1.name());
+  EXPECT_EQ("textreadout", b1.tagExtractedName());
+  EXPECT_THAT(b1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
+  EXPECT_EQ("textreadout.tag1.tag1Value2", b2.name());
+  EXPECT_EQ("textreadout", b2.tagExtractedName());
+  EXPECT_THAT(b2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
+  // Verify that textReadoutFromStatNameWithTags with the same params returns
+  // the existing stat object.
+  EXPECT_EQ(&b1, &scope_->textReadoutFromStatNameWithTags(base, tags));
+}
+
+TEST_F(StatsIsolatedStoreImplTest, HistogramWithTag) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
+  StatNameTagVector tags2{{makeStatName("tag1"), makeStatName("tag1Value2")}};
+  StatName base = makeStatName("histogram");
+  Histogram& h1 =
+      scope_->histogramFromStatNameWithTags(base, tags, Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 =
+      scope_->histogramFromStatNameWithTags(base, tags2, Stats::Histogram::Unit::Unspecified);
+  EXPECT_EQ("histogram.tag1.tag1Value", h1.name());
+  EXPECT_EQ("histogram", h1.tagExtractedName());
+  EXPECT_THAT(h1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
+  EXPECT_EQ("histogram.tag1.tag1Value2", h2.name());
+  EXPECT_EQ("histogram", h2.tagExtractedName());
+  EXPECT_THAT(h2.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value2"}));
+  // Verify that histogramFromStatNameWithTags with the same params returns
+  // the existing stat object.
+  EXPECT_EQ(
+      &h1, &scope_->histogramFromStatNameWithTags(base, tags, Stats::Histogram::Unit::Unspecified));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, ConstSymtabAccessor) {

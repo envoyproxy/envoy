@@ -52,11 +52,11 @@ std::string buildServiceName(const std::string& name, const std::string& proto,
   if (name[0] != '_') {
     result += "_";
   }
-  result += name + ".";
+  absl::StrAppend(&result, name, ".");
   if (proto[0] != '_') {
     result += "_";
   }
-  result += proto + '.' + domain;
+  absl::StrAppend(&result, proto, ".", domain);
   return result;
 }
 

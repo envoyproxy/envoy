@@ -69,7 +69,7 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
   InSequence s;
 
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
+  ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](Event::PostCb cb) { cb(); }));
 
   auto manager = ThreadSafeCallbackManager::create();
 
@@ -98,7 +98,7 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
 // and can be destructed without error.
 TEST_F(ThreadSafeCallbackManagerTest, DestroyManagerBeforeHandle) {
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
+  ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](Event::PostCb cb) { cb(); }));
 
   CallbackHandlePtr handle;
   {
@@ -118,12 +118,12 @@ TEST_F(ThreadSafeCallbackManagerTest, RegisterAndRemoveOnExpiredThread) {
   auto manager = ThreadSafeCallbackManager::create();
 
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
+  ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](Event::PostCb cb) { cb(); }));
 
   // Register a callback in a new thread and then remove it
   auto t = std::thread([this, manager = manager.get()] {
     testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-    ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
+    ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](Event::PostCb cb) { cb(); }));
 
     auto handle = manager->add(cb_dispatcher, [this]() { called(20); });
     handle.reset();

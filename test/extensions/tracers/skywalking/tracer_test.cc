@@ -61,7 +61,7 @@ protected:
   NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
       context_.server_factory_context_.api_.random_;
   Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
-  NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
+  NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.store_;
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
   std::string test_string = "ABCDEFGHIJKLMN";
   SkyWalkingTracerStatsSharedPtr tracing_stats_{
@@ -152,8 +152,8 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     // child span (EXIT span).
     EXPECT_EQ(span->spanEntity()->operationName(), first_child_span->spanEntity()->operationName());
 
-    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"},
-                                                       {":path", "/upstream/path"}};
+    Tracing::TestTraceContextImpl first_child_headers{{":authority", "test.com"},
+                                                      {":path", "/upstream/path"}};
     Upstream::HostDescriptionConstSharedPtr host{
         new testing::NiceMock<Upstream::MockHostDescription>()};
 
@@ -162,7 +162,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     // request.
     EXPECT_EQ("/upstream/path", first_child_span->spanEntity()->operationName());
 
-    auto sp = createSpanContext(first_child_headers.get_("sw8"));
+    auto sp = createSpanContext(std::string(first_child_headers.get("sw8").value()));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
     EXPECT_EQ("/downstream/path", sp->endpoint());
@@ -189,10 +189,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ(span->spanEntity()->operationName(),
               second_child_span->spanEntity()->operationName());
 
-    Http::TestRequestHeaderMapImpl second_child_headers{{":authority", "test.com"}};
+    Tracing::TestTraceContextImpl second_child_headers{{":authority", "test.com"}};
 
     second_child_span->injectContext(second_child_headers, nullptr);
-    auto sp = createSpanContext(second_child_headers.get_("sw8"));
+    auto sp = createSpanContext(std::string(second_child_headers.get("sw8").value()));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
     EXPECT_EQ("/downstream/path", sp->endpoint());

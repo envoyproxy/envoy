@@ -83,7 +83,6 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   auto& http_async_client = thread_local_cluster->httpAsyncClient();
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
-
   if (stream_ == nullptr) {
     callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
     http_reset_ = true;
@@ -96,9 +95,8 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
-  // TODO(cpakulski): Find a better way to access requestHeaders after runtime guard
-  // envoy_reloadable_features_unified_header_formatter runtime guard is deprecated and
-  // request headers are not stored in stream_info.
+  // TODO(cpakulski): Find a better way to access requestHeaders
+  // request headers should not be stored in stream_info.
   // Maybe put it to parent_context?
   // Since request headers may be empty, consider using Envoy::OptRef.
   parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
@@ -125,6 +123,7 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
       // TODO(mattklein123): clang-tidy is showing a use after move when passing to
       // onReceiveInitialMetadata() above. This looks like an actual bug that I will fix in a
       // follow up.
+      // NOLINTNEXTLINE(bugprone-use-after-move)
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
@@ -196,10 +195,6 @@ void AsyncStreamImpl::onReset() {
   streamError(Status::WellKnownGrpcStatus::Internal);
 }
 
-void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
-  stream_->sendData(*Common::serializeToGrpcFrame(request), end_stream);
-}
-
 void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stream) {
   Common::prependGrpcFrameHeader(*buffer);
   stream_->sendData(*buffer, end_stream);
@@ -260,7 +255,8 @@ void AsyncRequestImpl::cancel() {
 }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata, nullptr);
+  Tracing::HttpTraceContext trace_context(metadata);
+  current_span_->injectContext(trace_context, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

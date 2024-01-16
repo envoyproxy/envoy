@@ -93,7 +93,7 @@ public:
     Network::ReadFilterCallbacks* read_callbacks_{};
   };
 
-  // Helper read filter inserted into downstream filter chain. The filter reacts to
+  // Helper read filter inserted into downstream network filter chain. The filter reacts to
   // SwitchViaFilterManager string and signals to the filter manager to signal to the terminal
   // filter to switch upstream connection to secure mode.
   struct DownstreamReadFilter : public Network::ReadFilter {
@@ -180,8 +180,8 @@ public:
       // Inject two filters into downstream connection: first is helper read filter and then
       // terminal filter.
       filter_manager.addReadFilter(std::make_shared<StartTlsSwitchFilter::DownstreamReadFilter>());
-      filter_manager.addReadFilter(
-          StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
+      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(
+          context.serverFactoryContext().clusterManager(), upstream_callbacks_));
     };
   }
 
@@ -269,13 +269,13 @@ void StartTlsIntegrationTest::initialize() {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), downstream_tls_context);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(*api_));
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       downstream_tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
-          std::move(cfg), *tls_context_manager_, *client_stats_store, {})};
+          std::move(cfg), *tls_context_manager_, *client_stats_store->rootScope(), {})};
 
   BaseIntegrationTest::initialize();
 }

@@ -1,5 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -60,8 +60,6 @@ py_test(
         "//tools/testdata/api_proto_breaking_change_detector:proto_breaking_change_detector_testdata",
     ],
     main = "detector_test.py",
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["manual"],
     deps = [
         ":detector",

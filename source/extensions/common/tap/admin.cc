@@ -55,12 +55,11 @@ Http::Code AdminHandler::handler(Http::HeaderMap&, Buffer::Instance& response,
   }
 
   envoy::admin::v3::TapRequest tap_request;
-  try {
+  TRY_NEEDS_AUDIT {
     MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request,
                                          ProtobufMessage::getStrictValidationVisitor());
-  } catch (EnvoyException& e) {
-    return badRequest(response, e.what());
   }
+  END_TRY catch (EnvoyException& e) { return badRequest(response, e.what()); }
 
   ENVOY_LOG(debug, "tap admin request for config_id={}", tap_request.config_id());
   if (config_id_map_.count(tap_request.config_id()) == 0) {

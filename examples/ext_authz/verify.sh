@@ -13,8 +13,8 @@ responds_with_header \
     "http://localhost:${PORT_PROXY}/service"
 
 run_log "Restart front-envoy with FRONT_ENVOY_YAML=config/http-service.yaml"
-"$DOCKER_COMPOSE" down
-FRONT_ENVOY_YAML=config/http-service.yaml "$DOCKER_COMPOSE" up -d
+"${DOCKER_COMPOSE[@]}" down
+FRONT_ENVOY_YAML=config/http-service.yaml "${DOCKER_COMPOSE[@]}" up -d
 
 wait_for 15 bash -c "\
          responds_with_header \
@@ -34,8 +34,8 @@ responds_with_header \
     "http://localhost:${PORT_PROXY}/service"
 
 run_log "Restart front-envoy with FRONT_ENVOY_YAML=config/opa-service/v3.yaml"
-"$DOCKER_COMPOSE" down
-FRONT_ENVOY_YAML=config/opa-service/v3.yaml "$DOCKER_COMPOSE" up -d
+"${DOCKER_COMPOSE[@]}" down
+FRONT_ENVOY_YAML=config/opa-service/v3.yaml "${DOCKER_COMPOSE[@]}" up -d
 wait_for 15 bash -c "\
          responds_with_header \
          'HTTP/1.1 200 OK' \
@@ -47,7 +47,7 @@ responds_with_header \
     "http://localhost:${PORT_PROXY}/service"
 
 run_log "Check OPA logs"
-"$DOCKER_COMPOSE" logs ext_authz-opa-service | grep decision_id -A 30
+"${DOCKER_COMPOSE[@]}" logs ext_authz-opa-service | grep decision_id -A 30
 
 run_log "Check OPA service rejects POST"
 responds_with_header \

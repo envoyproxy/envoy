@@ -18,8 +18,9 @@
 namespace Envoy {
 namespace Config {
 
-using ConstMetadataSharedPoolSharedPtr = std::shared_ptr<
-    SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>;
+using ConstMetadataSharedPoolSharedPtr =
+    std::shared_ptr<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata,
+                                                 MessageUtil, MessageUtil>>;
 
 /**
  * MetadataKey presents the key name and path to retrieve value from metadata.
@@ -139,6 +140,20 @@ protected:
 
   absl::node_hash_map<std::string, std::unique_ptr<const TypedMetadata::Object>> data_;
 };
+
+// MetadataPack is struct that contains both the proto and typed metadata.
+template <class FactoryClass> struct MetadataPack {
+  MetadataPack(const envoy::config::core::v3::Metadata& metadata)
+      : proto_metadata_(metadata), typed_metadata_(proto_metadata_) {}
+  MetadataPack() : proto_metadata_(), typed_metadata_(proto_metadata_) {}
+
+  const envoy::config::core::v3::Metadata proto_metadata_;
+  const TypedMetadataImpl<FactoryClass> typed_metadata_;
+};
+
+template <class FactoryClass> using MetadataPackPtr = std::unique_ptr<MetadataPack<FactoryClass>>;
+template <class FactoryClass>
+using MetadataPackSharedPtr = std::shared_ptr<MetadataPack<FactoryClass>>;
 
 } // namespace Config
 } // namespace Envoy

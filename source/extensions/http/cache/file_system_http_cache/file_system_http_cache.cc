@@ -1,7 +1,10 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
+#include <chrono>
+
 #include "source/common/filesystem/directory.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
@@ -18,6 +21,9 @@ namespace FileSystemHttpCache {
 // memory usage. Since UpdateHeaders is unlikely to be a common operation it is most likely
 // not worthwhile to carefully tune this.
 const size_t FileSystemHttpCache::max_update_headers_copy_chunk_size_ = 128 * 1024;
+
+const CacheStats& FileSystemHttpCache::stats() const { return shared_->stats_; }
+const ConfigProto& FileSystemHttpCache::config() const { return shared_->config_; }
 
 void FileSystemHttpCache::writeVaryNodeToDisk(const Key& key,
                                               const Http::ResponseHeaderMap& response_headers,
@@ -71,11 +77,20 @@ absl::string_view FileSystemHttpCache::name() {
 }
 
 FileSystemHttpCache::FileSystemHttpCache(
-    Singleton::InstanceSharedPtr owner, ConfigProto config,
-    std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
+    Singleton::InstanceSharedPtr owner, CacheEvictionThread& cache_eviction_thread,
+    ConfigProto config, std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
     Stats::Scope& stats_scope)
-    : owner_(owner), config_(config), async_file_manager_(async_file_manager),
-      stats_(generateStats(stats_scope, cachePath())) {}
+    : owner_(owner), async_file_manager_(async_file_manager),
+      shared_(std::make_shared<CacheShared>(config, stats_scope)),
+      cache_eviction_thread_(cache_eviction_thread) {
+  cache_eviction_thread_.addCache(shared_);
+}
+
+CacheShared::CacheShared(ConfigProto config, Stats::Scope& stats_scope)
+    : config_(config), stat_names_(stats_scope.symbolTable()),
+      stats_(generateStats(stat_names_, stats_scope, cachePath())) {}
+
+FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache(shared_); }
 
 CacheInfo FileSystemHttpCache::cacheInfo() const {
   CacheInfo info;
@@ -292,7 +307,7 @@ void FileSystemHttpCache::updateHeaders(const LookupContext& lookup_context,
   ctx->begin(ctx);
 }
 
-absl::string_view FileSystemHttpCache::cachePath() const { return config_.cache_path(); }
+absl::string_view FileSystemHttpCache::cachePath() const { return shared_->cachePath(); }
 
 bool FileSystemHttpCache::workInProgress(const Key& key) {
   absl::MutexLock lock(&cache_mu_);
@@ -319,6 +334,7 @@ FileSystemHttpCache::setCacheEntryToVary(const Key& key,
 }
 
 std::string FileSystemHttpCache::generateFilename(const Key& key) const {
+  // TODO(ravenblack): Add support for directory tree structure.
   return absl::StrCat("cache-", stableHashKey(key));
 }
 
@@ -333,38 +349,23 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
   return std::make_unique<FileInsertContext>(shared_from_this(), std::move(file_lookup_context));
 }
 
-void FileSystemHttpCache::init() {
-  size_bytes_ = 0;
-  size_count_ = 0;
-  for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
-    if (entry.type_ != Filesystem::FileType::Regular) {
-      continue;
-    }
-    if (!absl::StartsWith(entry.name_, "cache-")) {
-      continue;
-    }
-    size_count_++;
-    size_bytes_ += entry.size_bytes_.value_or(0);
-  }
-  stats_.size_count_.set(size_count_);
-  stats_.size_bytes_.set(size_bytes_);
-  if (config().has_max_cache_size_bytes()) {
-    stats_.size_limit_bytes_.set(config().max_cache_size_bytes().value());
-  }
-  if (config().has_max_cache_entry_count()) {
-    stats_.size_limit_count_.set(config().max_cache_entry_count().value());
+void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
+  shared_->trackFileAdded(file_size);
+  if (shared_->needsEviction()) {
+    cache_eviction_thread_.signal();
   }
 }
-
-void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
+void CacheShared::trackFileAdded(uint64_t file_size) {
   size_count_++;
   size_bytes_ += file_size;
   stats_.size_count_.inc();
   stats_.size_bytes_.add(file_size);
-  // TODO(ravenblack): potentially trigger cache cleanup operation.
 }
 
 void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
+  shared_->trackFileRemoved(file_size);
+}
+void CacheShared::trackFileRemoved(uint64_t file_size) {
   // Atomically decrement-but-clamp-at-zero the count of files in the cache.
   //
   // It is an error to try to set a gauge to less than zero, so we must actively
@@ -372,20 +373,34 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
   //
   // See comment on size_bytes and size_count in stats.h for explanation of how stat
   // values can be out of sync with the actionable cache.
-  uint64_t count = size_count_;
-  while (count > 0 && !size_count_.compare_exchange_weak(count, count - 1)) {
-  }
+  uint64_t count, size;
+  do {
+    count = size_count_;
+  } while (count > 0 && !size_count_.compare_exchange_weak(count, count - 1));
+
   stats_.size_count_.set(size_count_);
   // Atomically decrease-but-clamp-at-zero the size of files in the cache, by file_size.
   //
   // See comment above for why; the same rationale applies here.
-  uint64_t size = size_bytes_;
-  while (size >= file_size && !size_bytes_.compare_exchange_weak(size, size - file_size)) {
-  }
+  do {
+    size = size_bytes_;
+  } while (size >= file_size && !size_bytes_.compare_exchange_weak(size, size - file_size));
+
   if (size < file_size) {
     size_bytes_ = 0;
   }
   stats_.size_bytes_.set(size_bytes_);
+}
+
+bool CacheShared::needsEviction() const {
+  if (config_.has_max_cache_size_bytes() && size_bytes_ > config_.max_cache_size_bytes().value()) {
+    return true;
+  }
+  if (config_.has_max_cache_entry_count() &&
+      size_count_ > config_.max_cache_entry_count().value()) {
+    return true;
+  }
+  return false;
 }
 
 } // namespace FileSystemHttpCache

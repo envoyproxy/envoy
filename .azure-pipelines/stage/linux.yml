@@ -1,0 +1,90 @@
+parameters:
+- name: cacheTestResults
+  displayName: "Cache test results"
+  type: boolean
+  default: true
+- name: pool
+  displayName: "Agent pool"
+  type: string
+  default: envoy-x64-small
+- name: artifactSuffix
+  displayName: "Artifact suffix"
+  type: string
+  default:
+- name: runTests
+  displayName: "Run release tests"
+  type: string
+  default: true
+- name: rbe
+  displayName: "Use RBE"
+  type: boolean
+  default: true
+- name: timeoutBuild
+  displayName: "Build timeout"
+  type: number
+  default: 120
+- name: bazelBuildExtraOptions
+  type: string
+  default: ""
+- name: bazelConfigRBE
+  type: string
+  default: --config=remote-ci --config=rbe-google --jobs=$(RbeJobs)
+
+- name: managedAgent
+  type: boolean
+  default: false
+- name: tmpfsDockerDisabled
+  type: string
+  default: ''
+
+
+- name: runBuild
+  displayName: "Run build"
+  type: string
+  default: true
+
+jobs:
+- job: release
+  displayName: Build and test
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runBuild }}, 'true'))
+  timeoutInMinutes: ${{ parameters.timeoutBuild }}
+  pool: ${{ parameters.pool }}
+  steps:
+  - bash: |
+      if [[ "${{ parameters.runTests }}" == "false" ]]; then
+          CI_TARGET="release.server_only"
+      else
+          CI_TARGET="release"
+      fi
+      echo "${CI_TARGET}"
+      echo "##vso[task.setvariable variable=value;isoutput=true]${CI_TARGET}"
+    name: target
+  - template: ../ci.yml
+    parameters:
+      managedAgent: ${{ parameters.managedAgent }}
+      ciTarget: $(target.value)
+      cacheName: "release"
+      bazelConfigRBE: ${{ parameters.bazelConfigRBE }}
+      bazelBuildExtraOptions: ${{ parameters.bazelBuildExtraOptions }}
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      cacheVersion: $(cacheKeyBazel)
+      artifactSuffix: ${{ parameters.artifactSuffix }}
+      rbe: ${{ parameters.rbe }}
+      tmpfsDockerDisabled: ${{ parameters.tmpfsDockerDisabled }}
+
+- job: released
+  displayName: Complete
+  dependsOn: ["release"]
+  pool:
+    vmImage: $(agentUbuntu)
+  # This condition ensures that this (required) job passes if all of
+  # the preceeding jobs either pass or are skipped
+  # adapted from:
+  #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+  condition: and(eq(variables['Build.Reason'], 'PullRequest'), in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+  steps:
+  - checkout: none
+  - bash: |
+      echo "linux_x64 released"

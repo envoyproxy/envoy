@@ -33,7 +33,7 @@ public:
   public:
     virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
-    const absl::string_view hashKey(HostConstSharedPtr host, bool use_hostname) {
+    const absl::string_view hashKey(HostConstSharedPtr host, bool use_hostname) const {
       const ProtobufWkt::Value& val = Config::Metadata::metadataValue(
           host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
           Config::MetadataEnvoyLbKeys::get().HASH_KEY);
@@ -106,12 +106,12 @@ public:
   }
 
 protected:
-  ThreadAwareLoadBalancerBase(
-      const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
-      Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(stats, random)) {}
+  ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats,
+                              Runtime::Loader& runtime, Random::RandomGenerator& random,
+                              uint32_t healthy_panic_threshold, bool locality_weighted_balancing)
+      : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
+        factory_(new LoadBalancerFactoryImpl(stats, random)),
+        locality_weighted_balancing_(locality_weighted_balancing) {}
 
 private:
   struct PerPriorityState {
@@ -150,9 +150,8 @@ private:
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
-    LoadBalancerPtr create() override;
     // Ignore the params for the thread-aware LB.
-    LoadBalancerPtr create(LoadBalancerParams) override { return create(); }
+    LoadBalancerPtr create(LoadBalancerParams) override;
 
     ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
@@ -169,6 +168,7 @@ private:
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
+  const bool locality_weighted_balancing_{};
   Common::CallbackHandlePtr priority_update_cb_;
 };
 

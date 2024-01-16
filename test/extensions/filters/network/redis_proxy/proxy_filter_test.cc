@@ -69,7 +69,8 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_TRUE(config.downstream_auth_username_.empty());
   EXPECT_TRUE(config.downstream_auth_passwords_.empty());
@@ -98,7 +99,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
 }
@@ -120,7 +122,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamMultipleAuthPasswordsSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword1");
@@ -142,7 +145,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamOnlyExraAuthPasswordsSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword2");
@@ -164,7 +168,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -189,7 +194,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithMultiplePasswords) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -214,7 +220,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithOnlyExtraPasswords) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
@@ -245,8 +252,8 @@ public:
   RedisProxyFilterTest(const std::string& yaml_string) {
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    config_ = std::make_shared<ProxyFilterConfig>(proto_config, store_, drain_decision_, runtime_,
-                                                  api_, *this);
+    config_ = std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(),
+                                                  drain_decision_, runtime_, api_, *this);
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
                                             config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -296,13 +303,13 @@ public:
 
   void decodeHelper(Buffer::Instance&) {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
-    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _, _))
         .WillOnce(
             DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1_)), Return(request_handle1_)));
     decoder_callbacks_->onRespValue(std::move(request1));
 
     Common::Redis::RespValuePtr request2(new Common::Redis::RespValue());
-    EXPECT_CALL(splitter_, makeRequest_(Ref(*request2), _, _))
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request2), _, _, _))
         .WillOnce(
             DoAll(WithArg<1>(SaveArgAddress(&request_callbacks2_)), Return(request_handle2_)));
     decoder_callbacks_->onRespValue(std::move(request2));
@@ -363,7 +370,7 @@ TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
   CommandSplitter::SplitCallbacks* request_callbacks1;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
-    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
     decoder_callbacks_->onRespValue(std::move(request1));
   }));
@@ -381,18 +388,18 @@ TEST_F(RedisProxyFilterTest, ImmediateResponse) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request1));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
-            error->type(Common::Redis::RespType::Error);
-            error->asString() = "no healthy upstream";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onResponse(std::move(error));
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
+        error->type(Common::Redis::RespType::Error);
+        error->asString() = "no healthy upstream";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onResponse(std::move(error));
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -425,21 +432,21 @@ TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_TRUE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
-            error->type(Common::Redis::RespType::Error);
-            error->asString() = "ERR Client sent AUTH, but no password is set";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("foo");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_TRUE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
+        error->type(Common::Redis::RespType::Error);
+        error->asString() = "ERR Client sent AUTH, but no password is set";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("foo");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -452,21 +459,21 @@ TEST_F(RedisProxyFilterTest, AuthAclWhenNotRequired) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_TRUE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
-            error->type(Common::Redis::RespType::Error);
-            error->asString() = "ERR Client sent AUTH, but no username-password pair is set";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("foo", "bar");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_TRUE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
+        error->type(Common::Redis::RespType::Error);
+        error->asString() = "ERR Client sent AUTH, but no username-password pair is set";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*error)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("foo", "bar");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -495,21 +502,21 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("somepassword");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("somepassword");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -522,21 +529,21 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordIncorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "ERR invalid password";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("wrongpassword");
-            // callbacks cannot be accessed now.
-            EXPECT_FALSE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "ERR invalid password";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("wrongpassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -569,21 +576,21 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthPasswordCorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("somepassword");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("somepassword");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -596,21 +603,21 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthNewPassword1Correct) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("newpassword1");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("newpassword1");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -623,21 +630,21 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthNewPassword2Correct) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("newpassword2");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("newpassword2");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -650,21 +657,21 @@ TEST_F(RedisProxyFilterWithMultipleAuthPasswordsTest, AuthPasswordIncorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "ERR invalid password";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("wrongpassword");
-            // callbacks cannot be accessed now.
-            EXPECT_FALSE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "ERR invalid password";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("wrongpassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -695,21 +702,21 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclCorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("someusername", "somepassword");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("someusername", "somepassword");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -722,21 +729,21 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclUsernameIncorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "WRONGPASS invalid username-password pair";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("wrongusername", "somepassword");
-            // callbacks cannot be accessed now.
-            EXPECT_FALSE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("wrongusername", "somepassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -749,21 +756,21 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclPasswordIncorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "WRONGPASS invalid username-password pair";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("someusername", "wrongpassword");
-            // callbacks cannot be accessed now.
-            EXPECT_FALSE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("someusername", "wrongpassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -798,21 +805,21 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclCorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("someusername", "somepassword");
-            // callbacks cannot be accessed now.
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("someusername", "somepassword");
+        // callbacks cannot be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -825,20 +832,20 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclCorrect1) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("someusername", "newpassword1");
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("someusername", "newpassword1");
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -851,20 +858,20 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclCorrect2) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::SimpleString);
-            reply->asString() = "OK";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("someusername", "newpassword2");
-            EXPECT_TRUE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("someusername", "newpassword2");
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -877,21 +884,21 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclUsernameIncorrec
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "WRONGPASS invalid username-password pair";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("wrongusername", "somepassword");
-            // callbacks cannot be accessed now.
-            EXPECT_FALSE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("wrongusername", "somepassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
@@ -904,21 +911,21 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclPasswordIncorrec
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
-      .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
-                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
-            EXPECT_FALSE(callbacks.connectionAllowed());
-            Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-            reply->type(Common::Redis::RespType::Error);
-            reply->asString() = "WRONGPASS invalid username-password pair";
-            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-            callbacks.onAuth("someusername", "wrongpassword");
-            // callbacks cannot be accessed now.
-            EXPECT_FALSE(filter_->connectionAllowed());
-            return nullptr;
-          }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS invalid username-password pair";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("someusername", "wrongpassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }

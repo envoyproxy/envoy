@@ -42,12 +42,15 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "file_system_buffer_integration_test",
+    size = "large",
     srcs = [
         "filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    shard_count = 2,
-    tags = ["skip_on_windows"],
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
         "//test/integration:http_protocol_integration_lib",

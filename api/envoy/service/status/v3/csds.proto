@@ -18,7 +18,6 @@ option java_package = "io.envoyproxy.envoy.service.status.v3";
 option java_outer_classname = "CsdsProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/status/v3;statusv3";
-option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Client status discovery service (CSDS)]
@@ -86,6 +85,11 @@ message ClientStatusRequest {
 
   // The node making the csds request.
   config.core.v3.Node node = 2;
+
+  // If true, the server will not include the resource contents in the response
+  // (i.e., the generic_xds_configs.xds_config field will not be populated).
+  // [#not-implemented-hide:]
+  bool exclude_resource_contents = 3;
 }
 
 // Detailed config (per xDS) with status.

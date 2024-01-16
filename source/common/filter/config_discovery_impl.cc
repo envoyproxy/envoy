@@ -17,12 +17,14 @@ namespace Envoy {
 namespace Filter {
 
 namespace {
-void validateTypeUrlHelper(const std::string& type_url,
-                           const absl::flat_hash_set<std::string> require_type_urls) {
+absl::Status validateTypeUrlHelper(const std::string& type_url,
+                                   const absl::flat_hash_set<std::string> require_type_urls) {
   if (!require_type_urls.contains(type_url)) {
-    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                     type_url, absl::StrJoin(require_type_urls, ", ")));
+    return absl::InvalidArgumentError(
+        fmt::format("Error: filter config has type URL {} but expect {}.", type_url,
+                    absl::StrJoin(require_type_urls, ", ")));
   }
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -50,8 +52,9 @@ DynamicFilterConfigProviderImplBase::~DynamicFilterConfigProviderImplBase() {
   subscription_->filter_config_providers_.erase(this);
 }
 
-void DynamicFilterConfigProviderImplBase::validateTypeUrl(const std::string& type_url) const {
-  validateTypeUrlHelper(type_url, require_type_urls_);
+absl::Status
+DynamicFilterConfigProviderImplBase::validateTypeUrl(const std::string& type_url) const {
+  return validateTypeUrlHelper(type_url, require_type_urls_);
 }
 
 const std::string& DynamicFilterConfigProviderImplBase::name() { return subscription_->name(); }
@@ -59,12 +62,15 @@ const std::string& DynamicFilterConfigProviderImplBase::name() { return subscrip
 FilterConfigSubscription::FilterConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
     FilterConfigProviderManagerImplBase& filter_config_provider_manager,
     const std::string& subscription_id)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      filter_config_name_(filter_config_name), factory_context_(factory_context),
+      filter_config_name_(filter_config_name),
+      last_(std::make_shared<ConfigVersion>("", factory_context.timeSource().systemTime())),
+      factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
       scope_(factory_context.scope().createScope(stat_prefix)),
@@ -72,10 +78,8 @@ FilterConfigSubscription::FilterConfigSubscription(
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
   const auto resource_name = getResourceName();
-  subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_,
-          {});
+  subscription_ = cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
+      config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
 }
 
 void FilterConfigSubscription::start() {
@@ -85,77 +89,80 @@ void FilterConfigSubscription::start() {
   }
 }
 
-void FilterConfigSubscription::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
-  // Make sure to make progress in case the control plane is temporarily inconsistent.
-  init_target_.ready();
-
+absl::Status
+FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                         const std::string& version_info) {
+  ConfigVersionSharedPtr next =
+      std::make_shared<ConfigVersion>(version_info, factory_context_.timeSource().systemTime());
   if (resources.size() != 1) {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
   const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
       resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
-    throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
-                                     filter_config.name()));
+    return absl::InvalidArgumentError(fmt::format(
+        "Unexpected resource name in ExtensionConfigDS response: {}", filter_config.name()));
   }
   // Skip update if hash matches
-  const uint64_t new_hash = MessageUtil::hash(filter_config.typed_config());
-  if (new_hash == last_config_hash_) {
-    return;
+  next->config_hash_ = MessageUtil::hash(filter_config.typed_config());
+  if (next->config_hash_ == last_->config_hash_) {
+    // Initial hash is 0, so this branch happens only after a config was already applied, and
+    // there is no need to mark the init target ready.
+    return absl::OkStatus();
   }
-  // Ensure that the filter config is valid in the filter chain context once the proto is processed.
-  // Validation happens before updating to prevent a partial update application. It might be
-  // possible that the providers have distinct type URL constraints.
-  const auto type_url = Config::Utility::getFactoryType(filter_config.typed_config());
+  // Ensure that the filter config is valid in the filter chain context once the proto is
+  // processed. Validation happens before updating to prevent a partial update application. It
+  // might be possible that the providers have distinct type URL constraints.
+  next->type_url_ = Config::Utility::getFactoryType(filter_config.typed_config());
   for (auto* provider : filter_config_providers_) {
-    provider->validateTypeUrl(type_url);
+    absl::Status status = provider->validateTypeUrl(next->type_url_);
+    if (!status.ok()) {
+      return status;
+    }
   }
-  auto [message, factory_name] =
+  std::tie(next->config_, next->factory_name_) =
       filter_config_provider_manager_.getMessage(filter_config, factory_context_);
   for (auto* provider : filter_config_providers_) {
-    provider->validateMessage(filter_config_name_, *message, factory_name);
+    provider->validateMessage(filter_config_name_, *next->config_, next->factory_name_);
   }
-  ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-
+  ENVOY_LOG(debug, "Updated filter config {} accepted, posting to workers", filter_config_name_);
+  // Update the latest subscription config first, to prevent a race with new
+  // providers missing the latest config.
+  last_ = std::move(next);
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
-      [&message = message, &version_info](DynamicFilterConfigProviderImplBase* provider,
-                                          std::shared_ptr<Cleanup> cleanup) {
-        provider->onConfigUpdate(*message, version_info, [cleanup] {});
+      [last = last_](DynamicFilterConfigProviderImplBase* provider,
+                     std::shared_ptr<Cleanup> cleanup) {
+        THROW_IF_NOT_OK(
+            provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {}));
       },
-      [this]() { stats_.config_reload_.inc(); });
-  last_config_hash_ = new_hash;
-  last_config_ = std::move(message);
-  last_type_url_ = type_url;
-  last_version_info_ = version_info;
-  last_factory_name_ = factory_name;
-  last_updated_ = factory_context_.timeSource().systemTime();
+      [me = shared_from_this()]() { me->updateComplete(); });
+  // The filter configs are created and published to worker queues at this point, so it
+  // is safe to mark the subscription as ready and publish the warmed parent resources.
+  ENVOY_LOG(debug, "Updated filter config {} created, warming done", filter_config_name_);
+  init_target_.ready();
+  return absl::OkStatus();
 }
 
-void FilterConfigSubscription::onConfigUpdate(
+absl::Status FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
+    last_ = std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime());
     Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
           provider->onConfigRemoved([cleanup] {});
         },
-        [this]() { stats_.config_reload_.inc(); });
-
-    last_config_hash_ = 0;
-    last_config_ = nullptr;
-    last_type_url_ = "";
-    last_version_info_ = "";
-    last_factory_name_ = "";
-    last_updated_ = factory_context_.timeSource().systemTime();
+        [me = shared_from_this()]() { me->updateComplete(); });
   } else if (!added_resources.empty()) {
-    onConfigUpdate(added_resources, added_resources[0].get().version());
+    ASSERT(added_resources.size() == 1);
+    return onConfigUpdate(added_resources, added_resources[0].get().version());
   }
+  return absl::OkStatus();
 }
 
 void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
@@ -165,6 +172,11 @@ void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureR
   stats_.config_fail_.inc();
   // Make sure to make progress in case the control plane is temporarily failing.
   init_target_.ready();
+}
+
+void FilterConfigSubscription::updateComplete() {
+  ENVOY_LOG(debug, "Filter config {} worker update complete", filter_config_name_);
+  stats_.config_reload_.inc();
 }
 
 FilterConfigSubscription::~FilterConfigSubscription() {
@@ -178,7 +190,8 @@ void FilterConfigSubscription::incrementConflictCounter() { stats_.config_confli
 
 std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
-    Server::Configuration::ServerFactoryContext& server_context, const std::string& stat_prefix) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix) {
   // There are ECDS filters configured. Setup ECDS config dump call backs.
   setupEcdsConfigDumpCallbacks(server_context.admin());
 
@@ -190,7 +203,7 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::g
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
     auto subscription = std::make_shared<FilterConfigSubscription>(
-        config_source, name, server_context, stat_prefix, *this, subscription_id);
+        config_source, name, server_context, cluster_manager, stat_prefix, *this, subscription_id);
     subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
     return subscription;
   } else {
@@ -212,19 +225,20 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   bool last_config_valid = false;
   if (subscription->lastConfig()) {
     TRY_ASSERT_MAIN_THREAD {
-      provider.validateTypeUrl(subscription->lastTypeUrl());
+      THROW_IF_NOT_OK(provider.validateTypeUrl(subscription->lastTypeUrl()));
       provider.validateMessage(filter_config_name, *subscription->lastConfig(),
                                subscription->lastFactoryName());
       last_config_valid = true;
     }
-    END_TRY catch (const EnvoyException& e) {
+    END_TRY CATCH(const EnvoyException& e, {
       ENVOY_LOG(debug, "ECDS subscription {} is invalid in a listener context: {}.",
                 filter_config_name, e.what());
       subscription->incrementConflictCounter();
-    }
+    });
+
     if (last_config_valid) {
-      provider.onConfigUpdate(*subscription->lastConfig(), subscription->lastVersionInfo(),
-                              nullptr);
+      THROW_IF_NOT_OK(provider.onConfigUpdate(*subscription->lastConfig(),
+                                              subscription->lastVersionInfo(), nullptr));
     }
   }
 
@@ -238,15 +252,16 @@ void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
     const bool null_default_factory, const std::string& filter_config_name,
     absl::string_view type_url) const {
   if (null_default_factory) {
-    throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                     "configuration with type URL {}.",
-                                     filter_config_name, type_url));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Error: cannot find filter factory {} for default filter "
+                    "configuration with type URL {}.",
+                    filter_config_name, type_url));
   }
 }
 
 void FilterConfigProviderManagerImplBase::validateProtoConfigTypeUrl(
     const std::string& type_url, const absl::flat_hash_set<std::string>& require_type_urls) const {
-  validateTypeUrlHelper(type_url, require_type_urls);
+  THROW_IF_NOT_OK(validateTypeUrlHelper(type_url, require_type_urls));
 }
 
 } // namespace Filter

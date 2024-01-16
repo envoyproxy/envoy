@@ -13,6 +13,9 @@ envoy_cc_library(
     hdrs = [
         "stream.h",
     ],
+    deps = [
+        "//envoy/tracing:trace_context_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -65,6 +68,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
         "//envoy/rds:rds_config_interface",
+        "//envoy/router:router_interface",
         "//envoy/stream_info:stream_info_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -91,5 +95,8 @@ envoy_cc_library(
         ":codec_interface",
         ":filter_interface",
         ":route_interface",
+        "//contrib/generic_proxy/filters/network/source:access_log_lib",
+        "//envoy/tracing:trace_config_interface",
+        "//envoy/tracing:tracer_interface",
     ],
 )

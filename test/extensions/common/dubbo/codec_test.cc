@@ -535,6 +535,43 @@ TEST(DubboCodecTest, EncodeTest) {
     EXPECT_EQ(8, buffer.peekBEInt<int32_t>(BodySizeOffset));
   }
 
+  // Encode exception response with ServerError
+  {
+    Buffer::OwnedImpl buffer;
+    MessageMetadata metadata;
+
+    auto context = std::make_unique<Context>();
+    context->setMessageType(MessageType::Exception);
+    context->setResponseStatus(ResponseStatus::ServerError);
+    context->setRequestId(12345);
+    context->setSerializeType(SerializeType::Hessian2);
+
+    metadata.setContext(std::move(context));
+
+    EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _))
+        .WillOnce(testing::Invoke(
+            [](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); }));
+
+    codec.encode(buffer, metadata);
+
+    EXPECT_EQ(DubboCodec::HeadersSize + 8, buffer.length());
+
+    // Check magic number.
+    EXPECT_EQ(MagicNumber, buffer.peekBEInt<uint16_t>());
+
+    // Check flag.
+    EXPECT_EQ(0x02, buffer.peekBEInt<uint8_t>(FlagOffset));
+
+    // Check status. Only response has valid status byte.
+    EXPECT_EQ(80, buffer.peekBEInt<uint8_t>(StatusOffset));
+
+    // Check request id.
+    EXPECT_EQ(12345, buffer.peekBEInt<int64_t>(RequestIDOffset));
+
+    // Check body size.
+    EXPECT_EQ(8, buffer.peekBEInt<int32_t>(BodySizeOffset));
+  }
+
   // Encode heartbeat response
   {
     Buffer::OwnedImpl buffer;

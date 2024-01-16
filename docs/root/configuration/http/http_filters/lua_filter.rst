@@ -11,12 +11,6 @@ and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Beca
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
 <https://luajit.org/extensions.html>`_ for more details.
 
-.. note::
-
-  `moonjit <https://github.com/moonjit/moonjit/>`_ is a continuation of LuaJIT development, which
-  supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
-  by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
-
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
@@ -32,10 +26,12 @@ The design of the filter and Lua support at a high level is as follows:
 Currently supported high level features
 ---------------------------------------
 
-**NOTE:** It is expected that this list will expand over time as the filter is used in production.
-The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
-safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
-API.
+.. note::
+
+  It is expected that this list will expand over time as the filter is used in production.
+  The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
+  safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
+  API.
 
 * Inspection of headers, body, and trailers while streaming in either the request flow, response
   flow, or both.
@@ -153,7 +149,7 @@ Statistics
 ----------
 .. _config_http_filters_lua_stats:
 
-The lua filter outputs statistics in the *.lua.* namespace by default. When
+The lua filter outputs statistics in the ``.lua.`` namespace by default. When
 there are multiple lua filters configured in a filter chain, stats from
 individual filter instance/script can be tracked by providing a per filter
 :ref:`stat prefix
@@ -423,6 +419,8 @@ the supported keys are:
   If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
   If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type
   of table.
+- *send_xff* is a boolean flag that decides whether the *x-forwarded-for* header is sent to target server.
+  The default value is true.
 
   For example, the following upstream response headers have repeated headers.
 
@@ -631,7 +629,8 @@ get()
   headers:get(key)
 
 Gets a header. *key* is a string that supplies the header key. Returns a string that is the header
-value or nil if there is no such header.
+value or nil if there is no such header. If there are multiple headers in the same case-insensitive
+key, their values will be combined with a *,* separator and returned as a string.
 
 getAtIndex()
 ^^^^^^^^^^^^
@@ -789,8 +788,10 @@ downstreamLocalAddress()
 
   streamInfo:downstreamLocalAddress()
 
-Returns the string representation of :repo:`downstream remote address <envoy/stream_info/stream_info.h>`
+Returns the string representation of :repo:`downstream local address <envoy/stream_info/stream_info.h>`
 used by the current request.
+
+.. _config_http_filters_lua_stream_info_downstream_direct_remote_address:
 
 downstreamDirectRemoteAddress()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -801,6 +802,19 @@ downstreamDirectRemoteAddress()
 
 Returns the string representation of :repo:`downstream directly connected address <envoy/stream_info/stream_info.h>`
 used by the current request. This is equivalent to the address of the physical connection.
+
+.. _config_http_filters_lua_stream_info_downstream_remote_address:
+
+downstreamRemoteAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamRemoteAddress()
+
+Returns the string representation of the downstream remote address for the current request. This may differ from
+:ref:`downstreamDirectRemoteAddress() <config_http_filters_lua_stream_info_downstream_direct_remote_address>` depending upon the setting of
+:ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
 
 dynamicMetadata()
 ^^^^^^^^^^^^^^^^^
@@ -931,11 +945,21 @@ peerCertificateValidated()
 
 .. code-block:: lua
 
-  if downstreamSslConnection:peerCertificateVaidated() then
-    print("peer certificate is valiedated")
+  if downstreamSslConnection:peerCertificateValidated() then
+    print("peer certificate is validated")
   end
 
 Returns bool whether the peer certificate was validated.
+
+.. warning::
+
+   Client certificate validation is not currently performed upon TLS session resumption. For a
+   resumed TLS session this method will return false, regardless of whether the peer certificate is
+   valid.
+
+   The only known workaround for this issue is to disable TLS session resumption entirely, by
+   setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+   and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
 
 uriSanLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^

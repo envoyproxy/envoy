@@ -80,7 +80,7 @@ public:
         Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_, redis_command_stats_, stats_, false);
+                                 *config_, redis_command_stats_, *stats_.rootScope(), false);
     EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -190,6 +190,8 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -349,6 +351,8 @@ class ConfigEnableCommandStats : public Config {
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return true; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 void initializeRedisSimpleCommand(Common::Redis::RespValue* request, std::string command_name,
@@ -735,6 +739,8 @@ class ConfigOutlierDisabled : public Config {
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {
@@ -1213,8 +1219,8 @@ TEST(RedisClientFactoryImplTest, Basic) {
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
   const std::string auth_username;
   const std::string auth_password;
-  ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_,
-                                    auth_username, auth_password, false);
+  ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats,
+                                    *stats_.rootScope(), auth_username, auth_password, false);
   client->close();
 }
 } // namespace Client

@@ -9,38 +9,46 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
+absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
+    Server::Configuration::GenericFactoryContext& context,
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
+  const uint32_t max_hosts = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024);
+  if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts) {
+    return absl::InvalidArgumentError(fmt::format(
+        "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
+        config.name(), config.preresolve_hostnames().size(), max_hosts));
+  }
+
+  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(context, config));
+}
+
 DnsCacheImpl::DnsCacheImpl(
-    Server::Configuration::FactoryContextBase& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()), config_(config),
-      random_generator_(context.api().randomGenerator()),
+    : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
+      config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context)),
-      tls_slot_(context.threadLocal()),
+      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext())),
+      tls_slot_(context.serverFactoryContext().threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
-      resource_manager_(*scope_, context.runtime(), config.name(),
+      resource_manager_(*scope_, context.serverFactoryContext().runtime(), config.name(),
                         config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       min_refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_min_refresh_rate, 5000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
-      file_system_(context.api().fileSystem()),
+      file_system_(context.serverFactoryContext().api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
-
-  if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts_) {
-    throw EnvoyException(fmt::format(
-        "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
-        config.name(), config.preresolve_hostnames().size(), max_hosts_));
-  }
 
   loadCacheEntries(config);
 
@@ -51,7 +59,13 @@ DnsCacheImpl::DnsCacheImpl(
     // cache to load an entry. Further if this particular resolution fails all the is lost is the
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
-    startCacheLoad(hostname.address(), hostname.port_value(), false);
+    const std::string host =
+        (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns"))
+            ? DnsHostInfo::normalizeHostForDfp(hostname.address(), hostname.port_value())
+            : hostname.address();
+    ENVOY_LOG(debug, "DNS pre-resolve starting for host {}", host);
+    startCacheLoad(host, hostname.port_value(), false);
   }
 }
 
@@ -70,7 +84,8 @@ DnsCacheImpl::~DnsCacheImpl() {
 
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::FactoryContextBase& context) {
+    Event::Dispatcher& main_thread_dispatcher,
+    Server::Configuration::CommonFactoryContext& context) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory& dns_resolver_factory =
       Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
@@ -83,8 +98,10 @@ DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
-DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port, bool is_proxy_lookup,
-                                LoadDnsCacheEntryCallbacks& callbacks) {
+DnsCacheImpl::loadDnsCacheEntry(absl::string_view raw_host, uint16_t default_port,
+                                bool is_proxy_lookup, LoadDnsCacheEntryCallbacks& callbacks) {
+  std::string host = DnsHostInfo::normalizeHostForDfp(raw_host, default_port);
+
   ENVOY_LOG(debug, "thread local lookup for host '{}' {}", host,
             is_proxy_lookup ? "proxy mode " : "");
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;
@@ -216,7 +233,7 @@ DnsCacheImpl::PrimaryHostInfo& DnsCacheImpl::getPrimaryHost(const std::string& h
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   const auto primary_host_it = primary_hosts_.find(host);
   ASSERT(primary_host_it != primary_hosts_.end());
-  return *(primary_host_it->second.get());
+  return *(primary_host_it->second);
 }
 
 void DnsCacheImpl::onResolveTimeout(const std::string& host) {
@@ -289,8 +306,8 @@ void DnsCacheImpl::forceRefreshHosts() {
 }
 
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
-  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
-            host_info.host_info_->resolvedHost(), host_info.port_);
+  ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
+            host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
@@ -392,6 +409,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dns_cache_set_first_resolve_complete")) {
+      primary_host_info->host_info_->setFirstResolveComplete();
+    }
     address_changed = true;
     stats_.host_address_changed_.inc();
   }
@@ -508,10 +529,9 @@ void DnsCacheImpl::addCacheEntry(
   if (address_list.empty()) {
     value = absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
   } else {
-    for (auto& addr : address_list) {
-      value += absl::StrCat((value.empty() ? "" : "\n"), addr->asString(), "|", ttl.count(), "|",
-                            seconds_since_epoch);
-    }
+    value = absl::StrJoin(address_list, "\n", [&](std::string* out, const auto& addr) {
+      absl::StrAppend(out, addr->asString(), "|", ttl.count(), "|", seconds_since_epoch);
+    });
   }
   key_value_store_->addOrUpdate(host, value, absl::nullopt);
 }

@@ -18,8 +18,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
-    // TODO(dio): Add the case when using parseAndDecodeQueryString().
-    Http::Utility::parseQueryString(input.parse_query_string());
+    Http::Utility::QueryParamsMulti::parseQueryString(input.parse_query_string());
+    Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(input.parse_query_string());
     break;
   }
   case test::common::http::UtilityTestCase::kParseCookieValue: {
@@ -58,9 +58,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kParseParameters: {
     const auto& parse_parameters = input.parse_parameters();
-    // TODO(dio): Add a case when doing parse_parameters with decode_params flag true.
-    Http::Utility::parseParameters(parse_parameters.data(), parse_parameters.start(),
-                                   /*decode_params*/ false);
+    Http::Utility::QueryParamsMulti::parseParameters(parse_parameters.data(),
+                                                     parse_parameters.start(),
+                                                     /*decode_params*/ false);
+    Http::Utility::QueryParamsMulti::parseParameters(parse_parameters.data(),
+                                                     parse_parameters.start(),
+                                                     /*decode_params*/ true);
     break;
   }
   case test::common::http::UtilityTestCase::kFindQueryString: {
@@ -71,8 +74,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kMakeSetCookieValue: {
     const auto& cookie_value = input.make_set_cookie_value();
     std::chrono::seconds max_age(cookie_value.max_age());
+    Http::CookieAttributeRefVector cookie_attributes;
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
-                                      max_age, cookie_value.httponly());
+                                      max_age, cookie_value.httponly(), cookie_attributes);
     break;
   }
   case test::common::http::UtilityTestCase::kParseAuthorityString: {

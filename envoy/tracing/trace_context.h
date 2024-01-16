@@ -3,13 +3,17 @@
 #include <functional>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/header_map.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tracing {
+
+class TraceContextHandler;
 
 /**
  * Protocol-independent abstraction for traceable stream. It hides the differences between different
@@ -30,12 +34,12 @@ public:
   virtual absl::string_view protocol() const PURE;
 
   /**
-   * Get context authority.
+   * Get context host.
    *
-   * @return The authority of traceable stream. It generally consists of the host and an optional
-   * user information and an optional port.
+   * @return The host of traceable stream. It typically should be domain, VIP, or service name that
+   * used to represents target service instances.
    */
-  virtual absl::string_view authority() const PURE;
+  virtual absl::string_view host() const PURE;
 
   /**
    * Get context path.
@@ -66,7 +70,7 @@ public:
    * @param key The context key of string view type.
    * @return The optional context value of string_view type.
    */
-  virtual absl::optional<absl::string_view> getByKey(absl::string_view key) const PURE;
+  virtual absl::optional<absl::string_view> get(absl::string_view key) const PURE;
 
   /**
    * Set new tracing context key/value pair.
@@ -74,25 +78,25 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setByKey(absl::string_view key, absl::string_view val) PURE;
+  virtual void set(absl::string_view key, absl::string_view val) PURE;
 
   /**
-   * Set new tracing context key/value pair. The key MUST point to data that will live beyond
-   * the lifetime of any traceable stream that using the string.
+   * Removes the following key and its associated values from the tracing
+   * context.
    *
-   * @param key The context key of string view type.
-   * @param val The context value of string view type.
+   * @param key The key to remove if it exists.
    */
-  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) PURE;
+  virtual void remove(absl::string_view key) PURE;
+
+private:
+  friend class TraceContextHandler;
 
   /**
-   * Set new tracing context key/value pair. Both key and val MUST point to data that will live
-   * beyond the lifetime of any traceable stream that using the string.
-   *
-   * @param key The context key of string view type.
-   * @param val The context value of string view type.
+   * Optional HTTP request headers map. This is valid for HTTP protocol or any protocol that
+   * that provides HTTP request headers.
    */
-  virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
+  virtual OptRef<Http::RequestHeaderMap> requestHeaders() { return {}; };
+  virtual OptRef<const Http::RequestHeaderMap> requestHeaders() const { return {}; };
 };
 
 } // namespace Tracing

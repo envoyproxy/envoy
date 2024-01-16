@@ -58,7 +58,8 @@ public:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_{*stats_store_.rootScope()};
   NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<MockConcurrencyController> controller_{new MockConcurrencyController()};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

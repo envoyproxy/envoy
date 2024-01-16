@@ -16,7 +16,7 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromPro
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   JsonTranscoderConfigSharedPtr filter_config =
-      std::make_shared<JsonTranscoderConfig>(proto_config, context.api());
+      std::make_shared<JsonTranscoderConfig>(proto_config, context.serverFactoryContext().api());
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(*filter_config));
@@ -35,8 +35,9 @@ GrpcJsonTranscoderFilterConfig::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the grpc transcoding filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-REGISTER_FACTORY(GrpcJsonTranscoderFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.grpc_json_transcoder"};
+LEGACY_REGISTER_FACTORY(GrpcJsonTranscoderFilterConfig,
+                        Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.grpc_json_transcoder");
 
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters

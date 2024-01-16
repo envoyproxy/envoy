@@ -17,6 +17,7 @@ TEST(Status, Ok) {
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_FALSE(isCodecClientError(status));
   EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
+  EXPECT_FALSE(isEnvoyOverloadError(status));
 }
 
 TEST(Status, CodecProtocolError) {
@@ -30,6 +31,7 @@ TEST(Status, CodecProtocolError) {
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_FALSE(isCodecClientError(status));
   EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
+  EXPECT_FALSE(isEnvoyOverloadError(status));
 }
 
 TEST(Status, BufferFloodError) {
@@ -43,6 +45,7 @@ TEST(Status, BufferFloodError) {
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_FALSE(isCodecClientError(status));
   EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
+  EXPECT_FALSE(isEnvoyOverloadError(status));
 }
 
 TEST(Status, PrematureResponseError) {
@@ -57,6 +60,7 @@ TEST(Status, PrematureResponseError) {
   EXPECT_EQ(Http::Code::ProxyAuthenticationRequired, getPrematureResponseHttpCode(status));
   EXPECT_FALSE(isCodecClientError(status));
   EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
+  EXPECT_FALSE(isEnvoyOverloadError(status));
 }
 
 TEST(Status, CodecClientError) {
@@ -70,6 +74,7 @@ TEST(Status, CodecClientError) {
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_TRUE(isCodecClientError(status));
   EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
+  EXPECT_FALSE(isEnvoyOverloadError(status));
 }
 
 TEST(Status, InboundFramesWithEmptyPayload) {
@@ -84,11 +89,26 @@ TEST(Status, InboundFramesWithEmptyPayload) {
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_FALSE(isCodecClientError(status));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(status));
+  EXPECT_FALSE(isEnvoyOverloadError(status));
+}
+
+TEST(Status, EnvoyOverloadError) {
+  auto status = envoyOverloadError("foobar");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ("foobar", status.message());
+  EXPECT_EQ("EnvoyOverloadError: foobar", toString(status));
+  EXPECT_EQ(StatusCode::EnvoyOverloadError, getStatusCode(status));
+  EXPECT_FALSE(isCodecProtocolError(status));
+  EXPECT_FALSE(isBufferFloodError(status));
+  EXPECT_FALSE(isPrematureResponseError(status));
+  EXPECT_FALSE(isCodecClientError(status));
+  EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
+  EXPECT_TRUE(isEnvoyOverloadError(status));
 }
 
 TEST(Status, ReturnIfError) {
 
-  auto outer = [](Status (*inner)()) {
+  auto outer = [](Status (*inner)()) -> Status {
     RETURN_IF_ERROR(inner());
     return bufferFloodError("boom");
   };
@@ -103,7 +123,7 @@ TEST(Status, ReturnIfError) {
   EXPECT_EQ("foobar", result.message());
 
   // Check that passing a `Status` object directly into the RETURN_IF_ERROR works.
-  auto direct_status = [](const Status& status) {
+  auto direct_status = [](const Status& status) -> Status {
     RETURN_IF_ERROR(status);
     return bufferFloodError("baz");
   };

@@ -18,7 +18,6 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
-#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::DoAll;
@@ -79,7 +78,7 @@ public:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -131,7 +130,7 @@ public:
     interval: 1s
     no_traffic_interval: 5s
     interval_jitter: 1s
-    unhealthy_threshold: 1
+    unhealthy_threshold: 2
     healthy_threshold: 1
     custom_health_check:
       name: redis
@@ -164,7 +163,7 @@ public:
         key: foo
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -602,6 +601,8 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(2UL,
+            cluster_->info_->stats_store_.counter("health_check.redis.exists_failure").value());
 }
 
 TEST_F(RedisHealthCheckerTest, ExistsRedirected) {

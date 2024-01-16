@@ -37,7 +37,7 @@ public:
   }
 
   void validateMatcher(const std::string& matcher_yaml) {
-    checkMatcher(fmt::format(matcher_yaml, header_key, header_value));
+    checkMatcher(fmt::format(fmt::runtime(matcher_yaml), header_key, header_value));
   }
 
 private:
@@ -68,15 +68,17 @@ private:
 
     Stats::IsolatedStoreImpl store;
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
-    EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
-                     config, store, context, ProtobufMessage::getStrictValidationVisitor()),
-                 Envoy::EnvoyException);
+    EXPECT_THROW(
+        std::make_shared<RoleBasedAccessControlFilterConfig>(
+            config, *store.rootScope(), context, ProtobufMessage::getStrictValidationVisitor()),
+        Envoy::EnvoyException);
 
     config.clear_matcher();
     *config.mutable_shadow_matcher() = matcher_proto;
-    EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
-                     config, store, context, ProtobufMessage::getStrictValidationVisitor()),
-                 Envoy::EnvoyException);
+    EXPECT_THROW(
+        std::make_shared<RoleBasedAccessControlFilterConfig>(
+            config, *store.rootScope(), context, ProtobufMessage::getStrictValidationVisitor()),
+        Envoy::EnvoyException);
   }
 };
 

@@ -21,16 +21,12 @@ gRPC streaming endpoints
 See :repo:`cds.proto <api/envoy/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
 as a client when
 
-.. code-block:: yaml
-
-    cds_config:
-      resource_api_version: V3
-      api_config_source:
-        api_type: GRPC
-        transport_api_version: V3
-        grpc_services:
-          envoy_grpc:
-            cluster_name: some_xds_cluster
+.. literalinclude:: _include/xds_api/dynamic-resources.yaml
+   :language: yaml
+   :lines: 12-19
+   :linenos:
+   :lineno-start: 12
+   :caption: :download:`xds-api-cds-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -50,7 +46,7 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set in the :ref:`eds_cluster_config
@@ -63,16 +59,12 @@ See :repo:`lds.proto
 <api/envoy/service/listener/v3/lds.proto>`
 for the service definition. This is used by Envoy as a client when
 
-.. code-block:: yaml
-
-    lds_config:
-      resource_api_version: V3
-      api_config_source:
-        api_type: GRPC
-        transport_api_version: V3
-        grpc_services:
-          envoy_grpc:
-            cluster_name: some_xds_cluster
+.. literalinclude:: _include/xds_api/dynamic-resources.yaml
+   :language: yaml
+   :lines: 20-27
+   :linenos:
+   :lineno-start: 20
+   :caption: :download:`xds-api-lds-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -93,7 +85,7 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set in the :ref:`rds
@@ -117,7 +109,7 @@ for the service definition. This is used by Envoy as a client when
           api_type: GRPC
           transport_api_version: V3
           grpc_services:
-            envoy_grpc:
+          - envoy_grpc:
               cluster_name: some_xds_cluster
 
 is set in the :ref:`scoped_routes
@@ -131,17 +123,12 @@ See :repo:`sds.proto
 <api/envoy/service/secret/v3/sds.proto>`
 for the service definition. This is used by Envoy as a client when
 
-.. code-block:: yaml
-
-    name: some_secret_name
-    config_source:
-      resource_api_version: V3
-      api_config_source:
-        api_type: GRPC
-        transport_api_version: V3
-        grpc_services:
-          envoy_grpc:
-            cluster_name: some_xds_cluster
+.. literalinclude:: _include/xds_api/oauth-sds-example.yaml
+   :language: yaml
+   :lines: 48-57
+   :linenos:
+   :lineno-start: 48
+   :caption: :download:`oauth-sds-example.yaml <_include/xds_api/oauth-sds-example.yaml>`
 
 is set inside a :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` message. This message
 is used in various places such as the :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`.
@@ -161,11 +148,12 @@ for the service definition. This is used by Envoy as a client when
         api_type: GRPC
         transport_api_version: V3
         grpc_services:
-          envoy_grpc:
+        - envoy_grpc:
             cluster_name: some_xds_cluster
 
 is set inside the :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
 field.
+
 
 REST endpoints
 ^^^^^^^^^^^^^^
@@ -290,14 +278,12 @@ See :repo:`discovery.proto
 <api/envoy/service/discovery/v3/discovery.proto>`
 for the service definition. This is used by Envoy as a client when
 
-.. code-block:: yaml
-
-    ads_config:
-      api_type: GRPC
-      transport_api_version: V3
-      grpc_services:
-        envoy_grpc:
-          cluster_name: some_ads_cluster
+.. literalinclude:: _include/xds_api/dynamic-resources.yaml
+   :language: yaml
+   :lines: 6-11
+   :linenos:
+   :lineno-start: 6
+   :caption: :download:`xds-api-ads-demo.yaml <_include/xds_api/dynamic-resources.yaml>`
 
 is set in the :ref:`dynamic_resources
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap

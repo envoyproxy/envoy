@@ -158,6 +158,11 @@ SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
   PANIC("not implemented");
 }
 
+SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
+  const ssize_t rc = ::send(socket, static_cast<char*>(buffer), length, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
   const ssize_t rc = ::recv(socket, static_cast<char*>(buffer), length, flags);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
@@ -207,7 +212,7 @@ bool OsSysCallsImpl::supportsUdpGso() const {
   return false;
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion) const {
   // Windows doesn't support it.
   return false;
 }
@@ -455,17 +460,9 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
-bool OsSysCallsImpl::supportsGetifaddrs() const {
-  if (alternate_getifaddrs_.has_value()) {
-    return true;
-  }
-  return false;
-}
+bool OsSysCallsImpl::supportsGetifaddrs() const { return false; }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
-  if (alternate_getifaddrs_.has_value()) {
-    return alternate_getifaddrs_.value()(interfaces);
-  }
   PANIC("not implemented");
 }
 

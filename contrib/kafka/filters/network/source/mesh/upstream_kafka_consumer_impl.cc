@@ -1,5 +1,6 @@
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_consumer_impl.h"
 
+#include "contrib/kafka/filters/network/source/kafka_types.h"
 #include "contrib/kafka/filters/network/source/mesh/librdkafka_utils_impl.h"
 
 namespace Envoy {
@@ -99,12 +100,27 @@ void RichKafkaConsumer::runWorkerLoop() {
   ENVOY_LOG(debug, "Worker thread for consumer [{}] finished", topic_);
 }
 
+// Helper method, converts byte array.
+static NullableBytes toBytes(const void* data, const size_t size) {
+  const unsigned char* as_char = static_cast<const unsigned char*>(data);
+  if (data) {
+    Bytes bytes(as_char, as_char + size);
+    return {bytes};
+  } else {
+    return absl::nullopt;
+  }
+}
+
 // Helper method, gets rid of librdkafka.
 static InboundRecordSharedPtr transform(RdKafkaMessagePtr arg) {
   const auto topic = arg->topic_name();
   const auto partition = arg->partition();
   const auto offset = arg->offset();
-  return std::make_shared<InboundRecord>(topic, partition, offset);
+
+  const NullableBytes key = toBytes(arg->key_pointer(), arg->key_len());
+  const NullableBytes value = toBytes(arg->payload(), arg->len());
+
+  return std::make_shared<InboundRecord>(topic, partition, offset, key, value);
 }
 
 std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
@@ -117,7 +133,7 @@ std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
 
     // XXX (adam.kotwasinski) There could be something more present in the consumer,
     // and we could drain it (at least a little) in the next commits.
-    // See: https://github.com/edenhill/librdkafka/discussions/3897
+    // See: https://github.com/confluentinc/librdkafka/discussions/3897
     return {inbound_record};
   } else {
     // Nothing extraordinary (timeout because there is nothing upstream),

@@ -51,6 +51,7 @@ envoy_cc_test(
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
+        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/filesystem:filesystem_mocks",

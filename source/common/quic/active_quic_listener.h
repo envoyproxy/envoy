@@ -5,14 +5,15 @@
 #include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/process_context.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
+#include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
-#include "source/server/connection_handler_impl.h"
 
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
@@ -37,7 +38,8 @@ public:
                      uint32_t packets_to_read_to_connection_count_ratio,
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-                     QuicConnectionIdGeneratorPtr&& cid_generator);
+                     QuicConnectionIdGeneratorPtr&& cid_generator,
+                     QuicConnectionIdWorkerSelector worker_selector);
 
   ~ActiveQuicListener() override;
 
@@ -60,10 +62,13 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override;
   void resumeListening() override;
-  void shutdownListener() override;
+  void shutdownListener(const Network::ExtraShutdownListenerOptions& options) override;
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+
+protected:
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
 private:
   friend class ActiveQuicListenerPeer;
@@ -84,7 +89,12 @@ private:
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
   uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
-  QuicConnectionIdGeneratorPtr connection_id_generator_;
+  const QuicConnectionIdGeneratorPtr connection_id_generator_;
+  const QuicConnectionIdWorkerSelector select_connection_id_worker_;
+  // Latches envoy.reloadable_features.quic_reject_all at the beginning of each event loop.
+  bool reject_all_{false};
+  // During hot restart, an optional handler for packets that weren't for existing connections.
+  OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -95,20 +105,33 @@ class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
 public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
-                            ProtobufMessage::ValidationVisitor& validation_visitor);
+                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                            ProcessContextOptRef context);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(Runtime::Loader& runtime, uint32_t worker_index,
                           Network::UdpConnectionHandler& parent,
                           Network::SocketSharedPtr&& listen_socket_ptr,
-                          Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
+                          Event::Dispatcher& dispatcher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
 
   static void setDisableKernelBpfPacketRoutingForTest(bool val) {
     disable_kernel_bpf_packet_routing_for_test_ = val;
   }
+
+protected:
+  virtual Network::ConnectionHandler::ActiveUdpListenerPtr createActiveQuicListener(
+      Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+      Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
+      const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+      uint32_t packets_to_read_to_connection_count_ratio,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      QuicConnectionIdGeneratorPtr&& cid_generator);
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
@@ -118,13 +141,16 @@ private:
   absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
+  EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
   QuicStatNames& quic_stat_names_;
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
+  QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};
+  ProcessContextOptRef context_;
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
 };

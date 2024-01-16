@@ -166,6 +166,7 @@ public:
                                 Event::Dispatcher& dispatcher) override;
   void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
+  bool isAvailable() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int connectionIndex();
@@ -191,6 +192,8 @@ private:
   ThreadLocal::TypedSlotPtr<ThreadLocalData> tls_;
 
   CryptoMbStats stats_;
+
+  bool initialized_{};
 };
 
 } // namespace CryptoMb

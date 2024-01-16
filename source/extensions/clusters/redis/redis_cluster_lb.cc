@@ -99,7 +99,7 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
   }
 }
 
-Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create() {
+Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create(Upstream::LoadBalancerParams) {
   absl::ReaderMutexLock lock(&mutex_);
   return std::make_unique<RedisClusterLoadBalancer>(slot_array_, shard_vector_, random_);
 }

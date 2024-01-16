@@ -4,7 +4,6 @@
 #include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 
 #include "absl/base/call_once.h"
 #include "extension_registry.h"
@@ -35,10 +34,9 @@ public:
    * Run the engine with the provided configuration.
    * @param config, the Envoy bootstrap configuration to use.
    * @param log_level, the log level.
-   * @param admin_address_path to set --admin-address-path, or an empty string if not needed.
    */
-  envoy_status_t run(std::string config, std::string log_level,
-                     const std::string admin_address_path);
+  envoy_status_t run(std::string config, std::string log_level);
+  envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
 
   /**
    * Immediately terminate the engine, if running.
@@ -73,21 +71,10 @@ public:
                                   uint64_t count);
 
   /**
-   * Issue a call against the admin handler, populating the `out` parameter with the response if
-   * the call was successful.
-   * @param path the admin path to query.
-   * @param method the HTTP method to use (GET or POST).
-   * @param out the response body, populated if the call is successful.
-   * @returns ENVOY_SUCCESS if the call was successful and `out` was populated.
+   * Dump Envoy stats into the returned buffer
+   * @returns a buffer with referenced stats dumped in Envoy's standard text format.
    */
-  envoy_status_t makeAdminCall(absl::string_view path, absl::string_view method, envoy_data& out);
-
-  /**
-   * Flush the stats sinks outside of a flushing interval.
-   * Note: stat flushing is done asynchronously, this function will never block.
-   * This is a noop if called before the underlying EnvoyEngine has started.
-   */
-  void flushStats();
+  Buffer::OwnedImpl dumpStats();
 
   /**
    * Get cluster manager from the Engine.
@@ -100,7 +87,7 @@ public:
   Stats::Store& getStatsStore();
 
 private:
-  envoy_status_t main(std::string config, std::string log_level, std::string admin_address_path);
+  envoy_status_t main(std::unique_ptr<Envoy::OptionsImplBase>&& options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
 

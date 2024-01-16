@@ -66,6 +66,7 @@ constexpr absl::string_view URISanPeerCertificate = "uri_san_peer_certificate";
 constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate";
 constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
+constexpr absl::string_view DownstreamTransportFailureReason = "transport_failure_reason";
 
 // Source properties
 constexpr absl::string_view Source = "source";
@@ -88,6 +89,9 @@ constexpr absl::string_view RouteName = "route_name";
 constexpr absl::string_view RouteMetadata = "route_metadata";
 constexpr absl::string_view UpstreamHostMetadata = "upstream_host_metadata";
 constexpr absl::string_view FilterChainName = "filter_chain_name";
+constexpr absl::string_view ListenerMetadata = "listener_metadata";
+constexpr absl::string_view ListenerDirection = "listener_direction";
+constexpr absl::string_view Node = "node";
 
 class WrapperFieldValues {
 public:
@@ -99,10 +103,10 @@ using WrapperFields = ConstSingleton<WrapperFieldValues>;
 
 class RequestWrapper;
 
-absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
+absl::optional<CelValue> convertHeaderEntry(const ::Envoy::Http::HeaderEntry* header);
 absl::optional<CelValue>
 convertHeaderEntry(Protobuf::Arena& arena,
-                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
+                   ::Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
 
 template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
@@ -112,24 +116,26 @@ public:
       return {};
     }
     auto str = std::string(key.StringOrDie().value());
-    if (!Http::validHeaderString(str)) {
+    if (!::Envoy::Http::validHeaderString(str)) {
       // Reject key if it is an invalid header string
       return {};
     }
-    return convertHeaderEntry(
-        arena_, Http::HeaderUtility::getAllOfHeaderAsString(*value_, Http::LowerCaseString(str)));
+    return convertHeaderEntry(arena_, ::Envoy::Http::HeaderUtility::getAllOfHeaderAsString(
+                                          *value_, ::Envoy::Http::LowerCaseString(str)));
   }
   int size() const override { return ListKeys().value()->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     if (value_ == nullptr) {
       return &WrapperFields::get().Empty;
     }
     absl::flat_hash_set<absl::string_view> keys;
-    value_->iterate([&keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      keys.insert(header.key().getStringView());
-      return Http::HeaderMap::Iterate::Continue;
-    });
+    value_->iterate(
+        [&keys](const ::Envoy::Http::HeaderEntry& header) -> ::Envoy::Http::HeaderMap::Iterate {
+          keys.insert(header.key().getStringView());
+          return ::Envoy::Http::HeaderMap::Iterate::Continue;
+        });
     std::vector<CelValue> values;
     values.reserve(keys.size());
     for (const auto& key : keys) {
@@ -153,6 +159,7 @@ class BaseWrapper : public google::api::expr::runtime::CelMap {
 public:
   BaseWrapper(Protobuf::Arena& arena) : arena_(arena) {}
   int size() const override { return 0; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return absl::UnimplementedError("ListKeys() is not implemented");
   }
@@ -163,26 +170,27 @@ protected:
 
 class RequestWrapper : public BaseWrapper {
 public:
-  RequestWrapper(Protobuf::Arena& arena, const Http::RequestHeaderMap* headers,
+  RequestWrapper(Protobuf::Arena& arena, const ::Envoy::Http::RequestHeaderMap* headers,
                  const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const HeadersWrapper<Http::RequestHeaderMap> headers_;
+  const HeadersWrapper<::Envoy::Http::RequestHeaderMap> headers_;
   const StreamInfo::StreamInfo& info_;
 };
 
 class ResponseWrapper : public BaseWrapper {
 public:
-  ResponseWrapper(Protobuf::Arena& arena, const Http::ResponseHeaderMap* headers,
-                  const Http::ResponseTrailerMap* trailers, const StreamInfo::StreamInfo& info)
+  ResponseWrapper(Protobuf::Arena& arena, const ::Envoy::Http::ResponseHeaderMap* headers,
+                  const ::Envoy::Http::ResponseTrailerMap* trailers,
+                  const StreamInfo::StreamInfo& info)
       : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const HeadersWrapper<Http::ResponseHeaderMap> headers_;
-  const HeadersWrapper<Http::ResponseTrailerMap> trailers_;
+  const HeadersWrapper<::Envoy::Http::ResponseHeaderMap> headers_;
+  const HeadersWrapper<::Envoy::Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
 };
 
@@ -229,12 +237,14 @@ private:
 
 class XDSWrapper : public BaseWrapper {
 public:
-  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), info_(info) {}
+  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
+             const LocalInfo::LocalInfo* local_info)
+      : BaseWrapper(arena), info_(info), local_info_(local_info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const StreamInfo::StreamInfo& info_;
+  const LocalInfo::LocalInfo* local_info_;
 };
 
 } // namespace Expr

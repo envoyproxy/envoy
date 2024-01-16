@@ -54,8 +54,10 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 void ConnectionManager::emitLogEntry(const Http::RequestHeaderMap* request_headers,
                                      const Http::ResponseHeaderMap* response_headers,
                                      const StreamInfo::StreamInfo& stream_info) {
+  const Formatter::HttpFormatterContext log_context{request_headers, response_headers};
+
   for (const auto& access_log : config_.accessLogs()) {
-    access_log->log(request_headers, response_headers, nullptr, stream_info);
+    access_log->log(log_context, stream_info);
   }
 }
 
@@ -70,7 +72,7 @@ void ConnectionManager::dispatch() {
     return;
   }
 
-  try {
+  TRY_NEEDS_AUDIT {
     bool underflow = false;
     while (!underflow) {
       FilterStatus status = decoder_->onData(request_buffer_, underflow);
@@ -81,7 +83,8 @@ void ConnectionManager::dispatch() {
     }
 
     return;
-  } catch (const AppException& ex) {
+  }
+  END_TRY catch (const AppException& ex) {
     ENVOY_LOG(debug, "thrift application exception: {}", ex.what());
     if (rpcs_.empty()) {
       MessageMetadata metadata;
@@ -89,7 +92,8 @@ void ConnectionManager::dispatch() {
     } else {
       sendLocalReply(*(*rpcs_.begin())->metadata_, ex, true);
     }
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "thrift error: {}", read_callbacks_->connection(), ex.what());
 
     if (rpcs_.empty()) {
@@ -106,10 +110,11 @@ void ConnectionManager::dispatch() {
   resetAllRpcs(true);
 }
 
-void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
-                                       bool end_stream) {
+absl::optional<DirectResponse::ResponseType>
+ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
+                                  bool end_stream) {
   if (read_callbacks_->connection().state() == Network::Connection::State::Closed) {
-    return;
+    return absl::nullopt;
   }
 
   DirectResponse::ResponseType result = DirectResponse::ResponseType::Exception;
@@ -139,6 +144,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
     stats_.response_exception_.inc();
     break;
   }
+  return result;
 }
 
 void ConnectionManager::continueDecoding() {
@@ -356,20 +362,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
     }
   }
 
-  ProtobufWkt::Struct stats_obj;
-  auto& fields_map = *stats_obj.mutable_fields();
-  auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
-
-  response_fields_map["transport_type"] =
-      ValueUtil::stringValue(TransportNames::get().fromType(decoder_->transportType()));
-  response_fields_map["protocol_type"] =
-      ValueUtil::stringValue(ProtocolNames::get().fromType(decoder_->protocolType()));
-  response_fields_map["message_type"] = ValueUtil::stringValue(
-      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
-  response_fields_map["reply_type"] = ValueUtil::stringValue(
-      metadata->hasReplyType() ? ReplyTypeNames::get().fromType(metadata->replyType()) : "-");
-
-  parent_.streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+  parent_.recordResponseAccessLog(metadata);
 
   return parent_.applyEncoderFilters(DecoderEvent::MessageBegin, metadata, protocol_converter_);
 }
@@ -816,6 +809,43 @@ bool ConnectionManager::ActiveRpc::passthroughSupported() const {
   return true;
 }
 
+void ConnectionManager::ActiveRpc::recordResponseAccessLog(
+    DirectResponse::ResponseType direct_response_type, const MessageMetadataSharedPtr& metadata) {
+  if (direct_response_type == DirectResponse::ResponseType::Exception) {
+    recordResponseAccessLog(MessageTypeNames::get().fromType(MessageType::Exception), "-");
+    return;
+  }
+  const std::string& message_type_name =
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-";
+  const std::string& reply_type_name = ReplyTypeNames::get().fromType(
+      direct_response_type == DirectResponse::ResponseType::SuccessReply ? ReplyType::Success
+                                                                         : ReplyType::Error);
+  recordResponseAccessLog(message_type_name, reply_type_name);
+}
+
+void ConnectionManager::ActiveRpc::recordResponseAccessLog(
+    const MessageMetadataSharedPtr& metadata) {
+  recordResponseAccessLog(
+      metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-",
+      metadata->hasReplyType() ? ReplyTypeNames::get().fromType(metadata->replyType()) : "-");
+}
+
+void ConnectionManager::ActiveRpc::recordResponseAccessLog(const std::string& message_type,
+                                                           const std::string& reply_type) {
+  ProtobufWkt::Struct stats_obj;
+  auto& fields_map = *stats_obj.mutable_fields();
+  auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
+
+  response_fields_map["transport_type"] =
+      ValueUtil::stringValue(TransportNames::get().fromType(downstreamTransportType()));
+  response_fields_map["protocol_type"] =
+      ValueUtil::stringValue(ProtocolNames::get().fromType(downstreamProtocolType()));
+  response_fields_map["message_type"] = ValueUtil::stringValue(message_type);
+  response_fields_map["reply_type"] = ValueUtil::stringValue(reply_type);
+
+  streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
+}
+
 FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
   passthrough_ = true;
   return applyDecoderFilters(DecoderEvent::PassthroughData, &data);
@@ -839,34 +869,46 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
     ASSERT(upgrade_handler_ != nullptr);
   }
 
-  // Filters could change cluster_header's value, which affect the routing decision.
-  // Therefore, we need to apply filter chain before the routing decision is made and cached.
-  // TODO(kuochunghsu): implement FilterCallbacks::clearRouteCache
-  auto result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
+  FilterStatus result = FilterStatus::StopIteration;
+  absl::optional<std::string> error;
+  TRY_NEEDS_AUDIT { result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata); }
+  END_TRY catch (const std::bad_function_call& e) { error = std::string(e.what()); }
 
   const auto& route_ptr = route();
+  const std::string& cluster_name = route_ptr ? route_ptr->routeEntry()->clusterName() : "-";
+  const std::string& method = metadata->hasMethodName() ? metadata->methodName() : "-";
+  const int32_t frame_size =
+      metadata->hasFrameSize() ? static_cast<int32_t>(metadata->frameSize()) : -1;
+
+  if (error.has_value()) {
+    parent_.stats_.request_internal_error_.inc();
+    std::ostringstream oss;
+    parent_.read_callbacks_->connection().dumpState(oss, 0);
+    ENVOY_STREAM_LOG(error,
+                     "Catch exception: {}. Request seq_id: {}, method: {}, frame size: {}, cluster "
+                     "name: {}, downstream connection state {}, headers:\n{}",
+                     *this, error.value(), metadata_->sequenceId(), method, frame_size,
+                     cluster_name, oss.str(), metadata->requestHeaders());
+    throw EnvoyException(error.value());
+  }
 
   ProtobufWkt::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
-  fields_map["cluster"] =
-      ValueUtil::stringValue(route_ptr ? route_ptr->routeEntry()->clusterName() : "-");
-  fields_map["method"] =
-      ValueUtil::stringValue(metadata->hasMethodName() ? metadata->methodName() : "-");
+  fields_map["cluster"] = ValueUtil::stringValue(cluster_name);
+  fields_map["method"] = ValueUtil::stringValue(method);
   fields_map["passthrough"] = ValueUtil::stringValue(passthroughSupported() ? "true" : "false");
 
   auto& request_fields_map = *fields_map["request"].mutable_struct_value()->mutable_fields();
   request_fields_map["transport_type"] =
       ValueUtil::stringValue(TransportNames::get().fromType(downstreamTransportType()));
   request_fields_map["protocol_type"] =
-      ValueUtil::stringValue(ProtocolNames::get().fromType(parent_.decoder_->protocolType()));
+      ValueUtil::stringValue(ProtocolNames::get().fromType(downstreamProtocolType()));
   request_fields_map["message_type"] = ValueUtil::stringValue(
       metadata->hasMessageType() ? MessageTypeNames::get().fromType(metadata->messageType()) : "-");
 
   streamInfo().setDynamicMetadata("thrift.proxy", stats_obj);
-  ENVOY_STREAM_LOG(
-      trace, "Request seq_id: {}, method: {}, frame size: {}, headers:\n{}", *this,
-      metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
-      metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->requestHeaders());
+  ENVOY_STREAM_LOG(trace, "Request seq_id: {}, method: {}, frame size: {}, headers:\n{}", *this,
+                   metadata_->sequenceId(), method, frame_size, metadata->requestHeaders());
 
   return result;
 }
@@ -979,7 +1021,7 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
           parent_.config_.routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
-      cached_route_ = nullptr;
+      cached_route_ = absl::nullopt;
     }
   }
 
@@ -1010,7 +1052,11 @@ void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response
     cm.stats_.downstream_response_drain_close_.inc();
   }
 
-  parent_.sendLocalReply(*localReplyMetadata_, response, end_stream);
+  auto result = parent_.sendLocalReply(*localReplyMetadata_, response, end_stream);
+  // Only report while the local reply is successfully written.
+  if (result.has_value()) {
+    recordResponseAccessLog(*result, localReplyMetadata_);
+  }
 
   if (end_stream) {
     return;
@@ -1031,20 +1077,22 @@ void ConnectionManager::ActiveRpc::startUpstreamResponse(Transport& transport, P
 ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer::Instance& buffer) {
   ASSERT(response_decoder_ != nullptr);
 
-  try {
+  TRY_NEEDS_AUDIT {
     if (response_decoder_->onData(buffer)) {
       // Completed upstream response.
       parent_.doDeferredRpcDestroy(*this);
       return ThriftFilters::ResponseStatus::Complete;
     }
     return ThriftFilters::ResponseStatus::MoreData;
-  } catch (const AppException& ex) {
+  }
+  END_TRY catch (const AppException& ex) {
     ENVOY_LOG(error, "thrift response application error: {}", ex.what());
     parent_.stats_.response_decoding_error_.inc();
 
     sendLocalReply(ex, true);
     return ThriftFilters::ResponseStatus::Reset;
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "thrift response error: {}", parent_.read_callbacks_->connection(),
                    ex.what());
     parent_.stats_.response_decoding_error_.inc();
@@ -1053,6 +1101,8 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
     return ThriftFilters::ResponseStatus::Reset;
   }
 }
+
+void ConnectionManager::ActiveRpc::clearRouteCache() { cached_route_ = absl::nullopt; }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
   ENVOY_CONN_LOG(debug, "resetting downstream connection", parent_.read_callbacks_->connection());

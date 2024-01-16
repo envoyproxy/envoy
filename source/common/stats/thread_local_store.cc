@@ -12,6 +12,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/lock_guard.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
@@ -95,6 +96,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
     for (uint32_t i = first_histogram_index; i < deleted_histograms_.size(); ++i) {
       uint32_t erased = histogram_set_.erase(deleted_histograms_[i].get());
       ASSERT(erased == 1);
+      sinked_histograms_.erase(deleted_histograms_[i].get());
     }
   }
 }
@@ -170,11 +172,7 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   forEachGauge([&ret](std::size_t size) { ret.reserve(size); },
-               [&ret](Gauge& gauge) {
-                 if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
-                   ret.emplace_back(GaugeSharedPtr(&gauge));
-                 }
-               });
+               [&ret](Gauge& gauge) { ret.emplace_back(GaugeSharedPtr(&gauge)); });
   return ret;
 }
 
@@ -225,6 +223,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
     histogram->setShuttingDown(true);
   }
   histogram_set_.clear();
+  sinked_histograms_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -259,7 +258,7 @@ ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
   // is because many tests will not populate rejected_stats_.
   ASSERT(symbol_table_.toString(StatNameManagedStorage("Hello.world", symbol_table_).statName()) ==
          "Hello.world");
-  rejected_stats_.free(symbol_table_);
+  rejected_stats_.free(symbol_table_); // NOLINT(clang-analyzer-unix.Malloc)
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
@@ -582,7 +581,8 @@ void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, u
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) {
-  if (parent_.rejectsAll()) {
+  // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
+  if (parent_.rejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
   }
 
@@ -591,7 +591,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
-  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  StatsMatcher::FastResult fast_reject_result;
+  if (import_mode != Gauge::ImportMode::HiddenAccumulate) {
+    fast_reject_result = parent_.fastRejects(final_stat_name);
+  } else {
+    fast_reject_result = StatsMatcher::FastResult::Matches;
+  }
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_gauge_;
   }
@@ -678,6 +683,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
+          if (parent_.sink_predicates_.has_value() &&
+              parent_.sink_predicates_->includeHistogram(*stat)) {
+            parent_.sinked_histograms_.insert(stat.get());
+          }
         }
       }
     }
@@ -794,8 +803,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Uni
                                                    const StatNameTagVector& stat_name_tags,
                                                    SymbolTable& symbol_table)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
-      current_active_(0), used_(false), created_thread_id_(std::this_thread::get_id()),
-      symbol_table_(symbol_table) {
+      used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -827,8 +835,7 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
       unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, unit, supported_buckets),
-      cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), merged_(false),
-      id_(id) {}
+      cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   thread_local_store_.releaseHistogramCrossThread(id_);
@@ -877,6 +884,7 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
     if (!shutting_down_) {
       const size_t count = histogram_set_.erase(hist.statName());
       ASSERT(shutting_down_ || count == 1);
+      sinked_histograms_.erase(&hist);
     }
     return true;
   }
@@ -897,6 +905,8 @@ bool ParentHistogramImpl::used() const {
   // Consider ParentHistogram used only if has ever been merged.
   return merged_;
 }
+
+bool ParentHistogramImpl::hidden() const { return false; }
 
 void ParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);
@@ -930,7 +940,7 @@ std::string ParentHistogramImpl::quantileSummary() const {
     }
     return absl::StrJoin(summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
 }
 
@@ -946,8 +956,22 @@ std::string ParentHistogramImpl::bucketSummary() const {
     }
     return absl::StrJoin(bucket_summary, " ");
   } else {
-    return std::string("No recorded values");
+    return {"No recorded values"};
   }
+}
+
+std::vector<Stats::ParentHistogram::Bucket>
+ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
+  const uint32_t num_buckets = hist_num_buckets(&histogram);
+  std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
+  hist_bucket_t hist_bucket;
+  for (uint32_t i = 0; i < num_buckets; ++i) {
+    ParentHistogram::Bucket& bucket = buckets[i];
+    hist_bucket_idx_bucket(&histogram, i, &hist_bucket, &bucket.count_);
+    bucket.lower_bound_ = hist_bucket_to_double(hist_bucket);
+    bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
+  }
+  return buckets;
 }
 
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
@@ -1034,11 +1058,50 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
   alloc_.forEachSinkedTextReadout(f_size, f_stat);
 }
 
+void ThreadLocalStoreImpl::forEachSinkedHistogram(SizeFn f_size,
+                                                  StatFn<ParentHistogram> f_stat) const {
+  if (sink_predicates_.has_value() &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_include_histograms")) {
+    Thread::LockGuard lock(hist_mutex_);
+
+    if (f_size != nullptr) {
+      f_size(sinked_histograms_.size());
+    }
+    for (auto histogram : sinked_histograms_) {
+      f_stat(*histogram);
+    }
+  } else {
+    forEachHistogram(f_size, f_stat);
+  }
+}
+
 void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
   ASSERT(sink_predicates != nullptr);
   if (sink_predicates != nullptr) {
     sink_predicates_.emplace(*sink_predicates);
     alloc_.setSinkPredicates(std::move(sink_predicates));
+    // Add histograms to the set of sinked histograms.
+    Thread::LockGuard lock(hist_mutex_);
+    sinked_histograms_.clear();
+    for (auto& histogram : histogram_set_) {
+      if (sink_predicates_->includeHistogram(*histogram)) {
+        sinked_histograms_.insert(histogram);
+      }
+    }
+  }
+}
+
+void ThreadLocalStoreImpl::extractAndAppendTags(StatName name, StatNamePool& pool,
+                                                StatNameTagVector& stat_tags) {
+  extractAndAppendTags(symbolTable().toString(name), pool, stat_tags);
+}
+
+void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                                                StatNameTagVector& stat_tags) {
+  TagVector tags;
+  tagProducer().produceTags(name, tags);
+  for (const auto& tag : tags) {
+    stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
   }
 }
 

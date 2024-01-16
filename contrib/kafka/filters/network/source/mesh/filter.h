@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/time.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
@@ -9,6 +10,7 @@
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
 #include "contrib/kafka/filters/network/source/mesh/request_processor.h"
+#include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 #include "contrib/kafka/filters/network/source/request_codec.h"
@@ -26,26 +28,7 @@ namespace Mesh {
  * Filter is going to maintain a list of in-flight-request so it can send responses when they
  * finish.
  *
- *
- * +----------------+    <creates>    +-----------------------+
- * |RequestProcessor+----------------->AbstractInFlightRequest|
- * +-------^--------+                 +----^-----^------------+
- *         |                               |     | <subclass>
- *         |                               |   +-+------------------+
- * +-------+-------+ <in-flight-reference> |   |ProduceRequestHolder|
- * |KafkaMeshFilter+-----------------------+   +-+------------------+
- * +-------+-------+                             |
- *         |                                     |
- *         |                                     |
- * +-------v-----------+                         |<in-flight-reference>
- * |UpstreamKafkaFacade|                         |(for callback when finished)
- * +-------+-----------+                         |
- *         |                                     |
- *         |                                     |
- * +-------v--------------+       +--------------v--+    +-----------------+
- * |<<ThreadLocalObject>> +------->RichKafkaProducer+--->><<librdkafka>>   |
- * |ThreadLocalKafkaFacade|       +-----------------+    |RdKafka::Producer|
- * +----------------------+                              +-----------------+
+ * See command_handlers.md for particular request interactions.
  **/
 class KafkaMeshFilter : public Network::ReadFilter,
                         public Network::ConnectionCallbacks,
@@ -54,7 +37,8 @@ class KafkaMeshFilter : public Network::ReadFilter,
 public:
   // Main constructor.
   KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
-                  UpstreamKafkaFacade& upstream_kafka_facade);
+                  UpstreamKafkaFacade& upstream_kafka_facade,
+                  RecordCallbackProcessor& record_callback_processor);
 
   // Visible for testing.
   KafkaMeshFilter(RequestDecoderSharedPtr request_decoder);
@@ -75,6 +59,7 @@ public:
   // AbstractRequestListener
   void onRequest(InFlightRequestSharedPtr request) override;
   void onRequestReadyForAnswer() override;
+  Event::Dispatcher& dispatcher() override;
 
   std::list<InFlightRequestSharedPtr>& getRequestsInFlightForTest();
 

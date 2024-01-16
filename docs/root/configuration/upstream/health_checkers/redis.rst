@@ -23,3 +23,14 @@ Redis health checker is shown below:
         key: foo
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`
+
+Statistics
+----------
+
+The Redis health checker emits some statistics in the *health_check.redis.* namespace.
+
+.. csv-table::
+     :header: Name, Description
+     :widths: 1, 2
+
+     exists_failure, Total number of health check failures caused by EXISTS check failure.

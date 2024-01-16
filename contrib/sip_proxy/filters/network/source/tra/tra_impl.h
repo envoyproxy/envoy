@@ -5,7 +5,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/linked_object.h"

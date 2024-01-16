@@ -11,6 +11,7 @@ envoy_package()
 
 envoy_cc_binary(
     name = "wee8_compile_tool",
+    stamp = 0,
     deps = [":wee8_compile_lib"],
 )
 

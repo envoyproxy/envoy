@@ -22,6 +22,7 @@
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
@@ -30,14 +31,6 @@
 #define DISABLE_UNDER_COVERAGE return
 #else
 #define DISABLE_UNDER_COVERAGE                                                                     \
-  do {                                                                                             \
-  } while (0)
-#endif
-
-#ifdef WIN32
-#define DISABLE_UNDER_WINDOWS return
-#else
-#define DISABLE_UNDER_WINDOWS                                                                      \
   do {                                                                                             \
   } while (0)
 #endif
@@ -66,7 +59,11 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
+  static const InstanceConstSharedPtrFn defaultAddressFunction(Network::Address::IpVersion version);
 
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
@@ -150,6 +147,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
@@ -158,8 +156,10 @@ public:
   void useListenerAccessLog(absl::string_view format = "");
   // Returns all log entries after the nth access log entry, defaulting to log entry 0.
   // By default will trigger an expect failure if more than one entry is returned.
+  // If client_connection is provided, flush pending acks to enable deferred logging.
   std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
-                               bool allow_excess_entries = false);
+                               bool allow_excess_entries = false,
+                               Network::ClientConnection* client_connection = nullptr);
 
   std::string listener_access_log_name_;
 
@@ -186,15 +186,18 @@ public:
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
+
   template <class T>
-  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
-                             const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version) {
+  void
+  sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
+                        const std::vector<T>& added_or_updated,
+                        const std::vector<std::string>& removed, const std::string& version,
+                        const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata = {}) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, nullptr, metadata);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, metadata);
     }
   }
 
@@ -225,15 +228,33 @@ public:
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                                  const std::string& version, FakeStream* stream = nullptr) {
+    sendSotwDiscoveryResponse(type_url, messages, version, stream, {});
+  }
+  template <class T>
+  void
+  sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                            const std::string& version, FakeStream* stream,
+                            const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     if (stream == nullptr) {
       stream = xds_stream_.get();
     }
-
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(message);
+      if (!metadata.empty()) {
+        envoy::service::discovery::v3::Resource resource;
+        resource.mutable_resource()->PackFrom(message);
+        resource.set_name(intResourceName(message));
+        resource.set_version(version);
+        for (const auto& kvp : metadata) {
+          auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
+          (*map)[std::string(kvp.first)] = kvp.second;
+        }
+        discovery_response.add_resources()->PackFrom(resource);
+      } else {
+        discovery_response.add_resources()->PackFrom(message);
+      }
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -244,15 +265,34 @@ public:
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {});
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {}, {});
   }
+
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
-    auto response =
-        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream, aliases, {});
+  }
+
+  template <class T>
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
+                               metadata);
+  }
+
+  template <class T>
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases,
+                             const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
+    auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
+                                                    aliases, metadata);
     stream->sendGrpcMessage(response);
   }
 
@@ -276,17 +316,20 @@ public:
   envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
-                               const std::vector<std::string>& aliases) {
+                               const std::vector<std::string>& aliases,
+                               const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(message);
       resource.mutable_resource()->PackFrom(message);
       resource.set_name(intResourceName(message));
       resource.set_version(version);
       for (const auto& alias : aliases) {
         resource.add_aliases(alias);
+      }
+      for (const auto& kvp : metadata) {
+        auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
+        (*map)[std::string(kvp.first)] = kvp.second;
       }
       resources.emplace_back(resource);
     }
@@ -431,6 +474,13 @@ protected:
 
   void checkForMissingTagExtractionRules();
 
+  // Sets the timeout to wait for listeners to be created before invoking
+  // registerTestServerPorts(), as that needs to know about the bound listener ports.
+  // Needs to be called before invoking createEnvoy() (invoked during initialize()).
+  void setListenersBoundTimeout(const std::chrono::milliseconds& duration) {
+    listeners_bound_timeout_ms_ = duration;
+  }
+
   std::unique_ptr<Stats::Store> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
@@ -484,6 +534,13 @@ protected:
 
   spdlog::level::level_enum default_log_level_;
 
+  // Timeout to wait for listeners to be created before invoking
+  // registerTestServerPorts(), as that needs to know about the bound listener ports.
+  // Using 2x default timeout to cover for slow TLS implementations (no inline asm) on slow
+  // computers (e.g., Raspberry Pi) that sometimes time out on TLS listeners, or when
+  // the number of listeners in a test is large.
+  std::chrono::milliseconds listeners_bound_timeout_ms_{2 * TestUtility::DefaultTimeout};
+
   // Target number of upstreams.
   uint32_t fake_upstreams_count_{1};
 
@@ -524,7 +581,7 @@ protected:
 private:
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
-  // True if initialized() has been called.
+  // True if initialize() has been called.
   bool initialized_{};
   // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
   // the proxy uses the default watermark buffer factory to create buffers.

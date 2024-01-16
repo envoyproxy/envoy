@@ -1,0 +1,71 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "https"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "head"
+            }
+            headers {
+              key: "via"
+              value: "empty"
+            }
+            headers {
+              key: "-retriable-status-codes"
+              value: "empty"
+            }
+            headers {
+              key: "grpc-accept-encoding"
+              value: "identity"
+            }
+            headers {
+              key: "content-type"
+              value: "application/grpc-web-text"
+            }
+            headers {
+              key: "connection"
+              value: "upgrade"
+            }
+            headers {
+              key: "proxy-status"
+              value: "empty"
+            }
+            headers {
+              key: ":status"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

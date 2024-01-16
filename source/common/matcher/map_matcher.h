@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/matcher/matcher.h"
 
 namespace Envoy {
@@ -15,7 +17,14 @@ template <class DataType>
 class MapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
   MapMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match)
-      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)) {}
+      : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)) {
+    auto input_type = data_input_->dataInputType();
+    if (input_type != DefaultMatchingDataType) {
+      throwEnvoyExceptionOrPanic(
+          absl::StrCat("Unsupported data input type: ", input_type,
+                       ", currently only string type is supported in map matcher"));
+    }
+  }
 
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
@@ -27,11 +36,12 @@ public:
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    if (!input.data_) {
+    // Returns `on_no_match` when input data is empty. (i.e., is absl::monostate).
+    if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
 
-    const auto result = doMatch(*input.data_);
+    const auto result = doMatch(absl::get<std::string>(input.data_));
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);

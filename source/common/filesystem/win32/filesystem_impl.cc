@@ -1,5 +1,7 @@
 #include <fcntl.h>
 
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -110,6 +112,95 @@ Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, uint64_t count, uin
                 : resultFailure<ssize_t>(-1, ::GetLastError());
 }
 
+static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  ULARGE_INTEGER file_size;
+  file_size.LowPart = data.nFileSizeLow;
+  file_size.HighPart = data.nFileSizeHigh;
+  return static_cast<uint64_t>(file_size.QuadPart);
+}
+
+static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
+  // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
+  // intervals since January 1, 1601 (UTC).
+  // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
+  // So we set a SystemTime to that moment, and add that many 100-nanosecond units to that
+  // time, to get a SystemTime representing the same moment as the `FILETIME`, in microsecond
+  // precision.
+  // For timestamps earlier than the unix epoch (1970, `SystemTime{0}`), we assume it's an
+  // invalid value and return nullopt.
+  static const SystemTime windows_file_time_epoch =
+      absl::ToChronoTime(absl::FromCivil(absl::CivilYear(1601), absl::UTCTimeZone()));
+  ULARGE_INTEGER tenths_of_microseconds{t.dwLowDateTime, t.dwHighDateTime};
+  uint64_t v = static_cast<uint64_t>(tenths_of_microseconds.QuadPart);
+  SystemTime ret = windows_file_time_epoch + std::chrono::microseconds{v / 10};
+  if (ret <= SystemTime{}) {
+    // If the timestamp is before the unix epoch, return nullopt.
+    return absl::nullopt;
+  }
+  return ret;
+}
+
+static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+    return FileType::Directory;
+  }
+  if (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+    return FileType::Other;
+  }
+  return FileType::Regular;
+}
+
+static Api::IoCallResult<FileInfo>
+fileInfoFromAttributeData(absl::string_view path, const WIN32_FILE_ATTRIBUTE_DATA& data) {
+  absl::optional<uint64_t> sz;
+  FileType type = fileTypeFromAttributeData(data);
+  if (type == FileType::Regular) {
+    sz = fileSizeFromAttributeData(data);
+  }
+  absl::StatusOr<PathSplitResult> result_or_error = InstanceImplWin32().splitPathFromFilename(path);
+  FileInfo ret{
+      result_or_error.ok() ? std::string{result_or_error.value().file_} : "",
+      sz,
+      type,
+      systemTimeFromFileTime(data.ftCreationTime),
+      systemTimeFromFileTime(data.ftLastAccessTime),
+      systemTimeFromFileTime(data.ftLastWriteTime),
+  };
+  if (result_or_error.status().ok()) {
+    return resultSuccess(ret);
+  }
+  return resultFailure(ret, ERROR_INVALID_DATA);
+}
+
+Api::IoCallResult<FileInfo> FileImplWin32::info() {
+  ASSERT(isOpen());
+  WIN32_FILE_ATTRIBUTE_DATA data;
+  BOOL result = GetFileAttributesEx(path().c_str(), GetFileExInfoStandard, &data);
+  if (!result) {
+    return resultFailure<FileInfo>({}, ::GetLastError());
+  }
+  return fileInfoFromAttributeData(path(), data);
+}
+
+Api::IoCallResult<FileInfo> InstanceImplWin32::stat(absl::string_view path) {
+  WIN32_FILE_ATTRIBUTE_DATA data;
+  std::string full_path{path};
+  BOOL result = GetFileAttributesEx(full_path.c_str(), GetFileExInfoStandard, &data);
+  if (!result) {
+    return resultFailure<FileInfo>({}, ::GetLastError());
+  }
+  return fileInfoFromAttributeData(full_path, data);
+}
+
+Api::IoCallBoolResult InstanceImplWin32::createPath(absl::string_view path) {
+  std::error_code ec;
+  while (!path.empty() && path.back() == '/') {
+    path.remove_suffix(1);
+  }
+  bool result = std::filesystem::create_directories(std::string{path}, ec);
+  return ec ? resultFailure(false, ec.value()) : resultSuccess(result);
+}
+
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
   DWORD access = 0;
   DWORD creation = OPEN_EXISTING;
@@ -190,9 +281,9 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   return result;
 }
 
-std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
 
   // In integration tests (and potentially in production) we rename config files and this creates
@@ -204,9 +295,9 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   if (fd == INVALID_HANDLE) {
     auto last_error = ::GetLastError();
     if (last_error == ERROR_FILE_NOT_FOUND) {
-      throw EnvoyException(absl::StrCat("Invalid path: ", path));
+      return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
     }
-    throw EnvoyException(absl::StrCat("unable to read file: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("unable to read file: ", path));
   }
   DWORD buffer_size = 100;
   DWORD bytes_read = 0;
@@ -217,10 +308,10 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
       auto last_error = ::GetLastError();
       if (last_error == ERROR_FILE_NOT_FOUND) {
         CloseHandle(fd);
-        throw EnvoyException(absl::StrCat("Invalid path: ", path));
+        return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
       }
       CloseHandle(fd);
-      throw EnvoyException(absl::StrCat("unable to read file: ", path));
+      return absl::InvalidArgumentError(absl::StrCat("unable to read file: ", path));
     }
     complete_buffer.insert(complete_buffer.end(), buffer.begin(), buffer.begin() + bytes_read);
   } while (bytes_read == buffer_size);
@@ -228,10 +319,10 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   return std::string(complete_buffer.begin(), complete_buffer.end());
 }
 
-PathSplitResult InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
+absl::StatusOr<PathSplitResult> InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
   size_t last_slash = path.find_last_of(":/\\");
   if (last_slash == std::string::npos) {
-    throw EnvoyException(fmt::format("invalid file path {}", path));
+    return absl::InvalidArgumentError(fmt::format("invalid file path {}", path));
   }
   absl::string_view name = path.substr(last_slash + 1);
   // Truncate all trailing slashes, but retain the entire
@@ -239,7 +330,7 @@ PathSplitResult InstanceImplWin32::splitPathFromFilename(absl::string_view path)
   if (last_slash == 0 || path[last_slash] == ':' || path[last_slash - 1] == ':') {
     ++last_slash;
   }
-  return {path.substr(0, last_slash), name};
+  return PathSplitResult{path.substr(0, last_slash), name};
 }
 
 // clang-format off

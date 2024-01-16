@@ -3,7 +3,8 @@ virtual_hosts:
   domains:
   - www1.lyft.com
   routes:
-  - match:
+  - name: catchall-weighted-www1
+    match:
       prefix: /
     route:
       weighted_clusters:
@@ -28,7 +29,8 @@ virtual_hosts:
   domains:
   - www2.lyft.com
   routes:
-  - match:
+  - name: catchall-weighted-www2
+    match:
       prefix: /
     route:
       weighted_clusters:

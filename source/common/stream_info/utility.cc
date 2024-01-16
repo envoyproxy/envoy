@@ -5,33 +5,43 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/http/default_server_string.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace StreamInfo {
 
+const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info) {
+  return toString(stream_info, true);
+}
+
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
+  return toString(stream_info, false);
+}
+
+const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, bool use_long_name) {
   // We don't expect more than 4 flags are set. Relax to 16 since the vector is allocated on stack
   // anyway.
-  absl::InlinedVector<absl::string_view, 16> flag_strings;
-  for (const auto& [flag_string, flag] : ALL_RESPONSE_STRING_FLAGS) {
+  absl::InlinedVector<absl::string_view, 16> flag_strings_vec;
+  for (const auto& [flag_strings, flag] : ALL_RESPONSE_STRINGS_FLAGS) {
     if (stream_info.hasResponseFlag(flag)) {
-      flag_strings.push_back(flag_string);
+      flag_strings_vec.push_back(use_long_name ? flag_strings.long_string_
+                                               : flag_strings.short_string_);
     }
   }
-  if (flag_strings.empty()) {
+  if (flag_strings_vec.empty()) {
     return std::string(NONE);
   }
-  return absl::StrJoin(flag_strings, ",");
+  return absl::StrJoin(flag_strings_vec, ",");
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
-  static_assert(ResponseFlag::LastFlag == 0x4000000,
-                "A flag has been added. Add the new flag to ALL_RESPONSE_STRING_FLAGS.");
+  static_assert(ResponseFlag::LastFlag == 0x8000000,
+                "A flag has been added. Add the new flag to ALL_RESPONSE_STRINGS_FLAGS.");
   absl::flat_hash_map<std::string, ResponseFlag> res;
-  for (auto [str, flag] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
-    res.emplace(str, flag);
+  for (auto [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+    res.emplace(flag_strings.short_string_, flag);
   }
   return res;
 }
@@ -98,6 +108,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceiv
   return duration(timing.value().get().last_upstream_rx_byte_received_, stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().upstreamHandshakeComplete(), stream_info_);
+}
+
 absl::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSent() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
@@ -130,6 +148,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeCompl
   return duration(timing.value().get().downstreamHandshakeComplete(), stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamAckReceived(), stream_info_);
+}
+
 const std::string&
 Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {
@@ -146,6 +172,14 @@ Utility::formatDownstreamAddressJustPort(const Network::Address::Instance& addre
     port = std::to_string(address.ip()->port());
   }
   return port;
+}
+
+absl::optional<uint32_t>
+Utility::extractDownstreamAddressJustPort(const Network::Address::Instance& address) {
+  if (address.type() == Network::Address::Type::Ip) {
+    return address.ip()->port();
+  }
+  return {};
 }
 
 const absl::optional<Http::Code>
@@ -280,7 +314,7 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
   case ProxyStatusError::TlsProtocolError:
     return TLS_PROTOCOL_ERROR;
   case ProxyStatusError::TlsCertificateError:
-    return TLS_CERTIFICATE_ERORR;
+    return TLS_CERTIFICATE_ERROR;
   case ProxyStatusError::TlsAlertReceived:
     return TLS_ALERT_RECEIVED;
   case ProxyStatusError::HttpRequestError:
@@ -333,7 +367,11 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   } else if (stream_info.hasResponseFlag(ResponseFlag::NoHealthyUpstream)) {
     return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
-    return ProxyStatusError::ConnectionTimeout;
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.proxy_status_upstream_request_timeout")) {
+      return ProxyStatusError::ConnectionTimeout;
+    }
+    return ProxyStatusError::HttpResponseTimeout;
   } else if (stream_info.hasResponseFlag(ResponseFlag::LocalReset)) {
     return ProxyStatusError::ConnectionTimeout;
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
@@ -366,6 +404,8 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
     return ProxyStatusError::HttpProtocolError;
   } else if (stream_info.hasResponseFlag(ResponseFlag::NoClusterFound)) {
     return ProxyStatusError::DestinationUnavailable;
+  } else if (stream_info.hasResponseFlag(ResponseFlag::DnsResolutionFailed)) {
+    return ProxyStatusError::DnsError;
   } else {
     return absl::nullopt;
   }

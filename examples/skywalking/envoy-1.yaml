@@ -104,7 +104,7 @@ static_resources:
             address:
               socket_address:
                 address: service-1
-                port_value: 8000
+                port_value: 8080
   - name: envoy_cluster2
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN

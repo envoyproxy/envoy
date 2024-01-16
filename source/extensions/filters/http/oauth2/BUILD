@@ -52,7 +52,6 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

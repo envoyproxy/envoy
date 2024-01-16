@@ -1,5 +1,8 @@
+#pragma once
+
 #import <Foundation/Foundation.h>
 
+#import "library/objective-c/EMODirectResponse.h"
 #import "library/objective-c/EnvoyAliases.h"
 #import "library/objective-c/EnvoyConfiguration.h"
 #import "library/objective-c/EnvoyEventTracker.h"
@@ -47,14 +50,14 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Run the Envoy engine with the provided yaml string and log level.
 
- @param yaml The configuration template with which to start Envoy.
+ @param yaml The configuration yaml with which to start Envoy.
  @param config The EnvoyConfiguration used to start Envoy.
  @param logLevel The log level to use when starting Envoy.
  @return A status indicating if the action was successful.
  */
-- (int)runWithTemplate:(NSString *)yaml
-                config:(EnvoyConfiguration *)config
-              logLevel:(NSString *)logLevel;
+- (int)runWithYAML:(NSString *)yaml
+            config:(EnvoyConfiguration *)config
+          logLevel:(NSString *)logLevel;
 
 /**
  Opens a new HTTP stream attached to this engine.
@@ -73,11 +76,6 @@ NS_ASSUME_NONNULL_BEGIN
  @return A status indicating if the action was successful.
  */
 - (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count;
-
-/**
- Attempt to trigger a stat flush.
- */
-- (void)flushStats;
 
 /**
  Retrieve the value of all active stats. Note that this function may block for some time.

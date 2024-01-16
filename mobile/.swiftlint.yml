@@ -111,7 +111,7 @@ type_body_length:
   warning: 300
   error: 400
 file_length:
-  warning: 300
+  warning: 400
   ignore_comment_only_lines: true
 private_over_fileprivate:
   validate_extensions: true
@@ -140,7 +140,7 @@ modifier_order:
   - dynamic
   - convenience
 deployment_target:
-  iOS_deployment_target: 12.0
+  iOS_deployment_target: 13.0
 
 custom_rules:
   newline_after_brace:

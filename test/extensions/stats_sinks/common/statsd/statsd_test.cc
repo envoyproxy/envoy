@@ -39,7 +39,7 @@ public:
     cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     sink_ = std::make_unique<TcpStatsdSink>(
         local_info_, "fake_cluster", tls_, cluster_manager_,
-        cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_);
+        *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()));
   }
 
   void expectCreateConnection() {
@@ -83,9 +83,24 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
   gauge.used_ = true;
   snapshot_.gauges_.push_back(gauge);
 
+  Stats::PrimitiveCounter host_counter;
+  host_counter.add(3);
+  Stats::PrimitiveCounterSnapshot host_counter_snap(host_counter);
+  host_counter_snap.setName("test_host_counter");
+  snapshot_.host_counters_.push_back(host_counter_snap);
+
+  Stats::PrimitiveGauge host_gauge;
+  host_gauge.add(4);
+  Stats::PrimitiveGaugeSnapshot host_gauge_snap(host_gauge);
+  host_gauge_snap.setName("test_host_gauge");
+  snapshot_.host_gauges_.push_back(host_gauge_snap);
+
   expectCreateConnection();
-  EXPECT_CALL(*connection_,
-              write(BufferStringEqual("envoy.test_counter:1|c\nenvoy.test_gauge:2|g\n"), _));
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n"
+                                                    "envoy.test_host_counter:3|c\n"
+                                                    "envoy.test_gauge:2|g\n"
+                                                    "envoy.test_host_gauge:4|g\n"),
+                                  _));
   sink_->flush(snapshot_);
 
   connection_->runHighWatermarkCallbacks();
@@ -178,7 +193,8 @@ TEST_F(TcpStatsdSinkTest, NoHost) {
 TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
   sink_ = std::make_unique<TcpStatsdSink>(
       local_info_, "fake_cluster", tls_, cluster_manager_,
-      cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_, "test_prefix");
+      *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()),
+      "test_prefix");
 
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";

@@ -1,14 +1,10 @@
 #pragma once
 
-#include <vector>
-
-#include "envoy/common/regex.h"
 #include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.h"
 #include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.validate.h"
 #include "envoy/http/early_header_mutation.h"
 
-#include "source/common/common/regex.h"
-#include "source/common/router/header_parser.h"
+#include "source/common/http/header_mutation.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,15 +17,6 @@ using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 using ProtoHeaderMutation =
     envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation;
 
-class Mutation {
-public:
-  virtual ~Mutation() = default;
-
-  virtual void mutate(Envoy::Http::RequestHeaderMap& headers,
-                      const StreamInfo::StreamInfo& stream_info) const PURE;
-};
-using MutationPtr = std::unique_ptr<Mutation>;
-
 class HeaderMutation : public Envoy::Http::EarlyHeaderMutation {
 public:
   HeaderMutation(const ProtoHeaderMutation& mutations);
@@ -38,7 +25,7 @@ public:
               const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  std::vector<MutationPtr> mutations_;
+  Envoy::Http::HeaderMutations mutations_;
 };
 
 } // namespace HeaderMutation

@@ -1,8 +1,17 @@
 #!/bin/bash -e
 
 export NAME=skywalking
-export PORT_PROXY="${SKYWALKING_PORT_PROXY:-12600}"
-export PORT_UI="${SKYWALKING_PORT_UI:-12601}"
+export PORT_PROXY="${SKYWALKING_PORT_PROXY:-11910}"
+export PORT_UI="${SKYWALKING_PORT_UI:-11911}"
+
+# NB: This allows ES to run in a low-resource environment,
+#   dont do this in a production environment.
+export ES_MAX_HEADROOM=1GB
+export ES_WATERMARK_FLOOD_FROZEN=99%
+export ES_WATERMARK_FLOOD=99%
+export ES_WATERMARK_HIGH=99%
+export ES_WATERMARK_LOW=99%
+
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"

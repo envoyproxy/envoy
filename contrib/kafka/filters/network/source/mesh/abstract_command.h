@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
+
 #include "source/common/common/logger.h"
 
 #include "contrib/kafka/filters/network/source/kafka_response.h"
@@ -57,18 +59,23 @@ public:
   // Notifies the listener that a new request has been received.
   virtual void onRequest(InFlightRequestSharedPtr request) PURE;
 
-  // Notified the listener, that the request finally has an answer ready.
+  // Notifies the listener, that the request finally has an answer ready.
   // Usually this means that the request has been sent to upstream Kafka clusters and we got answers
   // (unless it's something that could be responded to locally).
   // IMPL: we do not need to pass request here, as filters need to answer in-order.
   // What means that we always need to check if first answer is ready, even if the latter are
   // already finished.
   virtual void onRequestReadyForAnswer() PURE;
+
+  // Accesses listener's dispatcher.
+  // Used by non-Envoy threads that need to communicate with listeners.
+  virtual Event::Dispatcher& dispatcher() PURE;
 };
 
 /**
  * Helper base class for all in flight requests.
  * Binds request to its origin filter.
+ * All the fields can be accessed only by the owning dispatcher thread.
  */
 class BaseInFlightRequest : public InFlightRequest, protected Logger::Loggable<Logger::Id::kafka> {
 public:

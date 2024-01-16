@@ -20,6 +20,7 @@ def envoy_cc_binary(
         visibility = None,
         external_deps = [],
         repository = "",
+        stamp = 1,
         stamped = False,
         deps = [],
         linkopts = [],
@@ -45,7 +46,7 @@ def envoy_cc_binary(
         linkstatic = 1,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
-        stamp = 1,
+        stamp = stamp,
         deps = deps,
         tags = tags,
         features = features,
@@ -54,7 +55,12 @@ def envoy_cc_binary(
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
     return select({
-        "@envoy//bazel:apple": [],
+        "@envoy//bazel:apple": [
+            # https://github.com/envoyproxy/envoy/issues/24782
+            "-Wl,-framework,CoreFoundation",
+            # https://github.com/bazelbuild/bazel/pull/16414
+            "-Wl,-undefined,error",
+        ],
         "@envoy//bazel:windows_opt_build": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",

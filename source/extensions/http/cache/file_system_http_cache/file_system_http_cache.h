@@ -4,6 +4,7 @@
 
 #include "envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/http/cache/file_system_http_cache/stats.h"
@@ -21,13 +22,28 @@ namespace FileSystemHttpCache {
 using ConfigProto =
     envoy::extensions::http::cache::file_system_http_cache::v3::FileSystemHttpCacheConfig;
 
+class CacheEvictionThread;
+struct CacheShared;
+
+/**
+ * An instance of a cache. There may be multiple caches in a single envoy configuration.
+ * Caches are jointly owned by filters using the cache and the filter configurations.
+ * When the filter configurations are destroyed and all cache actions from those filters
+ * are resolved, the cache instance is destroyed.
+ * Cache instances jointly own the CacheSingleton.
+ * If all cache instances are destroyed, the CacheSingleton is destroyed.
+ *
+ * See DESIGN.md for details of cache behavior.
+ */
 class FileSystemHttpCache : public HttpCache,
                             public std::enable_shared_from_this<FileSystemHttpCache>,
                             public Logger::Loggable<Logger::Id::cache_filter> {
 public:
-  FileSystemHttpCache(Singleton::InstanceSharedPtr owner, ConfigProto config,
+  FileSystemHttpCache(Singleton::InstanceSharedPtr owner,
+                      CacheEvictionThread& cache_eviction_thread, ConfigProto config,
                       std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
                       Stats::Scope& stats_scope);
+  ~FileSystemHttpCache() override;
 
   // Overrides for HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& lookup,
@@ -35,7 +51,7 @@ public:
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
                                      Http::StreamEncoderFilterCallbacks& callbacks) override;
   CacheInfo cacheInfo() const override;
-  const CacheStats& stats() const { return stats_; }
+  const CacheStats& stats() const;
 
   /**
    * Replaces the headers of a cache entry.
@@ -71,7 +87,7 @@ public:
    * configs using the same path.
    * @return the config of this cache.
    */
-  const ConfigProto& config() { return config_; }
+  const ConfigProto& config() const;
 
   /**
    * True if the given key currently has a stream writing to it.
@@ -139,7 +155,7 @@ public:
   std::string generateFilename(const Key& key) const;
 
   /**
-   * Returns the path for this cache instance.
+   * Returns the path for this cache instance. Guaranteed to end in a path-separator.
    * @return the configured path for this cache instance.
    */
   absl::string_view cachePath() const;
@@ -151,11 +167,6 @@ public:
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> asyncFileManager() const {
     return async_file_manager_;
   }
-
-  /**
-   * Measures initial state of cache path, to facilitate stats and timely eviction.
-   */
-  void init();
 
   /**
    * Updates stats to reflect that a file has been added to the cache.
@@ -174,6 +185,8 @@ public:
   // is totally irrelevant to the outward-facing API.
   static const size_t max_update_headers_copy_chunk_size_;
 
+  using PostEvictionCallback = std::function<void(uint64_t size_bytes, uint64_t count)>;
+
 private:
   /**
    * Writes a vary node to disk for the given key. A vary node in the cache consists of
@@ -188,7 +201,6 @@ private:
 
   // A shared_ptr to keep the cache singleton alive as long as any of its caches are in use.
   const Singleton::InstanceSharedPtr owner_;
-  const ConfigProto config_;
 
   absl::Mutex cache_mu_;
   // When a new cache entry is being written, its key will be here and the cache file
@@ -205,8 +217,27 @@ private:
       entries_being_written_ ABSL_GUARDED_BY(cache_mu_);
 
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
-  CacheStats stats_;
 
+  // Stats and config are held in a shared_ptr so that CacheEvictionThread can use
+  // them even if the cache instance has been deleted while it performed work.
+  std::shared_ptr<CacheShared> shared_;
+
+  // This reference must be declared after owner_, since it can potentially be
+  // invalid after owner_ is destroyed.
+  CacheEvictionThread& cache_eviction_thread_;
+
+  // Allow test access to cache_eviction_thread_ for synchronization.
+  friend class FileSystemCacheTestContext;
+};
+
+// This part of the cache implementation is shared between CacheEvictionThread and
+// FileSystemHttpCache. The implementation of CacheShared is also split between the
+// two implementation files, accordingly.
+struct CacheShared {
+  CacheShared(ConfigProto config, Stats::Scope& stats_scope);
+  const ConfigProto config_;
+  CacheStatNames stat_names_;
+  CacheStats stats_;
   // These are part of stats, but we have to track them separately because there is
   // potential to go "less than zero" due to not having sole control of the file cache;
   // gauge values don't have fine enough control to prevent that, and aren't allowed to
@@ -214,8 +245,42 @@ private:
   //
   // See comment on size_bytes and size_count in stats.h for explanation of how stat
   // values can be out of sync with the actionable cache.
-  std::atomic<uint64_t> size_count_;
-  std::atomic<uint64_t> size_bytes_;
+  std::atomic<uint64_t> size_count_ = 0;
+  std::atomic<uint64_t> size_bytes_ = 0;
+  bool needs_init_ = true;
+
+  /**
+   * @return true if the eviction thread should do a pass over this cache.
+   */
+  bool needsEviction() const;
+
+  /**
+   * Returns the path for this cache instance. Guaranteed to end in a path-separator.
+   * @return the configured path for this cache instance.
+   */
+  absl::string_view cachePath() const { return config_.cache_path(); }
+
+  /**
+   * Updates stats (size and count) to reflect that a file has been added to the cache.
+   * @param file_size The size in bytes of the file that was added.
+   */
+  void trackFileAdded(uint64_t file_size);
+
+  /**
+   * Updates stats (size and count) to reflect that a file has been removed from the cache.
+   * @param file_size The size in bytes of the file that was removed.
+   */
+  void trackFileRemoved(uint64_t file_size);
+
+  /**
+   * Performs an eviction pass over this cache. Runs in the CacheEvictionThread.
+   */
+  void evict();
+
+  /**
+   * Initializes the stats for this cache. Runs in the CacheEvictionThread.
+   */
+  void initStats();
 };
 
 } // namespace FileSystemHttpCache

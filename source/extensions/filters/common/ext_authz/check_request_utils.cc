@@ -68,24 +68,24 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansLocalCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(ssl->subjectLocalCertificate());
+          peer.set_principal(MessageUtil::sanitizeUtf8String(ssl->subjectLocalCertificate()));
         } else {
-          peer.set_principal(dns_sans[0]);
+          peer.set_principal(MessageUtil::sanitizeUtf8String(dns_sans[0]));
         }
       } else {
-        peer.set_principal(uri_sans[0]);
+        peer.set_principal(MessageUtil::sanitizeUtf8String(uri_sans[0]));
       }
     } else {
       const auto uri_sans = ssl->uriSanPeerCertificate();
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansPeerCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(ssl->subjectPeerCertificate());
+          peer.set_principal(MessageUtil::sanitizeUtf8String(ssl->subjectPeerCertificate()));
         } else {
-          peer.set_principal(dns_sans[0]);
+          peer.set_principal(MessageUtil::sanitizeUtf8String(dns_sans[0]));
         }
       } else {
-        peer.set_principal(uri_sans[0]);
+        peer.set_principal(MessageUtil::sanitizeUtf8String(uri_sans[0]));
       }
       if (include_certificate) {
         peer.set_certificate(ssl->urlEncodedPemEncodedPeerCertificate());
@@ -94,7 +94,7 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
   }
 
   if (!service.empty()) {
-    peer.set_service(service);
+    peer.set_service(MessageUtil::sanitizeUtf8String(service));
   }
 }
 
@@ -102,7 +102,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
   if (entry) {
     // TODO(jmarantz): plumb absl::string_view further here; there's no need
     // to allocate a temp string in the local uses.
-    return std::string(entry->value().getStringView());
+    return MessageUtil::sanitizeUtf8String(entry->value().getStringView());
   }
   return EMPTY_STRING;
 }
@@ -138,17 +138,21 @@ void CheckRequestUtils::setHttpRequest(
   headers.iterate([request_header_matchers, mutable_headers](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
+      const std::string sanitized_value =
+          MessageUtil::sanitizeUtf8String(e.value().getStringView());
+
       const std::string key(e.key().getStringView());
 
       if (request_header_matchers == nullptr || request_header_matchers->matches(key)) {
         if (mutable_headers->find(key) == mutable_headers->end()) {
-          (*mutable_headers)[key] = std::string(e.value().getStringView());
+          (*mutable_headers)[key] = sanitized_value;
         } else {
           // Merge duplicate headers.
-          (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
+          (*mutable_headers)[key].append(",").append(sanitized_value);
         }
       }
     }
+
     return Envoy::Http::HeaderMap::Iterate::Continue;
   });
 
@@ -164,7 +168,7 @@ void CheckRequestUtils::setHttpRequest(
     if (pack_as_bytes) {
       httpreq.set_raw_body(std::move(data));
     } else {
-      httpreq.set_body(std::move(data));
+      httpreq.set_body(MessageUtil::sanitizeUtf8String(data));
     }
 
     // Add in a header to detect when a partial body is used.
@@ -188,8 +192,9 @@ void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::RequestHeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
     envoy::config::core::v3::Metadata&& metadata_context,
+    envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool include_peer_certificate,
+    bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
     const MatcherSharedPtr& request_header_matchers) {
 
@@ -207,10 +212,20 @@ void CheckRequestUtils::createHttpCheck(
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         request_header_matchers);
 
+  if (include_tls_session) {
+    if (cb->connection()->ssl() != nullptr) {
+      attrs->mutable_tls_session();
+      if (!cb->connection()->ssl()->sni().empty()) {
+        const std::string server_name(cb->connection()->ssl()->sni());
+        attrs->mutable_tls_session()->set_sni(server_name);
+      }
+    }
+  }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
   (*attrs->mutable_metadata_context()) = std::move(metadata_context);
+  (*attrs->mutable_route_metadata_context()) = std::move(route_metadata_context);
 }
 
 void CheckRequestUtils::createTcpCheck(

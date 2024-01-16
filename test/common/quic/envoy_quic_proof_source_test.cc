@@ -37,8 +37,7 @@ public:
     ON_CALL(client_context_config_, alpnProtocols()).WillByDefault(ReturnRef(alpn));
     const std::string empty_string;
     ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string));
-    ON_CALL(client_context_config_, signingAlgorithmsForTest())
-        .WillByDefault(ReturnRef(empty_string));
+    ON_CALL(client_context_config_, signatureAlgorithms()).WillByDefault(ReturnRef(empty_string));
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
 
@@ -70,7 +69,7 @@ public:
     const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        store_, client_context_config_, time_system_);
+        *store_.rootScope(), client_context_config_, time_system_);
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(verify_context_, transportSocketOptions())
         .WillByDefault(ReturnRef(transport_socket_options_));
@@ -150,6 +149,7 @@ public:
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         proof_source_(listen_socket_, filter_chain_manager_, listener_stats_, time_system_) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
+    EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
         true, listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
@@ -202,6 +202,7 @@ protected:
   Server::ListenerStats listener_stats_;
   Event::GlobalTimeSystem time_system_;
   EnvoyQuicProofSource proof_source_;
+  std::string alpn_{"h3"};
 };
 
 TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {

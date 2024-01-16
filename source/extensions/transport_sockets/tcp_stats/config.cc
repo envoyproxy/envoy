@@ -16,7 +16,7 @@ TcpStatsSocketFactory::TcpStatsSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
     const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config) {
 #if defined(__linux__)
-  config_ = std::make_shared<Config>(config, context.scope());
+  config_ = std::make_shared<Config>(config, context.statsScope());
 #else
   UNREFERENCED_PARAMETER(config);
   UNREFERENCED_PARAMETER(context);

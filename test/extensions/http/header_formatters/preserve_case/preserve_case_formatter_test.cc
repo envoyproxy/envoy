@@ -86,14 +86,6 @@ TEST(PreserveCaseFormatterTest, DefaultFormatterOnEnvoyHeadersEnabled) {
   EXPECT_EQ(false, formatter.formatterOnEnvoyHeaders().has_value());
 }
 
-TEST(PreserveCaseFormatterTest, InvalidFormatterOnEnvoyHeaders) {
-  EXPECT_THROW_WITH_REGEX(
-      PreserveCaseHeaderFormatter formatter(
-          false, static_cast<envoy::extensions::http::header_formatters::preserve_case::v3::
-                                 PreserveCaseFormatterConfig::FormatterTypeOnEnvoyHeaders>(-1)),
-      EnvoyException, "Not supported FormatterTypeOnEnvoyHeaders:.*");
-}
-
 } // namespace PreserveCase
 } // namespace HeaderFormatters
 } // namespace Http

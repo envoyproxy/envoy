@@ -10,6 +10,8 @@ builtin:
 - envoy.matching.inputs.request_trailers
 - envoy.matching.inputs.response_headers
 - envoy.matching.inputs.response_trailers
+- envoy.matching.inputs.query_params
+- envoy.matching.inputs.cel_data_input
 - envoy.matching.inputs.destination_ip
 - envoy.matching.inputs.destination_port
 - envoy.matching.inputs.source_ip
@@ -19,11 +21,13 @@ builtin:
 - envoy.matching.inputs.server_name
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
+- envoy.matching.inputs.filter_state
 - envoy.matching.inputs.uri_san
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject
 - envoy.regex_engines.google_re2
 - envoy.filters.http.upstream_codec
+- envoy.upstream.local_address_selector.default_local_address_selector
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -63,14 +67,20 @@ categories:
 - envoy.compression.compressor
 - envoy.compression.decompressor
 - envoy.config.validators
+- envoy.config_subscription
+- envoy.config_mux
 - envoy.filters.http
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
+- envoy.filters.udp.session
+- envoy.filters.quic_listener
 - envoy.formatter
+- envoy.geoip_providers
 - envoy.grpc_credentials
 - envoy.guarddog_actions
 - envoy.health_checkers
+- envoy.health_check.event_sinks
 - envoy.http.cache
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters
@@ -84,6 +94,7 @@ categories:
 - envoy.quic.connection_id_generator
 - envoy.quic.proof_source
 - envoy.quic.server.crypto_stream
+- envoy.quic.server_preferred_address
 - envoy.rate_limit_descriptors
 - envoy.regex_engines
 - envoy.request_id
@@ -99,6 +110,7 @@ categories:
 - envoy.transport_sockets.upstream
 - envoy.tls.cert_validator
 - envoy.upstreams
+- envoy.upstream.local_address_selector
 - envoy.udp_packet_writer
 - envoy.wasm.runtime
 - envoy.xds_delegates
@@ -106,8 +118,10 @@ categories:
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.rbac.matchers
+- envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.injected_credentials
 - envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
@@ -119,8 +133,12 @@ categories:
 - envoy.tls_handshakers
 - envoy.generic_proxy.filters
 - envoy.generic_proxy.codecs
+- envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.router.cluster_specifier_plugin
+- envoy.tracers.opentelemetry.resource_detectors
+- envoy.tracers.opentelemetry.samplers
 
 status_values:
 - name: stable

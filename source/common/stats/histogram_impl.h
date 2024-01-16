@@ -49,8 +49,6 @@ public:
       const histogram_t* histogram_ptr, Histogram::Unit unit = Histogram::Unit::Unspecified,
       ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
 
-  static ConstSupportedBuckets& defaultSupportedBuckets();
-
   void refresh(const histogram_t* new_histogram_ptr);
 
   // HistogramStatistics
@@ -62,6 +60,7 @@ public:
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
   std::vector<uint64_t> computeDisjointBuckets() const override;
   uint64_t sampleCount() const override { return sample_count_; }
+  uint64_t outOfBoundCount() const override { return out_of_bound_count_; }
   double sampleSum() const override { return sample_sum_; }
 
 private:
@@ -69,6 +68,7 @@ private:
   std::vector<double> computed_quantiles_;
   std::vector<uint64_t> computed_buckets_;
   uint64_t sample_count_{0};
+  uint64_t out_of_bound_count_{0};
   double sample_sum_{0};
   const Histogram::Unit unit_{Histogram::Unit::Unspecified};
 };
@@ -111,6 +111,7 @@ public:
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
+  bool hidden() const override { return false; }
   SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
 private:
@@ -131,6 +132,7 @@ public:
   ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }
+  bool hidden() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
   Unit unit() const override { return Unit::Null; };

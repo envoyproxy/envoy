@@ -41,6 +41,7 @@ static void bmCreateRace(benchmark::State& state) {
             access.wait();
 
             for (int count = 0; count < 1000; ++count) {
+              // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
               Envoy::Stats::StatNameStorage second(stat_name_string, table);
               second.free(table);
             }
@@ -74,7 +75,8 @@ static void bmJoinStatNames(benchmark::State& state) {
   Envoy::Stats::StatName e = pool.add("e");
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    Envoy::Stats::Utility::counterFromStatNames(store, Envoy::Stats::makeStatNames(a, b, c, d, e));
+    Envoy::Stats::Utility::counterFromStatNames(*store.rootScope(),
+                                                Envoy::Stats::makeStatNames(a, b, c, d, e));
   }
 }
 BENCHMARK(bmJoinStatNames);
@@ -91,7 +93,7 @@ static void bmJoinElements(benchmark::State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     Envoy::Stats::Utility::counterFromElements(
-        store, Envoy::Stats::makeElements(a, b, c, Envoy::Stats::DynamicName("d"), e));
+        *store.rootScope(), Envoy::Stats::makeElements(a, b, c, Envoy::Stats::DynamicName("d"), e));
   }
 }
 BENCHMARK(bmJoinElements);

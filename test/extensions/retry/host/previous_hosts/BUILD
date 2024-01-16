@@ -24,6 +24,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "integration_test",
+    size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.retry_host_predicates.previous_hosts"],
     deps = [

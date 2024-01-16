@@ -71,7 +71,7 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
   Envoy::Http::ResponseHeaderMapPtr headers{
       Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
           {{Envoy::Http::Headers::get().Status, "200"}})};
-  upstream_request_->decodeHeaders(std::move(headers), false);
+  upstream_request_->decodeHeaders(std::move(headers), /*end_stream=*/false);
   return Envoy::Http::okStatus();
 }
 
@@ -89,7 +89,8 @@ void TcpUpstream::readDisable(bool disable) {
 
 void TcpUpstream::resetStream() {
   upstream_request_ = nullptr;
-  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                          "tcp_upstream_reset_stream");
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {

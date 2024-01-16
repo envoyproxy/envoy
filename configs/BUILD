@@ -1,9 +1,9 @@
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_python//python:defs.bzl", "py_binary")
-load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -43,8 +43,8 @@ filegroup(
         "//bazel:disable_admin_functionality": [],
         "//conditions:default": [
             "envoy-demo.yaml",
-            "freebind/freebind.yaml",
             "envoy-tap-config.yaml",
+            "freebind/freebind.yaml",
         ],
     }),
 )
@@ -63,7 +63,7 @@ genrule(
     ],
     outs = ["example_configs.tar"],
     cmd = (
-        "$(location configgen.sh) $(location configgen) $(@D) " +
+        "$(location configgen.sh) $(location configgen) example_configs.tar $(@D) " +
         "$(locations :configs) " +
         "$(locations //examples:configs) " +
         "$(locations //examples:certs) " +
@@ -71,6 +71,30 @@ genrule(
         "$(locations //examples/wasm-cc:configs) " +
         "$(locations //docs:configs) " +
         "$(locations //docs:proto_examples) " +
+        "$(locations //test/config/integration/certs)"
+    ),
+    tools = [
+        "configgen.sh",
+        ":configgen",
+    ],
+)
+
+genrule(
+    name = "example_contrib_configs",
+    srcs = [
+        "//docs:contrib_configs",
+        "//contrib:configs",
+        "//examples:contrib_configs",
+        "//examples:certs",
+        "//test/config/integration/certs",
+    ],
+    outs = ["example_contrib_configs.tar"],
+    cmd = (
+        "$(location configgen.sh) NO_CONFIGGEN example_contrib_configs.tar $(@D) " +
+        "$(locations //contrib:configs) " +
+        "$(locations //docs:contrib_configs) " +
+        "$(locations //examples:contrib_configs) " +
+        "$(locations //examples:certs) " +
         "$(locations //test/config/integration/certs)"
     ),
     tools = [

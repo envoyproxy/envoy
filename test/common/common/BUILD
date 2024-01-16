@@ -108,7 +108,6 @@ envoy_cc_test(
     srcs = ["dns_utils_test.cc"],
     deps = [
         "//source/common/common:dns_utils_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -212,6 +211,8 @@ envoy_cc_test(
     srcs = ["logger_test.cc"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
     ],
 )
 
@@ -276,6 +277,17 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "packed_struct_test",
+    srcs = ["packed_struct_test.cc"],
+    deps = [
+        "//source/common/common:packed_struct_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -471,4 +483,31 @@ envoy_cc_test(
     deps = [
         "//envoy/common:union_string",
     ],
+)
+
+envoy_cc_test(
+    name = "bit_array_test",
+    srcs = ["bit_array_test.cc"],
+    deps = [
+        "//source/common/common:bit_array_lib",
+        "//source/common/common:random_generator_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "inline_map_test",
+    srcs = ["inline_map_test.cc"],
+    deps = ["//source/common/common:inline_map"],
+)
+
+envoy_cc_benchmark_binary(
+    name = "inline_map_speed_test",
+    srcs = ["inline_map_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = ["//source/common/common:inline_map"],
+)
+
+envoy_benchmark_test(
+    name = "inline_map_speed_test_benchmark_test",
+    benchmark_binary = "inline_map_speed_test",
 )

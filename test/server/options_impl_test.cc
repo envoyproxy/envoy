@@ -81,6 +81,15 @@ TEST_F(OptionsImplTest, V1Disallowed) {
   EXPECT_EQ(Server::Mode::Validate, options->mode());
 }
 
+TEST_F(OptionsImplTest, ConcurrencyZeroIsOne) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl("envoy --mode validate --concurrency 0 ");
+  EXPECT_EQ(1U, options->concurrency());
+
+  options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_EQ(Server::Mode::InitOnly, options->mode());
+}
+
 TEST_F(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 0 "
@@ -104,6 +113,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ(2, options->componentLogLevels().size());
   EXPECT_EQ("[%v]", options->logFormat());
+  EXPECT_TRUE(options->logFormatSet());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ(true, options->enableFineGrainLogging());
   EXPECT_EQ("cluster", options->serviceClusterName());
@@ -200,6 +210,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(Server::DrainStrategy::Immediate, options->drainStrategy());
   EXPECT_EQ(spdlog::level::trace, options->logLevel());
   EXPECT_EQ("%L %n %v", options->logFormat());
+  EXPECT_TRUE(options->logFormatSet());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ(std::chrono::seconds(43), options->parentShutdownTime());
   EXPECT_EQ(44, options->restartEpoch());
@@ -282,6 +293,28 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_FALSE(command_line_options->allow_unknown_static_fields());
   EXPECT_FALSE(command_line_options->reject_unknown_dynamic_fields());
   EXPECT_EQ(0, options->statsTags().size());
+}
+
+TEST_F(OptionsImplTest, DefaultParamsNoConstructorArgs) {
+  std::unique_ptr<OptionsImplBase> options = std::make_unique<OptionsImplBase>();
+  EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
+  EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
+  EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
+  EXPECT_EQ("", options->adminAddressPath());
+  EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
+  EXPECT_EQ(Server::Mode::Serve, options->mode());
+  EXPECT_EQ("@envoy_domain_socket", options->socketPath());
+  EXPECT_EQ(0, options->socketMode());
+  EXPECT_EQ(0U, options->statsTags().size());
+  EXPECT_FALSE(options->hotRestartDisabled());
+  EXPECT_FALSE(options->cpusetThreadsEnabled());
+
+  // Not supported for OptionsImplBase
+  EXPECT_EQ(nullptr, options->toCommandLineOptions());
+
+  // This is the only difference between this test and DefaultParams above, as
+  // the DefaultParams constructor explicitly sets log level to warn.
+  EXPECT_EQ(spdlog::level::info, options->logLevel());
 }
 
 // Validates that the server_info proto is in sync with the options.
@@ -483,18 +516,21 @@ TEST_F(OptionsImplTest, SetCpusetOnly) {
 TEST_F(OptionsImplTest, LogFormatDefault) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
+  EXPECT_FALSE(options->logFormatSet());
 }
 
 TEST_F(OptionsImplTest, LogFormatOverride) {
   std::unique_ptr<OptionsImpl> options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
   EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
+  EXPECT_TRUE(options->logFormatSet());
 }
 
 TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
   std::unique_ptr<OptionsImpl> options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
   EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
+  EXPECT_TRUE(options->logFormatSet());
 }
 
 // Test that --base-id and --restart-epoch with non-default values are accepted.

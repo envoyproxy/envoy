@@ -6,6 +6,7 @@
 #include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/server/overload_manager.h"
 
 #include "quiche/http2/adapter/http2_adapter.h"
 
@@ -61,8 +62,20 @@ private:
   absl::node_hash_map<int32_t, uint32_t> settings_;
 };
 
+class TestCodecOverloadManagerProvider {
+public:
+  TestCodecOverloadManagerProvider() {
+    ON_CALL(overload_manager_, getLoadShedPoint(testing::_))
+        .WillByDefault(testing::Return(&server_go_away_on_dispatch));
+  }
+
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
+  testing::NiceMock<Server::MockLoadShedPoint> server_go_away_on_dispatch;
+};
+
 class TestServerConnectionImpl : public TestCodecStatsProvider,
                                  public TestCodecSettingsProvider,
+                                 public TestCodecOverloadManagerProvider,
                                  public ServerConnectionImpl {
 public:
   TestServerConnectionImpl(
@@ -75,7 +88,7 @@ public:
       : TestCodecStatsProvider(scope),
         ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             headers_with_underscores_action) {}
+                             headers_with_underscores_action, overload_manager_) {}
 
   http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   using ServerConnectionImpl::getStream;
@@ -114,6 +127,8 @@ public:
 
   using ClientConnectionImpl::getStream;
   using ConnectionImpl::sendPendingFrames;
+
+  bool useOghttp2Library() const { return use_oghttp2_library_; }
 
 protected:
   // Overrides ClientConnectionImpl::onSettings().

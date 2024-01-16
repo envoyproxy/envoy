@@ -22,10 +22,22 @@
 namespace Envoy {
 namespace Upstream {
 
+OriginalDstClusterHandle::~OriginalDstClusterHandle() {
+  std::shared_ptr<OriginalDstCluster> cluster = std::move(cluster_);
+  cluster_.reset();
+  Event::Dispatcher& dispatcher = cluster->dispatcher_;
+  dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
+}
+
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
-    // Check if filter state override is present, if yes use it before headers and local address.
+    // Check if filter state override is present, if yes use it before anything else.
     Network::Address::InstanceConstSharedPtr dst_host = filterStateOverrideHost(context);
+
+    // Check if override host metadata is present, if yes use it otherwise check the header.
+    if (dst_host == nullptr) {
+      dst_host = metadataOverrideHost(context);
+    }
 
     // Check if override host header is present, if yes use it otherwise check local address.
     if (dst_host == nullptr) {
@@ -60,21 +72,21 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         Network::Address::InstanceConstSharedPtr host_ip_port(
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
-        auto info = parent_->info();
+        auto info = parent_->cluster_->info();
         HostSharedPtr host(std::make_shared<HostImpl>(
             info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-            envoy::config::core::v3::UNKNOWN, parent_->time_source_));
+            envoy::config::core::v3::UNKNOWN, parent_->cluster_->time_source_));
         ENVOY_LOG(debug, "Created host {} {}.", *host, host->address()->asString());
 
         // Tell the cluster about the new host
         // lambda cannot capture a member by value.
-        std::weak_ptr<OriginalDstCluster> post_parent = parent_;
-        parent_->dispatcher_.post([post_parent, host]() mutable {
+        std::weak_ptr<OriginalDstClusterHandle> post_parent = parent_;
+        parent_->cluster_->dispatcher_.post([post_parent, host]() mutable {
           // The main cluster may have disappeared while this post was queued.
-          if (std::shared_ptr<OriginalDstCluster> parent = post_parent.lock()) {
-            parent->addHost(host);
+          if (std::shared_ptr<OriginalDstClusterHandle> parent = post_parent.lock()) {
+            parent->cluster_->addHost(host);
           }
         });
         return host;
@@ -90,17 +102,20 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 
 Network::Address::InstanceConstSharedPtr
 OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* context) {
-  const auto* conn = context->downstreamConnection();
-  if (!conn) {
-    return nullptr;
+  const auto streamInfos = {
+      context->requestStreamInfo(),
+      context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
+  for (const auto streamInfo : streamInfos) {
+    if (streamInfo == nullptr) {
+      continue;
+    }
+    const auto* dst_address = streamInfo->filterState().getDataReadOnly<Network::AddressObject>(
+        OriginalDstClusterFilterStateKey);
+    if (dst_address) {
+      return dst_address->address();
+    }
   }
-  const auto* dst_address =
-      conn->streamInfo().filterState().getDataReadOnly<Network::DestinationAddress>(
-          Network::DestinationAddress::key());
-  if (!dst_address) {
-    return nullptr;
-  }
-  return dst_address->address();
+  return nullptr;
 }
 
 Network::Address::InstanceConstSharedPtr
@@ -124,21 +139,59 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   if (request_host == nullptr) {
     ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
               request_override_host);
-    parent_->info()->trafficStats()->original_dst_host_invalid_.inc();
+    parent_->cluster_->info()->trafficStats()->original_dst_host_invalid_.inc();
     return nullptr;
   }
   ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
   return request_host;
 }
 
-OriginalDstCluster::OriginalDstCluster(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(server_context, config, runtime, factory_context, std::move(stats_scope),
-                      added_via_api, factory_context.mainThreadDispatcher().timeSource()),
-      dispatcher_(factory_context.mainThreadDispatcher()),
+Network::Address::InstanceConstSharedPtr
+OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* context) {
+  if (!metadata_key_.has_value()) {
+    return nullptr;
+  }
+  const auto streamInfos = {
+      context->requestStreamInfo(),
+      context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
+  const ProtobufWkt::Value* value = nullptr;
+  for (const auto streamInfo : streamInfos) {
+    if (streamInfo == nullptr) {
+      continue;
+    }
+    const auto& metadata = streamInfo->dynamicMetadata();
+    value = &Config::Metadata::metadataValue(&metadata, metadata_key_.value());
+    // Path can refer to a list, in which case we extract the first element.
+    if (value->kind_case() == ProtobufWkt::Value::kListValue) {
+      const auto& values = value->list_value().values();
+      if (!values.empty()) {
+        value = &(values[0]);
+      }
+    }
+    if (value->kind_case() == ProtobufWkt::Value::kStringValue) {
+      break;
+    }
+  }
+  if (value == nullptr || value->kind_case() != ProtobufWkt::Value::kStringValue) {
+    return nullptr;
+  }
+  const std::string& metadata_override_host = value->string_value();
+  Network::Address::InstanceConstSharedPtr metadata_host =
+      Network::Utility::parseInternetAddressAndPortNoThrow(metadata_override_host, false);
+  if (metadata_host == nullptr) {
+    ENVOY_LOG(debug, "original_dst_load_balancer: invalid override metadata value. {}",
+              metadata_override_host);
+    parent_->cluster_->info()->trafficStats()->original_dst_host_invalid_.inc();
+    return nullptr;
+  }
+  ENVOY_LOG(debug, "Using metadata override host {}.", metadata_override_host);
+  return metadata_host;
+}
+
+OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
+                                       ClusterFactoryContext& context)
+    : ClusterImplBase(config, context),
+      dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
@@ -148,20 +201,13 @@ OriginalDstCluster::OriginalDstCluster(
       http_header_name_ = config_opt->http_header_name().empty()
                               ? Http::Headers::get().EnvoyOriginalDstHost
                               : Http::LowerCaseString(config_opt->http_header_name());
-    } else {
-      if (!config_opt->http_header_name().empty()) {
-        throw EnvoyException(fmt::format(
-            "ORIGINAL_DST cluster: invalid config http_header_name={} and use_http_header is "
-            "false. Set use_http_header to true if http_header_name is desired.",
-            config_opt->http_header_name()));
-      }
+    }
+    if (config_opt->has_metadata_key()) {
+      metadata_key_ = Config::MetadataKey(config_opt->metadata_key());
     }
     if (config_opt->has_upstream_port_override()) {
       port_override_ = config_opt->upstream_port_override().value();
     }
-  }
-  if (config.has_load_assignment()) {
-    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
@@ -192,7 +238,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   all_hosts->emplace_back(host);
   priority_set_.updateHosts(0,
                             HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
-                            {}, {std::move(host)}, {}, absl::nullopt);
+                            {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
@@ -263,33 +309,42 @@ void OriginalDstCluster::cleanup() {
     setHostMap(new_host_map);
     priority_set_.updateHosts(
         0, HostSetImpl::partitionHosts(keeping_hosts, HostsPerLocalityImpl::empty()), {}, {},
-        to_be_removed, absl::nullopt);
+        to_be_removed, false, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-OriginalDstClusterFactory::createClusterImpl(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                                             ClusterFactoryContext& context) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
                     "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
                     envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
   }
 
+  if (cluster.has_load_assignment()) {
+    return absl::InvalidArgumentError(
+        "ORIGINAL_DST clusters must have no load assignment configured");
+  }
+
+  if (!cluster.original_dst_lb_config().use_http_header() &&
+      !cluster.original_dst_lb_config().http_header_name().empty()) {
+    return absl::InvalidArgumentError(fmt::format(
+        "ORIGINAL_DST cluster: invalid config http_header_name={} and use_http_header is "
+        "false. Set use_http_header to true if http_header_name is desired.",
+        cluster.original_dst_lb_config().http_header_name()));
+  }
+
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster = std::make_shared<OriginalDstCluster>(
-      server_context, cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
-      context.addedViaApi());
-  auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
+  auto new_cluster = std::shared_ptr<OriginalDstCluster>(new OriginalDstCluster(cluster, context));
+  auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(
+      std::make_shared<OriginalDstClusterHandle>(new_cluster));
   return std::make_pair(new_cluster, std::move(lb));
 }
 
@@ -297,6 +352,13 @@ OriginalDstClusterFactory::createClusterImpl(
  * Static registration for the original dst cluster factory. @see RegisterFactory.
  */
 REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
+
+class OriginalDstClusterFilterStateFactory : public Network::BaseAddressObjectFactory {
+public:
+  std::string name() const override { return std::string(OriginalDstClusterFilterStateKey); }
+};
+
+REGISTER_FACTORY(OriginalDstClusterFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace Upstream
 } // namespace Envoy

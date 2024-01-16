@@ -14,25 +14,12 @@ const std::string& RequestHeaders::authority() const { return (*this)[":authorit
 const std::string& RequestHeaders::path() const { return (*this)[":path"][0]; }
 
 absl::optional<RetryPolicy> RequestHeaders::retryPolicy() const {
-  try {
-    return absl::optional<RetryPolicy>(RetryPolicy::fromRawHeaderMap(this->allHeaders()));
-  } catch (const std::exception&) {
-    return absl::optional<RetryPolicy>();
-  }
-}
-
-absl::optional<UpstreamHttpProtocol> RequestHeaders::upstreamHttpProtocol() const {
-  const auto header_name = "x-envoy-mobile-upstream-protocol";
-  if (!this->contains(header_name)) {
-    return absl::optional<UpstreamHttpProtocol>();
-  }
-  return upstreamHttpProtocolFromString((*this)[header_name][0]);
+  return absl::optional<RetryPolicy>(RetryPolicy::fromRawHeaderMap(allHeaders()));
 }
 
 RequestHeadersBuilder RequestHeaders::toRequestHeadersBuilder() const {
-  RequestHeadersBuilder builder(this->requestMethod(), this->scheme(), this->authority(),
-                                this->path());
-  for (const auto& pair : this->allHeaders()) {
+  RequestHeadersBuilder builder(requestMethod(), scheme(), authority(), path());
+  for (const auto& pair : allHeaders()) {
     builder.set(pair.first, pair.second);
   }
   return builder;

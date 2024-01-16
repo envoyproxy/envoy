@@ -49,7 +49,7 @@ TEST(InternalParsing, ParsedPathDebugString) {
   EXPECT_EQ(patt2.debugString(), "/{var}");
 }
 
-TEST(InternalParsing, isValidLiteralWorks) {
+TEST(InternalParsing, IsValidLiteralWorks) {
   EXPECT_TRUE(isValidLiteral("123abcABC"));
   EXPECT_TRUE(isValidLiteral("._~-"));
   EXPECT_TRUE(isValidLiteral("-._~%20!$&'()+,;:@"));
@@ -57,7 +57,7 @@ TEST(InternalParsing, isValidLiteralWorks) {
   EXPECT_FALSE(isValidLiteral("abc/"));
   EXPECT_FALSE(isValidLiteral("ab*c"));
   EXPECT_FALSE(isValidLiteral("a**c"));
-  EXPECT_FALSE(isValidLiteral("a=c"));
+  EXPECT_TRUE(isValidLiteral("a=c"));
   EXPECT_FALSE(isValidLiteral("?abc"));
   EXPECT_FALSE(isValidLiteral("?a=c"));
   EXPECT_FALSE(isValidLiteral("{abc"));
@@ -75,7 +75,7 @@ TEST(InternalParsing, IsValidRewriteLiteralWorks) {
   EXPECT_FALSE(isValidRewriteLiteral("`~!@#$%^&()-_+;:,<.>'\"| "));
   EXPECT_FALSE(isValidRewriteLiteral("ab}c"));
   EXPECT_FALSE(isValidRewriteLiteral("ab{c"));
-  EXPECT_FALSE(isValidRewriteLiteral("a=c"));
+  EXPECT_TRUE(isValidRewriteLiteral("a=c"));
   EXPECT_FALSE(isValidRewriteLiteral("?a=c"));
 }
 
@@ -133,7 +133,8 @@ class ParseVariableSuccess : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(ParseVariableSuccessTestSuite, ParseVariableSuccess,
                          testing::Values("{var=*}", "{Var}", "{v1=**}", "{v_1=*/abc/**}",
-                                         "{v3=abc}", "{v=123/*/*}", "{var=abc/*/def}"));
+                                         "{v3=abc}", "{v=123/*/*}", "{var=abc/*/def}",
+                                         "{var=abc=def}"));
 
 TEST_P(ParseVariableSuccess, ParseVariableSuccessTest) {
   std::string pattern = GetParam();
@@ -151,8 +152,7 @@ class ParseVariableFailure : public testing::TestWithParam<std::string> {};
 INSTANTIATE_TEST_SUITE_P(ParseVariableFailureTestSuite, ParseVariableFailure,
                          testing::Values("{var", "{=abc}", "{_var=*}", "{1v}", "{1v=abc}",
                                          "{var=***}", "{v-a-r}", "{var=*/abc?q=1}", "{var=abc/a*}",
-                                         "{var=*def/abc}", "{var=}", "{var=abc=def}",
-                                         "{rc=||||(A+yl/}", "/"));
+                                         "{var=*def/abc}", "{var=}", "{rc=||||(A+yl/}", "/"));
 
 TEST_P(ParseVariableFailure, ParseVariableFailureTest) {
   std::string pattern = GetParam();
@@ -216,7 +216,7 @@ TEST(InternalRegexGen, LiteralEscapes) {
 TEST(InternalRegexGen, LiteralMatches) {
   absl::string_view kPattern = "abcABC123/-._~%20!$&'()+,;:@";
 
-  EXPECT_TRUE(RE2::FullMatch(toStringPiece(kPattern), toRegexPattern(kPattern)));
+  EXPECT_TRUE(RE2::FullMatch(kPattern, toRegexPattern(kPattern)));
 }
 
 TEST(InternalRegexGen, LiteralMatchesInNamedCapture) {
@@ -226,14 +226,14 @@ TEST(InternalRegexGen, LiteralMatchesInNamedCapture) {
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
-  std::vector<re2::StringPiece> captures(2);
-  ASSERT_TRUE(regex.Match(toStringPiece(kPattern), /*startpos=*/0, /*endpos=*/kPattern.size(),
-                          RE2::ANCHOR_BOTH, captures.data(), captures.size()));
+  std::vector<absl::string_view> captures(2);
+  ASSERT_TRUE(regex.Match(kPattern, /*startpos=*/0, /*endpos=*/kPattern.size(), RE2::ANCHOR_BOTH,
+                          captures.data(), captures.size()));
 
   // Index 0 would be the full text of the matched string.
-  EXPECT_EQ(toStringPiece(kPattern), captures[0]);
+  EXPECT_EQ(kPattern, captures[0]);
   // Get the pattern matched with the named capture group.
-  EXPECT_EQ(toStringPiece(kPattern), captures.at(regex.NamedCapturingGroups().at("var")));
+  EXPECT_EQ(kPattern, captures.at(regex.NamedCapturingGroups().at("var")));
 }
 
 TEST(InternalRegexGen, LiteralOnlyMatchesItself) {
@@ -268,8 +268,8 @@ TEST(InternalRegexGen, DollarSignMatchesIfself) {
 }
 
 TEST(InternalRegexGen, OperatorRegexPattern) {
-  EXPECT_EQ(toRegexPattern(Operator::PathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@]+");
-  EXPECT_EQ(toRegexPattern(Operator::TextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@/]*");
+  EXPECT_EQ(toRegexPattern(Operator::PathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=]+");
+  EXPECT_EQ(toRegexPattern(Operator::TextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*");
 }
 
 TEST(InternalRegexGen, PathGlobRegex) {
@@ -291,10 +291,10 @@ TEST(InternalRegexGen, TextGlobRegex) {
 }
 
 TEST(InternalRegexGen, VariableRegexPattern) {
-  EXPECT_EQ(toRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@]+)");
+  EXPECT_EQ(toRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)");
   EXPECT_EQ(toRegexPattern(Variable("var2", {Operator::PathGlob, "abc", Operator::TextGlob})),
-            "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@]+/abc/"
-            "[a-zA-Z0-9-._~%!$&'()+,;:@/]*)");
+            "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@=]+/abc/"
+            "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*)");
 }
 
 TEST(InternalRegexGen, VariableRegexDefaultMatch) {
@@ -332,7 +332,7 @@ TEST(InternalRegexGen, VariableRegexTextGlobMatch) {
 }
 
 TEST(InternalRegexGen, VariableRegexNamedCapture) {
-  re2::StringPiece kPattern = "abc";
+  absl::string_view kPattern = "abc";
   absl::StatusOr<ParsedResult<Variable>> var = parseVariable("{var=*}");
   ASSERT_OK(var);
 
@@ -340,7 +340,7 @@ TEST(InternalRegexGen, VariableRegexNamedCapture) {
   ASSERT_EQ(regex.NumberOfCapturingGroups(), 1);
 
   // Full matched string + capture groups
-  std::vector<re2::StringPiece> captures(2);
+  std::vector<absl::string_view> captures(2);
   ASSERT_TRUE(regex.Match(kPattern, /*startpos=*/0, /*endpos=*/kPattern.size(), RE2::ANCHOR_BOTH,
                           captures.data(), captures.size()));
 
@@ -429,12 +429,12 @@ TEST_P(GenPatternRegexWithMatch, WithCapture) {
   ASSERT_EQ(regex.NumberOfCapturingGroups(), varValues().size());
 
   int capture_num = regex.NumberOfCapturingGroups() + 1;
-  std::vector<re2::StringPiece> captures(capture_num);
+  std::vector<absl::string_view> captures(capture_num);
   ASSERT_TRUE(regex.Match(requestPath(), /*startpos=*/0,
                           /*endpos=*/requestPath().size(), RE2::ANCHOR_BOTH, captures.data(),
                           captures.size()));
 
-  EXPECT_EQ(captures[0], toStringPiece(requestPath()));
+  EXPECT_EQ(captures[0], requestPath());
 
   for (const auto& [name, value] : varValues()) {
     int capture_index = regex.NamedCapturingGroups().at(name);

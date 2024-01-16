@@ -6,27 +6,35 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::EndsWith;
 using testing::HasSubstr;
-using testing::Not;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
 
+static Admin::RequestPtr handlerCallback(AdminStream&) {
+  return Admin::makeStaticTextRequest("", Http::Code::OK);
+}
+
+const Admin::UrlHandler handler() {
+  return Admin::UrlHandler{"/prefix",
+                           "help text",
+                           handlerCallback,
+                           false,
+                           false,
+                           {{Admin::ParamDescriptor::Type::Boolean, "boolparam", "bool param help"},
+                            {Admin::ParamDescriptor::Type::String, "strparam", "str param help"}}};
+}
+
 class StatsHtmlRenderTest : public StatsRenderTestBase {
 protected:
-  static Admin::RequestPtr handlerCallback(AdminStream&) {
-    return Admin::makeStaticTextRequest("", Http::Code::OK);
-  }
-
-  const Admin::UrlHandler handler_{
-      "/prefix", "help text", handlerCallback,
-      false,     false,       {{Admin::ParamDescriptor::Type::Boolean, "param", "param help"}}};
-  StatsHtmlRender renderer_{response_headers_, response_, params_};
-  Http::Utility::QueryParams query_params_;
+  Http::Utility::QueryParamsMulti query_params_;
 };
 
 TEST_F(StatsHtmlRenderTest, String) {
-  EXPECT_THAT(render<std::string>(renderer_, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"),
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  EXPECT_THAT(render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"),
               HasSubstr("name: \"abc 123 ~!@#$%^&amp;*()-_=+;:&#39;&quot;,&lt;.&gt;/?\"\n"));
 }
 
@@ -35,62 +43,50 @@ TEST_F(StatsHtmlRenderTest, HistogramNoBuckets) {
       "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
       "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
       "P99.9(309.985,309.985) P100(310,310)\n";
-  EXPECT_THAT(render<>(renderer_, "h1", populateHistogram("h1", {200, 300, 300})),
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::NoBuckets;
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
               HasSubstr(expected));
 }
 
-TEST_F(StatsHtmlRenderTest, RenderHead) {
-  // The "<head>...</head>" is rendered by the constructor.
-  EXPECT_THAT(response_.toString(), HasSubstr("<head>"));
-  EXPECT_THAT(response_.toString(), HasSubstr("</head>"));
+TEST_F(StatsHtmlRenderTest, HistogramStreamingDetailed) {
+  // The goal of this test is to show that we have embedded the histogram as a
+  // json fragment, which gets streamed out to HTML one histogram at a time,
+  // rather than buffered.
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  renderer.generate(response_, "scalar", 42);
+  EXPECT_THAT(response_.toString(), StartsWith("<!DOCTYPE html>\n<html lang='en'>\n<head>\n"));
+  EXPECT_THAT(response_.toString(), EndsWith("\nscalar: 42\n"));
+  response_.drain(response_.length());
+
+  renderer.generate(response_, "h1", populateHistogram("h1", {200, 300, 300}));
+  EXPECT_THAT(response_.toString(), StartsWith("</pre>\n<div id='histograms'></div>\n"
+                                               "<script>\nconst supportedPercentiles = ["));
+  EXPECT_THAT(response_.toString(),
+              HasSubstr("\nconst histogramDiv = document.getElementById('histograms');\n"
+                        "renderHistogram(histogramDiv, supportedPercentiles,\n"
+                        "{\"name\":\"h1\",\"totals\":[{\"lower_bound\":"));
+  EXPECT_THAT(response_.toString(), EndsWith("\n</script>\n"));
+  response_.drain(response_.length());
+
+  renderer.generate(response_, "h2", populateHistogram("h2", {200, 300, 300}));
+  EXPECT_THAT(response_.toString(),
+              StartsWith("<script>\nrenderHistogram(histogramDiv, supportedPercentiles,\n"
+                         "{\"name\":\"h2\",\"totals\":[{\"lower_bound\":"));
+  EXPECT_THAT(response_.toString(), EndsWith("\n</script>\n"));
+  response_.drain(response_.length());
+
+  renderer.finalize(response_);
+  EXPECT_EQ("</body>\n</html>\n", response_.toString());
 }
 
-TEST_F(StatsHtmlRenderTest, RenderTableBegin) {
-  renderer_.tableBegin(response_);
-  EXPECT_THAT(response_.toString(), HasSubstr("<table class='home-table'>"));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderTableEnd) {
-  renderer_.tableEnd(response_);
-  EXPECT_THAT(response_.toString(), HasSubstr("</table>"));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderUrlHandlerNoQuery) {
-  renderer_.urlHandler(response_, handler_, query_params_);
-  std::string out = response_.toString();
-  EXPECT_THAT(
-      out,
-      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
-  EXPECT_THAT(out, Not(HasSubstr(" checked/>")));
-  EXPECT_THAT(out, HasSubstr("help text"));
-  EXPECT_THAT(out, HasSubstr("param help"));
-  EXPECT_THAT(out, HasSubstr("<button class='button-as-link'>prefix</button>"));
-  EXPECT_THAT(out, Not(HasSubstr(" onchange='prefix.submit()")));
-  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderUrlHandlerWithQuery) {
-  query_params_["param"] = "on";
-  renderer_.urlHandler(response_, handler_, query_params_);
-  std::string out = response_.toString();
-  EXPECT_THAT(
-      out,
-      HasSubstr("<input type='checkbox' name='param' id='param-1-prefix-param' form='prefix'"));
-  EXPECT_THAT(out, HasSubstr(" checked/>"));
-  EXPECT_THAT(out, HasSubstr("help text"));
-  EXPECT_THAT(out, HasSubstr("param help"));
-  EXPECT_THAT(out, HasSubstr("<button class='button-as-link'>prefix</button>"));
-  EXPECT_THAT(out, Not(HasSubstr(" onchange='prefix.submit()")));
-  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
-}
-
-TEST_F(StatsHtmlRenderTest, RenderUrlHandlerSubmitOnChange) {
-  renderer_.setSubmitOnChange(true);
-  renderer_.urlHandler(response_, handler_, query_params_);
-  std::string out = response_.toString();
-  EXPECT_THAT(out, HasSubstr(" onchange='prefix.submit()"));
-  EXPECT_THAT(out, Not(HasSubstr("<button class='button-as-link'>prefix</button>")));
-  EXPECT_THAT(out, Not(HasSubstr(" type='hidden' ")));
+TEST_F(StatsHtmlRenderTest, RenderActive) {
+  params_.format_ = StatsFormat::ActiveHtml;
+  StatsHtmlRender renderer(response_headers_, response_, params_);
+  renderer.setupStatsPage(handler(), params_, response_);
+  EXPECT_THAT(response_.toString(), HasSubstr("<script>"));
 }
 
 } // namespace Server

@@ -64,12 +64,16 @@ public:
   void setup(uint32_t connections, bool set_redirect_records,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) override {
     if (config.has_on_demand()) {
-      EXPECT_CALL(factory_context_.cluster_manager_, allocateOdCdsApi(_, _, _))
+      EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+                  allocateOdCdsApi(_, _, _))
           .WillOnce(
               Invoke([this]() { return Upstream::MockOdCdsApiHandlePtr(mock_odcds_api_handle_); }));
     }
 
     configure(config);
+    mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+    const_cast<std::vector<AccessLog::InstanceSharedPtr>&>(config_->accessLogs())
+        .push_back(mock_access_logger_);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {
@@ -92,7 +96,8 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                    tcpConnPool(_, _))
             .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -103,7 +108,8 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                  tcpConnPool(_, _))
           .WillRepeatedly(Return(absl::nullopt));
     }
 
@@ -126,7 +132,8 @@ public:
             ->addOption(
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
-      filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+      filter_ = std::make_unique<Filter>(config_,
+                                         factory_context_.server_factory_context_.cluster_manager_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -160,6 +167,7 @@ public:
   // Saved api handle pointer. The pointer is assigned in setup() in most of the on demand cases.
   // In these cases, the mocked allocateOdCdsApi() takes the ownership.
   Upstream::MockOdCdsApiHandle* mock_odcds_api_handle_{};
+  std::shared_ptr<NiceMock<AccessLog::MockInstance>> mock_access_logger_;
 };
 
 TEST_F(TcpProxyTest, ExplicitCluster) {
@@ -193,10 +201,11 @@ TEST_F(TcpProxyTest, HalfCloseProxy) {
 // Test with an explicitly configured upstream.
 TEST_F(TcpProxyTest, ExplicitFactory) {
   // Explicitly configure an HTTP upstream, to test factory creation.
-  auto& info = factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
-  info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  auto& info = factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .cluster_.info_;
+  info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_.value().mutable_typed_config()->PackFrom(generic_config);
+  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
   setup(1);
 
   raiseEventUpstreamConnected(0);
@@ -215,11 +224,12 @@ TEST_F(TcpProxyTest, ExplicitFactory) {
 
 // Test nothing bad happens if an invalid factory is configured.
 TEST_F(TcpProxyTest, BadFactory) {
-  auto& info = factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
-  info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  auto& info = factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .cluster_.info_;
+  info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   // The HTTP Generic connection pool is not a valid type for TCP upstreams.
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_.value().mutable_typed_config()->PackFrom(generic_config);
+  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
@@ -235,12 +245,13 @@ TEST_F(TcpProxyTest, BadFactory) {
       std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
 
   ON_CALL(*upstream_hosts_.at(0), cluster())
-      .WillByDefault(
-          ReturnPointee(factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
+      .WillByDefault(ReturnPointee(factory_context_.server_factory_context_.cluster_manager_
+                                       .thread_local_cluster_.cluster_.info_));
   EXPECT_CALL(*upstream_connections_.at(0), dispatcher())
       .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
   EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -271,7 +282,13 @@ TEST_F(TcpProxyTest, UpstreamLocalDisconnect) {
 TEST_F(TcpProxyTest, UpstreamRemoteDisconnect) {
   setup(1);
 
+  timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   raiseEventUpstreamConnected(0);
+
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
@@ -292,13 +309,19 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
 
   setup(2, config);
 
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(40));
   raiseEventUpstreamConnected(1);
 
-  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
   EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(50), upstream_connection_establishment_latency.value());
 }
 
 // Make sure that the tcp proxy code handles reentrant calls to onPoolFailure.
@@ -334,8 +357,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamRemoteFail) {
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   raiseEventUpstreamConnected(1);
 
-  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 }
 
@@ -348,8 +371,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamTimeout) {
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
   raiseEventUpstreamConnected(1);
 
-  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 }
 
@@ -367,12 +390,19 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   // Try both failure modes
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
   raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(15));
   raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(25), upstream_connection_establishment_latency.value());
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
@@ -441,7 +471,7 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -458,14 +488,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
 
   filter_.reset();
@@ -475,7 +505,7 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
 TEST_F(TcpProxyTest, UpstreamClusterNotFound) {
   setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
 
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillRepeatedly(Return(nullptr));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -484,7 +514,7 @@ TEST_F(TcpProxyTest, UpstreamClusterNotFound) {
 }
 
 TEST_F(TcpProxyTest, NoHost) {
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   filter_.reset();
@@ -513,7 +543,8 @@ TEST_F(TcpProxyTest, RouteWithMetadataMatch) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -553,7 +584,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         k0: v0
 )EOF";
 
-  factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1", "cluster2"});
+  factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"cluster1", "cluster2"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -562,15 +594,19 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   v2.set_string_value("v2");
   HashedValue hv0(v0), hv1(v1), hv2(v2);
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
-  filter_->initializeReadFilterCallbacks(filter_callbacks_);
-
   // Expect filter to try to open a connection to cluster1.
   {
+    NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+    filter_ = std::make_unique<Filter>(config_,
+                                       factory_context_.server_factory_context_.cluster_manager_);
+    filter_->initializeReadFilterCallbacks(filter_callbacks);
+
     Upstream::LoadBalancerContext* context;
 
-    EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+        .WillOnce(Return(0));
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -591,10 +627,17 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
 
   // Expect filter to try to open a connection to cluster2.
   {
+    NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+    filter_ = std::make_unique<Filter>(config_,
+                                       factory_context_.server_factory_context_.cluster_manager_);
+    filter_->initializeReadFilterCallbacks(filter_callbacks);
+
     Upstream::LoadBalancerContext* context;
 
-    EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(2));
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+        .WillOnce(Return(2));
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _))
         .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -628,12 +671,14 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
       .WillRepeatedly(ReturnRef(metadata));
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -665,7 +710,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
             k1: from_config
 )EOF";
 
-  factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1"});
+  factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"cluster1"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -682,12 +728,14 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
       .WillRepeatedly(ReturnRef(metadata));
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -711,7 +759,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -736,8 +785,14 @@ TEST_F(TcpProxyTest, LocalClosedBeforeUpstreamConnected) {
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
@@ -745,13 +800,14 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
-  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
-      0, 0, 0, 0, 0);
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(0, 0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.server_factory_context_.cluster_manager_);
   // The downstream connection closes if the proxy can't make an upstream connection.
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   filter_->onNewConnection();
 
@@ -784,8 +840,8 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->invokeCallback();
 }
@@ -858,11 +914,11 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
   // In this case we expect readDisable to not be called on the already closed
   // connection.
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true)).Times(0);
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _))
       .WillOnce(InvokeWithoutArgs(
           [&]() -> void { upstream_connections_.at(0)->runLowWatermarkCallbacks(); }));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->invokeCallback();
 }
@@ -956,10 +1012,10 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
-// Test that intermediate log entry by field %DURATION%.
+// Test that intermediate log entry by field %ACCESS_LOG_TYPE%.
 TEST_F(TcpProxyTest, IntermediateLogEntry) {
-  auto config = accessLogConfig("%DURATION%");
-  config.mutable_access_log_flush_interval()->set_seconds(1);
+  auto config = accessLogConfig("%ACCESS_LOG_TYPE%");
+  config.mutable_access_log_options()->mutable_access_log_flush_interval()->set_seconds(1);
   config.mutable_idle_timeout()->set_seconds(0);
 
   auto* flush_timer = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
@@ -970,13 +1026,69 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
 
   // The timer will be enabled cyclically.
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(10);
+  EXPECT_CALL(*mock_access_logger_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
+
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
+        EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
+                    testing::IsNull());
+      }));
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
-  EXPECT_EQ(access_log_data_.value(), fmt::format("-"));
+  EXPECT_EQ(access_log_data_.value(), AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic));
+
+  filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(9);
+  EXPECT_CALL(*mock_access_logger_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
+
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 19);
+        EXPECT_EQ(stream_info.getDownstreamBytesMeter()
+                      ->bytesAtLastDownstreamPeriodicLog()
+                      ->wire_bytes_received,
+                  10);
+      }));
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  flush_timer->invokeCallback();
+
+  EXPECT_CALL(*mock_access_logger_, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext& log_context, const StreamInfo::StreamInfo&) {
+            EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpConnectionEnd);
+          }));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(),
+            AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd));
+}
+
+TEST_F(TcpProxyTest, TestAccessLogOnUpstreamConnected) {
+  auto config = accessLogConfig("%UPSTREAM_HOST% %ACCESS_LOG_TYPE%");
+  config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Default access log will only be flushed after the stream is closed.
+  // Passing the following check makes sure that the access log was flushed
+  // before the stream was closed.
+  EXPECT_EQ(access_log_data_.value(),
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected)));
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(),
+            absl::StrCat("127.0.0.1:80 ",
+                         AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd)));
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
@@ -1000,8 +1112,7 @@ TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
   setup(1);
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1031,8 +1142,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1063,8 +1173,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1086,8 +1195,7 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   setup(1);
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1163,21 +1271,25 @@ TEST_F(TcpProxyTest, PickClusterOnUpstreamFailure) {
   config.mutable_max_connect_attempts()->set_value(2);
 
   // The random number lead into picking the first one in the weighted clusters.
-  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_0"))
-      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_0"))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   setup(1, config);
 
   // The random number lead into picking the second cluster.
-  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(1));
 
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_1"))
-      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_1"))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
-  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 }
 
@@ -1189,14 +1301,16 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
   mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
 
   // The random number lead to select the first one in the weighted clusters.
-  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
 
   // The first cluster is requested 2 times.
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_0"))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_0"))
       // Invoked on new connection. Null is returned which would trigger on demand.
       .WillOnce(Return(nullptr))
       // Invoked in the callback of on demand look up. The cluster is ready upon callback.
-      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_))
       .RetiresOnSaturation();
 
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
@@ -1210,15 +1324,16 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
 
   // When the on-demand look up callback is invoked, the target cluster should not change.
   // The behavior is verified by checking the random() which is used during cluster re-pick.
-  EXPECT_CALL(factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
 
   // Start to raise connect failure.
 
   // random() is raised in the cluster pick. `fake_cluster_1` will be picked.
-  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(1));
 
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster_1"))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_1"))
       // Invoked on connect attempt. Null is returned which would trigger on demand.
       .WillOnce(Return(nullptr))
       .RetiresOnSaturation();
@@ -1229,11 +1344,11 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
       }));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
-  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_cx_connect_attempts_exceeded")
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 }
 
@@ -1263,7 +1378,8 @@ TEST_F(TcpProxyTest, OdcdsCancelIfConnectionClose) {
 
   // To trigger the on demand request, we enforce the first call to getThreadLocalCluster returning
   // no cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster"))
       .WillOnce(Return(nullptr))
       .RetiresOnSaturation();
 
@@ -1284,11 +1400,14 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
 
   // To trigger the on demand request, we enforce the first call to getThreadLocalCluster returning
   // no cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster"))
       .WillOnce(Return(nullptr))
-      .WillOnce(Return(&factory_context_.cluster_manager_.thread_local_cluster_))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_))
       .RetiresOnSaturation();
 
+  timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
       .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
@@ -1298,7 +1417,14 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
 
   setup(1, config);
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
+
   raiseEventUpstreamConnected(0);
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  // OdCds resolution time isn't included in time to connect to upstream.
+  EXPECT_EQ(std::chrono::microseconds(10), upstream_connection_establishment_latency.value());
 
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
@@ -1308,7 +1434,7 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -1317,7 +1443,8 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   auto config = onDemandConfig();
   mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
 
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("fake_cluster"))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster"))
       .WillOnce(Return(nullptr))
       .RetiresOnSaturation();
 
@@ -1331,8 +1458,13 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   setup(0, config);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
+
+  // No upstream connection was attempted, so no latency should be recorded.
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_FALSE(upstream_connection_establishment_latency.has_value());
 }
 
 // Test that upstream transport failure message is reflected in access logs.
@@ -1360,6 +1492,18 @@ TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
   raiseEventUpstreamConnected(0);
   EXPECT_CALL(*upstream_connections_.at(0), startSecureTransport);
   filter_->startUpstreamSecureTransport();
+}
+
+TEST(PerConnectionCluster, ObjectFactory) {
+  const std::string name = "envoy.tcp_proxy.cluster";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string cluster = "per_connection_cluster";
+  auto object = factory->createFromBytes(cluster);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(cluster, object->serializeAsString());
 }
 
 } // namespace

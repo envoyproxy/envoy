@@ -28,6 +28,5 @@ envoy_cc_test(
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
-        "//test/test_common:test_runtime_lib",
     ]),
 )

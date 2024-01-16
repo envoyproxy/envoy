@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class FilterResetIdleTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testFilterResetIdle() {
     let idleTimeout = "0.5s"
     let remotePort = Int.random(in: 10001...11000)
@@ -18,6 +24,10 @@ final class FilterResetIdleTests: XCTestCase {
     let filterName = "reset_idle_test_filter"
     let config =
 """
+listener_manager:
+    name: envoy.listener_manager_impl.api
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
 static_resources:
   listeners:
   - name: fake_remote_listener
@@ -200,7 +210,6 @@ static_resources:
       method: .get, scheme: "https",
       authority: "example.com", path: "/test"
     )
-    .addUpstreamHttpProtocol(.http2)
     .build()
 
     client
@@ -217,7 +226,7 @@ static_resources:
     )
 
     XCTAssertEqual(
-      XCTWaiter.wait(for: [cancelExpectation], timeout: 1),
+      XCTWaiter.wait(for: [cancelExpectation], timeout: 2),
       .completed
     )
 

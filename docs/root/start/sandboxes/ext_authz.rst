@@ -32,22 +32,22 @@ To build this sandbox example and start the example services, run the following 
 
     $ pwd
     envoy/examples/ext_authz
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+    $ docker compose pull
+    $ docker compose up --build -d
+    $ docker compose ps
 
-                   Name                             Command               State             Ports
-    ---------------------------------------------------------------------------------------------------------------
+                   Name                             Command               State                   Ports
+    --------------------------------------------------------------------------------------------------------------------
     ext_authz_ext_authz-grpc-service_1   /app/server -users /etc/us       Up
     ext_authz_ext_authz-http-service_1   docker-entrypoint.sh node        Up
-    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp
-    ext_authz_upstream-service_1         python3 /app/service/server.py   Up
+    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up           10000/tcp, 0.0.0.0:8000->8000/tcp
+    ext_authz_upstream-service_1         python3 /code/service.py         Up (healthy)
 
 .. note::
 
     This sandbox has multiple setup controlled by ``FRONT_ENVOY_YAML`` environment variable which
     points to the effective Envoy configuration to be used. The default value of ``FRONT_ENVOY_YAML``
-    can be defined in the ``.env`` file or provided inline when running the ``docker-compose up``
+    can be defined in the ``.env`` file or provided inline when running the ``docker compose up``
     command.
 
     For more information, please take a look at
@@ -66,10 +66,10 @@ For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
 
     $ pwd
     envoy/examples/ext_authz
-    $ docker-compose pull
+    $ docker compose pull
     $ # Tearing down the currently running setup
-    $ docker-compose down
-    $ FRONT_ENVOY_YAML=config/http-service.yaml docker-compose up --build -d
+    $ docker compose down
+    $ FRONT_ENVOY_YAML=config/http-service.yaml docker compose up --build -d
     $ # Or you can update the .env file with the above FRONT_ENVOY_YAML value, so you don't have to specify it when running the "up" command.
 
 Step 4: Access the upstream-service behind the Front Envoy
@@ -134,10 +134,10 @@ as the authorization server. To run this example:
 
     $ pwd
     envoy/examples/ext_authz
-    $ docker-compose pull
+    $ docker compose pull
     $ # Tearing down the currently running setup
-    $ docker-compose down
-    $ FRONT_ENVOY_YAML=config/opa-service/v3.yaml docker-compose up --build -d
+    $ docker compose down
+    $ FRONT_ENVOY_YAML=config/opa-service/v3.yaml docker compose up --build -d
 
 And sending a request to the upstream service (via the Front Envoy) gives:
 
@@ -168,7 +168,7 @@ the above request against the defined policy in
 
 .. code-block:: console
 
-    $ docker-compose logs ext_authz-opa-service | grep decision_id -A 30
+    $ docker compose logs ext_authz-opa-service | grep decision_id -A 30
     ext_authz-opa-service_1   |   "decision_id": "8143ca68-42d8-43e6-ade6-d1169bf69110",
     ext_authz-opa-service_1   |   "input": {
     ext_authz-opa-service_1   |     "attributes": {

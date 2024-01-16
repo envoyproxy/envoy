@@ -11,9 +11,9 @@ TEST(ValueInputMatcher, TestMatch) {
 
   StringInputMatcher matcher(matcher_proto);
 
-  EXPECT_TRUE(matcher.match("exact"));
-  EXPECT_FALSE(matcher.match("not"));
-  EXPECT_FALSE(matcher.match(absl::nullopt));
+  EXPECT_TRUE(matcher.match(MatchingDataType("exact")));
+  EXPECT_FALSE(matcher.match(MatchingDataType("not")));
+  EXPECT_FALSE(matcher.match(MatchingDataType(absl::monostate())));
 }
 
 } // namespace Matcher

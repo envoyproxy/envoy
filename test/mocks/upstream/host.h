@@ -123,15 +123,15 @@ public:
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
-class MockHost : public Host {
+class MockHostLight : public Host {
 public:
+  MockHostLight();
+  ~MockHostLight() override;
+
   struct MockCreateConnectionData {
     Network::ClientConnection* connection_{};
     HostDescriptionConstSharedPtr host_description_{};
   };
-
-  MockHost();
-  ~MockHost() override;
 
   CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
@@ -161,12 +161,6 @@ public:
     setLastHcPassTime_(last_hc_pass_time);
   }
 
-  Stats::StatName localityZoneStatName() const override {
-    locality_zone_stat_name_ =
-        std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
-    return locality_zone_stat_name_->statName();
-  }
-
   bool disableActiveHealthCheck() const override { return disable_active_health_check_; }
   void setDisableActiveHealthCheck(bool disable_active_health_check) override {
     disable_active_health_check_ = disable_active_health_check;
@@ -194,8 +188,13 @@ public:
   MOCK_METHOD(void, healthFlagClear, (HealthFlag flag));
   MOCK_METHOD(bool, healthFlagGet, (HealthFlag flag), (const));
   MOCK_METHOD(void, healthFlagSet, (HealthFlag flag));
+  MOCK_METHOD(uint32_t, healthFlagsGetAll, (), (const));
+  MOCK_METHOD(void, healthFlagsSetAll, (uint32_t));
   MOCK_METHOD(Host::Health, coarseHealth, (), (const));
   MOCK_METHOD(Host::HealthStatus, healthStatus, (), (const));
+  MOCK_METHOD(Host::HealthStatus, edsHealthStatus, (), (const));
+  MOCK_METHOD(void, setEdsHealthStatus, (Host::HealthStatus), ());
+
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
@@ -211,10 +210,25 @@ public:
   MOCK_METHOD(HostHandlePtr, acquireHandle, (), (const));
 
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
+  MOCK_METHOD(Stats::StatName, localityZoneStatName, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+
+  bool disable_active_health_check_ = false;
+};
+
+class MockHost : public MockHostLight {
+public:
+  MockHost();
+  ~MockHost() override;
+
+  Stats::StatName localityZoneStatName() const override {
+    locality_zone_stat_name_ =
+        std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
+    return locality_zone_stat_name_->statName();
+  }
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;
@@ -223,7 +237,6 @@ public:
   LoadMetricStatsImpl load_metric_stats_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
-  bool disable_active_health_check_ = false;
 };
 
 } // namespace Upstream

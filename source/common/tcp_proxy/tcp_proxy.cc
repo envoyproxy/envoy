@@ -11,6 +11,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -40,6 +41,17 @@ namespace TcpProxy {
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
+
+class PerConnectionClusterFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return PerConnectionCluster::key(); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<PerConnectionCluster>(data);
+  }
+};
+
+REGISTER_FACTORY(PerConnectionClusterFactory, StreamInfo::FilterState::ObjectFactory);
 
 Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
     : parent_(parent), cluster_name_(cluster_name) {}
@@ -90,10 +102,32 @@ Config::SharedConfig::SharedConfig(
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 
-  if (config.has_access_log_flush_interval()) {
-    const uint64_t flush_interval =
-        DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
-    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+  if (config.has_access_log_options()) {
+    if (config.flush_access_log_on_connected() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of flush_access_log_on_connected or access_log_options can be specified.");
+    }
+
+    if (config.has_access_log_flush_interval() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
+    }
+
+    flush_access_log_on_connected_ = config.access_log_options().flush_access_log_on_connected();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      const uint64_t flush_interval = DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
+  } else {
+    flush_access_log_on_connected_ = config.flush_access_log_on_connected();
+
+    if (config.has_access_log_flush_interval()) {
+      const uint64_t flush_interval =
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
+      access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+    }
   }
 
   if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
@@ -105,9 +139,9 @@ Config::SharedConfig::SharedConfig(
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
-      upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
+      upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
-      random_generator_(context.api().randomGenerator()) {
+      random_generator_(context.serverFactoryContext().api().randomGenerator()) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -190,9 +224,7 @@ Filter::~Filter() {
   disableAccessLogFlushTimer();
 
   // Flush the final end stream access log entry.
-  for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
-  }
+  flushAccessLog(AccessLog::AccessLogType::TcpConnectionEnd);
 
   ASSERT(generic_conn_pool_ == nullptr);
   ASSERT(upstream_ == nullptr);
@@ -235,6 +267,22 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   }
 }
 
+void Filter::onInitFailure(UpstreamFailureReason reason) {
+  // If ODCDS fails, the filter will not attempt to create a connection to
+  // upstream, as it does not have an assigned upstream. As such the filter will
+  // not have started attempting to connect to an upstream and there is no
+  // connection pool callback latency to record.
+  if (initial_upstream_connection_start_time_.has_value()) {
+    getStreamInfo().upstreamInfo()->upstreamTiming().recordConnectionPoolCallbackLatency(
+        initial_upstream_connection_start_time_.value(),
+        read_callbacks_->connection().dispatcher().timeSource());
+  }
+  read_callbacks_->connection().close(
+      Network::ConnectionCloseType::NoFlush,
+      absl::StrCat(StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
+                   enumToInt(reason)));
+}
+
 void Filter::readDisableUpstream(bool disable) {
   bool success = false;
   if (upstream_) {
@@ -263,11 +311,14 @@ void Filter::readDisableDownstream(bool disable) {
     // despite the downstream connection being closed.
     return;
   }
-  read_callbacks_->connection().readDisable(disable);
 
-  if (disable) {
+  const Network::Connection::ReadDisableStatus read_disable_status =
+      read_callbacks_->connection().readDisable(disable);
+
+  if (read_disable_status == Network::Connection::ReadDisableStatus::TransitionedToReadDisabled) {
     config_->stats().downstream_flow_control_paused_reading_total_.inc();
-  } else {
+  } else if (read_disable_status ==
+             Network::Connection::ReadDisableStatus::TransitionedToReadEnabled) {
     config_->stats().downstream_flow_control_resumed_reading_total_.inc();
   }
 }
@@ -303,7 +354,8 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
-  ASSERT(!on_high_watermark_called_);
+  // TCP Tunneling may call on high/low watermark multiple times.
+  ASSERT(parent_->config_->tunnelingConfigHelper() || !on_high_watermark_called_);
   on_high_watermark_called_ = true;
 
   if (parent_ != nullptr) {
@@ -313,7 +365,8 @@ void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
-  ASSERT(on_high_watermark_called_);
+  // TCP Tunneling may call on high/low watermark multiple times.
+  ASSERT(parent_->config_->tunnelingConfigHelper() || on_high_watermark_called_);
   on_high_watermark_called_ = false;
 
   if (parent_ != nullptr) {
@@ -381,6 +434,10 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                  cluster_name);
+  if (!initial_upstream_connection_start_time_.has_value()) {
+    initial_upstream_connection_start_time_.emplace(
+        read_callbacks_->connection().dispatcher().timeSource().monotonicTime());
+  }
 
   const Upstream::ClusterInfoConstSharedPtr& cluster = thread_local_cluster->info();
   getStreamInfo().setUpstreamClusterInfo(cluster);
@@ -471,7 +528,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
-        cluster.info()->upstreamConfig().value());
+        cluster.info()->upstreamConfig().ref());
   } else {
     factory = Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.tcp.generic");
@@ -525,6 +582,9 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+  upstream_info.upstreamTiming().recordConnectionPoolCallbackLatency(
+      initial_upstream_connection_start_time_.value(),
+      read_callbacks_->connection().dispatcher().timeSource());
   upstream_info.setUpstreamHost(host);
   upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
   upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
@@ -555,9 +615,9 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   }
 }
 
-ProtobufTypes::MessagePtr TunnelResponseHeaders::serializeAsProto() const {
+ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailers::serializeAsProto() const {
   auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
-  response_headers_->iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+  value().iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     auto* new_header = proto_out->add_headers();
     new_header->set_key(std::string(e.key().getStringView()));
     new_header->set_value(std::string(e.value().getStringView()));
@@ -570,6 +630,10 @@ const std::string& TunnelResponseHeaders::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_headers");
 }
 
+const std::string& TunnelResponseTrailers::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_trailers");
+}
+
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
         config_message,
@@ -577,6 +641,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     : use_post_(config_message.use_post()),
       header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
       propagate_response_headers_(config_message.propagate_response_headers()),
+      propagate_response_trailers_(config_message.propagate_response_trailers()),
       post_path_(config_message.post_path()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
@@ -591,10 +656,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
-  return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                               *Http::StaticEmptyHeaders::get().response_headers,
-                               *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                               absl::string_view());
+  return hostname_fmt_->formatWithContext({}, stream_info);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
@@ -605,6 +667,17 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   }
   filter_state->setData(
       TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+}
+
+void TunnelingConfigHelperImpl::propagateResponseTrailers(
+    Http::ResponseTrailerMapPtr&& trailers,
+    const StreamInfo::FilterStateSharedPtr& filter_state) const {
+  if (!propagate_response_trailers_) {
+    return;
+  }
+  filter_state->setData(
+      TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -656,7 +729,14 @@ Network::FilterStatus Filter::onNewConnection() {
   return establishUpstreamConnection();
 }
 
-bool Filter::startUpstreamSecureTransport() { return upstream_->startUpstreamSecureTransport(); }
+bool Filter::startUpstreamSecureTransport() {
+  bool switched_to_tls = upstream_->startUpstreamSecureTransport();
+  if (switched_to_tls) {
+    StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
+    upstream_info.setUpstreamSslConnection(upstream_->getUpstreamConnectionSslInfo());
+  }
+  return switched_to_tls;
+}
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
@@ -667,7 +747,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   }
 
   ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
-                 static_cast<int>(event), upstream_ == nullptr);
+                 static_cast<int>(event), upstream_ != nullptr);
 
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
@@ -683,6 +763,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
       disableIdleTimer();
     }
   }
+
   if (generic_conn_pool_) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
@@ -727,6 +808,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         establishUpstreamConnection();
       }
     } else {
+      // TODO(botengyao): propagate RST back to downstream connection if RST is received.
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       }
@@ -765,6 +847,10 @@ void Filter::onUpstreamConnection() {
       });
     }
   }
+
+  if (config_->flushAccessLogOnConnected()) {
+    flushAccessLog(AccessLog::AccessLogType::TcpUpstreamConnected);
+  }
 }
 
 void Filter::onIdleTimeout() {
@@ -772,21 +858,35 @@ void Filter::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                      StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout);
 }
 
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(
+      Network::ConnectionCloseType::NoFlush,
+      StreamInfo::LocalCloseReasons::get().MaxConnectionDurationReached);
 }
 
 void Filter::onAccessLogFlushInterval() {
-  for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+  flushAccessLog(AccessLog::AccessLogType::TcpPeriodic);
+  const SystemTime now = read_callbacks_->connection().dispatcher().timeSource().systemTime();
+  getStreamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
+  if (getStreamInfo().getUpstreamBytesMeter()) {
+    getStreamInfo().getUpstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
   }
   resetAccessLogFlushTimer();
+}
+
+void Filter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
+  const Formatter::HttpFormatterContext log_context{nullptr, nullptr, nullptr, {}, access_log_type};
+
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(log_context, getStreamInfo());
+  }
 }
 
 void Filter::resetAccessLogFlushTimer() {

@@ -31,12 +31,14 @@ struct FilterStats {
   ALL_AWS_REQUEST_SIGNING_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+enum class SigningAlgorithm { SIGV4, SIGV4A };
+
 /**
  * Abstract filter configuration.
  */
-class FilterConfig {
+class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  virtual ~FilterConfig() = default;
+  ~FilterConfig() override = default;
 
   /**
    * @return the config's signer.
@@ -54,7 +56,7 @@ public:
   virtual const std::string& hostRewrite() const PURE;
 
   /**
-   * @return  whether or not to buffer and sign the payload.
+   * @return whether or not to buffer and sign the payload.
    */
   virtual bool useUnsignedPayload() const PURE;
 };
@@ -95,6 +97,8 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
 private:
+  FilterConfig& getConfig() const;
+
   std::shared_ptr<FilterConfig> config_;
   Http::RequestHeaderMap* request_headers_{};
 };

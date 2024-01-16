@@ -1,31 +1,18 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "connectivity_manager_lib",
     srcs = [
         "connectivity_manager.cc",
-        "android.cc",
-    ] + select({
-        "//bazel:include_ifaddrs": [
-            "//third_party:android/ifaddrs-android.h",
-            "//third_party:android/LocalArray.h",
-            "//third_party:android/ScopedFd.h",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     hdrs = [
-        "android.h",
         "connectivity_manager.h",
         "proxy_settings.h",
     ],
-    copts = select({
-        "//bazel:include_ifaddrs": ["-DINCLUDE_IFADDRS"],
-        "//conditions:default": [],
-    }),
     repository = "@envoy",
     deps = [
         "//library/common/network:src_addr_socket_option_lib",
@@ -77,7 +64,7 @@ envoy_cc_library(
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "apple_platform_cert_verifier",
     srcs = select({
         "@envoy//bazel:apple": ["apple_platform_cert_verifier.cc"],
@@ -87,10 +74,14 @@ cc_library(
         "@envoy//bazel:apple": ["apple_platform_cert_verifier.h"],
         "//conditions:default": [],
     }),
+    linkopts = select({
+        "@envoy//bazel:apple": ["-framework Security"],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
-            "//library/common:envoy_main_interface_lib",
             "@envoy//bazel:boringssl",
         ],
         "//conditions:default": [],

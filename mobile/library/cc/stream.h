@@ -19,6 +19,7 @@ public:
 
   Stream& sendHeaders(RequestHeadersSharedPtr headers, bool end_stream);
   Stream& sendData(envoy_data data);
+  Stream& readData(size_t bytes_to_read);
   void close(RequestTrailersSharedPtr trailers);
   void close(envoy_data data);
   void cancel();

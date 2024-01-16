@@ -91,9 +91,6 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
-  // TODO(danzh) remove when deprecate envoy.reloadable_features.tls_async_cert_validation
-  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates, std::string& error_details);
-
   // Validate cert asynchronously for a QUIC connection.
   ValidationResults customVerifyCertChainForQuic(
       STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
@@ -114,9 +111,6 @@ protected:
    * in the SSL instance, for retrieval in callbacks.
    */
   static int sslContextIndex();
-
-  // A SSL_CTX_set_cert_verify_callback for custom cert validation.
-  static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
   // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
   static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
@@ -174,10 +168,10 @@ public:
 
 private:
   int newSessionKey(SSL_SESSION* session);
-  uint16_t parseSigningAlgorithmsForTest(const std::string& sigalgs);
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
   std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
@@ -222,7 +216,7 @@ private:
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
   ServerNamesMap server_names_map_;
-  bool has_rsa_;
+  bool has_rsa_{false};
   bool full_scan_certs_on_sni_mismatch_;
 };
 

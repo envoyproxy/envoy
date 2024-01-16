@@ -44,7 +44,7 @@ envoy_cc_library(
         ":trace_segment_reporter_lib",
         "//envoy/common:time_interface",
         "//envoy/server:tracer_config_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
         "//source/common/runtime:runtime_lib",

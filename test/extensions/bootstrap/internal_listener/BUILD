@@ -27,6 +27,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "internal_listener_registry_test",
+    size = "large",
     srcs = ["internal_listener_registry_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
@@ -37,6 +38,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "internal_listener_integration_test",
+    size = "large",
     srcs = [
         "internal_listener_integration_test.cc",
     ],
@@ -66,9 +68,11 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "active_internal_listener_test",
+    size = "large",
     srcs = ["active_internal_listener_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
@@ -77,7 +81,6 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/internal_listener:active_internal_listener",
         "//source/extensions/bootstrap/internal_listener:thread_local_registry",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/server:connection_handler_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/network:network_mocks",
         "//test/server:utility_lib",

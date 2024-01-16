@@ -7,6 +7,14 @@
 
 #include "source/extensions/tracers/common/factory_base.h"
 
+namespace datadog {
+namespace tracing {
+
+struct TracerConfig;
+
+} // namespace tracing
+} // namespace datadog
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -19,8 +27,14 @@ class DatadogTracerFactory : public Common::FactoryBase<envoy::config::trace::v3
 public:
   DatadogTracerFactory();
 
+  static datadog::tracing::TracerConfig
+  makeConfig(const envoy::config::trace::v3::DatadogConfig& proto_config);
+  static std::string
+  makeCollectorReferenceHost(const envoy::config::trace::v3::DatadogConfig& proto_config);
+
 private:
-  // FactoryBase
+  // Common::FactoryBase
+
   Tracing::DriverSharedPtr
   createTracerDriverTyped(const envoy::config::trace::v3::DatadogConfig& proto_config,
                           Server::Configuration::TracerFactoryContext& context) override;

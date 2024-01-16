@@ -499,6 +499,8 @@ bool CryptoMbPrivateKeyMethodProvider::checkFips() {
   return false;
 }
 
+bool CryptoMbPrivateKeyMethodProvider::isAvailable() { return initialized_; }
+
 Ssl::BoringSslPrivateKeyMethodSharedPtr
 CryptoMbPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
   return method_;
@@ -516,19 +518,20 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
-    : api_(factory_context.api()),
-      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())),
-      stats_(generateCryptoMbStats("cryptomb", factory_context.scope())) {
+    : api_(factory_context.serverFactoryContext().api()),
+      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(
+          factory_context.serverFactoryContext().threadLocal())),
+      stats_(generateCryptoMbStats("cryptomb", factory_context.statsScope())) {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
-    throw EnvoyException("Multi-buffer CPU instructions not available.");
+    ENVOY_LOG(warn, "Multi-buffer CPU instructions not available.");
+    return;
   }
 
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 200));
 
-  std::string private_key =
-      Config::DataSource::read(conf.private_key(), false, factory_context.api());
+  std::string private_key = Config::DataSource::read(conf.private_key(), false, api_);
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
@@ -565,7 +568,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
       key_size = 4096;
       break;
     default:
-      throw EnvoyException("Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
+      ENVOY_LOG(warn, "Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
+      return;
     }
 
     // If longer keys are ever supported, remember to change the signature buffer to be larger.
@@ -619,6 +623,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     ENVOY_LOG(debug, "Created CryptoMb Queue for thread {}", d.name());
     return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d, stats_);
   });
+
+  initialized_ = true;
 }
 
 namespace {

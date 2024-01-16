@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
 #include "envoy/network/socket_interface.h"
 
@@ -67,6 +68,24 @@ public:
   }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
   void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return round_trip_time_;
+  }
+  void setRoundTripTime(std::chrono::milliseconds round_trip_time) override {
+    round_trip_time_ = round_trip_time;
+  }
+  OptRef<const FilterChainInfo> filterChainInfo() const override {
+    return makeOptRefFromPtr<const FilterChainInfo>(filter_chain_info_.get());
+  }
+  void setFilterChainInfo(FilterChainInfoConstSharedPtr filter_chain_info) override {
+    filter_chain_info_ = std::move(filter_chain_info);
+  }
+  OptRef<const ListenerInfo> listenerInfo() const override {
+    return makeOptRefFromPtr<const ListenerInfo>(listener_info_.get());
+  }
+  void setListenerInfo(ListenerInfoConstSharedPtr listener_info) override {
+    listener_info_ = std::move(listener_info);
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -79,6 +98,9 @@ private:
   absl::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   std::string ja3_hash_;
+  absl::optional<std::chrono::milliseconds> round_trip_time_;
+  FilterChainInfoConstSharedPtr filter_chain_info_;
+  ListenerInfoConstSharedPtr listener_info_;
 };
 
 class SocketImpl : public virtual Socket {

@@ -17,6 +17,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace {
 
+using ::testing::Return;
+
 // Limit the number of threads for the FileSystemBufferFilterConfig.manager_config.thread_count to
 // 8 to ensure test stays responsive.
 static const uint32_t kMaxAsyncFileManagerThreadCount = 8;
@@ -139,7 +141,8 @@ void UberFilterFuzzer::perFilterSetup() {
   addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
+  ON_CALL(factory_context_.server_factory_context_, clusterManager())
+      .WillByDefault(testing::ReturnRef(cluster_manager_));
   ON_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillByDefault(Return(&async_request_));
 
@@ -162,16 +165,18 @@ void UberFilterFuzzer::perFilterSetup() {
       .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.
-  ON_CALL(factory_context_, admin())
-      .WillByDefault(testing::Return(OptRef<Server::Admin>{factory_context_.admin_}));
-  ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _, _))
+  ON_CALL(factory_context_.server_factory_context_, admin())
+      .WillByDefault(
+          testing::Return(OptRef<Server::Admin>{factory_context_.server_factory_context_.admin_}));
+  ON_CALL(factory_context_.server_factory_context_.admin_, addHandler(_, _, _, _, _, _))
       .WillByDefault(testing::Return(true));
-  ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
+  ON_CALL(factory_context_.server_factory_context_.admin_, removeHandler(_))
+      .WillByDefault(testing::Return(true));
 
   // Prepare expectations for WASM filter.
-  ON_CALL(factory_context_, listenerMetadata())
-      .WillByDefault(testing::ReturnRef(listener_metadata_));
-  ON_CALL(factory_context_.api_, customStatNamespaces())
+  ON_CALL(factory_context_, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info_));
+  ON_CALL(listener_info_, metadata()).WillByDefault(testing::ReturnRef(listener_metadata_));
+  ON_CALL(factory_context_.server_factory_context_.api_, customStatNamespaces())
       .WillByDefault(testing::ReturnRef(custom_stat_namespaces_));
 
   // Prepare expectations for AWSRequestSigning filter

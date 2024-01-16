@@ -15,6 +15,9 @@ namespace Http {
 namespace Http2 {
 
 template <typename Flag> constexpr uint8_t orFlags(Flag flag) { return static_cast<uint8_t>(flag); }
+template <typename Flag> constexpr uint8_t andFlags(Flag flag) {
+  return static_cast<uint8_t>(flag);
+}
 
 // All this templatized stuff is for the typesafe constexpr bitwise ORing of the "enum class" values
 template <typename First, typename... Rest> struct FirstArgType {
@@ -25,6 +28,12 @@ template <typename Flag, typename... Flags> constexpr uint8_t orFlags(Flag first
   static_assert(std::is_same<Flag, typename FirstArgType<Flags...>::type>::value,
                 "All flag types must be the same!");
   return static_cast<uint8_t>(first) | orFlags(rest...);
+}
+
+template <typename Flag, typename... Flags> constexpr uint8_t andFlags(Flag first, Flags... rest) {
+  static_assert(std::is_same<Flag, typename FirstArgType<Flags...>::type>::value,
+                "All flag types must be the same!");
+  return static_cast<uint8_t>(first) & andFlags(rest...);
 }
 
 // Rudimentary facility for building and parsing of HTTP2 frames for unit tests
@@ -63,6 +72,7 @@ public:
     None = 0,
     EndStream = 1,
     EndHeaders = 4,
+    Padded = 8,
   };
 
   enum class DataFlags : uint8_t {
@@ -74,6 +84,8 @@ public:
     None = 0,
     EndMetadata = 4,
   };
+
+  using FrameFlags = absl::variant<SettingsFlags, HeadersFlags, DataFlags, MetadataFlags>;
 
   // See https://tools.ietf.org/html/rfc7541#appendix-A for static header indexes
   enum class StaticHeaderIndex : uint8_t {
@@ -109,7 +121,7 @@ public:
     Http11Required
   };
 
-  enum class ResponseStatus { Unknown, Ok, NotFound };
+  enum class ResponseStatus { Unknown, Ok, NotFound, InternalServerError };
 
   struct Header {
     Header(absl::string_view key, absl::string_view value) : key_(key), value_(value) {}
@@ -127,6 +139,8 @@ public:
   static uint32_t makeClientStreamId(uint32_t stream_id) { return (stream_id << 1) | 1; }
 
   // Methods for creating HTTP2 frames
+  static Http2Frame makeRawFrame(Type type, uint8_t flags, uint32_t stream_id,
+                                 absl::string_view payload);
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
   static Http2Frame makeSettingsFrame(SettingsFlags flags,
@@ -181,7 +195,38 @@ public:
   static Http2Frame makeGenericFrameFromHexDump(absl::string_view contents);
 
   Type type() const { return static_cast<Type>(data_[3]); }
+  FrameFlags frameFlags() const {
+    switch (type()) {
+    case Type::Data:
+      return static_cast<DataFlags>(data_[4]);
+    case Type::Headers:
+      return static_cast<HeadersFlags>(data_[4]);
+    case Type::Settings:
+      return static_cast<SettingsFlags>(data_[4]);
+    case Type::Metadata:
+      return static_cast<MetadataFlags>(data_[4]);
+    default:
+      PANIC("Unimplemented frame type.");
+    }
+  }
+
+  // Returns whether the frame indicates end stream.
+  bool endStream() const {
+    if (type() == Type::RstStream) {
+      return true;
+    }
+
+    FrameFlags flags = frameFlags();
+    if (absl::holds_alternative<DataFlags>(flags)) {
+      return andFlags(absl::get<DataFlags>(flags), DataFlags::EndStream);
+    } else if (absl::holds_alternative<HeadersFlags>(flags)) {
+      return andFlags(absl::get<HeadersFlags>(flags), HeadersFlags::EndStream);
+    }
+
+    return false;
+  }
   ResponseStatus responseStatus() const;
+  uint32_t streamId() const;
 
   // Copy HTTP2 header. The `header` parameter must at least be HeaderSize long.
   // Allocates payload size based on the value in the header.
@@ -195,7 +240,7 @@ public:
     if (data_.empty()) {
       return {};
     }
-    return std::string(reinterpret_cast<const char*>(data()), size());
+    return {reinterpret_cast<const char*>(data()), size()};
   }
 
   uint32_t payloadSize() const;
@@ -209,6 +254,16 @@ public:
   ConstIterator end() const { return data_.end(); }
   bool empty() const { return data_.empty(); }
 
+  void appendHeaderWithoutIndexing(const Header& header);
+  // This method updates payload length in the HTTP2 header based on the size of the data_
+  void adjustPayloadSize() {
+    ASSERT(size() >= HeaderSize);
+    setPayloadSize(size() - HeaderSize);
+  }
+  // Headers are directly encoded
+  void appendStaticHeader(StaticHeaderIndex index);
+  void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
+
 private:
   void buildHeader(Type type, uint32_t payload_size = 0, uint8_t flags = 0, uint32_t stream_id = 0);
   void setPayloadSize(uint32_t size);
@@ -221,21 +276,11 @@ private:
   void appendData(std::vector<uint8_t> data) {
     data_.insert(data_.end(), data.begin(), data.end());
   }
-  void appendDataAfterHeaders(std::vector<uint8_t> data) {
+  void appendDataAfterHeaders(absl::string_view data) {
     std::copy(data.begin(), data.end(), data_.begin() + 9);
   }
 
-  // Headers are directly encoded
-  void appendStaticHeader(StaticHeaderIndex index);
-  void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
-  void appendHeaderWithoutIndexing(const Header& header);
   void appendEmptyHeader();
-
-  // This method updates payload length in the HTTP2 header based on the size of the data_
-  void adjustPayloadSize() {
-    ASSERT(size() >= HeaderSize);
-    setPayloadSize(size() - HeaderSize);
-  }
 
   DataContainer data_;
 };

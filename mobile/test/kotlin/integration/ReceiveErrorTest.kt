@@ -1,6 +1,5 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Custom
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -11,6 +10,7 @@ import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -20,42 +20,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val hcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
-private const val filterName = "error_validation_filter"
-private const val config =
-"""
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-    api_listener:
-      api_listener:
-        "@type": $hcmType
-        config:
-          stat_prefix: hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-            - name: api
-              domains: ["*"]
-              routes:
-              - match: { prefix: "/" }
-                direct_response: { status: 503 }
-          http_filters:
-          - name: envoy.filters.http.platform_bridge
-            typed_config:
-              "@type": $pbfType
-              platform_filter_name: $filterName
-          - name: envoy.filters.http.local_error
-            typed_config:
-              "@type": $localErrorFilterType
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-"""
+private const val PBF_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+private const val LOCAL_ERROR_FILTER_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+private const val FILTER_NAME = "error_validation_filter"
 
 class ReceiveErrorTest {
   init {
@@ -96,6 +65,7 @@ class ReceiveErrorTest {
     override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {
       receivedError.countDown()
     }
+
     override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
     override fun onCancel(finalStreamIntel: FinalStreamIntel) {
@@ -105,23 +75,31 @@ class ReceiveErrorTest {
 
   @Test
   fun `errors on stream call onError callback`() {
-    val requestHeader = GRPCRequestHeadersBuilder(
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    ).build()
+    val requestHeader =
+      GRPCRequestHeadersBuilder(
+          scheme = "https",
+          authority = "doesnotexist.example.com",
+          path = "/test"
+        )
+        .build()
 
-    val engine = EngineBuilder(Custom(config))
-      .addPlatformFilter(
-        name = filterName,
-        factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
-      )
-      .setOnEngineRunning {}
-      .build()
+    val engine =
+      EngineBuilder(Standard())
+        .addPlatformFilter(
+          name = FILTER_NAME,
+          factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
+        )
+        .addNativeFilter(
+          "envoy.filters.http.platform_bridge",
+          "{'@type': $PBF_TYPE, platform_filter_name: $FILTER_NAME}"
+        )
+        .addNativeFilter("envoy.filters.http.local_error", "{'@type': $LOCAL_ERROR_FILTER_TYPE}")
+        .build()
 
     var errorCode: Int? = null
 
-    engine.streamClient()
+    engine
+      .streamClient()
       .newStreamPrototype()
       .setOnResponseHeaders { _, _, _ -> fail("Headers received instead of expected error") }
       .setOnResponseData { _, _, _ -> fail("Data received instead of expected error") }
@@ -131,9 +109,7 @@ class ReceiveErrorTest {
         errorCode = error.errorCode
         callbackReceivedError.countDown()
       }
-      .setOnCancel { _ ->
-        fail("Unexpected call to onCancel response callback")
-      }
+      .setOnCancel { _ -> fail("Unexpected call to onCancel response callback") }
       .start()
       .sendHeaders(requestHeader, true)
 

@@ -17,12 +17,16 @@
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/udp_packet_writer_handler.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/interval_value.h"
 
 namespace Envoy {
 namespace Network {
+
+// Set this to the maximum value which effectively accepts all connections.
+constexpr uint32_t DefaultMaxConnectionsToAcceptPerSocketEvent = UINT32_MAX;
 
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
@@ -130,6 +134,39 @@ public:
 using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
 
 /**
+ * Description of the listener.
+ */
+class ListenerInfo {
+public:
+  virtual ~ListenerInfo() = default;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this listener.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
+   * the local proxy.
+   */
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
+
+  /**
+   * @return whether the listener is a Quic listener.
+   */
+  virtual bool isQuic() const PURE;
+};
+
+using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
+
+/**
  * A configuration for an individual listener.
  */
 class ListenerConfig {
@@ -203,6 +240,11 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
+   * @return ListenerInfoConstSharedPtr& description of the listener.
+   */
+  virtual const ListenerInfoConstSharedPtr& listenerInfo() const PURE;
+
+  /**
    * @return the UDP configuration for the listener IFF it is a UDP listener.
    */
   virtual UdpListenerConfigOptRef udpListenerConfig() PURE;
@@ -211,11 +253,6 @@ public:
    * @return the internal configuration for the listener IFF it is an internal listener.
    */
   virtual InternalListenerConfigOptRef internalListenerConfig() PURE;
-
-  /**
-   * @return traffic direction of the listener.
-   */
-  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @param address is used for query the address specific connection balancer.
@@ -238,6 +275,11 @@ public:
    * @return pending connection backlog for TCP listeners.
    */
   virtual uint32_t tcpBacklogSize() const PURE;
+
+  /**
+   * @return the maximum number of connections that will be accepted for a given socket event.
+   */
+  virtual uint32_t maxConnectionsToAcceptPerSocketEvent() const PURE;
 
   /**
    * @return init manager of the listener.
@@ -272,6 +314,13 @@ public:
    * Called when a new connection is rejected.
    */
   virtual void onReject(RejectCause cause) PURE;
+
+  /**
+   * Called when the listener has finished accepting connections per socket
+   * event.
+   * @param connections_accepted number of connections accepted.
+   */
+  virtual void recordConnectionsAcceptedOnSocketEvent(uint32_t connections_accepted) PURE;
 };
 
 /**
@@ -412,6 +461,12 @@ public:
    * after being opened.
    */
   virtual void setRejectFraction(UnitFloat reject_fraction) PURE;
+
+  /**
+   * Configures the LoadShedPoints for this listener.
+   */
+  virtual void
+  configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

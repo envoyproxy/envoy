@@ -12,8 +12,8 @@ echo -n HELO | nc -4u -w1 127.0.0.1 "${PORT_PROXY}"
 echo -n OLEH | nc -4u -w1 127.0.0.1 "${PORT_PROXY}"
 
 run_log "Check backend log"
-docker-compose logs service-udp | grep HELO
-docker-compose logs service-udp | grep OLEH
+"${DOCKER_COMPOSE[@]}" logs service-udp | grep HELO
+"${DOCKER_COMPOSE[@]}" logs service-udp | grep OLEH
 
 run_log "Check admin stats"
 curl -s "http://127.0.0.1:${PORT_ADMIN}/stats" | grep udp | grep -v "\: 0"

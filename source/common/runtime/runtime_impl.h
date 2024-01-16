@@ -87,31 +87,12 @@ public:
 
   const EntryMap& values() const;
 
-  static Entry createEntry(const std::string& value);
-  static Entry createEntry(const ProtobufWkt::Value& value);
+  static Entry createEntry(const ProtobufWkt::Value& value, absl::string_view raw_string,
+                           const char*& error_message);
+  static void addEntry(Snapshot::EntryMap& values, const std::string& key,
+                       const ProtobufWkt::Value& value, absl::string_view raw_string = "");
 
 private:
-  static void resolveEntryType(Entry& entry) {
-    if (parseEntryBooleanValue(entry)) {
-      return;
-    }
-
-    if (parseEntryDoubleValue(entry) && entry.double_value_ >= 0 &&
-        entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
-      // Valid uint values will always be parseable as doubles, so we assign the value to both the
-      // uint and double fields. In cases where the value is something like "3.1", we will floor the
-      // number by casting it to a uint and assigning the uint value.
-      entry.uint_value_ = entry.double_value_;
-      return;
-    }
-
-    parseEntryFractionalPercentValue(entry);
-  }
-
-  static bool parseEntryBooleanValue(Entry& entry);
-  static bool parseEntryDoubleValue(Entry& entry);
-  static void parseEntryFractionalPercentValue(Entry& entry);
-
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;
   Random::RandomGenerator& generator_;
@@ -197,18 +178,18 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                              const std::string& version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
   void start();
-  void validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
-  void onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
+  absl::Status validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
+  absl::Status onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
   void createSubscription();
 
   LoaderImpl& parent_;

@@ -59,7 +59,7 @@ private:
 struct TokenCache {
   TokenCache(const envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig& cache_config,
              Envoy::Server::Configuration::FactoryContext& context)
-      : tls(context.threadLocal()) {
+      : tls(context.serverFactoryContext().threadLocal()) {
     tls.set([cache_config](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalCache>(cache_config, dispatcher.timeSource());
     });
@@ -93,7 +93,6 @@ TokenType* TokenCacheImpl<TokenType>::validateTokenAndReturn(const std::string& 
     // Note: verifyTimeConstraint() interface is correct for the token consumer. However, as the
     // token producer here, we should instead include the clock skew as the part of the `now` time
     // up front to account for the clock skew on the consumer side where the token will be consumed.
-    // TODO(tyxia) Add test for token verification. It currently relies on the tests in jwt library.
     if (found_token->verifyTimeConstraint(
             DateUtil::nowToSeconds(time_source_) + ::google::jwt_verify::kClockSkewInSecond,
             /*clock_skew=*/0) == ::google::jwt_verify::Status::JwtExpired) {

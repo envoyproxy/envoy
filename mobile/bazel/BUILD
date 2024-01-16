@@ -1,9 +1,14 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
+
+config_setting(
+    name = "envoy_mobile_swift_cxx_interop",
+    values = {"define": "envoy_mobile_swift_cxx_interop=enabled"},
+)
 
 kt_jvm_library(
     name = "envoy_mobile_test_suite",
@@ -15,11 +20,6 @@ kt_jvm_library(
         "@maven//:io_github_classgraph_classgraph",
         "@maven//:junit_junit",
     ],
-)
-
-config_setting(
-    name = "include_ifaddrs",
-    values = {"define": "include_ifaddrs=true"},
 )
 
 config_setting(

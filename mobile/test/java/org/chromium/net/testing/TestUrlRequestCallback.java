@@ -339,12 +339,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
     request.read(buffer);
   }
 
-  public boolean isDone() {
-    // It's not mentioned by the Android docs, but block(0) seems to block
-    // indefinitely, so have to block for one millisecond to get state
-    // without blocking.
-    return !mDone.isBlocked();
-  }
+  public boolean isDone() { return !mDone.isBlocked(); }
 
   protected void openDone() { mDone.open(); }
 

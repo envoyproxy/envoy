@@ -42,20 +42,37 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       api_(api), only_verify_leaf_cert_crl_(config.only_verify_leaf_cert_crl()),
       max_verify_depth_(config.has_max_verify_depth()
                             ? absl::optional<uint32_t>(config.max_verify_depth().value())
-                            : absl::nullopt) {
+                            : absl::nullopt) {}
+
+absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
+CertificateValidationContextConfigImpl::create(
+    const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
+    Api::Api& api) {
+  auto config = std::unique_ptr<CertificateValidationContextConfigImpl>(
+      new CertificateValidationContextConfigImpl(context, api));
+  absl::Status status = config->initialize();
+  if (status.ok()) {
+    return config;
+  }
+  return status;
+}
+
+absl::Status CertificateValidationContextConfigImpl::initialize() {
   if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
     if (!certificate_revocation_list_.empty()) {
-      throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
-                                       certificateRevocationListPath()));
+      return absl::InvalidArgumentError(fmt::format("Failed to load CRL from {} without trusted CA",
+                                                    certificateRevocationListPath()));
     }
     if (!subject_alt_name_matchers_.empty()) {
-      throw EnvoyException("SAN-based verification of peer certificates without "
-                           "trusted CA is insecure and not allowed");
+      return absl::InvalidArgumentError("SAN-based verification of peer certificates without "
+                                        "trusted CA is insecure and not allowed");
     }
     if (allow_expired_certificate_) {
-      throw EnvoyException("Certificate validity period is always ignored without trusted CA");
+      return absl::InvalidArgumentError(
+          "Certificate validity period is always ignored without trusted CA");
     }
   }
+  return absl::OkStatus();
 }
 
 std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>

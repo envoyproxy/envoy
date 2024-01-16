@@ -135,8 +135,8 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
       std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, "", mock_factory_ctx),
-      *context_manager_, stats_store_);
+          tls_context_, mock_factory_ctx),
+      *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
       socket_factory.createTransportSocket(nullptr, nullptr);
@@ -161,8 +161,8 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
       std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, "", mock_factory_ctx),
-      *context_manager_, stats_store_);
+          tls_context_, mock_factory_ctx),
+      *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
       socket_factory.createTransportSocket(nullptr, nullptr);
@@ -198,8 +198,8 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
       std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, "", mock_factory_ctx),
-      *context_manager_, stats_store_);
+          tls_context_, mock_factory_ctx),
+      *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
       socket_factory.createTransportSocket(nullptr, nullptr);
@@ -295,8 +295,8 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   Extensions::TransportSockets::Tls::ServerContextConfigImpl server_context_config(
       tls_context_, mock_factory_ctx);
   EXPECT_TRUE(server_context_config.isReady());
-  EXPECT_NO_THROW(context_manager_->createSslServerContext(stats_store_, server_context_config,
-                                                           std::vector<std::string>{}));
+  EXPECT_NO_THROW(context_manager_->createSslServerContext(
+      *stats_store_.rootScope(), server_context_config, std::vector<std::string>{}));
 }
 
 } // namespace

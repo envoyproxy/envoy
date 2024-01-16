@@ -17,6 +17,8 @@ public:
   MOCK_METHOD(const std::string&, clusterName, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (absl::string_view), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(absl::string_view, name, (), (const));
 
   std::string cluster_name_{"fake_cluster_name"};
 
@@ -29,7 +31,8 @@ public:
 
   MOCK_METHOD(RouteEntryConstSharedPtr, routeEntry, (const Request& request), (const));
 
-  std::shared_ptr<const MockRouteEntry> route_entry_{std::make_shared<MockRouteEntry>()};
+  std::shared_ptr<const testing::NiceMock<MockRouteEntry>> route_entry_{
+      std::make_shared<testing::NiceMock<MockRouteEntry>>()};
 };
 
 } // namespace GenericProxy

@@ -1,347 +1,381 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/cc/log_level.h"
 #include "library/common/api/external.h"
-#include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
 
 #if defined(__APPLE__)
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 #endif
 
-using testing::HasSubstr;
-using testing::Not;
-extern const char* alternate_protocols_cache_filter_insert;
-
 namespace Envoy {
 namespace {
 
 using namespace Platform;
 
+using envoy::config::bootstrap::v3::Bootstrap;
+using DfpClusterConfig = ::envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig;
+using testing::HasSubstr;
+using testing::IsEmpty;
+using testing::Not;
+using testing::SizeIs;
+
+DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
+  DfpClusterConfig cluster_config;
+  const auto& clusters = bootstrap.static_resources().clusters();
+  for (const auto& cluster : clusters) {
+    if (cluster.name() == "base") {
+      MessageUtil::unpackTo(cluster.cluster_type().typed_config(), cluster_config);
+    }
+  }
+  return cluster_config;
+}
+
 TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
-  engine_builder.addGrpcStatsDomain("asdf.fake.website")
+  engine_builder
+#ifdef ENVOY_ENABLE_QUIC
+      .setHttp3ConnectionOptions("5RTO")
+      .setHttp3ClientConnectionOptions("MPQC")
+      .addQuicHint("www.abc.com", 443)
+      .addQuicHint("www.def.com", 443)
+      .addQuicCanonicalSuffix(".opq.com")
+      .addQuicCanonicalSuffix(".xyz.com")
+#endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
       .addDnsMinRefreshSeconds(567)
       .addDnsFailureRefreshSeconds(789, 987)
       .addDnsQueryTimeoutSeconds(321)
-      .addDnsPreresolveHostnames("[hostname]")
       .addH2ConnectionKeepaliveIdleIntervalMilliseconds(222)
       .addH2ConnectionKeepaliveTimeoutSeconds(333)
-      .addStatsFlushSeconds(654)
-      .addVirtualClusters("[virtual-clusters]")
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
+      .setRuntimeGuard("test_feature_false", true)
+      .enableDnsCache(true, /* save_interval_seconds */ 101)
+      .addDnsPreresolveHostnames({"lyft.com", "google.com"})
+      .setForceAlwaysUsev6(true)
       .setDeviceOs("probably-ubuntu-on-CI");
-  std::string config_str = engine_builder.generateConfigStr();
 
-  std::vector<std::string> must_contain = {"- &stats_domain asdf.fake.website",
-                                           "- &connect_timeout 123s",
-                                           "- &dns_refresh_rate 456s",
-                                           "- &dns_fail_base_interval 789s",
-                                           "- &dns_fail_max_interval 987s",
-                                           "- &dns_min_refresh_rate 567s",
-                                           "- &dns_query_timeout 321s",
-                                           "- &dns_preresolve_hostnames [hostname]",
-                                           "- &h2_connection_keepalive_idle_interval 0.222s",
-                                           "- &h2_connection_keepalive_timeout 333s",
-                                           "- &stats_flush_interval 654s",
-                                           "- &virtual_clusters [virtual-clusters]",
-                                           ("- &metadata { device_os: probably-ubuntu-on-CI, "
-                                            "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
-                                           R"(- &validation_context
-  trusted_ca:)"};
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string config_str = bootstrap->ShortDebugString();
+
+  std::vector<std::string> must_contain = {
+      "connect_timeout { seconds: 123 }",
+      "dns_refresh_rate { seconds: 456 }",
+      "dns_min_refresh_rate { seconds: 567 }",
+      "dns_query_timeout { seconds: 321 }",
+      "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
+      "connection_idle_interval { nanos: 222000000 }",
+      "connection_keepalive { timeout { seconds: 333 }",
+#ifdef ENVOY_ENABLE_QUIC
+      "connection_options: \"5RTO\"",
+      "client_connection_options: \"MPQC\"",
+      "hostname: \"www.abc.com\"",
+      "hostname: \"www.def.com\"",
+      "canonical_suffixes: \".opq.com\"",
+      "canonical_suffixes: \".xyz.com\"",
+#endif
+      "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
+      "key: \"always_use_v6\" value { bool_value: true }",
+      "key: \"test_feature_false\" value { bool_value: true }",
+      "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
+      "key: \"app_version\" value { string_value: \"1.2.3\" } }",
+      "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
+      "validation_context { trusted_ca {",
+  };
+
   for (const auto& string : must_contain) {
-    ASSERT_NE(config_str.find(string), std::string::npos) << "'" << string << "' not found";
+    EXPECT_THAT(config_str, HasSubstr(string)) << "'" << string << "' not found in " << config_str;
   }
+}
+
+TEST(TestConfig, MultiFlag) {
+  EngineBuilder engine_builder;
+  engine_builder.setRuntimeGuard("test_feature_false", true)
+      .setRuntimeGuard("test_feature_true", false);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string bootstrap_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_true\" value { bool_value: false }"));
 }
 
 TEST(TestConfig, ConfigIsValid) {
   EngineBuilder engine_builder;
-  std::string config_str = engine_builder.generateConfigStr();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
 
   // Test per-platform DNS fixes.
 #if defined(__APPLE__)
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.network.dns_resolver.getaddrinfo")));
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.network.dns_resolver.apple"));
+  EXPECT_THAT(bootstrap->DebugString(), Not(HasSubstr("envoy.network.dns_resolver.getaddrinfo")));
+  EXPECT_THAT(bootstrap->DebugString(), HasSubstr("envoy.network.dns_resolver.apple"));
 #else
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.network.dns_resolver.getaddrinfo"));
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.network.dns_resolver.apple")));
+  EXPECT_THAT(bootstrap->DebugString(), HasSubstr("envoy.network.dns_resolver.getaddrinfo"));
+  EXPECT_THAT(bootstrap->DebugString(), Not(HasSubstr("envoy.network.dns_resolver.apple")));
 #endif
 }
 
-TEST(TestConfig, SetGzip) {
+TEST(TestConfig, SetGzipDecompression) {
   EngineBuilder engine_builder;
 
-  engine_builder.enableGzip(false);
-  std::string config_str = engine_builder.generateConfigStr();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.filters.http.decompressor")));
+  engine_builder.enableGzipDecompression(false);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->DebugString(), Not(HasSubstr("envoy.filters.http.decompressor")));
 
-  engine_builder.enableGzip(true);
-  config_str = engine_builder.generateConfigStr();
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.decompressor"));
+  engine_builder.enableGzipDecompression(true);
+  bootstrap.reset();
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->DebugString(), HasSubstr("envoy.filters.http.decompressor"));
 }
 
-TEST(TestConfig, SetBrotli) {
+TEST(TestConfig, SetBrotliDecompression) {
   EngineBuilder engine_builder;
 
-  engine_builder.enableBrotli(false);
-  std::string config_str = engine_builder.generateConfigStr();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.decompressor.v3.Brotli")));
+  engine_builder.enableBrotliDecompression(false);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->DebugString(), Not(HasSubstr("brotli.decompressor.v3.Brotli")));
 
-  engine_builder.enableBrotli(true);
-  config_str = engine_builder.generateConfigStr();
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
+  engine_builder.enableBrotliDecompression(true);
+  bootstrap.reset();
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
 }
 
 TEST(TestConfig, SetSocketTag) {
   EngineBuilder engine_builder;
 
   engine_builder.enableSocketTagging(false);
-  std::string config_str = engine_builder.generateConfigStr();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("http.socket_tag.SocketTag")));
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->DebugString(), Not(HasSubstr("http.socket_tag.SocketTag")));
 
   engine_builder.enableSocketTagging(true);
-  config_str = engine_builder.generateConfigStr();
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("http.socket_tag.SocketTag"));
+  bootstrap.reset();
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->DebugString(), HasSubstr("http.socket_tag.SocketTag"));
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 TEST(TestConfig, SetAltSvcCache) {
   EngineBuilder engine_builder;
-
-  std::string config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
-
-  absl::StrReplaceAll({{"#{custom_filters}", alternate_protocols_cache_filter_insert}},
-                      &config_str);
-
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(config_str, bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->DebugString(), HasSubstr("alternate_protocols_cache"));
 }
+#endif
 
 TEST(TestConfig, StreamIdleTimeout) {
   EngineBuilder engine_builder;
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 15s"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("stream_idle_timeout { seconds: 15 }"));
 
   engine_builder.setStreamIdleTimeoutSeconds(42);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 42s"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("stream_idle_timeout { seconds: 42 }"));
 }
 
 TEST(TestConfig, PerTryIdleTimeout) {
   EngineBuilder engine_builder;
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 15s"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("per_try_idle_timeout { seconds: 15 }"));
 
   engine_builder.setPerTryIdleTimeoutSeconds(42);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 42s"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-}
-
-TEST(TestConfig, EnableAdminInterface) {
-  EngineBuilder engine_builder;
-
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, Not(HasSubstr("admin: *admin_interface")));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  engine_builder.enableAdminInterface(true);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("admin: *admin_interface"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("per_try_idle_timeout { seconds: 42 }"));
 }
 
 TEST(TestConfig, EnableInterfaceBinding) {
   EngineBuilder engine_builder;
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&enable_interface_binding false"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("enable_interface_binding")));
 
   engine_builder.enableInterfaceBinding(true);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&enable_interface_binding true"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_interface_binding: true"));
 }
 
 TEST(TestConfig, EnableDrainPostDnsRefresh) {
   EngineBuilder engine_builder;
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&enable_drain_post_dns_refresh false"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("enable_drain_post_dns_refresh")));
 
   engine_builder.enableDrainPostDnsRefresh(true);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&enable_drain_post_dns_refresh true"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-}
-
-TEST(TestConfig, EnableH2ExtendKeepaliveTimeout) {
-  EngineBuilder engine_builder;
-
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&h2_delay_keepalive_timeout false"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  engine_builder.enableH2ExtendKeepaliveTimeout(true);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&h2_delay_keepalive_timeout true"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-}
-
-TEST(TestConfig, EnableHappyEyeballs) {
-  EngineBuilder engine_builder;
-
-  std::string config_str = engine_builder.generateConfigStr();
-  config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family V4_PREFERRED")));
-  ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family ALL"));
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses false")));
-  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses true"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  engine_builder.enableHappyEyeballs(false);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family V4_PREFERRED"));
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family ALL")));
-  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses false"));
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses true")));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("enable_drain_post_dns_refresh: true"));
 }
 
 TEST(TestConfig, EnforceTrustChainVerification) {
   EngineBuilder engine_builder;
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&trust_chain_verification VERIFY_TRUST_CHAIN"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("trust_chain_verification")));
 
   engine_builder.enforceTrustChainVerification(false);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&trust_chain_verification ACCEPT_UNTRUSTED"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(),
+              HasSubstr("trust_chain_verification: ACCEPT_UNTRUSTED"));
 }
 
 TEST(TestConfig, AddMaxConnectionsPerHost) {
   EngineBuilder engine_builder;
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&max_connections_per_host 7"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("max_connections { value: 7 }"));
 
   engine_builder.addMaxConnectionsPerHost(16);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&max_connections_per_host 16"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("max_connections { value: 16 }"));
 }
 
-std::string statsdSinkConfig(int port) {
-  std::string config = R"({ name: envoy.stat_sinks.statsd,
-      typed_config: {
-        "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
-        address: { socket_address: { address: 127.0.0.1, port_value: )" +
-                       fmt::format("{}", port) + " } } } }";
-  return config;
+TEST(TestConfig, AddDnsPreresolveHostnames) {
+  EngineBuilder engine_builder;
+  engine_builder.addDnsPreresolveHostnames({"google.com", "lyft.com"});
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>
+      expected_dns_preresolve_hostnames;
+  auto& host_addr1 = *expected_dns_preresolve_hostnames.Add();
+  host_addr1.set_address("google.com");
+  host_addr1.set_port_value(443);
+  auto& host_addr2 = *expected_dns_preresolve_hostnames.Add();
+  host_addr2.set_address("lyft.com");
+  host_addr2.set_port_value(443);
+  EXPECT_TRUE(TestUtility::repeatedPtrFieldEqual(
+      getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
+      expected_dns_preresolve_hostnames));
+
+  // Resetting the DNS preresolve hostnames with just "google.com" now.
+  engine_builder.addDnsPreresolveHostnames({"google.com"});
+  bootstrap = engine_builder.generateBootstrap();
+  expected_dns_preresolve_hostnames.Clear();
+  auto& host_addr3 = *expected_dns_preresolve_hostnames.Add();
+  host_addr3.set_address("google.com");
+  host_addr3.set_port_value(443);
+  EXPECT_TRUE(TestUtility::repeatedPtrFieldEqual(
+      getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
+      expected_dns_preresolve_hostnames));
 }
 
-TEST(TestConfig, AddStatsSinks) {
+TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, Not(HasSubstr("&stats_sinks")));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  engine_builder.addStatsSinks({statsdSinkConfig(1), statsdSinkConfig(2)});
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str,
-              HasSubstr("&stats_sinks [" + statsdSinkConfig(1) + "," + statsdSinkConfig(2) + "]"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-}
-
-TEST(TestConfig, EnableHttp3) {
-  EngineBuilder engine_builder;
-
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(
-      config_str,
-      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  engine_builder.enableHttp3(true);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str,
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+#ifdef ENVOY_ENABLE_QUIC
+  EXPECT_THAT(bootstrap->ShortDebugString(),
               HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+#endif
+#ifndef ENVOY_ENABLE_QUIC
+  EXPECT_THAT(
+      bootstrap->ShortDebugString(),
+      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+#endif
+
+#ifdef ENVOY_ENABLE_QUIC
+  engine_builder.enableHttp3(false);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(
+      bootstrap->ShortDebugString(),
+      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+#endif
 }
 
-TEST(TestConfig, RemainingTemplatesThrows) {
-  EngineBuilder engine_builder("{{ template_that_i_will_not_fill }}");
-  try {
-    engine_builder.generateConfigStr();
-    FAIL() << "Expected std::runtime_error";
-  } catch (std::runtime_error& err) {
-    EXPECT_EQ(err.what(), std::string("could not resolve all template keys in config"));
-  }
+#ifdef ENVOY_MOBILE_XDS
+TEST(TestConfig, XdsConfig) {
+  EngineBuilder engine_builder;
+  const std::string host = "fake-td.googleapis.com";
+  const uint32_t port = 12345;
+  const std::string authority = absl::StrCat(host, ":", port);
+
+  XdsBuilder xds_builder(/*xds_server_address=*/host,
+                         /*xds_server_port=*/port);
+  engine_builder.setXds(std::move(xds_builder));
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+
+  auto& ads_config = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config.grpc_services(0).envoy_grpc().cluster_name(), "base");
+  EXPECT_EQ(ads_config.grpc_services(0).envoy_grpc().authority(), authority);
+
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>
+      expected_dns_preresolve_hostnames;
+  auto& host_addr1 = *expected_dns_preresolve_hostnames.Add();
+  host_addr1.set_address(host);
+  host_addr1.set_port_value(port);
+  EXPECT_TRUE(TestUtility::repeatedPtrFieldEqual(
+      getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
+      expected_dns_preresolve_hostnames));
+
+  // With initial gRPC metadata.
+  xds_builder = XdsBuilder(/*xds_server_address=*/host, /*xds_server_port=*/port);
+  xds_builder.addInitialStreamHeader(/*header=*/"x-goog-api-key", /*value=*/"A1B2C3")
+      .addInitialStreamHeader(/*header=*/"x-android-package",
+                              /*value=*/"com.google.envoymobile.io.myapp");
+  engine_builder.setXds(std::move(xds_builder));
+  bootstrap = engine_builder.generateBootstrap();
+  auto& ads_config_with_metadata = bootstrap->dynamic_resources().ads_config();
+  EXPECT_EQ(ads_config_with_metadata.api_type(), envoy::config::core::v3::ApiConfigSource::GRPC);
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).envoy_grpc().cluster_name(), "base");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).envoy_grpc().authority(), authority);
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(0).key(), "x-goog-api-key");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(0).value(), "A1B2C3");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(1).key(),
+            "x-android-package");
+  EXPECT_EQ(ads_config_with_metadata.grpc_services(0).initial_metadata(1).value(),
+            "com.google.envoymobile.io.myapp");
 }
+
+TEST(TestConfig, CopyConstructor) {
+  EngineBuilder engine_builder;
+  engine_builder.setRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  std::string bootstrap_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, Not(HasSubstr("envoy.filters.http.decompressor")));
+
+  EngineBuilder engine_builder_copy(engine_builder);
+  engine_builder_copy.enableGzipDecompression(true);
+  XdsBuilder xdsBuilder("FAKE_XDS_SERVER", 0);
+  xdsBuilder.addClusterDiscoveryService();
+  engine_builder_copy.setXds(xdsBuilder);
+  bootstrap_str = engine_builder_copy.generateBootstrap()->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
+
+  EngineBuilder engine_builder_copy2(engine_builder_copy);
+  bootstrap_str = engine_builder_copy2.generateBootstrap()->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
+}
+#endif
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   engine_builder.enablePlatformCertificatesValidation(false);
-  auto config_str1 = engine_builder.generateConfigStr();
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str1), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(),
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(),
               Not(HasSubstr("envoy_mobile.cert_validator.platform_bridge_cert_validator")));
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("trusted_ca"));
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("trusted_ca"));
 
-#if not defined(__APPLE__)
   engine_builder.enablePlatformCertificatesValidation(true);
-  auto config_str2 = engine_builder.generateConfigStr();
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str2), bootstrap);
-  ASSERT_THAT(bootstrap.DebugString(),
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(),
               HasSubstr("envoy_mobile.cert_validator.platform_bridge_cert_validator"));
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("trusted_ca")));
-#else
-  EXPECT_DEATH(engine_builder.enablePlatformCertificatesValidation(true),
-               "Certificates validation using platform provided APIs is not supported in IOS");
-#endif
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("trusted_ca")));
 }
 
 // Implementation of StringAccessor which tracks the number of times it was used.
@@ -363,26 +397,25 @@ private:
   mutable int count_ = 0;
 };
 
-TEST(TestConfig, AddNativeFilter) {
+TEST(TestConfig, AddNativeFilters) {
   EngineBuilder engine_builder;
 
-  std::string filter_name = "envoy.filters.http.buffer";
+  std::string filter_name1 = "envoy.filters.http.buffer1";
+  std::string filter_name2 = "envoy.filters.http.buffer2";
   std::string filter_config =
       "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\","
       "\"max_request_bytes\":5242880}";
+  engine_builder.addNativeFilter(filter_name1, filter_config);
+  engine_builder.addNativeFilter(filter_name2, filter_config);
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name)));
-  ASSERT_THAT(config_str, Not(HasSubstr("  typed_config: " + filter_config)));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  engine_builder.addNativeFilter(filter_name, filter_config);
-
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name));
-  ASSERT_THAT(config_str, HasSubstr("  typed_config: " + filter_config));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string hcm_config =
+      bootstrap->static_resources().listeners(0).api_listener().DebugString();
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name1));
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name2));
+  EXPECT_THAT(hcm_config,
+              HasSubstr("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer"));
+  EXPECT_THAT(hcm_config, HasSubstr(std::to_string(5242880)));
 }
 
 TEST(TestConfig, AddPlatformFilter) {
@@ -390,18 +423,16 @@ TEST(TestConfig, AddPlatformFilter) {
 
   std::string filter_name = "test_platform_filter";
 
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, Not(HasSubstr("http.platform_bridge.PlatformBridge")));
-  ASSERT_THAT(config_str, Not(HasSubstr("platform_filter_name: " + filter_name)));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  std::string bootstrap_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, Not(HasSubstr("http.platform_bridge.PlatformBridge")));
+  EXPECT_THAT(bootstrap_str, Not(HasSubstr("platform_filter_name: \"" + filter_name + "\"")));
 
   engine_builder.addPlatformFilter(filter_name);
-
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("http.platform_bridge.PlatformBridge"));
-  ASSERT_THAT(config_str, HasSubstr("platform_filter_name: " + filter_name));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  bootstrap = engine_builder.generateBootstrap();
+  bootstrap_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("http.platform_bridge.PlatformBridge"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("platform_filter_name: \"" + filter_name + "\""));
 }
 
 // TODO(RyanTheOptimist): This test seems to be flaky. #2641
@@ -420,5 +451,70 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   EXPECT_EQ(data_string, Data::Utility::copyToString(data));
   release_envoy_data(data);
 }
+
+TEST(TestConfig, SetNodeId) {
+  EngineBuilder engine_builder;
+  const std::string default_node_id = "envoy-mobile";
+  EXPECT_EQ(engine_builder.generateBootstrap()->node().id(), default_node_id);
+
+  const std::string test_node_id = "my_test_node";
+  engine_builder.setNodeId(test_node_id);
+  EXPECT_EQ(engine_builder.generateBootstrap()->node().id(), test_node_id);
+}
+
+TEST(TestConfig, SetNodeLocality) {
+  EngineBuilder engine_builder;
+  const std::string region = "us-west-1";
+  const std::string zone = "some_zone";
+  const std::string sub_zone = "some_sub_zone";
+  engine_builder.setNodeLocality(region, zone, sub_zone);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->node().locality().region(), region);
+  EXPECT_EQ(bootstrap->node().locality().zone(), zone);
+  EXPECT_EQ(bootstrap->node().locality().sub_zone(), sub_zone);
+}
+
+TEST(TestConfig, SetNodeMetadata) {
+  ProtobufWkt::Struct node_metadata;
+  (*node_metadata.mutable_fields())["string_field"].set_string_value("some_string");
+  (*node_metadata.mutable_fields())["bool_field"].set_bool_value(true);
+  (*node_metadata.mutable_fields())["number_field"].set_number_value(3.14);
+  EngineBuilder engine_builder;
+  engine_builder.setNodeMetadata(node_metadata);
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->node().metadata().fields().at("string_field").string_value(), "some_string");
+  EXPECT_EQ(bootstrap->node().metadata().fields().at("bool_field").bool_value(), true);
+  EXPECT_EQ(bootstrap->node().metadata().fields().at("number_field").number_value(), 3.14);
+}
+
+#ifdef ENVOY_MOBILE_XDS
+TEST(TestConfig, AddCdsLayer) {
+  XdsBuilder xds_builder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
+  xds_builder.addClusterDiscoveryService();
+  EngineBuilder engine_builder;
+  engine_builder.setXds(std::move(xds_builder));
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_resources_locator(), "");
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().initial_fetch_timeout().seconds(),
+            /*default_timeout=*/5);
+
+  xds_builder = XdsBuilder(/*xds_server_address=*/"fake-xds-server", /*xds_server_port=*/12345);
+  const std::string cds_resources_locator =
+      "xdstp://traffic-director-global.xds.googleapis.com/envoy.config.cluster.v3.Cluster";
+  const int timeout_seconds = 300;
+  xds_builder.addClusterDiscoveryService(cds_resources_locator, timeout_seconds);
+  engine_builder.setXds(std::move(xds_builder));
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_resources_locator(), cds_resources_locator);
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().initial_fetch_timeout().seconds(),
+            timeout_seconds);
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().api_type(),
+            envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  EXPECT_EQ(bootstrap->dynamic_resources().cds_config().api_config_source().transport_api_version(),
+            envoy::config::core::v3::ApiVersion::V3);
+}
+#endif
+
 } // namespace
 } // namespace Envoy

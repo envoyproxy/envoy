@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
@@ -25,6 +26,7 @@ namespace Stats {
 
 class Sink;
 class SinkPredicates;
+class StatNamePool;
 
 /**
  * Store keeps track of all Scopes created in it, and the Scopes manage
@@ -136,6 +138,7 @@ public:
   virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
   virtual void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
+  virtual void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const PURE;
 
   /**
    * Calls 'fn' for every stat. Note that in the case of overlapping scopes, the
@@ -150,19 +153,9 @@ public:
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
-  // TODO(#24007): The cast operator is available temporarily to bound the size
-  // of https://github.com/envoyproxy/envoy/pull/23851, which detaches the
-  // inheritance of Scope as a parent of Store. There is semantic complexity to
-  // that PR, so it's going to be easier review if it's as small as possible.
-  //
-  // A follow-up PR is required to remove the functions below, which will
-  // require a large number of files to be trivially changed, by explicitly
-  // accessing the rootScope() to call these methods.
-  operator Scope&() { return *rootScope(); }
-
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,
-  // when we resovle #24007 or in the next follow-up.
+  // when we resolve #24007 or in the next follow-up.
   Counter& counterFromString(const std::string& name) {
     return rootScope()->counterFromString(name);
   }
@@ -177,9 +170,34 @@ public:
   }
 
   /**
-   * @returns a scape of the given name.
+   * @return a scope of the given name.
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
+
+  /**
+   * Extracts tags from the name and appends them to the provided StatNameTagVector.
+   *     The StatName for the extracted tags will be saved in the provided pool.
+   * @param name The stat name.
+   * @param pool The pool to create the tags in.
+   * @param stat_tags The stat name tags vector to append the tags to.
+   */
+  virtual void extractAndAppendTags(StatName name, StatNamePool& pool,
+                                    StatNameTagVector& stat_tags) PURE;
+
+  /**
+   * Extracts tags from the name and appends them to the provided StatNameTagVector.
+   *     The StatName for the extracted tags will be saved in the provided pool.
+   * @param name The stat name.
+   * @param pool The pool to create the tags in.
+   * @param stat_tags The stat name tags vector to append the tags to.
+   */
+  virtual void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                                    StatNameTagVector& stat_tags) PURE;
+
+  /**
+   * Returns the configured fixed tags (which don't depend on the name of the stat).
+   */
+  virtual const TagVector& fixedTags() PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;
@@ -240,12 +258,14 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
+   * Set predicates for filtering stats to be flushed to sinks.
    * Note that if the sink predicates object is set, we do not send non-sink stats over to the
    * child process during hot restart. This will result in the admin stats console being wrong
    * during hot restart.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
+
+  virtual OptRef<SinkPredicates> sinkPredicates() PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;

@@ -30,5 +30,5 @@ genrule(
         "ssl/libssl.a",
     ],
     cmd = "$(location {}) $(location crypto/libcrypto.a) $(location ssl/libssl.a)".format("@envoy//bazel/external:boringssl_fips.genrule_cmd"),
-    exec_tools = ["@envoy//bazel/external:boringssl_fips.genrule_cmd"],
+    tools = ["@envoy//bazel/external:boringssl_fips.genrule_cmd"],
 )

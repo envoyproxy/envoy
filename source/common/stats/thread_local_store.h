@@ -60,11 +60,12 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
+  bool hidden() const override { return false; }
 
 private:
   Histogram::Unit unit_;
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
-  uint64_t current_active_;
+  uint64_t current_active_{0};
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
   std::thread::id created_thread_id_;
@@ -105,10 +106,17 @@ public:
   }
   std::string quantileSummary() const override;
   std::string bucketSummary() const override;
+  std::vector<Bucket> detailedTotalBuckets() const override {
+    return detailedlBucketsHelper(*cumulative_histogram_);
+  }
+  std::vector<Bucket> detailedIntervalBuckets() const override {
+    return detailedlBucketsHelper(*interval_histogram_);
+  }
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
+  bool hidden() const override;
 
   // RefcountInterface
   void incRefCount() override;
@@ -121,6 +129,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  static std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(const histogram_t& histogram);
 
   Histogram::Unit unit_;
   ThreadLocalStoreImpl& thread_local_store_;
@@ -130,7 +140,7 @@ private:
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
-  bool merged_;
+  bool merged_{false};
   std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
   const uint64_t id_; // Index into TlsCache::histogram_cache_.
@@ -192,8 +202,10 @@ public:
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
   void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
 
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
+  OptRef<SinkPredicates> sinkPredicates() override { return sink_predicates_; }
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -209,6 +221,10 @@ public:
   void releaseHistogramCrossThread(uint64_t histogram_id);
 
   const TagProducer& tagProducer() const { return *tag_producer_; }
+  void extractAndAppendTags(StatName name, StatNamePool& pool, StatNameTagVector& tags) override;
+  void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                            StatNameTagVector& tags) override;
+  const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
 private:
   friend class ThreadLocalStoreTestingPeer;
@@ -519,6 +535,7 @@ private:
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+  StatSet<ParentHistogramImpl> sinked_histograms_ ABSL_GUARDED_BY(hist_mutex_);
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats

@@ -54,13 +54,13 @@ inline Config constructConfigFromYaml(const std::string& yaml,
                                       Server::Configuration::FactoryContext& context) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
-  return Config(tcp_proxy, context);
+  return {tcp_proxy, context};
 }
 
 class TcpProxyTestBase : public testing::Test {
 public:
   TcpProxyTestBase() {
-    ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
+    ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
         .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
@@ -68,7 +68,8 @@ public:
         }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
         .WillByDefault(ReturnPointee(&upstream_cluster_));
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
   }
 
   ~TcpProxyTestBase() override {
@@ -150,7 +151,9 @@ public:
     return connection;
   }
 
-  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::TestTimeSystem& timeSystem() {
+    return factory_context_.server_factory_context_.timeSystem();
+  }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
