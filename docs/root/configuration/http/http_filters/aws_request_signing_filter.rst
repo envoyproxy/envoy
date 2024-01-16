@@ -52,7 +52,7 @@ Example filter configuration:
     :linenos:
     :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`
 
-Note that this filter also supports per route configuration:
+This filter also supports per route configuration. Below is an example of route-level config overriding the config at the virtual-host level.
 
 .. literalinclude:: _include/aws-request-signing-filter-route-level-override.yaml
     :language: yaml
@@ -61,9 +61,7 @@ Note that this filter also supports per route configuration:
     :linenos:
     :caption: :download:`aws-request-signing-filter-route-level-override.yaml <_include/aws-request-signing-filter-route-level-override.yaml>`
 
-Above shows an example of route-level config overriding the config on the virtual-host level.
-
-An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to a AWS VPC Lattice service:
+An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to an Amazon VPC Lattice service:
 
 .. literalinclude:: _include/aws-request-signing-filter-sigv4a.yaml
     :language: yaml
@@ -76,9 +74,9 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
 
 Configuration as an upstream HTTP filter
 ----------------------------------------
-SigV4 or SigV4A request signatures cover the HTTP host, URL and payload. Depending on the configuration, Envoy may modify these during
-prior to forwarding to the Cluster subsystem, but after the signature has been calculated and inserted into the HTTP headers. This will
-invalidate the signature, by design.
+SigV4 or SigV4A request signatures cover the HTTP host, URL and payload. Depending on the configuration, Envoy may modify these
+prior to forwarding to the Cluster subsystem, but after the signature has been calculated and inserted into the HTTP headers. This will invalidate the signature, by design.
+
 To resolve this situation, the AWS Request Signing Filter can be configured as an upstream HTTP filter. This allows signatures to be
 calculated as a final step before the HTTP request is forwarded upstream, ensuring signatures are correctly calculated over the updated
 HTTP fields.
