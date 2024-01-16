@@ -65,7 +65,7 @@ if [[ "${1:-}" == "--android" ]]; then
   "${SDKMANAGER}" --uninstall "ndk-bundle"
   "${SDKMANAGER}" --install "ndk;21.4.7075529"
   "${SDKMANAGER}" --install "build-tools;30.0.3"
-  "${SDKMANAGER}" --install "build-tools;30.0.2"
+  # "${SDKMANAGER}" --install "build-tools;30.0.2"
   ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/21.4.7075529"
   export ANDROID_NDK_HOME
 fi
