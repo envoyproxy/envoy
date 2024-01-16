@@ -348,4 +348,4 @@ steps:
     ${{ if ne(parameters.artifactName, '') }}:
       artifactName: ${{ parameters.artifactName }}
   timeoutInMinutes: 10
-  condition: and(eq(${{ parameters.publishEnvoy }}, 'true'))
+  condition: eq(${{ parameters.publishEnvoy }}, 'true')
