@@ -136,6 +136,7 @@ run:
     - examples/**/*
     - source/**/*
     - tools/**/*
+    - VERSION.txt
   verify:
     paths:
     - .bazelrc
@@ -149,6 +150,7 @@ run:
     - examples/**/*
     - source/**/*
     - tools/**/*
+    - VERSION.txt
     push: paths
 
 tables:
