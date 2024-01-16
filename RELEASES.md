@@ -114,6 +114,10 @@ deadline of 3 weeks.
   * Get a review and merge.
 * Create a pull request with that commit and **wait for tests to pass**.
 * Once the tests have passed, and the PR has landed, CI will automatically create the tagged release and corresponding release branch.
+* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
+  necessary changes to continue development.
+* Create a pull request with that commit.
+* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
 * If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
 * Craft a witty/uplifting email and send it to all the email aliases:
 envoy-announce@googlegroups.com
@@ -123,10 +127,6 @@ envoy-maintainers@googlegroups.com -
 include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
-* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
-  necessary changes to continue development.
-* Create a pull request with that commit.
-* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
 
 
 ## Security release schedule
