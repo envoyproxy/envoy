@@ -47,7 +47,7 @@ absl::StatusOr<InstanceConstSharedPtr>
 resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   switch (address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
-    throwEnvoyExceptionOrPanic("Address must be set: " + address.DebugString());
+    return absl::InvalidArgumentError("Address must be set: " + address.DebugString());
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
@@ -64,7 +64,7 @@ resolveProtoAddress(const envoy::config::core::v3::Address& address) {
       break;
     }
   }
-  throwEnvoyExceptionOrPanic("Failed to resolve address:" + address.DebugString());
+  return absl::InvalidArgumentError("Failed to resolve address:" + address.DebugString());
 }
 
 absl::StatusOr<InstanceConstSharedPtr>
@@ -78,10 +78,10 @@ resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& socket_a
     resolver = Registry::FactoryRegistry<Resolver>::getFactory(resolver_name);
   }
   if (resolver == nullptr) {
-    throwEnvoyExceptionOrPanic(fmt::format("Unknown address resolver: {}", resolver_name));
+    return absl::InvalidArgumentError(fmt::format("Unknown address resolver: {}", resolver_name));
   }
   auto instance_or_error = resolver->resolve(socket_address);
-  THROW_IF_STATUS_NOT_OK(instance_or_error, throw);
+  RETURN_IF_STATUS_NOT_OK(instance_or_error);
   return std::move(instance_or_error.value());
 }
 
