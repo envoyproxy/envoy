@@ -1,6 +1,6 @@
 Summary of changes:
 
-* Envoy Mobile can now be built without C++ exceptions using the --define=envoy_exceptions=disabled bazel flag.
+* Envoy Mobile can now be built without C++ exceptions using the `--define=envoy_exceptions=disabled` Bazel flag.
 * Add the logical OR operation to value matchers.
 * Add xDS support for Envoy Mobile Android (AAR) library.
 * Add configurable HTTP status when a global rate limit service fails.
