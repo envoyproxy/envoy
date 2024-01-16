@@ -173,6 +173,60 @@ protected:
     nghttp2_session_callbacks* callbacks_;
   };
 
+  class Http2Visitor : public http2::Http2VisitorInterface {
+   public:
+    explicit Http2Visitor(ConnectionImpl* connection);
+
+    int64_t OnReadyToSend(absl::string_view serialized) override;
+    void OnConnectionError(ConnectionError error) override;
+    bool OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
+                       uint8_t flags) override;
+    void OnSettingsStart() override;
+    void OnSetting(Http2Setting setting) override;
+    void OnSettingsEnd() override;
+    void OnSettingsAck() override {}
+    bool OnBeginHeadersForStream(Http2StreamId stream_id) override;
+    OnHeaderResult OnHeaderForStream(Http2StreamId stream_id,
+                                     absl::string_view name,
+                                     absl::string_view value) override;
+    bool OnEndHeadersForStream(Http2StreamId stream_id) override;
+    bool OnDataPaddingLength(Http2StreamId stream_id,
+                             size_t padding_length) override;
+    bool OnBeginDataForStream(Http2StreamId stream_id,
+                              size_t payload_length) override;
+    bool OnDataForStream(Http2StreamId stream_id,
+                         absl::string_view data) override;
+    bool OnEndStream(Http2StreamId stream_id) override;
+    void OnRstStream(Http2StreamId stream_id, Http2ErrorCode error_code) override;
+    bool OnCloseStream(Http2StreamId stream_id,
+                       Http2ErrorCode error_code) override;
+    void OnPriorityForStream(Http2StreamId stream_id,
+                             Http2StreamId parent_stream_id, int weight,
+                             bool exclusive) override {}
+    void OnPing(Http2PingId ping_id, bool is_ack) override;
+    void OnPushPromiseForStream(Http2StreamId stream_id,
+                                Http2StreamId promised_stream_id) override {}
+    bool OnGoAway(Http2StreamId last_accepted_stream_id,
+                  Http2ErrorCode error_code,
+                  absl::string_view opaque_data) override;
+    void OnWindowUpdate(Http2StreamId stream_id, int window_increment) override {}
+    int OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
+                          size_t length, uint8_t flags) override;
+    int OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
+                    uint8_t flags, uint32_t error_code) override;
+    bool OnInvalidFrame(Http2StreamId stream_id,
+                        InvalidFrameError error) override;
+    void OnBeginMetadataForStream(Http2StreamId stream_id,
+                                  size_t payload_length) override {}
+    bool OnMetadataForStream(Http2StreamId stream_id,
+                             absl::string_view metadata) override;
+    bool OnMetadataEndForStream(Http2StreamId stream_id) override;
+    void OnErrorDebug(absl::string_view message) override;
+
+   private:
+    ConnectionImpl* connection_;
+  };
+
   /**
    * Wrapper for static nghttp2 session options.
    */
@@ -691,6 +745,9 @@ private:
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
+  Status onPing(uint64_t ping_id, bool is_ack);
+  Status onGoAway(Http2ErrorCode error_code);
+  Status onRstStream(Http2StreamId stream_id, Http2ErrorCode error_code);
   Status onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,

@@ -1062,6 +1062,15 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
                  static_cast<uint64_t>(type), static_cast<uint64_t>(flags), stream_id);
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
+  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
+  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
+  // timeout for another timeout period. This will still timeout the connection if there is no
+  // activity, but if there is frame activity we assume the connection is still healthy and the
+  // PING ACK may be delayed behind other frames.
+  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
+    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+  }
+
   current_stream_id_ = stream_id;
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
@@ -1069,6 +1078,17 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
   auto status = okStatus();
   if (type != NGHTTP2_HEADERS && type != NGHTTP2_DATA) {
     status = trackInboundFrames(stream_id, length, type, flags, 0);
+  }
+
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+  if (stream != nullptr) {
+    // Track bytes sent and received.
+    if (frame->hd.type != METADATA_FRAME_TYPE) {
+      stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
+    if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
+      stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
   }
 
   return status;
@@ -1084,6 +1104,46 @@ enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
   }
 }
 
+Status ConnectionImpl::onPing(uint64_t ping_id, bool is_ack) {
+  ENVOY_CONN_LOG(trace, "recv frame type=PING", connection_);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
+
+  if (is_ack) {
+    // The ``opaque_data`` should be exactly what was sent in the ping, which is
+    // was the current time when the ping was sent. This can be useful while debugging
+    // to match the ping and ack.
+    ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, ping_id);
+
+    onKeepaliveResponse();
+  }
+
+  return okStatus();
+}
+
+Status ConnectionImpl::onGoAway(Http2ErrorCode error_code) {
+  ENVOY_CONN_LOG(trace, "recv frame type=GOAWAY", connection_);
+  // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
+  // notifications are the same as a normal GOAWAY.
+  // TODO: handle multiple GOAWAY frames.
+  if (!raised_goaway_) {
+    raised_goaway_ = true;
+    callbacks().onGoAway(ngHttp2ErrorCodeToErrorCode(error_code));
+  }
+  return okStatus();
+}
+
+Status ConnectionImpl::onRstStream(Http2StreamId stream_id, Http2ErrorCode error_code) {
+  ENVOY_CONN_LOG(trace, "recv frame type=RST_STREAM", connection_);
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+  if (!stream) {
+    return okStatus();
+  }
+  ENVOY_CONN_LOG(trace, "remote reset: {}", connection_, error_code);
+  stream->remote_rst_ = true;
+  stats_.rx_reset_.inc();
+  return okStatus();
+}
+
 Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   ASSERT(connection_.state() == Network::Connection::State::Open);
@@ -1093,40 +1153,10 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   // and CONTINUATION frames in onBeforeFrameReceived().
   ASSERT(frame->hd.type != NGHTTP2_CONTINUATION);
 
-  if ((frame->hd.type == NGHTTP2_PING) && (frame->ping.hd.flags & NGHTTP2_FLAG_ACK)) {
-    // The ``opaque_data`` should be exactly what was sent in the ping, which is
-    // was the current time when the ping was sent. This can be useful while debugging
-    // to match the ping and ack.
-    uint64_t data;
-    safeMemcpy(&data, &(frame->ping.opaque_data));
-    ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
-
-    onKeepaliveResponse();
-    return okStatus();
-  }
-
-  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
-  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
-  // timeout for another timeout period. This will still timeout the connection if there is no
-  // activity, but if there is frame activity we assume the connection is still healthy and the
-  // PING ACK may be delayed behind other frames.
-  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
-    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
-  }
 
   if (frame->hd.type == NGHTTP2_DATA) {
     RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
                                        frame->hd.flags, frame->data.padlen));
-  }
-
-  // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
-  // notifications are the same as a normal GOAWAY.
-  // TODO: handle multiple GOAWAY frames.
-  if (frame->hd.type == NGHTTP2_GOAWAY && !raised_goaway_) {
-    ASSERT(frame->hd.stream_id == 0);
-    raised_goaway_ = true;
-    callbacks().onGoAway(ngHttp2ErrorCodeToErrorCode(frame->goaway.error_code));
-    return okStatus();
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
@@ -1136,14 +1166,6 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
   if (!stream) {
     return okStatus();
-  }
-
-  // Track bytes sent and received.
-  if (frame->hd.type != METADATA_FRAME_TYPE) {
-    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
-  }
-  if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-    stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   switch (frame->hd.type) {
@@ -1186,12 +1208,6 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   case NGHTTP2_DATA: {
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     stream->decodeData();
-    break;
-  }
-  case NGHTTP2_RST_STREAM: {
-    ENVOY_CONN_LOG(trace, "remote reset: {}", connection_, frame->rst_stream.error_code);
-    stream->remote_rst_ = true;
-    stats_.rx_reset_.inc();
     break;
   }
   }
@@ -1662,46 +1678,6 @@ void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);
-  nghttp2_session_callbacks_set_send_callback(
-      callbacks_,
-      [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
-        return static_cast<ConnectionImpl*>(user_data)->onSend(data, length);
-      });
-
-  nghttp2_session_callbacks_set_on_begin_headers_callback(
-      callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame);
-        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
-            std::move(status));
-      });
-
-  nghttp2_session_callbacks_set_on_header_callback(
-      callbacks_,
-      [](nghttp2_session*, const nghttp2_frame* frame, const uint8_t* raw_name, size_t name_length,
-         const uint8_t* raw_value, size_t value_length, uint8_t, void* user_data) -> int {
-        // TODO PERF: Can reference count here to avoid copies.
-        HeaderString name;
-        name.setCopy(reinterpret_cast<const char*>(raw_name), name_length);
-        HeaderString value;
-        value.setCopy(reinterpret_cast<const char*>(raw_value), value_length);
-        return static_cast<ConnectionImpl*>(user_data)->onHeader(frame, std::move(name),
-                                                                 std::move(value));
-      });
-
-  nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
-      callbacks_,
-      [](nghttp2_session*, uint8_t, int32_t stream_id, const uint8_t* data, size_t len,
-         void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onData(stream_id, data, len);
-      });
-
-  nghttp2_session_callbacks_set_on_begin_frame_callback(
-      callbacks_, [](nghttp2_session*, const nghttp2_frame_hd* hd, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(
-            hd->stream_id, hd->length, hd->type, hd->flags);
-        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
-            std::move(status));
-      });
 
   nghttp2_session_callbacks_set_on_frame_recv_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
@@ -1710,68 +1686,80 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
             std::move(status));
       });
 
-  nghttp2_session_callbacks_set_on_stream_close_callback(
-      callbacks_,
-      [](nghttp2_session*, int32_t stream_id, uint32_t error_code, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
-        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
-            std::move(status));
-      });
+}
 
-  nghttp2_session_callbacks_set_on_frame_send_callback(
-      callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        uint32_t error_code = 0;
-        switch (frame->hd.type) {
-        case NGHTTP2_GOAWAY:
-          error_code = frame->goaway.error_code;
-          break;
-        case NGHTTP2_RST_STREAM:
-          error_code = frame->rst_stream.error_code;
-          break;
-        }
-        return static_cast<ConnectionImpl*>(user_data)->onFrameSend(
-            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags, error_code);
-      });
+int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
+  return connection_->onSend(serialized.data(), serialized.size());
+}
 
-  nghttp2_session_callbacks_set_before_frame_send_callback(
-      callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onBeforeFrameSend(
-            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags);
-      });
+bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
+                     uint8_t flags) {
+  auto status = connection_->onBeforeFrameReceived(stream_id, length, type, flags);
+  return 0 == connection_->setAndCheckCodecCallbackStatus(
+      std::move(status));
+}
 
-  nghttp2_session_callbacks_set_on_frame_not_send_callback(
-      callbacks_, [](nghttp2_session*, const nghttp2_frame*, int, void*) -> int {
-        // We used to always return failure here but it looks now this can get called if the other
-        // side sends GOAWAY and we are trying to send a SETTINGS ACK. Just ignore this for now.
-        return 0;
-      });
+bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id, absl::string_view data) {
+  return 0 == connection_->onData(stream_id, data.data(), data.size());
+}
 
-  nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(
-      callbacks_,
-      [](nghttp2_session*, const nghttp2_frame* frame, int error_code, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onInvalidFrame(frame->hd.stream_id,
-                                                                       error_code);
-      });
+bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
+  auto status = connection_->onBeginHeaders(frame);
+  return 0 == connection_->setAndCheckCodecCallbackStatus(
+      std::move(status));
+}
 
-  nghttp2_session_callbacks_set_on_extension_chunk_recv_callback(
-      callbacks_,
-      [](nghttp2_session*, const nghttp2_frame_hd* hd, const uint8_t* data, size_t len,
-         void* user_data) -> int {
-        ASSERT(hd->length >= len);
-        return static_cast<ConnectionImpl*>(user_data)->onMetadataReceived(hd->stream_id, data,
-                                                                           len);
-      });
+Http2VisitorInterface::OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id, absl::string_view name, absl::string_view value) {
+  // TODO PERF: Can reference count here to avoid copies.
+  HeaderString name;
+  name.setCopy(name.data(), name.size());
+  HeaderString value;
+  value.setCopy(value.data(), value.size());
+  const int result = connection_->onHeader(frame, std::move(name),
+                                          std::move(value));
+  switch (result) {
+    case 0:
+      return HEADER_OK;
+    case NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE:
+      return HEADER_RST_STREAM;
+    default:
+      return HEADER_CONNECTION_ERROR;
+  }
+}
 
-  nghttp2_session_callbacks_set_unpack_extension_callback(
-      callbacks_, [](nghttp2_session*, void**, const nghttp2_frame_hd* hd, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onMetadataFrameComplete(
-            hd->stream_id, hd->flags == END_METADATA_FLAG);
-      });
+bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id, Http2ErrorCode error_code) {
+  auto status = connection_->onStreamClose(stream_id, error_code);
+  return 0 == connection_->setAndCheckCodecCallbackStatus(
+      std::move(status));
+}
 
-  nghttp2_session_callbacks_set_error_callback2(
-      callbacks_, [](nghttp2_session*, int, const char* msg, size_t len, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onError(absl::string_view(msg, len));
-      });
+bool ConnectionImpl::Http2Visitor::a() { }
+bool ConnectionImpl::Http2Visitor::OnWindowUpdate() { }
+
+bool ConnectionImpl::Http2Visitor::OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
+                        size_t length, uint8_t flags) {
+  return 0 == connection_->onBeforeFrameSend(stream_id, length, frame_type, flags);
+}
+
+bool ConnectionImpl::Http2Visitor::OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
+                  uint8_t flags, uint32_t error_code) {
+  return 0 == connection_->onFrameSend(stream_id, length, frame_type, flags, error_code);
+}
+
+bool ConnectionImpl::Http2Visitor::OnInvalidFrame(Http2StreamId stream_id, http2::InvalidFrameError error) {
+  return 0 == connection_->onInvalidFrame(stream_id, http2::ToNghttp2ErrorCode(error));
+}
+
+bool ConnectionImpl::Http2Visitor::OnMetadataForStream(Http2StreamId stream_id, absl::string_view metadata) {
+  return 0 == connection->onMetadataReceived(stream_id, metadata.data(), metadata.size());
+}
+
+bool ConnectionImpl::Http2Visitor::OnMetadataEndForStream(Http2StreamId stream_id) {
+  return 0 == connection->onMetadataFrameComplete(hd->stream_id, true);
+}
+
+void ConnectionImpl::Http2Visitor::OnErrorDebug(absl::string_view message) {
+  connection_->onError(message);
 }
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
