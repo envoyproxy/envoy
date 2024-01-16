@@ -650,7 +650,7 @@ TEST_P(PostgresProxyUpstreamSSLTest, UpstreamSSLEnabled) {
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::NegotiatingUpstreamSSL);
 
   // Simulate various responses from the upstream server.
-  // Only "S" and "E" are valid responses.
+  // Only "S" and "N" are valid responses.
   data_.add(std::get<0>(GetParam()));
 
   EXPECT_CALL(callbacks_, encryptUpstream(std::get<1>(GetParam()), testing::_));
