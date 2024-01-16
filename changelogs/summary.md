@@ -11,7 +11,7 @@ Summary of changes:
 * Datadog: honor extracted sampling decisions to avoid dropping samples.
 * gRPC side streams: make idle connection timeout configurable.
 * Support CEL expressions in ext_proc for extraction of request or response atributes.
-* HTTP: clear hop by hop TE header.
+* HTTP: clear hop by hop `Transfer-Encoding` header.
 * Redis: Add support for the WATCH and GETDEL commands.
 * Addes strict mode for stateful session filter, that rejects requests if destination host is not available.
 * Internal redirects: support passing headers from response to request.
