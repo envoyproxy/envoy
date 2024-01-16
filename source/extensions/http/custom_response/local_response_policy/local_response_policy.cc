@@ -11,6 +11,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/custom_response_filter.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,19 +20,25 @@ namespace CustomResponse {
 LocalResponsePolicy::LocalResponsePolicy(
     const envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy&
         config,
-    Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context)
     : local_body_{config.has_body() ? absl::optional<std::string>(Config::DataSource::read(
                                           config.body(), true, context.api()))
                                     : absl::optional<std::string>{}},
-      formatter_(config.has_body_format()
-                     ? Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-                           config.body_format(), context)
-                     : nullptr),
       status_code_{config.has_status_code()
                        ? absl::optional<Envoy::Http::Code>(
                              static_cast<Envoy::Http::Code>(config.status_code().value()))
                        : absl::optional<Envoy::Http::Code>{}},
-      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
+      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {
+
+  // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
+  // of server context should not be used here directly. But this is bug is not introduced
+  // by this PR and will be fixed in the future.
+  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  if (config.has_body_format()) {
+    formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config.body_format(),
+                                                                           generic_context);
+  }
+}
 
 // TODO(pradeepcrao): investigate if this code can be made common with
 // Envoy::LocalReply::BodyFormatter for consistent behavior.
@@ -44,9 +51,8 @@ void LocalResponsePolicy::formatBody(const Envoy::Http::RequestHeaderMap& reques
   }
 
   if (formatter_) {
-    formatter_->format(request_headers, response_headers,
-                       *Envoy::Http::StaticEmptyHeaders::get().response_trailers, stream_info, body,
-                       AccessLog::AccessLogType::NotSet);
+    body = formatter_->formatWithContext({&request_headers, &response_headers, nullptr, body},
+                                         stream_info);
   }
 }
 

@@ -3,26 +3,8 @@ date: Pending
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-- area: eds
-  change: |
-    Introduced caching of EDS assignments when used with ADS. Prior to this change, Envoy required that EDS assignments were sent
-    after an EDS cluster was updated. If no EDS assignment was received for the cluster, it ended up with an empty assignment.
-    Following this change, after a cluster update, Envoy waits for an EDS assignment until
-    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
-    the cached assignment and finish updating the warmed cluster. This change is disabled by default, and can be enabled by setting
-    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to true.
-
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: outlier detection
-  change: |
-    Outlier detection will always respect max_ejection_percent now.
-    This behavioral change can be reverted by setting runtime guard
-    ``envoy.reloadable_features.check_mep_on_first_eject`` to false.
-- area: quic
-  change: |
-    Enable QUICHE request and response headers validation. This behavior can be reverted by setting runtime flag
-    ``envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -46,43 +28,5 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: access_log
-  change: |
-    added %RESPONSE_FLAGS_LONG% substitution string, that will output a pascal case string representing the resonse flags.
-    The output response flags will correspond with %RESPONSE_FLAGS%, only with a long textual string representation.
-- area: config
-  change: |
-    Added the capability to defer broadcasting of certain cluster (CDS, EDS) to
-    worker threads from the main thread. This optimization can save significant
-    amount of memory in cases where there are (1) a large number of workers and
-    (2) a large amount of config, most of which is unused. This capability is
-    guarded by :ref:`enable_deferred_cluster_creation
-    <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.enable_deferred_cluster_creation>`.
-- area: extension_discovery_service
-  change: |
-    added ECDS support for :ref:` downstream network filters<envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`.
-- area: ext_proc
-  change: |
-    added
-    :ref:`disable_immediate_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.disable_immediate_response>`
-    config API to ignore the
-    :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
-    message from the external processing server.
-
-- area: http
-  change: |
-    added :ref:`Json-To-Metadata filter <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata>`.
-- area: extension_discovery_service
-  change: |
-    added metric listener.listener_stat.network_extension_config_missing to track closed connections due to missing config.
-- area: redis
-  change: |
-    added support for time command (returns a local response).
-- area: redis
-  change: |
-    added support for lmove command.
 
 deprecated:
-- area: tracing
-  change: |
-    OpenTracing is deprecated and will be removed at version 1.30, since the upstream project has been abandoned.

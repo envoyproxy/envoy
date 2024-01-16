@@ -124,11 +124,12 @@ resources:
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
       envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration>(response);
-  factory_context.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
-      ->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-  auto message_ptr =
-      factory_context.admin_.config_tracker_.config_tracker_callbacks_["genericrds_routes"](
-          universal_name_matcher);
+  EXPECT_TRUE(
+      factory_context.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+          ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
+          .ok());
+  auto message_ptr = factory_context.server_factory_context_.admin_.config_tracker_
+                         .config_tracker_callbacks_["genericrds_routes"](universal_name_matcher);
   const auto& dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   EXPECT_EQ(1, dump.dynamic_route_configs().size());
@@ -272,6 +273,7 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
+  envoy::config::core::v3::TypedExtensionConfig codec_config;
 
   const std::string yaml_config_0 = R"EOF(
     name: mock_generic_proxy_filter_name_0
@@ -307,9 +309,10 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
 
   // No terminal filter.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
-        EnvoyException, "A terminal L7 filter is necessary for generic proxy");
+    EXPECT_THROW_WITH_MESSAGE(Factory::filtersFactoryFromProto(filters_proto_config, codec_config,
+                                                               "test", factory_context),
+                              EnvoyException,
+                              "A terminal L7 filter is necessary for generic proxy");
   }
 
   // Error terminal filter position.
@@ -317,17 +320,32 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(true));
 
     EXPECT_THROW_WITH_MESSAGE(
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
+        Factory::filtersFactoryFromProto(filters_proto_config, codec_config, "test",
+                                         factory_context),
         EnvoyException,
         "Terminal filter: mock_generic_proxy_filter_name_0 must be the last generic L7 "
         "filter");
   }
 
+  // Codec validation error.
+  {
+    ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
+    ON_CALL(mock_filter_config_0, validateCodec(_))
+        .WillByDefault(Return(absl::InvalidArgumentError("codec validation error")));
+
+    EXPECT_THROW_WITH_MESSAGE(Factory::filtersFactoryFromProto(filters_proto_config, codec_config,
+                                                               "test", factory_context),
+                              EnvoyException, "codec validation error");
+  }
+
   {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
     ON_CALL(mock_filter_config_1, isTerminalFilter()).WillByDefault(Return(true));
-    auto factories =
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context);
+    ON_CALL(mock_filter_config_0, validateCodec(_)).WillByDefault(Return(absl::OkStatus()));
+    ON_CALL(mock_filter_config_1, validateCodec(_)).WillByDefault(Return(absl::OkStatus()));
+
+    auto factories = Factory::filtersFactoryFromProto(filters_proto_config, codec_config, "test",
+                                                      factory_context);
     EXPECT_EQ(2, factories.size());
   }
 }
@@ -362,10 +380,59 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
   NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
+  NiceMock<Network::MockListenerInfo> listener_info;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ON_CALL(factory_context, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info));
   factory_context.server_factory_context_.cluster_manager_.initializeClusters({"zipkin"}, {});
   factory_context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
       {"zipkin"});
+
+  Factory factory;
+
+  envoy::extensions::filters::network::generic_proxy::v3::GenericProxy config;
+  TestUtility::loadFromYaml(config_yaml, config);
+
+  auto mock_codec_factory = std::make_unique<NiceMock<MockCodecFactory>>();
+
+  EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
+
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, factory_context);
+  EXPECT_NE(nullptr, cb);
+  NiceMock<Network::MockFilterManager> filter_manager;
+  cb(filter_manager);
+}
+
+TEST(BasicFilterConfigTest, TestConfigurationWithAccessLog) {
+  const std::string config_yaml = R"EOF(
+    stat_prefix: ingress
+    filters:
+    - name: envoy.filters.generic.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router
+    codec_config:
+      name: mock
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        type_url: envoy.generic_proxy.codecs.mock.type
+        value: {}
+    generic_rds:
+      config_source: { resource_api_version: V3, ads: {} }
+      route_config_name: test_route
+    access_log:
+    - name: envoy.generic_proxy.access_loggers.file
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+        path: "/dev/stdout"
+        log_format:
+          text_format_source:
+            inline_string: "%METHOD% %PATH% %HOST% %PROTOCOL% %REQUEST_PROPERTY(key)% RESPONSE_PROPERTY(key)\n"
+    )EOF";
+
+  NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   Factory factory;
 

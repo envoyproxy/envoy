@@ -1,6 +1,5 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -12,6 +11,7 @@ import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -21,7 +21,8 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val TEST_RESPONSE_FILTER_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 
 class CancelStreamTest {
 
@@ -32,9 +33,7 @@ class CancelStreamTest {
   private val filterExpectation = CountDownLatch(1)
   private val runExpectation = CountDownLatch(1)
 
-  class CancelValidationFilter(
-    private val latch: CountDownLatch
-  ) : ResponseFilter {
+  class CancelValidationFilter(private val latch: CountDownLatch) : ResponseFilter {
     override fun onResponseHeaders(
       headers: ResponseHeaders,
       endStream: Boolean,
@@ -59,6 +58,7 @@ class CancelStreamTest {
     }
 
     override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {}
+
     override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
     override fun onCancel(finalStreamIntel: FinalStreamIntel) {
@@ -68,29 +68,29 @@ class CancelStreamTest {
 
   @Test
   fun `cancel stream calls onCancel callback`() {
-    val engine = EngineBuilder(Standard())
-      .addPlatformFilter(
-        name = "cancel_validation_filter",
-        factory = { CancelValidationFilter(filterExpectation) }
-      )
-      .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
-      .setOnEngineRunning {}
-      .build()
+    val engine =
+      EngineBuilder(Standard())
+        .addPlatformFilter(
+          name = "cancel_validation_filter",
+          factory = { CancelValidationFilter(filterExpectation) }
+        )
+        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
+        .build()
 
     val client = engine.streamClient()
 
-    val requestHeaders = RequestHeadersBuilder(
-      method = RequestMethod.GET,
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    )
-      .build()
+    val requestHeaders =
+      RequestHeadersBuilder(
+          method = RequestMethod.GET,
+          scheme = "https",
+          authority = "example.com",
+          path = "/test"
+        )
+        .build()
 
-    client.newStreamPrototype()
-      .setOnCancel { _ ->
-        runExpectation.countDown()
-      }
+    client
+      .newStreamPrototype()
+      .setOnCancel { _ -> runExpectation.countDown() }
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, false)
       .cancel()

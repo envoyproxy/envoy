@@ -16,7 +16,6 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 namespace {
 
-using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::UhvResponseCodeDetail;
@@ -64,7 +63,7 @@ TEST_P(HttpCommonValidationTest, MalformedUrlEncodingAllowed) {
 
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/path%Z0with%xYbad%7Jencoding%");
+  EXPECT_EQ(headers.getPathValue(), "/path%Z0with%xYbad%7Jencoding%");
 }
 
 TEST_P(HttpCommonValidationTest, MalformedUrlEncodingRejectedWithOverride) {
@@ -90,7 +89,7 @@ TEST_P(HttpCommonValidationTest, BackslashInPathIsTranslatedToSlash) {
 
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/path/with/back/slash%5C");
+  EXPECT_EQ(headers.getPathValue(), "/path/with/back/slash%5C");
 }
 
 TEST_P(HttpCommonValidationTest, BackslashInPathIsRejectedWithOverride) {
@@ -148,7 +147,7 @@ TEST_P(HttpCommonValidationTest, FragmentStrippedFromPathWhenConfigured) {
 
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/path/with?query=and");
+  EXPECT_EQ(headers.getPathValue(), "/path/with?query=and");
 }
 
 TEST_P(HttpCommonValidationTest, ValidateRequestHeaderMapRedirectPath) {
@@ -165,7 +164,7 @@ TEST_P(HttpCommonValidationTest, ValidateRequestHeaderMapRedirectPath) {
       ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
   EXPECT_EQ(result.details(), "uhv.path_normalization_redirect");
   // By default decoded backslash (%5C) is converted to forward slash.
-  EXPECT_EQ(headers.path(), "/dir1/dir2/dir4");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2/dir4");
 }
 
 TEST_P(HttpCommonValidationTest, ValidateRequestHeadersNoPathNormalization) {
@@ -181,7 +180,7 @@ TEST_P(HttpCommonValidationTest, ValidateRequestHeadersNoPathNormalization) {
   EXPECT_EQ(
       result.action(),
       ::Envoy::Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect);
-  EXPECT_EQ(headers.path(), "/dir1/dir2\\..");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2\\..");
 }
 
 TEST_P(HttpCommonValidationTest, NoPathNormalizationNoSlashDecoding) {
@@ -193,7 +192,7 @@ TEST_P(HttpCommonValidationTest, NoPathNormalizationNoSlashDecoding) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   auto result = uhv->transformRequestHeaders(headers);
   EXPECT_ACCEPT(result);
-  EXPECT_EQ(headers.path(), "/dir1%2Fdir2%5cdir3");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%2Fdir2%5cdir3");
 }
 
 TEST_P(HttpCommonValidationTest, NoPathNormalizationDecodeSlashesAndForward) {
@@ -205,7 +204,7 @@ TEST_P(HttpCommonValidationTest, NoPathNormalizationDecodeSlashesAndForward) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   auto result = uhv->transformRequestHeaders(headers);
   EXPECT_ACCEPT(result);
-  EXPECT_EQ(headers.path(), "/dir1/dir2\\../dir3");
+  EXPECT_EQ(headers.getPathValue(), "/dir1/dir2\\../dir3");
 }
 
 TEST_P(HttpCommonValidationTest, RejectEncodedSlashes) {
@@ -238,7 +237,7 @@ TEST_P(HttpCommonValidationTest, AllowPercent00WithOverride) {
   auto uhv = createUhv(empty_config);
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.path(), "/dir1%00dir2");
+  EXPECT_EQ(headers.getPathValue(), "/dir1%00dir2");
 }
 
 } // namespace

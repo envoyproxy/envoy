@@ -10,49 +10,48 @@ updates:
 # Please ensure any new ones are added here, and any that are removed are removed here also.
 
 - package-ecosystem: "pip"
-  directory: "/.github/actions/pr_notifier"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
   directory: "/examples/grpc-bridge/client"
+  groups:
+    examples-grpc-bridge:
+      patterns:
+      - "*"
   schedule:
     interval: "daily"
     time: "06:00"
 
 - package-ecosystem: "pip"
   directory: "/examples/cache"
+  groups:
+    examples-cache:
+      patterns:
+      - "*"
   schedule:
     interval: "daily"
     time: "06:00"
 
 - package-ecosystem: "pip"
   directory: "/examples/shared/python/aiohttp"
+  groups:
+    examples-shared-python:
+      patterns:
+      - "*"
   schedule:
     interval: "daily"
     time: "06:00"
 
 - package-ecosystem: "pip"
   directory: "/examples/shared/python/postgres"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
-  directory: "/mobile/docs"
+  groups:
+    examples-postgres:
+      patterns:
+      - "*"
   schedule:
     interval: "daily"
     time: "06:00"
 
 - package-ecosystem: "pip"
   directory: "/tools/base"
-  schedule:
-    interval: "daily"
-    time: "06:00"
-
-- package-ecosystem: "pip"
-  directory: "/tools/code_format"
+  open-pull-requests-limit: 20
   schedule:
     interval: "daily"
     time: "06:00"
@@ -71,6 +70,10 @@ updates:
 
 - package-ecosystem: "docker"
   directory: "/examples/ext_authz"
+  groups:
+    examples-ext-authz:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
@@ -83,24 +86,40 @@ updates:
 
 - package-ecosystem: "docker"
   directory: "/examples/golang-network"
+  groups:
+    examples-golang-network:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "docker"
   directory: "/examples/grpc-bridge"
+  groups:
+    examples-grpc-bridge:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "docker"
   directory: "/examples/kafka"
+  groups:
+    examples-kafka:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "docker"
   directory: "/examples/local_ratelimit"
+  groups:
+    examples-local-ratelimit:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
@@ -210,78 +229,172 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/basic"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/dummy"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/echo"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/metric"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/passthrough"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/access_log"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/action"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/buffer"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/routeconfig"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/router/cluster_specifier/test/test_data/simple"
+  directory: "/contrib/golang/filters/http/test/test_data/property"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/network/test/test_data"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/router/cluster_specifier/test/test_data/simple"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/examples/ext_authz/auth/grpc-service"
+  groups:
+    examples-ext-authz:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/examples/load-reporting-service"
+  groups:
+    examples-load-reporting:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/examples/grpc-bridge/server"
+  groups:
+    examples-grpc-bridge:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/examples/golang-http/simple"
+  groups:
+    examples-golang-http:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/examples/golang-network/simple"
+  groups:
+    examples-golang-network:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "npm"
+  directory: "/examples/single-page-app/ui"
   schedule:
     interval: daily
     time: "06:00"

@@ -178,18 +178,18 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                              const std::string& version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
   void start();
-  void validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
-  void onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
+  absl::Status validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
+  absl::Status onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
   void createSubscription();
 
   LoaderImpl& parent_;

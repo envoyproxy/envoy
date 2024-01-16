@@ -15,7 +15,6 @@
 
 using testing::_;
 using testing::Property;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +26,8 @@ class GrpcStatsFilterConfigTest : public testing::Test {
 protected:
   void initialize() {
     GrpcStatsFilterConfigFactory factory;
-    Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config_, "stats", context_);
+    Http::FilterFactoryCb cb =
+        factory.createFilterFactoryFromProto(config_, "stats", context_).value();
     Http::MockFilterChainFactoryCallbacks filter_callback;
 
     ON_CALL(filter_callback, addStreamFilter(_)).WillByDefault(testing::SaveArg<0>(&filter_));

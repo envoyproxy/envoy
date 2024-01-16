@@ -30,8 +30,9 @@ public:
 protected:
   void SetUp() override {
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("test");
+    config_with_hash_key_.setConfig(grpc_service_);
 
-    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _))
+    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
 
     client_ =
@@ -67,6 +68,7 @@ protected:
   bool grpc_closed_ = false;
 
   envoy::config::core::v3::GrpcService grpc_service_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   ExternalProcessorClientPtr client_;
   Grpc::MockAsyncClientManager client_manager_;
   Grpc::MockAsyncStream stream_;
@@ -77,14 +79,14 @@ protected:
 };
 
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
-  auto stream = client_->start(*this, grpc_service_, stream_info_);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, SendToStream) {
-  auto stream = client_->start(*this, grpc_service_, stream_info_);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   // Send something and ensure that we get it. Doesn't really matter what.
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
@@ -95,14 +97,14 @@ TEST_F(ExtProcStreamTest, SendToStream) {
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
-  auto stream = client_->start(*this, grpc_service_, stream_info_);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
   stream->send(std::move(req), true);
 }
 
 TEST_F(ExtProcStreamTest, ReceiveFromStream) {
-  auto stream = client_->start(*this, grpc_service_, stream_info_);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   // Send something and ensure that we get it. Doesn't really matter what.
   ProcessingResponse resp;
@@ -132,7 +134,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
 }
 
 TEST_F(ExtProcStreamTest, StreamClosed) {
-  auto stream = client_->start(*this, grpc_service_, stream_info_);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
@@ -145,7 +147,7 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
 }
 
 TEST_F(ExtProcStreamTest, StreamError) {
-  auto stream = client_->start(*this, grpc_service_, stream_info_);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);

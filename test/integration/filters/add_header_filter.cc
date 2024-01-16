@@ -26,8 +26,8 @@ public:
 class AddHeaderFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
 public:
   AddHeaderFilterConfig() : EmptyHttpDualFilterConfig("add-header-filter") {}
-  Http::FilterFactoryCb createDualFilter(const std::string&,
-                                         Server::Configuration::ServerFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::AddHeaderFilter>());
     };
@@ -68,13 +68,13 @@ public:
     return std::make_unique<test::integration::filters::AddHeaderFilterConfig>();
   }
 
-  Http::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message& config, const std::string&,
-      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string&,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
 
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const test::integration::filters::AddHeaderFilterConfig&>(
-            config, context.getServerFactoryContext().messageValidationVisitor());
+            config, context.serverFactoryContext().messageValidationVisitor());
 
     return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<AddConfigurableHeaderFilter>(

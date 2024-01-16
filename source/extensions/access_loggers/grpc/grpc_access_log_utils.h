@@ -24,6 +24,9 @@ public:
       const StreamInfo::StreamInfo& stream_info);
 };
 
+bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const std::string& key,
+                            envoy::data::accesslog::v3::AccessLogCommon& common_access_log);
+
 } // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions

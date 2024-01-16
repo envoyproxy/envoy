@@ -13,8 +13,7 @@ import java.nio.ByteBuffer
 
 /**
  * Example of a more complex HTTP filter that pauses processing on the response filter chain,
- * buffers until the response is complete, then resumes filter iteration while setting a new
- * header.
+ * buffers until the response is complete, then resumes filter iteration while setting a new header.
  */
 class BufferDemoFilter : ResponseFilter {
   private lateinit var headers: ResponseHeaders
@@ -39,8 +38,7 @@ class BufferDemoFilter : ResponseFilter {
 
     // If this is the end of the stream, resume processing of the (now fully-buffered) response.
     if (endStream) {
-      val builder = headers.toResponseHeadersBuilder()
-        .add("buffer-filter-demo", "1")
+      val builder = headers.toResponseHeadersBuilder().add("buffer-filter-demo", "1")
       return FilterDataStatus.ResumeIteration(builder.build(), body)
     }
     return FilterDataStatus.StopIterationAndBuffer()
@@ -51,23 +49,14 @@ class BufferDemoFilter : ResponseFilter {
     streamIntel: StreamIntel
   ): FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
     // Trailers imply end of stream; resume processing of the (now fully-buffered) response.
-    val builder = headers.toResponseHeadersBuilder()
-      .add("buffer-filter-demo", "1")
+    val builder = headers.toResponseHeadersBuilder().add("buffer-filter-demo", "1")
     return FilterTrailersStatus.ResumeIteration(builder.build(), this.body, trailers)
   }
 
   @Suppress("EmptyFunctionBlock")
-  override fun onError(
-    error: EnvoyError,
-    finalStreamIntel: FinalStreamIntel
-  ) {
-  }
+  override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {}
 
-  @Suppress("EmptyFunctionBlock")
-  override fun onCancel(finalStreamIntel: FinalStreamIntel) {
-  }
+  @Suppress("EmptyFunctionBlock") override fun onCancel(finalStreamIntel: FinalStreamIntel) {}
 
-  @Suppress("EmptyFunctionBlock")
-  override fun onComplete(finalStreamIntel: FinalStreamIntel) {
-  }
+  @Suppress("EmptyFunctionBlock") override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 }

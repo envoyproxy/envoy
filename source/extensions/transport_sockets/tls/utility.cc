@@ -130,12 +130,12 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
   size_t data_len;
   int rc = BIO_mem_contents(buf.get(), &data, &data_len);
   ASSERT(rc == 1);
-  return std::string(reinterpret_cast<const char*>(data), data_len);
+  return {reinterpret_cast<const char*>(data), data_len};
 }
 
 } // namespace
 
-const ASN1_TIME& epochASN1_Time() {
+const ASN1_TIME& epochASN1Time() {
   static ASN1_TIME* e = []() -> ASN1_TIME* {
     ASN1_TIME* epoch = ASN1_TIME_new();
     const time_t epoch_time = 0;
@@ -145,7 +145,7 @@ const ASN1_TIME& epochASN1_Time() {
   return *e;
 }
 
-inline bssl::UniquePtr<ASN1_TIME> currentASN1_Time(TimeSource& time_source) {
+inline bssl::UniquePtr<ASN1_TIME> currentASN1Time(TimeSource& time_source) {
   bssl::UniquePtr<ASN1_TIME> current_asn_time(ASN1_TIME_new());
   const time_t current_time = std::chrono::system_clock::to_time_t(time_source.systemTime());
   RELEASE_ASSERT(ASN1_TIME_set(current_asn_time.get(), current_time) != nullptr, "");
@@ -238,7 +238,7 @@ absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
     return absl::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
-  if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
+  if (ASN1_TIME_diff(&days, &seconds, currentASN1Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
     if (days >= 0 && seconds >= 0) {
       return absl::make_optional(days);
@@ -279,7 +279,7 @@ absl::string_view Utility::getCertificateExtensionValue(X509& cert,
 
 SystemTime Utility::getValidFrom(const X509& cert) {
   int days, seconds;
-  int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notBefore(&cert));
+  int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1Time(), X509_get0_notBefore(&cert));
   ASSERT(rc == 1);
   // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate valid-from date
   // beyond 2038-01-19T03:14:08Z.
@@ -288,7 +288,7 @@ SystemTime Utility::getValidFrom(const X509& cert) {
 
 SystemTime Utility::getExpirationTime(const X509& cert) {
   int days, seconds;
-  int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notAfter(&cert));
+  int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1Time(), X509_get0_notAfter(&cert));
   ASSERT(rc == 1);
   // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate not-after date
   // beyond 2038-01-19T03:14:08Z.

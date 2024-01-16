@@ -22,7 +22,7 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -189,7 +189,11 @@ void FakeStream::encodeResetStream() {
         return;
       }
     }
-    encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    if (parent_.type() == Http::CodecType::HTTP1) {
+      parent_.connection().close(Network::ConnectionCloseType::FlushWrite);
+    } else {
+      encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    }
   });
 }
 
@@ -425,6 +429,16 @@ AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
       timeout);
 }
 
+AssertionResult FakeConnectionBase::close(Network::ConnectionCloseType close_type,
+                                          std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeConnectionBase close type={}", static_cast<int>(close_type));
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
+  return shared_connection_.executeOnDispatcher(
+      [&close_type](Network::Connection& connection) { connection.close(close_type); }, timeout);
+}
+
 AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milliseconds timeout) {
   return shared_connection_.executeOnDispatcher(
       [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
@@ -517,6 +531,24 @@ AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
     return AssertionFailure() << "Timed out waiting for disconnect.";
   }
   ENVOY_LOG(trace, "FakeConnectionBase done waiting for disconnect");
+  return AssertionSuccess();
+}
+
+AssertionResult FakeConnectionBase::waitForRstDisconnect(std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeConnectionBase waiting for RST disconnect");
+  absl::MutexLock lock(&lock_);
+  const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+    return shared_connection_.rstDisconnected();
+  };
+
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
+    if (timeout == TestUtility::DefaultTimeout) {
+      ADD_FAILURE()
+          << "Please don't waitForRstDisconnect with a 5s timeout if failure is expected\n";
+    }
+    return AssertionFailure() << "Timed out waiting for RST disconnect.";
+  }
+  ENVOY_LOG(trace, "FakeConnectionBase done waiting for RST disconnect");
   return AssertionSuccess();
 }
 
@@ -657,7 +689,7 @@ void FakeUpstream::initializeServer() {
 
   dispatcher_->post([this]() -> void {
     socket_factories_[0]->doFinalPreWorkerInit();
-    handler_->addListener(absl::nullopt, listener_, runtime_);
+    handler_->addListener(absl::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
@@ -706,6 +738,10 @@ bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { 
 void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                                 Network::UdpReadFilterCallbacks& callbacks) {
   udp_listener.addReadFilter(std::make_unique<FakeUdpFilter>(*this, callbacks));
+}
+
+bool FakeUpstream::createQuicListenerFilterChain(Network::QuicListenerFilterManager&) {
+  return true;
 }
 
 void FakeUpstream::threadRoutine() {
@@ -918,6 +954,11 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
   RELEASE_ASSERT(done->WaitForNotificationWithTimeout(absl::FromChrono(timeout)),
                  "Timed out waiting for cb to run on dispatcher");
   return *result;
+}
+
+void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
+  ASSERT(!dispatcher_->isThreadSafe());
+  dispatcher_->post([&]() { cb(); });
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,

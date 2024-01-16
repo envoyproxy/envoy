@@ -41,7 +41,6 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/server/factory_context_base_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -62,7 +61,8 @@ public:
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls, {context}),
+        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls,
+                                                   {context, context.messageValidationVisitor()}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
         server_(server) {}
 
@@ -131,6 +131,10 @@ public:
 
   // Set when a cluster has been added or updated. This is only called a single time for a cluster.
   virtual void setAddedOrUpdated() PURE;
+
+  // Return true if the cluster must be ready-for-use before ADS (Aggregated Discovery Service) can
+  // be initialized; will only occur if ADS is configured to use the cluster via EnvoyGrpc.
+  virtual bool requiredForAds() const PURE;
 };
 
 /**
@@ -242,15 +246,17 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                     ClusterManagerFactory& factory, Stats::Store& stats,
-                     ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                     const LocalInfo::LocalInfo& local_info,
-                     AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
-                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, const Server::Instance& server);
+  // Initializes the ClusterManagerImpl instance based on the given Bootstrap config.
+  //
+  // This method *must* be called prior to invoking any other methods on the class and *must* only
+  // be called once. This method should be called immediately after ClusterManagerImpl construction
+  // and from the same thread in which the ClusterManagerImpl was constructed.
+  //
+  // The initialization is separated from the constructor because lots of work, including ADS
+  // initialization, is done in this method. If the contents of this method are invoked during
+  // construction, a derived class cannot override any of the virtual methods and have them invoked
+  // instead, since the base class's methods are used when in a base class constructor.
+  absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -329,7 +335,7 @@ public:
 
   Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
 
-  void
+  absl::Status
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
@@ -358,7 +364,7 @@ public:
 
   void drainConnections(DrainConnectionsHostPredicate predicate) override;
 
-  void checkActiveStaticCluster(const std::string& cluster) override;
+  absl::Status checkActiveStaticCluster(const std::string& cluster) override;
 
   // Upstream::MissingClusterNotifier
   void notifyMissingCluster(absl::string_view name) override;
@@ -377,6 +383,18 @@ public:
   Config::EdsResourcesCacheOptRef edsResourcesCache() override;
 
 protected:
+  // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
+  // clusterManagerFromProto() static method. The init() method must be called after construction.
+  ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     ClusterManagerFactory& factory, Stats::Store& stats,
+                     ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                     const LocalInfo::LocalInfo& local_info,
+                     AccessLog::AccessLogManager& log_manager,
+                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
+                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Router::Context& router_context, const Server::Instance& server);
+
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
   // Parameters for calling postThreadLocalClusterUpdate()
@@ -414,18 +432,20 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map);
+                                HostMapConstSharedPtr map, UnitFloat drop_overload);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map);
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+        UnitFloat drop_overload);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
     const HostMapConstSharedPtr cross_priority_host_map_;
+    UnitFloat drop_overload_{0};
   };
 
   using ClusterInitializationObjectConstSharedPtr =
@@ -485,6 +505,9 @@ protected:
   ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name);
 
 private:
+  // To enable access to the protected constructor.
+  friend ProdClusterManagerFactory;
+
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
    * central dynamic cluster (if applicable). It maintains load balancer state and any created
@@ -591,6 +614,8 @@ private:
       // Drain any connection pools associated with the hosts filtered by the predicate.
       void drainConnPools(DrainConnectionsHostPredicate predicate,
                           ConnectionPool::DrainBehavior behavior);
+      UnitFloat dropOverload() const override { return drop_overload_; }
+      void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
 
     private:
       Http::ConnectionPool::Instance*
@@ -606,6 +631,7 @@ private:
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
+      UnitFloat drop_overload_{0};
 
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
@@ -630,14 +656,6 @@ private:
       // * 0b001000: envoy::config::core::v3::HealthStatus::DRAINING
       // * 0b010000: envoy::config::core::v3::HealthStatus::TIMEOUT
       // * 0b100000: envoy::config::core::v3::HealthStatus::DEGRADED
-      //
-      // If runtime flag `envoy.reloadable_features.validate_detailed_override_host_statuses` is
-      // disabled, the old coarse health status Host::Health will be used. The specific
-      // correspondence is shown below:
-      //
-      // * 0b001: Host::Health::Unhealthy
-      // * 0b010: Host::Health::Degraded
-      // * 0b100: Host::Health::Healthy
       //
       // If multiple bit fields are set, it is acceptable as long as the status of override host is
       // in any of these statuses.
@@ -718,11 +736,12 @@ private:
   struct ClusterData : public ClusterManagerCluster {
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const uint64_t cluster_config_hash, const std::string& version_info,
-                bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
+                bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
+                TimeSource& time_source)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()),
-          added_via_api_(added_via_api), added_or_updated_{} {}
+          added_via_api_(added_via_api), added_or_updated_{}, required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -740,6 +759,7 @@ private:
       ASSERT(!added_or_updated_);
       added_or_updated_ = true;
     }
+    bool requiredForAds() const override { return required_for_ads_; }
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
@@ -755,6 +775,7 @@ private:
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
     bool added_or_updated_ : 1;
+    const bool required_for_ads_ : 1;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -824,11 +845,13 @@ private:
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
-   * nullptr if cluster_map did not contain the same cluster.
+   * nullptr if cluster_map did not contain the same cluster or an error if
+   * cluster load fails.
    */
-  ClusterDataPtr loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                             const uint64_t cluster_hash, const std::string& version_info,
-                             bool added_via_api, ClusterMap& cluster_map);
+  absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                             const uint64_t cluster_hash,
+                                             const std::string& version_info, bool added_via_api,
+                                             bool required_for_ads, ClusterMap& cluster_map);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
@@ -844,6 +867,10 @@ private:
 
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
+protected:
+  ClusterMap active_clusters_;
+  ClusterInitializationMap cluster_initialization_map_;
+
 private:
   /**
    * Builds the cluster initialization object for this given cluster.
@@ -853,10 +880,12 @@ private:
    */
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map);
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+      UnitFloat drop_overload);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
+  const Server::Instance& server_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
@@ -864,14 +893,8 @@ private:
   // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;
   Random::RandomGenerator& random_;
-
-protected:
-  ClusterMap active_clusters_;
-
-private:
   ClusterMap warming_clusters_;
   const bool deferred_cluster_creation_;
-  ClusterInitializationMap cluster_initialization_map_;
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
@@ -890,6 +913,7 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
+  ProtobufMessage::ValidationContext& validation_context_;
   Router::Context& router_context_;
   ClusterTrafficStatNames cluster_stat_names_;
   ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
@@ -909,7 +933,18 @@ private:
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
   std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
 
+  bool initialized_{};
+  bool ads_mux_initialized_{};
   std::atomic<bool> shutdown_{};
+
+  // Records the last `warming_clusters_` map size from updateClusterCounts(). This variable is
+  // used for bookkeeping to run the `resume_cds_` cleanup that decrements the pause count and
+  // enables the resumption of DiscoveryRequests for the Cluster type url.
+  //
+  // The `warming_clusters` gauge is not suitable for this purpose, because different environments
+  // (e.g. mobile) may have different stats enabled, leading to the gauge not having a reliable
+  // previous warming clusters size value.
+  std::size_t last_recorded_warming_clusters_count_{0};
 };
 
 } // namespace Upstream

@@ -2,7 +2,9 @@
 
 # Enforces:
 # - License headers on Envoy BUILD files
-# - envoy_package() or envoy_extension_package() top-level invocation for standard Envoy package setup.
+# - envoy_package() top-level invocation for standard Envoy package setup.
+# - envoy_mobile_package() top-level invocation for standard Envoy Mobile package setup.
+# - envoy_extension_package() top-level invocation for Envoy extensions.
 # - Infers API dependencies from source files.
 # - Misc. cleanups: avoids redundant blank lines, removes unused loads.
 # - Maybe more later?
@@ -14,13 +16,12 @@ import subprocess
 import sys
 import tempfile
 import pathlib
-import paths
 
 # Where does Buildozer live?
-BUILDOZER_PATH = paths.get_buildozer()
+BUILDOZER_PATH = os.environ["BUILDOZER_PATH"]
 
 # Where does Buildifier live?
-BUILDIFIER_PATH = paths.get_buildifier()
+BUILDIFIER_PATH = os.environ["BUILDIFIER_PATH"]
 
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
@@ -72,12 +73,12 @@ def run_buildozer(cmds, contents):
         return r.stdout.decode('utf-8')
 
 
-# Add an Apache 2 license and envoy_package() import and rule as needed.
+# Add an Apache 2 license, envoy_package / envoy_mobile_package import and rule as needed.
 def fix_package_and_license(path, contents):
     regex_to_use = PACKAGE_LOAD_BLOCK_REGEX
     package_string = 'envoy_package'
 
-    if 'source/extensions' in path:
+    if 'source/extensions' in path or 'library/common/extensions' in path:
         regex_to_use = EXTENSION_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_extension_package'
 
@@ -85,19 +86,19 @@ def fix_package_and_license(path, contents):
         regex_to_use = CONTRIB_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_contrib_package'
 
-    if 'mobile/' in path:
+    if os.getcwd().endswith('mobile') and 'library/common/extensions' not in path:
         regex_to_use = MOBILE_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_mobile_package'
 
-    # Ensure we have an envoy_package import load if this is a real Envoy package. We also allow
-    # the prefix to be overridden if envoy is included in a larger workspace.
+    # Ensure we have an envoy_package / envoy_mobile_package import load if this is a real Envoy package.
+    # We also allow the prefix to be overridden if envoy is included in a larger workspace.
     if re.search(ENVOY_RULE_REGEX, contents):
         new_load = 'new_load {}//bazel:envoy_build_system.bzl %s' % package_string
         contents = run_buildozer([
             (new_load.format(os.getenv("ENVOY_BAZEL_PREFIX", "")), '__pkg__'),
         ], contents)
         # Envoy package is inserted after the load block containing the
-        # envoy_package import.
+        # envoy_package / envoy_mobile_package import.
         package_and_parens = package_string + '()'
         if package_and_parens[:-1] not in contents:
             contents = re.sub(regex_to_use, r'\1\n%s\n\n' % package_and_parens, contents)
@@ -182,7 +183,7 @@ def fix_api_deps(path, contents):
             existing_api_deps = set([
                 d for d in deps.split()
                 if d.startswith('@envoy_api') and d.endswith('pkg_cc_proto')
-                and d != '@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto'
+                and d != '@com_github_cncf_xds//udpa/annotations:pkg_cc_proto'
             ])
         deps_to_remove = existing_api_deps.difference(actual_api_deps)
         if deps_to_remove:

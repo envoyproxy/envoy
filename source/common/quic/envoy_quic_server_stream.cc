@@ -41,11 +41,6 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
 
   stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
-  // TODO(https://github.com/envoyproxy/envoy/issues/23564): Remove this line when the QUICHE is
-  // updated with a more reasonable default expiry time for QUIC Datagrams.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
-    SetMaxDatagramTimeInQueue(::quic::QuicTime::Delta::FromMilliseconds(100));
-  }
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -126,7 +121,19 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
       // TODO(danzh): investigate the cost of allocating one buffer per slice.
       // If it turns out to be expensive, add a new function to free data in the middle in buffer
       // interface and re-design QuicheMemSliceImpl.
-      quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.quiche_use_mem_slice_releasor_api")) {
+        quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+      } else {
+        auto single_slice_buffer = std::make_unique<Buffer::OwnedImpl>();
+        single_slice_buffer->move(data, slice.len_);
+        quic_slices.emplace_back(
+            reinterpret_cast<char*>(slice.mem_), slice.len_,
+            [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
+              // Free this memory explicitly when the callback is invoked.
+              single_slice_buffer = nullptr;
+            });
+      }
     }
     quic::QuicConsumedData result{0, false};
     absl::Span<quiche::QuicheMemSlice> span(quic_slices);
@@ -187,6 +194,12 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
   if (buffer_memory_account_) {
     buffer_memory_account_->clearDownstream();
   }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (http_datagram_handler_) {
+    UnregisterHttp3DatagramVisitor();
+  }
+#endif
 
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
@@ -275,8 +288,13 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
       (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
-       Http::HeaderUtility::isConnectUdp(*headers))) {
+       Http::HeaderUtility::isConnectUdpRequest(*headers))) {
     useCapsuleProtocol();
+    // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it bypass
+    // the default Datagram queue.
+    if (Http::HeaderUtility::isConnectUdpRequest(*headers)) {
+      session()->SetForceFlushForDefaultQueue(true);
+    }
   }
 #endif
 
@@ -563,13 +581,11 @@ bool EnvoyQuicServerStream::hasPendingData() {
 }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-// TODO(https://github.com/envoyproxy/envoy/issues/23564): Make the stream use Capsule Protocol
-// for CONNECT-UDP support when the headers contain "Capsule-Protocol: ?1" or "Upgrade:
-// connect-udp".
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   ASSERT(request_decoder_ != nullptr);
   http_datagram_handler_->setStreamDecoder(request_decoder_);
+  RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
 

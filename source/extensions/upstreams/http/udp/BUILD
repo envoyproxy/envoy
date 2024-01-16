@@ -49,8 +49,7 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
-        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
-        "@com_github_google_quiche//:quic_core_types_lib",
+        "@com_github_google_quiche//:quiche_common_capsule_lib",
         "@com_github_google_quiche//:quiche_common_connect_udp_datagram_payload_lib",
     ],
 )

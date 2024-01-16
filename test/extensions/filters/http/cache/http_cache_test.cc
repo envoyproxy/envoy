@@ -4,16 +4,14 @@
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
-using testing::ContainerEq;
 using testing::TestWithParam;
-using testing::ValuesIn;
 
 namespace Envoy {
 namespace Extensions {
@@ -296,6 +294,17 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
 }
 
 TEST(HttpCacheTest, StableHashKey) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "true"}});
+  Key key;
+  key.set_host("example.com");
+  ASSERT_EQ(stableHashKey(key), 6153940628716543519u);
+}
+
+TEST(HttpCacheTest, StableHashKeyWithSlowHash) {
+  // TODO(ravenblack): This test should be removed when the runtime guard is removed.
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "false"}});
   Key key;
   key.set_host("example.com");
   ASSERT_EQ(stableHashKey(key), 9582653837550152292u);

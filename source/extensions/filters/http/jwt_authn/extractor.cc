@@ -8,6 +8,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/btree_map.h"
@@ -272,14 +273,15 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   // Check query parameter locations only if query parameter locations specified and Path() is not
   // null
   if (!param_locations_.empty() && headers.Path() != nullptr) {
-    const auto& params = Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
+    const auto& params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
     for (const auto& location_it : param_locations_) {
       const auto& param_key = location_it.first;
       const auto& location_spec = location_it.second;
-      const auto& it = params.find(param_key);
-      if (it != params.end()) {
+      const auto& it = params.getFirstValue(param_key);
+      if (it.has_value()) {
         tokens.push_back(std::make_unique<const JwtParamLocation>(
-            it->second, location_spec.issuer_checker_, param_key));
+            it.value(), location_spec.issuer_checker_, param_key));
       }
     }
   }
@@ -325,7 +327,12 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   if (starting == value_str.npos) {
     return value_str;
   }
+
   // There should be two dots (periods; 0x2e) inside the string, but we don't verify that here
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.token_passed_entirely")) {
+    return value_str.substr(starting);
+  }
+
   auto ending = value_str.find_first_not_of(ConstantBase64UrlEncodingCharsPlusDot, starting);
   if (ending == value_str.npos) { // Base64Url-encoded string occupies the rest of the line
     return value_str.substr(starting);

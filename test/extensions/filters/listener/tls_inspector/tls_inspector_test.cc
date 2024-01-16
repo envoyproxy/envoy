@@ -22,7 +22,9 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+#ifdef WIN32
 using testing::Return;
+#endif
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;

@@ -118,7 +118,7 @@ envoy_extension_cc_test(
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "cpu:3",
     ],

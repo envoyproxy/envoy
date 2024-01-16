@@ -2,6 +2,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
@@ -19,6 +20,11 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   // registry may lead to crashes at Engine shutdown. To be figured out as part of
   // https://github.com/envoyproxy/envoy-mobile/issues/332
   Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
+  // Envoy Mobile always requires dfp_mixed_scheme for the TLS and cleartext DFP clusters.
+  // While dfp_mixed_scheme defaults to true, some environments force it to false (e.g. within
+  // Google), so we force it back to true in Envoy Mobile.
+  // TODO(abeyad): Remove once this is no longer needed.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
 envoy_status_t Engine::run(const std::string config, const std::string log_level) {
@@ -26,21 +32,21 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
-  auto options = std::make_unique<Envoy::OptionsImpl>();
+  auto options = std::make_unique<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
-    options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
+    ENVOY_BUG(options->setLogLevel(log_level.c_str()).ok(), "invalid log level");
   }
   options->setConcurrency(1);
   return run(std::move(options));
 }
 
-envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImpl>&& options) {
+envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
   main_thread_ = std::thread(&Engine::main, this, std::move(options));
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
+envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
@@ -90,8 +96,10 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImpl>&& options) {
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           ASSERT(Thread::MainThread::isMainOrTestThread());
 
-          connectivity_manager_ =
-              Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
+          Envoy::Server::GenericFactoryContextImpl generic_context(
+              server_->serverFactoryContext(),
+              server_->serverFactoryContext().messageValidationVisitor());
+          connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
@@ -236,17 +244,11 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
 }
 
 Envoy::Buffer::OwnedImpl Engine::dumpStats() {
-  ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
+  ASSERT(dispatcher_->isThreadSafe(), "dumpStats must be called from the dispatcher's context");
 
   Envoy::Buffer::OwnedImpl instance;
   handlerStats(server_->stats(), instance);
   return instance;
-}
-
-void Engine::flushStats() {
-  ASSERT(dispatcher_->isThreadSafe(), "flushStats must be called from the dispatcher's context");
-
-  server_->flushStats();
 }
 
 Upstream::ClusterManager& Engine::getClusterManager() {

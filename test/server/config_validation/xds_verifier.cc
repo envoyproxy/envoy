@@ -6,9 +6,7 @@
 
 namespace Envoy {
 
-XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta)
-    : num_warming_(0), num_active_(0), num_draining_(0), num_added_(0), num_modified_(0),
-      num_removed_(0) {
+XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta) {
   if (sotw_or_delta == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = SOTW;
   } else {

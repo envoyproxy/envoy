@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -113,23 +115,41 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
-    : disabled_(config.disabled()) {
-  if (config.has_overrides()) {
-    processing_mode_ = config.overrides().processing_mode();
+absl::optional<ProcessingMode>
+FilterConfigPerRoute::initProcessingMode(const ExtProcPerRoute& config) {
+  if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
+    return config.overrides().processing_mode();
   }
-  if (config.overrides().has_grpc_service()) {
-    grpc_service_ = config.overrides().grpc_service();
+  return absl::nullopt;
+}
+absl::optional<envoy::config::core::v3::GrpcService>
+FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
+  if (config.has_overrides() && config.overrides().has_grpc_service()) {
+    return config.overrides().grpc_service();
   }
+  return absl::nullopt;
 }
 
-void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
-  disabled_ = src.disabled_;
-  processing_mode_ = src.processing_mode_;
-  if (src.grpcService().has_value()) {
-    grpc_service_ = src.grpcService();
+absl::optional<ProcessingMode>
+FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                                          const FilterConfigPerRoute& more_specific) {
+  if (more_specific.disabled()) {
+    return absl::nullopt;
   }
+  return more_specific.processingMode().has_value() ? more_specific.processingMode()
+                                                    : less_specific.processingMode();
 }
+
+FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
+    : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
+      grpc_service_(initGrpcService(config)) {}
+
+FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                                           const FilterConfigPerRoute& more_specific)
+    : disabled_(more_specific.disabled()),
+      processing_mode_(mergeProcessingMode(less_specific, more_specific)),
+      grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
+                                                            : less_specific.grpcService()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -160,7 +180,7 @@ Filter::StreamOpenState Filter::openStream() {
   }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, grpc_service_, decoder_callbacks_->streamInfo());
+    stream_ = client_->start(*this, config_with_hash_key_, decoder_callbacks_->streamInfo());
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       // Asserts that `stream_` is nullptr since it is not valid to be used any further
@@ -235,13 +255,17 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (!decoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "decodeHeaders: Skipped");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (decoding_state_.sendHeaders()) {
+    status = onHeaders(decoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(decoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "decodeHeaders returning {}", static_cast<int>(status));
+  if (!processing_complete_ && decoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -271,22 +295,6 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     state.requestWatermark();
     return FilterDataStatus::StopIterationAndWatermark;
   }
-  if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallbackFinishing) {
-    // We were previously streaming the body, but there are more chunks waiting
-    // to be processed, so we can't send the body yet.
-    // Move the data for our chunk into a queue so that we can re-inject it later
-    // when the processor returns. See the comments below for more details on how
-    // this works in general.
-    ENVOY_LOG(trace, "Enqueuing data while we wait for processing to finish");
-    state.enqueueStreamingChunk(data, end_stream, false);
-    if (end_stream) {
-      // But we need to buffer the last chunk because it's our last chance to do stuff
-      state.setPaused(true);
-      return FilterDataStatus::StopIterationNoBuffer;
-    } else {
-      return FilterDataStatus::Continue;
-    }
-  }
 
   FilterDataStatus result;
   switch (state.bodyMode()) {
@@ -305,8 +313,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // The body has been buffered and we need to send the buffer
       ENVOY_LOG(debug, "Sending request body message");
       state.addBufferedData(data);
-      sendBodyChunk(state, *state.bufferedData(),
-                    ProcessorState::CallbackState::BufferedBodyCallback, true);
+      auto req = setupBodyChunk(state, *state.bufferedData(), end_stream);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
       // Since we just just moved the data into the buffer, return NoBuffer
       // so that we do not buffer this chunk twice.
       state.setPaused(true);
@@ -343,10 +351,11 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // Fall through
       break;
     }
-    // Send the chunk on the gRPC stream
-    sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
-    // Move the data to the queue and optionally raise the watermark.
-    state.enqueueStreamingChunk(data, end_stream, true);
+
+    // Need to first enqueue the data into the chunk queue before sending.
+    auto req = setupBodyChunk(state, data, end_stream);
+    state.enqueueStreamingChunk(data, end_stream);
+    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
 
     // At this point we will continue, but with no data, because that will come later
     if (end_stream) {
@@ -383,18 +392,18 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
                ProcessorState::CallbackState::BufferedPartialBodyCallback) {
       // More data came in while we were waiting for a callback result. We need
       // to queue it and deliver it later in case the callback changes the data.
-      state.enqueueStreamingChunk(data, false, false);
+      state.enqueueStreamingChunk(data, end_stream);
       ENVOY_LOG(trace, "Call in progress for partial mode");
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
-      state.enqueueStreamingChunk(data, false, false);
+      state.enqueueStreamingChunk(data, end_stream);
       if (end_stream || state.queueOverHighLimit()) {
         // At either end of stream or when the buffer is full, it's time to send what we have
         // to the processor.
         bool terminate;
         FilterDataStatus chunk_result;
-        std::tie(terminate, chunk_result) = sendStreamChunk(state, end_stream);
+        std::tie(terminate, chunk_result) = sendStreamChunk(state);
         if (terminate) {
           return chunk_result;
         }
@@ -411,8 +420,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   return result;
 }
 
-std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& state,
-                                                                bool end_stream) {
+std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& state) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return {true, FilterDataStatus::StopIterationNoBuffer};
@@ -423,12 +431,11 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
     break;
   }
 
-  // Put all buffered data so far into one big buffer
-  const auto& all_data = state.consolidateStreamedChunks(true);
+  const auto& all_data = state.consolidateStreamedChunks();
   ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
-            all_data.data.length(), end_stream);
-  sendBodyChunk(state, all_data.data, ProcessorState::CallbackState::BufferedPartialBodyCallback,
-                end_stream);
+            state.chunkQueue().receivedData().length(), all_data.end_stream);
+  auto req = setupBodyChunk(state, state.chunkQueue().receivedData(), all_data.end_stream);
+  sendBodyChunk(state, ProcessorState::CallbackState::BufferedPartialBodyCallback, req);
   state.setPaused(true);
   return {false, FilterDataStatus::StopIterationNoBuffer};
 }
@@ -451,14 +458,15 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailersAvailable(true);
   state.setTrailers(&trailers);
 
-  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
-      state.callbackState() == ProcessorState::CallbackState::BufferedBodyCallback) {
+  if (state.callbackState() != ProcessorState::CallbackState::Idle) {
     ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
 
-  if (!body_delivered && state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) {
+  if (!body_delivered &&
+      ((state.bufferedData() && state.bodyMode() == ProcessingMode::BUFFERED) ||
+       (!state.chunkQueue().empty() && state.bodyMode() == ProcessingMode::BUFFERED_PARTIAL))) {
     // If no gRPC stream yet, opens it before sending data.
     switch (openStream()) {
     case StreamOpenState::Error:
@@ -469,11 +477,22 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
       // Fall through
       break;
     }
+
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
-    sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback,
-                  false);
+    if (state.bodyMode() == ProcessingMode::BUFFERED) {
+      // Sending data left over in the buffer.
+      auto req = setupBodyChunk(state, *state.bufferedData(), false);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
+    } else {
+      // Sending data left over in the queue.
+      const auto& all_data = state.consolidateStreamedChunks();
+      auto req = setupBodyChunk(state, state.chunkQueue().receivedData(), false);
+      ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
+                state.chunkQueue().receivedData().length(), all_data.end_stream);
+      sendBodyChunk(state, ProcessorState::CallbackState::BufferedPartialBodyCallback, req);
+    }
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
@@ -514,13 +533,22 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
     encoding_state_.setCompleteBodyAvailable(true);
   }
 
-  if (processing_complete_ || !encoding_state_.sendHeaders()) {
-    ENVOY_LOG(trace, "encodeHeaders: Continue");
-    return FilterHeadersStatus::Continue;
+  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  if (!processing_complete_ && encoding_state_.sendHeaders()) {
+    status = onHeaders(encoding_state_, headers, end_stream);
+    ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
+  } else {
+    ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
   }
 
-  const auto status = onHeaders(encoding_state_, headers, end_stream);
-  ENVOY_LOG(trace, "encodeHeaders returns {}", static_cast<int>(status));
+  // The content-length header will be kept when either one of the following conditions is met:
+  // (1) `shouldRemoveContentLength` returns false.
+  // (2) side stream processing has been completed. For example, it could be caused by stream error
+  // that triggers the local reply or due to spurious message that skips the side stream
+  // mutation.
+  if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
+    headers.removeContentLength();
+  }
   return status;
 }
 
@@ -538,15 +566,20 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   return status;
 }
 
-void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-                           ProcessorState::CallbackState new_state, bool end_stream) {
-  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stram {}", data.length(), end_stream);
-  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             new_state);
+ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::Instance& data,
+                                         bool end_stream) {
+  ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stream {}", data.length(), end_stream);
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
+  return req;
+}
+
+void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
+                           ProcessingRequest& req) {
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             new_state);
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
@@ -624,8 +657,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
-  // set to true. Otherwise, the response mode_override proto field is ignored.
-  if (config_->allowModeOverride() && response->has_mode_override()) {
+  // set to true and filter is waiting for header processing response.
+  // Otherwise, the response mode_override proto field is ignored.
+  if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
     ENVOY_LOG(debug, "Processing mode overridden by server for this request");
     decoding_state_.setProcessingMode(response->mode_override());
     encoding_state_.setProcessingMode(response->mode_override());
@@ -662,14 +696,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // We won't be sending anything more to the stream after we
       // receive this message.
       ENVOY_LOG(debug, "Sending immediate response");
-      // TODO(tyxia) For immediate response case here and below, logging is needed because
-      // `onFinishProcessorCalls` is called after `closeStream` below.
-      // Investigate to see if we can switch the order of those two so that the logging here can be
-      // avoided.
-      logGrpcStreamInfo();
       processing_complete_ = true;
-      closeStream();
       onFinishProcessorCalls(Grpc::Status::Ok);
+      closeStream();
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
     }
@@ -702,9 +731,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response: {}", processing_status.message());
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
-    logGrpcStreamInfo();
-    closeStream();
     onFinishProcessorCalls(processing_status.raw_code());
+    closeStream();
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
@@ -727,10 +755,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
-    closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
     onFinishProcessorCalls(status);
+    closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
@@ -842,14 +870,29 @@ void Filter::mergePerRouteConfig() {
   if (route_config_merged_) {
     return;
   }
+
   route_config_merged_ = true;
 
-  auto merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-      decoder_callbacks_,
-      [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
+  absl::optional<FilterConfigPerRoute> merged_config;
+
+  decoder_callbacks_->traversePerFilterConfig([&merged_config](
+                                                  const Router::RouteSpecificFilterConfig& cfg) {
+    const FilterConfigPerRoute* typed_cfg = dynamic_cast<const FilterConfigPerRoute*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+    if (!merged_config) {
+      merged_config.emplace(*typed_cfg);
+    } else {
+      merged_config.emplace(FilterConfigPerRoute(merged_config.value(), *typed_cfg));
+    }
+  });
+
   if (!merged_config.has_value()) {
     return;
   }
+
   if (merged_config->disabled()) {
     // Rather than introduce yet another flag, use the processing mode
     // structure to disable all the callbacks.
@@ -859,14 +902,15 @@ void Filter::mergePerRouteConfig() {
     encoding_state_.setProcessingMode(all_disabled);
     return;
   }
-  if (merged_config->processingMode()) {
+  if (merged_config->processingMode().has_value()) {
     ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
     decoding_state_.setProcessingMode(*(merged_config->processingMode()));
     encoding_state_.setProcessingMode(*(merged_config->processingMode()));
   }
-  if (merged_config->grpcService()) {
+  if (merged_config->grpcService().has_value()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
+    config_with_hash_key_.setConfig(*merged_config->grpcService());
   }
 }
 

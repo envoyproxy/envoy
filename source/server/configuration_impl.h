@@ -96,6 +96,15 @@ public:
   buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
                       Network::UdpReadFilterCallbacks& callbacks,
                       const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
+
+  /**
+   * Given a QuicListenerFilterManager and a list of factories, create a new filter chain. Chain
+   * creation will exit early if any filters don't have a valid config.
+   *
+   * TODO(sumukhs): Coalesce with the above as they are very similar
+   */
+  static bool buildQuicFilterChain(Network::QuicListenerFilterManager& filter_manager,
+                                   const Filter::QuicListenerFilterFactoriesList& factories);
 };
 
 /**
@@ -189,7 +198,7 @@ public:
    * Initialize admin access log.
    */
   void initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                          Instance& server);
+                          FactoryContext& factory_context);
 
 private:
   struct AdminImpl : public Admin {

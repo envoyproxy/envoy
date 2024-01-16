@@ -29,6 +29,11 @@ type (
 		PassThroughStreamDecoderFilter
 		PassThroughStreamEncoderFilter
 	}
+
+	// EmptyDownstreamFilter provides the no-op implementation of the DownstreamFilter interface
+	EmptyDownstreamFilter struct{}
+	// EmptyUpstreamFilter provides the no-op implementation of the UpstreamFilter interface
+	EmptyUpstreamFilter struct{}
 )
 
 // request
@@ -74,8 +79,12 @@ type StreamFilter interface {
 	StreamDecoderFilter
 	// response stream
 	StreamEncoderFilter
-	// log when the request is finished
+
+	// log
 	OnLog()
+	OnLogDownstreamStart()
+	OnLogDownstreamPeriodic()
+
 	// destroy filter
 	OnDestroy(DestroyReason)
 	// TODO add more for stream complete
@@ -84,11 +93,17 @@ type StreamFilter interface {
 func (*PassThroughStreamFilter) OnLog() {
 }
 
+func (*PassThroughStreamFilter) OnLogDownstreamStart() {
+}
+
+func (*PassThroughStreamFilter) OnLogDownstreamPeriodic() {
+}
+
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
 
 type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) (interface{}, error)
+	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -124,6 +139,9 @@ type StreamInfo interface {
 	FilterState() FilterState
 	// VirtualClusterName returns the name of the virtual cluster which got matched
 	VirtualClusterName() (string, bool)
+
+	// Some fields in stream info can be fetched via GetProperty
+	// For example, startTime() is equal to GetProperty("request.time")
 }
 
 type StreamFilterCallbacks interface {
@@ -134,11 +152,22 @@ type FilterCallbacks interface {
 	StreamFilterCallbacks
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
-	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
+	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
 	Log(level LogType, msg string)
 	LogLevel() LogType
+	// GetProperty fetch Envoy attribute and return the value as a string.
+	// The list of attributes can be found in https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.
+	// If the fetch succeeded, a string will be returned.
+	// If the value is a timestamp, it is returned as a timestamp string like "2023-07-31T07:21:40.695646+00:00".
+	// If the fetch failed (including the value is not found), an error will be returned.
+	//
+	// The error can be one of:
+	// * ErrInternalFailure
+	// * ErrSerializationFailure (Currently, fetching attributes in List/Map type are unsupported)
+	// * ErrValueNotFound
+	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks
 }
 
@@ -162,6 +191,21 @@ type DownstreamFilter interface {
 	OnWrite(buffer []byte, endOfStream bool) FilterStatus
 }
 
+func (*EmptyDownstreamFilter) OnNewConnection() FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyDownstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyDownstreamFilter) OnEvent(event ConnectionEvent) {
+}
+
+func (*EmptyDownstreamFilter) OnWrite(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
 type UpstreamFilter interface {
 	// Called when a connection is available to process a request/response.
 	OnPoolReady(cb ConnectionCallback)
@@ -171,6 +215,19 @@ type UpstreamFilter interface {
 	OnData(buffer []byte, endOfStream bool)
 	// Callback for connection events.
 	OnEvent(event ConnectionEvent)
+}
+
+func (*EmptyUpstreamFilter) OnPoolReady(cb ConnectionCallback) {
+}
+
+func (*EmptyUpstreamFilter) OnPoolFailure(poolFailureReason PoolFailureReason, transportFailureReason string) {
+}
+
+func (*EmptyUpstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus {
+	return NetworkFilterContinue
+}
+
+func (*EmptyUpstreamFilter) OnEvent(event ConnectionEvent) {
 }
 
 type ConnectionCallback interface {
@@ -209,4 +266,40 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+type MetricType uint32
+
+const (
+	Counter   MetricType = 0
+	Gauge     MetricType = 1
+	Histogram MetricType = 2
+)
+
+type ConfigCallbacks interface {
+	// Define a metric, for different MetricType, name must be different,
+	// for same MetricType, the same name will share a metric.
+	DefineCounterMetric(name string) CounterMetric
+	DefineGaugeMetric(name string) GaugeMetric
+	// TODO Histogram
+}
+
+type ConfigCallbackHandler interface {
+	ConfigCallbacks
+}
+
+type CounterMetric interface {
+	Increment(offset int64)
+	Get() uint64
+	Record(value uint64)
+}
+
+type GaugeMetric interface {
+	Increment(offset int64)
+	Get() uint64
+	Record(value uint64)
+}
+
+// TODO
+type HistogramMetric interface {
 }

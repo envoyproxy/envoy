@@ -110,6 +110,16 @@ public:
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
+   * Creates a list of QUIC listener filter factories.
+   * @param filters supplies the JSON configuration.
+   * @param context supplies the factory creation context.
+   * @return Filter::ListenerFilterFactoriesList the list of filter factories.
+   */
+  virtual Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
    * @return DrainManagerPtr a new drain manager.
    * @param drain_type supplies the type of draining to do for the owning listener.
    */
@@ -211,18 +221,20 @@ public:
 
   /**
    * Start all workers accepting new connections on all added listeners.
-   * @param guard_dog supplies the guard dog to use for thread watching.
+   * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param callback supplies the callback to complete server initialization.
    */
-  virtual void startWorkers(GuardDog& guard_dog, std::function<void()> callback) PURE;
+  virtual void startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) PURE;
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
    * is used for server draining and /drain_listeners admin endpoint. This method directly stops the
    * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
    * @param stop_listeners_type indicates listeners to stop.
+   * @param options additional options passed through to shutdownListener.
    */
-  virtual void stopListeners(StopListenersType stop_listeners_type) PURE;
+  virtual void stopListeners(StopListenersType stop_listeners_type,
+                             const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will

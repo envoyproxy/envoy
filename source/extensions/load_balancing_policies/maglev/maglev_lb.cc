@@ -2,6 +2,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -10,6 +12,10 @@ bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
   if constexpr (!(ENVOY_BIT_ARRAY_SUPPORTED)) {
     return false;
   }
+
+#ifdef MAGLEV_LB_FORCE_ORIGINAL_IMPL
+  return false;
+#endif
 
   if (num_hosts > MaglevTable::MaxNumberOfHostsForCompactMaglev) {
     return false;
@@ -35,8 +41,7 @@ public:
                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
 
     MaglevTableSharedPtr maglev_table;
-    if (shouldUseCompactTable(normalized_host_weights.size(), table_size) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_compact_maglev")) {
+    if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
       maglev_table =
           std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
                                                table_size, use_hostname_for_hashing, stats);
@@ -55,6 +60,14 @@ public:
 };
 
 } // namespace
+
+LegacyMaglevLbConfig::LegacyMaglevLbConfig(const ClusterProto& cluster) {
+  if (cluster.has_maglev_lb_config()) {
+    lb_config_ = cluster.maglev_lb_config();
+  }
+}
+
+TypedMaglevLbConfig::TypedMaglevLbConfig(const MaglevLbProto& lb_config) : lb_config_(lb_config) {}
 
 ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr
 MaglevLoadBalancer::createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,

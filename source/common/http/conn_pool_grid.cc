@@ -46,7 +46,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
-    : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
+    : parent_(parent), pool_it_(it) {}
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttemptCallbacks() {
   if (cancellable_ != nullptr) {
@@ -148,6 +148,8 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   }
   if (callbacks != nullptr) {
     callbacks->onPoolReady(encoder, host, info, protocol);
+  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.avoid_zombie_streams")) {
+    encoder.getStream().resetStream(StreamResetReason::LocalReset);
   }
 }
 

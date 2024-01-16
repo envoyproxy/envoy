@@ -210,6 +210,11 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
       return CelValue::CreateString(&info_.connectionTerminationDetails().value());
     }
     return {};
+  } else if (value == DownstreamTransportFailureReason) {
+    if (!info_.downstreamTransportFailureReason().empty()) {
+      return CelValue::CreateStringView(info_.downstreamTransportFailureReason());
+    }
+    return {};
   }
 
   auto ssl_info = info_.downstreamAddressProvider().sslConnection();
@@ -284,6 +289,36 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   return {};
 }
 
+class FilterStateObjectWrapper : public google::api::expr::runtime::CelMap {
+public:
+  FilterStateObjectWrapper(const StreamInfo::FilterState::ObjectReflection* reflection)
+      : reflection_(reflection) {}
+  absl::optional<CelValue> operator[](CelValue key) const override {
+    if (reflection_ == nullptr || !key.IsString()) {
+      return {};
+    }
+    auto field_value = reflection_->getField(key.StringOrDie().value());
+    return absl::visit(Visitor{}, field_value);
+  }
+  // Default stubs.
+  int size() const override { return 0; }
+  bool empty() const override { return true; }
+  using CelMap::ListKeys;
+  absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
+    return &WrapperFields::get().Empty;
+  }
+
+private:
+  struct Visitor {
+    absl::optional<CelValue> operator()(int64_t val) { return CelValue::CreateInt64(val); }
+    absl::optional<CelValue> operator()(absl::string_view val) {
+      return CelValue::CreateStringView(val);
+    }
+    absl::optional<CelValue> operator()(absl::monostate) { return {}; }
+  };
+  const StreamInfo::FilterState::ObjectReflection* reflection_;
+};
+
 absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
@@ -295,6 +330,18 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
     if (cel_state) {
       return cel_state->exprValue(&arena_, false);
     } else if (object != nullptr) {
+      // Attempt to find the reflection object.
+      auto factory =
+          Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(value);
+      if (factory) {
+        auto reflection = factory->reflect(object);
+        if (reflection) {
+          auto* raw_reflection = reflection.release();
+          arena_.Own(raw_reflection);
+          return CelValue::CreateMap(
+              ProtobufWkt::Arena::Create<FilterStateObjectWrapper>(&arena_, raw_reflection));
+        }
+      }
       absl::optional<std::string> serialized = object->serializeAsString();
       if (serialized.has_value()) {
         std::string* out = ProtobufWkt::Arena::Create<std::string>(&arena_, serialized.value());
@@ -321,8 +368,8 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
       return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(), &arena_);
     }
   } else if (value == RouteName) {
-    if (info_.route() && info_.route()->routeEntry()) {
-      return CelValue::CreateString(&info_.route()->routeEntry()->routeName());
+    if (info_.route()) {
+      return CelValue::CreateString(&info_.route()->routeName());
     }
   } else if (value == RouteMetadata) {
     if (info_.route()) {
@@ -335,7 +382,24 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
                                             &arena_);
     }
   } else if (value == FilterChainName) {
-    return CelValue::CreateString(&info_.filterChainName());
+    const auto filter_chain_info = info_.downstreamAddressProvider().filterChainInfo();
+    const absl::string_view filter_chain_name =
+        filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
+    return CelValue::CreateStringView(filter_chain_name);
+  } else if (value == ListenerMetadata) {
+    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &arena_);
+    }
+  } else if (value == ListenerDirection) {
+    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelValue::CreateInt64(listener_info->direction());
+    }
+  } else if (value == Node) {
+    if (local_info_) {
+      return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
+    }
   }
   return {};
 }

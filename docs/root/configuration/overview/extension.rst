@@ -72,6 +72,7 @@ are supported for listener filters, downstream network filters, and HTTP filters
 
 - For TCP listener filters, the value of *<stat_prefix>* is *tcp_listener_filter*.
 - For downstream network filters, the value of *<stat_prefix>* is *network_filter*.
+- For upstream network filters, the value of *<stat_prefix>* is *upstream_network_filter*.
 - For downstream HTTP filters, the value of *<stat_prefix>* is *http_filter*.
 - For upstream HTTP filters, the value of *<stat_prefix>* is *upstream_http_filter*.
 

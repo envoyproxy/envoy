@@ -10,7 +10,6 @@
 #include "library/cc/bridge_utility.h"
 #include "library/cc/log_level.h"
 #include "library/common/engine.h"
-#include "library/common/engine_handle.h"
 #include "library/common/http/header_utility.h"
 #include "spdlog/spdlog.h"
 
@@ -94,6 +93,7 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   use_lds_ = false;
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
+  memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
 
   builder_.addLogLevel(getPlatformLogLevelFromOptions());
   // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
@@ -105,7 +105,10 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
-  stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  {
+    absl::MutexLock l(&engine_lock_);
+    stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  }
 
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
@@ -119,6 +122,7 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
         if (expect_data_streams_) {
           validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
         }
@@ -137,7 +141,7 @@ void BaseClientIntegrationTest::initialize() {
     cc_.terminal_callback->setReady();
   });
 
-  stream_ = (*stream_prototype_).start(explicit_flow_control_, min_delivery_size_);
+  stream_ = (*stream_prototype_).start(explicit_flow_control_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
@@ -170,7 +174,10 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
   builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
-  engine_ = builder_.build();
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_ = builder_.build();
+  }
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -180,9 +187,12 @@ void BaseClientIntegrationTest::TearDown() {
   }
   test_server_.reset();
   fake_upstreams_.clear();
-  if (engine_) {
-    engine_->terminate();
-    engine_.reset();
+  {
+    absl::MutexLock l(&engine_lock_);
+    if (engine_) {
+      engine_->terminate();
+      engine_.reset();
+    }
   }
   stream_.reset();
   stream_prototype_.reset();
@@ -201,16 +211,6 @@ void BaseClientIntegrationTest::createEnvoy() {
     }
   }
 
-  if (override_builder_config_) {
-    finalizeConfigWithPorts(config_helper_, ports, use_lds_);
-    ASSERT_FALSE(config_helper_.bootstrap().has_admin())
-        << "Bootstrap config should not have `admin` configured in Envoy Mobile";
-    builder_.setOverrideConfig(
-        std::make_unique<envoy::config::bootstrap::v3::Bootstrap>(config_helper_.bootstrap()));
-  } else {
-    ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
-  }
-
   absl::Notification engine_running;
   envoy_thread_ = api_->threadFactory().createThread(
       [this, &engine_running]() -> void { threadRoutine(engine_running); });
@@ -221,16 +221,15 @@ uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
   uint64_t counter_value = 0UL;
   uint64_t* counter_value_ptr = &counter_value;
   absl::Notification counter_value_set;
-  EXPECT_EQ(ENVOY_SUCCESS,
-            EngineHandle::runOnEngineDispatcher(
-                rawEngine(), [counter_value_ptr, &name, &counter_value_set](Envoy::Engine& engine) {
-                  Stats::CounterSharedPtr counter =
-                      TestUtility::findCounter(engine.getStatsStore(), name);
-                  if (counter != nullptr) {
-                    *counter_value_ptr = counter->value();
-                  }
-                  counter_value_set.Notify();
-                }));
+  auto engine = reinterpret_cast<Envoy::Engine*>(rawEngine());
+  engine->dispatcher().post([&] {
+    Stats::CounterSharedPtr counter = TestUtility::findCounter(engine->getStatsStore(), name);
+    if (counter != nullptr) {
+      *counter_value_ptr = counter->value();
+    }
+    counter_value_set.Notify();
+  });
+
   EXPECT_TRUE(counter_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
   return counter_value;
 }
@@ -253,16 +252,14 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   uint64_t gauge_value = 0UL;
   uint64_t* gauge_value_ptr = &gauge_value;
   absl::Notification gauge_value_set;
-  EXPECT_EQ(ENVOY_SUCCESS,
-            EngineHandle::runOnEngineDispatcher(
-                rawEngine(), [gauge_value_ptr, &name, &gauge_value_set](Envoy::Engine& engine) {
-                  Stats::GaugeSharedPtr gauge =
-                      TestUtility::findGauge(engine.getStatsStore(), name);
-                  if (gauge != nullptr) {
-                    *gauge_value_ptr = gauge->value();
-                  }
-                  gauge_value_set.Notify();
-                }));
+  auto engine = reinterpret_cast<Envoy::Engine*>(rawEngine());
+  engine->dispatcher().post([&] {
+    Stats::GaugeSharedPtr gauge = TestUtility::findGauge(engine->getStatsStore(), name);
+    if (gauge != nullptr) {
+      *gauge_value_ptr = gauge->value();
+    }
+    gauge_value_set.Notify();
+  });
   EXPECT_TRUE(gauge_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
   return gauge_value;
 }

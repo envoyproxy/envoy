@@ -100,6 +100,7 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnPointee(&ts_));
   ON_CALL(*this, currentDuration()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
@@ -154,9 +155,6 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(Const(*this), filterState()).WillByDefault(Invoke([this]() -> const FilterState& {
     return *filter_state_;
   }));
-  ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
-    route_name_ = std::string(route_name);
-  }));
   ON_CALL(*this, setVirtualClusterName(_))
       .WillByDefault(Invoke([this](const absl::optional<std::string>& virtual_cluster_name) {
         virtual_cluster_name_ = virtual_cluster_name;
@@ -165,11 +163,6 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setUpstreamInfo(_))
       .WillByDefault(Invoke([this](std::shared_ptr<UpstreamInfo> info) { upstream_info_ = info; }));
   ON_CALL(*this, virtualClusterName()).WillByDefault(ReturnRef(virtual_cluster_name_));
-  ON_CALL(*this, setFilterChainName(_))
-      .WillByDefault(Invoke([this](const absl::string_view filter_chain_name) {
-        filter_chain_name_ = std::string(filter_chain_name);
-      }));
-  ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
   ON_CALL(*this, setAttemptCount(_)).WillByDefault(Invoke([this](uint32_t attempt_count) {
     attempt_count_ = attempt_count;
   }));

@@ -3,7 +3,9 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/config_validation/server.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/common.h"
@@ -21,6 +23,11 @@ using testing::Return;
 namespace Envoy {
 namespace Server {
 namespace {
+
+class NullptrComponentFactory : public TestComponentFactory {
+public:
+  DrainManagerPtr createDrainManager(Instance&) override { return nullptr; }
+};
 
 // Test param is the path to the config file to validate.
 class ValidationServerTest : public testing::TestWithParam<std::string> {
@@ -179,10 +186,11 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
                             Filesystem::fileSystemForTest());
 
   // Execute dummy methods.
-  server.drainListeners();
+  server.drainListeners(absl::nullopt);
   server.failHealthcheck(true);
   server.lifecycleNotifier();
   server.secretManager();
+  server.drainManager();
   EXPECT_FALSE(server.isShutdown());
   EXPECT_FALSE(server.healthCheckFailed());
   server.grpcContext();
@@ -198,14 +206,56 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   server.admin()->addStreamingHandler("", "", nullptr, false, false);
   server.admin()->addListenerToHandler(nullptr);
   server.admin()->closeSocket();
-  server.admin()->startHttpListener({}, "", nullptr, nullptr, nullptr);
+  server.admin()->startHttpListener({}, nullptr, nullptr);
 
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockListenerConfig listener_config;
-  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(),
-                                     listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
 
   server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
+
+  ValidationListenerComponentFactory listener_component_factory(server);
+  listener_component_factory.getTcpListenerConfigProviderManager();
+}
+
+class TestObject : public ProcessObject {
+public:
+  void setFlag(bool value) { boolean_flag_ = value; }
+
+  bool boolean_flag_ = true;
+};
+
+TEST_P(ValidationServerTest, NoProcessContext) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+  EXPECT_FALSE(server.processContext().has_value());
+  server.shutdown();
+}
+
+TEST_P(ValidationServerTest, WithProcessContext) {
+  TestObject object;
+  ProcessContextImpl process_context(object);
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest(), process_context);
+  EXPECT_TRUE(server.processContext().has_value());
+  auto context = server.processContext();
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
+  EXPECT_EQ(&object_from_context, &object);
+  EXPECT_TRUE(object_from_context.boolean_flag_);
+
+  object.boolean_flag_ = false;
+  EXPECT_FALSE(object_from_context.boolean_flag_);
+  server.shutdown();
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
@@ -235,7 +285,23 @@ TEST_P(ValidationServerTest1, RunWithoutCrash) {
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest1,
                          ::testing::ValuesIn(ValidationServerTest1::getAllConfigFiles()));
 
-TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
+// A test to ensure that ENVOY_BUGs are handled when the component factory returns a nullptr for
+// the drain manager.
+TEST_P(RuntimeFeatureValidationServerTest, DrainManagerNullptrCheck) {
+  // Setup the server instance with a component factory that returns a null DrainManager.
+  NullptrComponentFactory component_factory;
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  EXPECT_ENVOY_BUG(ValidationInstance server(options_, time_system.timeSystem(),
+                                             Network::Address::InstanceConstSharedPtr(),
+                                             stats_store, access_log_lock, component_factory,
+                                             Thread::threadFactoryForTest(),
+                                             Filesystem::fileSystemForTest()),
+                   "Component factory should not return nullptr from createDrainManager()");
+}
+
+TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoader) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime time_system;

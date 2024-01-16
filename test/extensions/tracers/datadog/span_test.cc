@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/time_util.h"
@@ -78,19 +79,19 @@ public:
 
   std::uint64_t span_id() const override { return id_; }
 
-  datadog::tracing::TraceID trace_id() const override { return datadog::tracing::TraceID{id_}; }
+  datadog::tracing::TraceID trace_id(const datadog::tracing::TimePoint&) const override {
+    return datadog::tracing::TraceID{id_};
+  }
 };
 
 class DatadogTracerSpanTest : public testing::Test {
 public:
   DatadogTracerSpanTest()
-      : id_(0xcafebabe), collector_(std::make_shared<MockCollector>()),
-        config_(makeConfig(collector_)),
+      : collector_(std::make_shared<MockCollector>()), config_(makeConfig(collector_)),
         tracer_(
             // Override the tracer's ID generator so that all trace IDs and span
             // IDs are 0xcafebabe.
-            *datadog::tracing::finalize_config(config_), std::make_shared<MockIDGenerator>(id_),
-            datadog::tracing::default_clock),
+            *datadog::tracing::finalize_config(config_), std::make_shared<MockIDGenerator>(id_)),
         span_(tracer_.create_span()) {}
 
 private:
@@ -108,7 +109,7 @@ private:
   }
 
 protected:
-  const std::uint64_t id_;
+  const std::uint64_t id_{0xcafebabe};
   const std::shared_ptr<MockCollector> collector_;
   const datadog::tracing::TracerConfig config_;
   datadog::tracing::Tracer tracer_;
@@ -128,7 +129,10 @@ TEST_F(DatadogTracerSpanTest, SetOperation) {
   ASSERT_NE(nullptr, data_ptr);
   const datadog::tracing::SpanData& data = *data_ptr;
 
-  EXPECT_EQ("gastric bypass", data.name);
+  // Setting the operation name actually sets the resource name, because Envoy's
+  // notion of operation name more closely matches Datadog's notion of resource
+  // name.
+  EXPECT_EQ("gastric bypass", data.resource);
 }
 
 TEST_F(DatadogTracerSpanTest, SetTag) {
@@ -152,6 +156,110 @@ TEST_F(DatadogTracerSpanTest, SetTag) {
   found = data.tags.find("boom");
   ASSERT_NE(data.tags.end(), found);
   EXPECT_EQ("bam", found->second);
+}
+
+TEST_F(DatadogTracerSpanTest, SetTagResourceName) {
+  // The "resource.name" tag is special. It doesn't set a tag, but instead sets
+  // the span's resource name.
+
+  Span span{std::move(span_)};
+  span.setTag("resource.name", "vespene gas");
+  span.finishSpan();
+
+  ASSERT_EQ(1, collector_->chunks.size());
+  const auto& chunk = collector_->chunks[0];
+  ASSERT_EQ(1, chunk.size());
+  const auto& data_ptr = chunk[0];
+  ASSERT_NE(nullptr, data_ptr);
+  const datadog::tracing::SpanData& data = *data_ptr;
+
+  const auto found = data.tags.find("resource.name");
+  ASSERT_EQ(data.tags.end(), found);
+  EXPECT_EQ("vespene gas", data.resource);
+}
+
+// The "error" and "error.reason" tags are special.
+//
+// - The "error" tag is only ever set to "true", and doing so indicates that
+//   an error occurred during the extent of the span. The corresponding notion
+//   for a Datadog span is to call `.set_error(true)`, and the result is that
+//   the underlying Datadog span's `error` property will be `1`.
+// - The "error.reason" tag is set to some description of the kind of error
+//   that occurred. It's debatable whether this more closely corresponds to
+//   Datadog's `.set_error_message(...)` or to `.set_error_type(...)`, but this
+//   library chooses `.set_error_message(...)`, which has the result of setting
+//   the "error.message" tag. The "error.reason" tag is also set to the same
+//   value.
+// - Note that calling `.set_error_message(...)` causes `.set_error(true)` to
+//   be called. However, it might be possible for Envoy to set the
+//   "error.reason" tag without also setting the "error" tag. This library
+//   chooses to treat all "error.reason" as if they imply a corresponding
+//   "error", i.e. setting "error.reason" without "error" still implies an
+//   error.
+
+TEST_F(DatadogTracerSpanTest, SetTagError) {
+  Span span{std::move(span_)};
+  const auto& Tags = Envoy::Tracing::Tags::get();
+  span.setTag(Tags.Error, Tags.True);
+  span.finishSpan();
+
+  ASSERT_EQ(1, collector_->chunks.size());
+  const auto& chunk = collector_->chunks[0];
+  ASSERT_EQ(1, chunk.size());
+  const auto& data_ptr = chunk[0];
+  ASSERT_NE(nullptr, data_ptr);
+  const datadog::tracing::SpanData& data = *data_ptr;
+
+  ASSERT_TRUE(data.error);
+  ASSERT_EQ(0, data.tags.count(Tags.Error));
+  ASSERT_EQ(0, data.tags.count("error.message"));
+  ASSERT_EQ(0, data.tags.count(Tags.ErrorReason));
+}
+
+TEST_F(DatadogTracerSpanTest, SetTagErrorBogus) {
+  Span span{std::move(span_)};
+  const auto& Tags = Envoy::Tracing::Tags::get();
+  // `Tags.True`, which is "true", is the only value accepted for the
+  // `Tags.Error` ("error") tag. All others are ignored.
+  span.setTag(Tags.Error, Tags.True);
+  span.setTag(Tags.Error, "false");
+  span.setTag(Tags.Error, "supercalifragilisticexpialidocious");
+  span.finishSpan();
+
+  ASSERT_EQ(1, collector_->chunks.size());
+  const auto& chunk = collector_->chunks[0];
+  ASSERT_EQ(1, chunk.size());
+  const auto& data_ptr = chunk[0];
+  ASSERT_NE(nullptr, data_ptr);
+  const datadog::tracing::SpanData& data = *data_ptr;
+
+  ASSERT_TRUE(data.error);
+  ASSERT_EQ(0, data.tags.count(Tags.Error));
+  ASSERT_EQ(0, data.tags.count("error.message"));
+  ASSERT_EQ(0, data.tags.count(Tags.ErrorReason));
+}
+
+TEST_F(DatadogTracerSpanTest, SetTagErrorReason) {
+  Span span{std::move(span_)};
+  const auto& Tags = Envoy::Tracing::Tags::get();
+  span.setTag(Tags.ErrorReason, "not enough minerals");
+  span.finishSpan();
+
+  ASSERT_EQ(1, collector_->chunks.size());
+  const auto& chunk = collector_->chunks[0];
+  ASSERT_EQ(1, chunk.size());
+  const auto& data_ptr = chunk[0];
+  ASSERT_NE(nullptr, data_ptr);
+  const datadog::tracing::SpanData& data = *data_ptr;
+
+  // In addition to setting the "error.message" and "error.reason" tags, we also
+  // have `.error == true`. But still there is no "error" tag.
+  ASSERT_TRUE(data.error);
+  ASSERT_EQ(0, data.tags.count(Tags.Error));
+  ASSERT_EQ(1, data.tags.count("error.message"));
+  ASSERT_EQ("not enough minerals", data.tags.at("error.message"));
+  ASSERT_EQ(1, data.tags.count(Tags.ErrorReason));
+  ASSERT_EQ("not enough minerals", data.tags.at(Tags.ErrorReason));
 }
 
 TEST_F(DatadogTracerSpanTest, InjectContext) {
@@ -197,7 +305,11 @@ TEST_F(DatadogTracerSpanTest, SpawnChild) {
   EXPECT_NE(nullptr, child_ptr);
   const datadog::tracing::SpanData& child = *child_ptr;
   EXPECT_EQ(estimateTime(child_start).wall, child.start.wall);
-  EXPECT_EQ("child", child.name);
+  // Setting the operation name actually sets the resource name, because
+  // Envoy's notion of operation name more closely matches Datadog's notion of
+  // resource name. The actual operation name is hard-coded as "envoy.proxy".
+  EXPECT_EQ("child", child.resource);
+  EXPECT_EQ("envoy.proxy", child.name);
   EXPECT_EQ(id_, child.trace_id);
   EXPECT_EQ(id_, child.span_id);
   EXPECT_EQ(id_, child.parent_id);

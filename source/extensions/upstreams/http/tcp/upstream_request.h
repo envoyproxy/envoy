@@ -23,14 +23,14 @@ namespace Tcp {
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-              const Router::RouteEntry& route_entry, Upstream::LoadBalancerContext* ctx) {
-    conn_pool_data_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
+              Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx) {
+    conn_pool_data_ = thread_local_cluster.tcpConnPool(priority, ctx);
   }
+  // Router::GenericConnPool
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
     upstream_handle_ = conn_pool_data_.value().newConnection(*this);
   }
-
   bool cancelAnyPendingStream() override {
     if (upstream_handle_) {
       upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
@@ -42,8 +42,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override {
     return conn_pool_data_.value().host();
   }
-
-  bool valid() { return conn_pool_data_.has_value(); }
+  bool valid() const override { return conn_pool_data_.has_value(); }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,

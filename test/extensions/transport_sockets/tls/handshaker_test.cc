@@ -43,7 +43,7 @@ public:
   ~MockHandshakeCallbacks() override = default;
   MOCK_METHOD(Network::Connection&, connection, (), (const, override));
   MOCK_METHOD(void, onSuccess, (SSL*), (override));
-  MOCK_METHOD(void, onFailure, (bool syscall_error_occurred), (override));
+  MOCK_METHOD(void, onFailure, (), (override));
   MOCK_METHOD(Network::TransportSocketCallbacks*, transportSocketCallbacks, (), (override));
   MOCK_METHOD(void, onAsynchronousCertValidationComplete, (), (override));
 };

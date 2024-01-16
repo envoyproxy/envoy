@@ -128,6 +128,14 @@ echo "test report shoud not contain missing tests without detailed coverage flag
 MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/DetailedCoverage.yaml" "-t" "${PATH_CONFIG}/DetailedCoverage.golden.proto.json" 2>&1) ||
   echo "${MISSING_OUTPUT:-no-output}"
 if echo "${MISSING_OUTPUT}" | grep -qE "Missing test for host:.+"; then
-  echo "Error"
+  exit 1
+fi
+
+#  Correctness of route coverage for weighted clusters
+echo "route coverage should be calculated correctly for weighted clusters"
+MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--details" 2>&1) ||
+  echo "${MISSING_OUTPUT:-no-output}"
+if ! echo "${MISSING_OUTPUT}" | grep -Fxq "Current route coverage: 100%"; then
+  echo "${MISSING_OUTPUT:-no-output}"
   exit 1
 fi

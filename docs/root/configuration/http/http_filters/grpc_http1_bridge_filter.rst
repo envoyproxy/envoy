@@ -56,6 +56,13 @@ the size specified in the gRPC frame.
 The response body returned to the client will not contain the gRPC header frame for requests that are upgraded in this
 fashion, i.e. the body will contain only the encoded Protobuf.
 
+Ignore query parameters
+-----------------------
+
+Some client requests' URL path may contain query params, while gRPC upstream servers can not handle these requests,
+and may return error such as "unknown method". In order to solve this kind of problems, the filter will automatically strip query parameters in request's URL path if
+:ref:`ignore_query_parameters <envoy_v3_api_field_extensions.filters.http.grpc_http1_bridge.v3.Config.ignore_query_parameters>` is set.
+
 Statistics
 ----------
 

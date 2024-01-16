@@ -19,6 +19,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
@@ -69,11 +70,12 @@ using CNameMap = absl::node_hash_map<std::string, std::string>;
 class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
-                     const CNameMap& cnames, const std::chrono::seconds& record_ttl, bool refused,
-                     bool error_on_a, bool error_on_aaaa)
+                     const CNameMap& cnames, const std::chrono::seconds& record_ttl,
+                     const std::chrono::seconds& cname_ttl_, bool refused, bool error_on_a,
+                     bool error_on_aaaa)
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
-        cnames_(cnames), record_ttl_(record_ttl), refused_(refused), error_on_a_(error_on_a),
-        error_on_aaaa_(error_on_aaaa) {
+        cnames_(cnames), record_ttl_(record_ttl), cname_ttl_(cname_ttl_), refused_(refused),
+        error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -291,7 +293,7 @@ private:
       DNS_RR_SET_TYPE(cname_rr_fixed, T_CNAME);
       DNS_RR_SET_LEN(cname_rr_fixed, cname.size() + 1);
       DNS_RR_SET_CLASS(cname_rr_fixed, C_IN);
-      DNS_RR_SET_TTL(cname_rr_fixed, parent_.record_ttl_.count());
+      DNS_RR_SET_TTL(cname_rr_fixed, parent_.cname_ttl_.count());
       buf.add(encoded_name.c_str(), encoded_name.size() + 1);
       buf.add(cname_rr_fixed, RRFIXEDSZ);
       buf.add(cname.c_str(), cname.size() + 1);
@@ -329,6 +331,7 @@ private:
   const HostMap& hosts_aaaa_;
   const CNameMap& cnames_;
   const std::chrono::seconds& record_ttl_;
+  const std::chrono::seconds& cname_ttl_;
   const bool refused_;
   const bool error_on_a_;
   const bool error_on_aaaa_;
@@ -337,14 +340,15 @@ private:
 class TestDnsServer : public TcpListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher)
-      : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource(), nullptr) {}
+      : dispatcher_(dispatcher), record_ttl_(0), cname_ttl_(0),
+        stream_info_(dispatcher.timeSource(), nullptr) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
         std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
     TestDnsServerQuery* query =
         new TestDnsServerQuery(std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_,
-                               record_ttl_, refused_, error_on_a_, error_on_aaaa_);
+                               record_ttl_, cname_ttl_, refused_, error_on_a_, error_on_aaaa_);
     queries_.emplace_back(query);
   }
 
@@ -364,6 +368,7 @@ public:
   }
 
   void setRecordTtl(const std::chrono::seconds& ttl) { record_ttl_ = ttl; }
+  void setCnameTtl(const std::chrono::seconds& ttl) { cname_ttl_ = ttl; }
   void setRefused(bool refused) { refused_ = refused; }
   void setErrorOnQtypeA(bool error) { error_on_a_ = error; }
   void setErrorOnQtypeAAAA(bool error) { error_on_aaaa_ = error; }
@@ -375,6 +380,7 @@ private:
   HostMap hosts_aaaa_;
   CNameMap cnames_;
   std::chrono::seconds record_ttl_;
+  std::chrono::seconds cname_ttl_;
   bool refused_{};
   bool error_on_a_{};
   bool error_on_aaaa_{};
@@ -723,7 +729,11 @@ public:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     NiceMock<Network::MockListenerConfig> listener_config;
-    listener_ = dispatcher_->createListener(socket_, *server_, runtime_, listener_config);
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    listener_ = std::make_unique<Network::TcpListenerImpl>(
+        *dispatcher_, api_->randomGenerator(), runtime_, socket_, *server_,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     updateDnsResolverOptions();
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
@@ -1204,10 +1214,12 @@ TEST_P(DnsImplTest, MultiARecordLookup) {
 TEST_P(DnsImplTest, CNameARecordLookupV4) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRecordTtl(std::chrono::seconds(300));
+  server_->setCnameTtl(std::chrono::seconds(60));
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Success,
-                                             {"201.134.56.7"}, {}, absl::nullopt));
+                                             {"201.134.56.7"}, {}, std::chrono::seconds(60)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1216,12 +1228,50 @@ TEST_P(DnsImplTest, CNameARecordLookupV4) {
 TEST_P(DnsImplTest, CNameARecordLookupWithV6) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRecordTtl(std::chrono::seconds(300));
+  server_->setCnameTtl(std::chrono::seconds(60));
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,
-                                             {"201.134.56.7"}, {}, absl::nullopt));
+                                             {"201.134.56.7"}, {}, std::chrono::seconds(60)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+}
+
+// RFC 2181: TTL values can be between [0, 2^31-1]
+TEST_P(DnsImplTest, CNameARecordLookupV4InvalidTTL) {
+  server_->addCName("root.cnam.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+
+  // Case 1: Negative TTL
+  server_->setRecordTtl(std::chrono::seconds(-5));
+  server_->setCnameTtl(std::chrono::seconds(60));
+
+  EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, std::chrono::seconds(0)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Case 2: TTL Overflow
+  server_->setRecordTtl(std::chrono::seconds(2147483648));
+  server_->setCnameTtl(std::chrono::seconds(2147483648));
+
+  EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, std::chrono::seconds(0)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Case 3: Max TTL
+  server_->setRecordTtl(std::chrono::seconds(2147483647));
+  server_->setCnameTtl(std::chrono::seconds(2147483647));
+
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Success, {"201.134.56.7"}, {},
+                                    std::chrono::seconds(2147483647)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 

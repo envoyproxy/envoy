@@ -1,6 +1,6 @@
 #include "source/common/protobuf/utility.h"
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
 
 namespace Envoy {
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
@@ -77,6 +77,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/config/trace/v3/trace_descriptor.pb.h"
 #include "envoy/config/trace/v3/xray_descriptor.pb.h"
 #include "envoy/config/trace/v3/zipkin_descriptor.pb.h"
+#include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector_descriptor.pb.h"
 #include "envoy/data/accesslog/v3/accesslog_descriptor.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event_descriptor.pb.h"
 #include "envoy/data/core/v3/health_check_event_descriptor.pb.h"
@@ -85,13 +86,17 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster_descriptor.pb.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache_descriptor.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher_descriptor.pb.h"
+#include "envoy/extensions/compression/brotli/compressor/v3/brotli_descriptor.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli_descriptor.pb.h"
+#include "envoy/extensions/compression/gzip/compressor/v3/gzip_descriptor.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip_descriptor.pb.h"
 #include "envoy/extensions/early_data/v3/default_early_data_policy_descriptor.pb.h"
 #include "envoy/extensions/filters/common/dependency/v3/dependency_descriptor.pb.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action_descriptor.pb.h"
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache_descriptor.pb.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer_descriptor.pb.h"
+#include "envoy/extensions/filters/http/composite/v3/composite_descriptor.pb.h"
+#include "envoy/extensions/filters/http/compressor/v3/compressor_descriptor.pb.h"
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor_descriptor.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy_descriptor.pb.h"
 #include "envoy/extensions/filters/http/health_check/v3/health_check_descriptor.pb.h"
@@ -105,6 +110,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator_descriptor.pb.h"
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/common/v3/common_descriptor.pb.h"
+#include "envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/random/v3/random_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin_descriptor.pb.h"
@@ -180,13 +186,13 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/type/v3/token_bucket_descriptor.pb.h"
 #include "envoy/watchdog/v3/abort_action_descriptor.pb.h"
 
-using ::cc_proto_descriptor_library::internal::FileDescriptorInfo;
+using cc_proto_descriptor_library::TextFormatTranscoder;
+using cc_proto_descriptor_library::internal::FileDescriptorInfo;
 
 namespace {
 
-std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTranscoder() {
-  std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> transcoder =
-      std::make_unique<cc_proto_descriptor_library::TextFormatTranscoder>();
+std::unique_ptr<TextFormatTranscoder> createTranscoder() {
+  auto transcoder = std::make_unique<TextFormatTranscoder>(/*allow_global_fallback=*/false);
   std::vector<FileDescriptorInfo> file_descriptors = {
       protobuf::reflection::envoy_config_core_v3_base::kFileDescriptorInfo,
       protobuf::reflection::envoy_admin_v3_certs::kFileDescriptorInfo,
@@ -251,6 +257,9 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTransco
       protobuf::reflection::envoy_config_trace_v3_trace::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_xray::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_zipkin::kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_config_upstream_local_address_selector_v3_default_local_address_selector::
+              kFileDescriptorInfo,
       protobuf::reflection::envoy_data_accesslog_v3_accesslog::kFileDescriptorInfo,
       protobuf::reflection::envoy_data_cluster_v3_outlier_detection_event::kFileDescriptorInfo,
       protobuf::reflection::envoy_data_core_v3_health_check_event::kFileDescriptorInfo,
@@ -262,7 +271,11 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTransco
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_common_matching_v3_extension_matcher::
           kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_compression_brotli_compressor_v3_brotli::
+          kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_compression_brotli_decompressor_v3_brotli::
+          kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_compression_gzip_compressor_v3_gzip::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_compression_gzip_decompressor_v3_gzip::
           kFileDescriptorInfo,
@@ -276,6 +289,10 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTransco
           envoy_extensions_filters_http_alternate_protocols_cache_v3_alternate_protocols_cache::
               kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_filters_http_buffer_v3_buffer::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_http_composite_v3_composite::
+          kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_filters_http_compressor_v3_compressor::
+          kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_filters_http_decompressor_v3_decompressor::
           kFileDescriptorInfo,
       protobuf::reflection::
@@ -302,6 +319,9 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTransco
               kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_http_original_ip_detection_xff_v3_xff::
           kFileDescriptorInfo,
+      protobuf::reflection::
+          envoy_extensions_load_balancing_policies_cluster_provided_v3_cluster_provided::
+              kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_load_balancing_policies_common_v3_common::
           kFileDescriptorInfo,
       protobuf::reflection::
@@ -409,18 +429,29 @@ std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> createTransco
   }
   return transcoder;
 }
-} // namespace
 
-namespace Envoy {
-
-Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
+TextFormatTranscoder& getTranscoder() {
   // This transcoder is used by createDynamicMessage() to convert an instance of a MessageLite
   // subclass into an instance of Message. This Message instance has reflection capabilities
   // but does not have the per-field accessors that the generated C++ subclasses have.
   // As such it is only useful for reflection uses.
-  static std::unique_ptr<cc_proto_descriptor_library::TextFormatTranscoder> transcoder =
-      createTranscoder();
-  return createDynamicMessage(*transcoder, message);
+  static std::unique_ptr<TextFormatTranscoder> transcoder = createTranscoder();
+  return *transcoder;
 }
+
+} // namespace
+
+namespace Envoy {
+
+void loadFileDescriptors(const FileDescriptorInfo& file_descriptor_info) {
+  getTranscoder().loadFileDescriptors(file_descriptor_info);
+}
+
+Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
+  Protobuf::ReflectableMessage reflectable_message = createDynamicMessage(getTranscoder(), message);
+  ASSERT(reflectable_message, "Unable to create dyanmic message for: " + message.GetTypeName());
+  return reflectable_message;
+}
+
 } // namespace Envoy
 #endif

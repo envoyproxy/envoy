@@ -20,19 +20,22 @@ namespace Http {
 
 class HttpConnPool : public Router::GenericConnPool, public Envoy::Http::ConnectionPool::Callbacks {
 public:
-  // GenericConnPool
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-               const Router::RouteEntry& route_entry,
+               Upstream::ResourcePriority priority,
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
-    pool_data_ =
-        thread_local_cluster.httpConnPool(route_entry.priority(), downstream_protocol, ctx);
+    pool_data_ = thread_local_cluster.httpConnPool(priority, downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
     ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
   }
+  // GenericConnPool
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;
+  bool valid() const override { return pool_data_.has_value(); }
+  Upstream::HostDescriptionConstSharedPtr host() const override {
+    return pool_data_.value().host();
+  }
 
   // Http::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -41,11 +44,6 @@ public:
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    absl::optional<Envoy::Http::Protocol> protocol) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override {
-    return pool_data_.value().host();
-  }
-
-  bool valid() { return pool_data_.has_value(); }
 
 protected:
   // Points to the actual connection pool to create streams from.

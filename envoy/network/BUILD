@@ -11,6 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
+    deps = [
+        "//envoy/common:base_includes",
+        "//envoy/common:pure_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -47,6 +51,7 @@ envoy_cc_library(
         ":connection_balancer_interface",
         ":listen_socket_interface",
         ":listener_interface",
+        "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/ssl:context_interface",
         "//source/common/common:interval_value",
@@ -180,6 +185,7 @@ envoy_cc_library(
         ":io_handle_interface",
         ":post_io_action_interface",
         ":proxy_protocol_options_lib",
+        "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",

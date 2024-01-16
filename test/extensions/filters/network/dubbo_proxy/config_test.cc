@@ -76,7 +76,7 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
-  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.getServerFactoryContext()));
+  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.serverFactoryContext()));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -203,10 +203,11 @@ resources:
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
       envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration>(response);
-  context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
-      ->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-  auto message_ptr = context_.admin_.config_tracker_.config_tracker_callbacks_["drds_routes"](
-      universal_name_matcher);
+  EXPECT_TRUE(context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
+                  .ok());
+  auto message_ptr = context_.server_factory_context_.admin_.config_tracker_
+                         .config_tracker_callbacks_["drds_routes"](universal_name_matcher);
   const auto& dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   EXPECT_EQ(1, dump.dynamic_route_configs().size());

@@ -22,7 +22,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "grpc_mux_lib",
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
@@ -149,13 +149,9 @@ envoy_cc_library(
     name = "delta_subscription_state_lib",
     srcs = [
         "delta_subscription_state.cc",
-        "new_delta_subscription_state.cc",
-        "old_delta_subscription_state.cc",
     ],
     hdrs = [
         "delta_subscription_state.h",
-        "new_delta_subscription_state.h",
-        "old_delta_subscription_state.h",
     ],
     deps = [
         ":pausable_ack_queue_lib",
@@ -176,9 +172,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_stream_interface",
+    hdrs = ["grpc_stream_interface.h"],
+    deps = [
+        "//source/common/grpc:async_client_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_stream_lib",
     hdrs = ["grpc_stream.h"],
     deps = [
+        ":grpc_stream_interface",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
         "//envoy/grpc:async_client_interface",
@@ -189,6 +194,14 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "grpc_mux_failover_lib",
+    hdrs = ["grpc_mux_failover.h"],
+    deps = [
+        ":grpc_stream_lib",
     ],
 )
 

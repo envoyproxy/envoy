@@ -21,6 +21,7 @@ namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
+using testing::HasSubstr;
 
 // Capture regex for /{var1}/{var2}/{var3}/{var4}/{var5}
 static constexpr absl::string_view kCaptureRegex = "/(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
@@ -32,15 +33,15 @@ static constexpr absl::string_view kCaptureRegex = "/(?P<var1>[a-zA-Z0-9-._~%!$&
 TEST(ConvertPathPattern, ValidPattern) {
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/abc"), IsOkAndHolds("/abc"));
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/**.mpd"),
-              IsOkAndHolds("/[a-zA-Z0-9-._~%!$&'()+,;:@/]*\\.mpd"));
+              IsOkAndHolds("/[a-zA-Z0-9-._~%!$&'()+,;:@=/]*\\.mpd"));
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/api/*/{resource=*}/{method=**}"),
-              IsOkAndHolds("/api/[a-zA-Z0-9-._~%!$&'()+,;:@]+/"
-                           "(?P<resource>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
-                           "(?P<method>[a-zA-Z0-9-._~%!$&'()+,;:@/]*)"));
+              IsOkAndHolds("/api/[a-zA-Z0-9-._~%!$&'()+,;:@=]+/"
+                           "(?P<resource>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)/"
+                           "(?P<method>[a-zA-Z0-9-._~%!$&'()+,;:@=/]*)"));
   EXPECT_THAT(convertPathPatternSyntaxToRegex("/api/{VERSION}/{version}/{verSION}"),
-              IsOkAndHolds("/api/(?P<VERSION>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
-                           "(?P<version>[a-zA-Z0-9-._~%!$&'()+,;:@]+)/"
-                           "(?P<verSION>[a-zA-Z0-9-._~%!$&'()+,;:@]+)"));
+              IsOkAndHolds("/api/(?P<VERSION>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)/"
+                           "(?P<version>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)/"
+                           "(?P<verSION>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)"));
 }
 
 TEST(ConvertPathPattern, InvalidPattern) {
@@ -67,7 +68,17 @@ TEST_P(ParseRewriteHelperSuccess, ParseRewriteHelperSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_OK(parseRewritePattern(pattern));
+  const auto result = parseRewritePattern(pattern);
+  EXPECT_OK(result);
+
+  // The following is to exercise operator<< in ParseSegments.
+  const auto& parsed_segments_vec = result.value();
+  std::stringstream all_segments_str;
+  for (const auto& parsed_segment : parsed_segments_vec) {
+    all_segments_str << parsed_segment;
+  }
+  EXPECT_THAT(all_segments_str.str(), HasSubstr("kind = Literal, value ="));
+  EXPECT_THAT(all_segments_str.str(), HasSubstr("kind = Variable, value ="));
 }
 
 class ParseRewriteHelperFailure : public testing::TestWithParam<std::string> {};

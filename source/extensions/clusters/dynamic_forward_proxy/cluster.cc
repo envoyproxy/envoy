@@ -10,6 +10,8 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -19,14 +21,44 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
 
+namespace {
+constexpr absl::string_view DynamicHostFilterStateKey = "envoy.upstream.dynamic_host";
+constexpr absl::string_view DynamicPortFilterStateKey = "envoy.upstream.dynamic_port";
+
+class DynamicHostObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(DynamicHostFilterStateKey); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+class DynamicPortObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(DynamicPortFilterStateKey); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    uint32_t port = 0;
+    if (absl::SimpleAtoi(data, &port)) {
+      return std::make_unique<StreamInfo::UInt32AccessorImpl>(port);
+    }
+    return nullptr;
+  }
+};
+
+} // namespace
+
+REGISTER_FACTORY(DynamicHostObjectFactory, StreamInfo::FilterState::ObjectFactory);
+REGISTER_FACTORY(DynamicPortObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 Cluster::Cluster(
     const envoy::config::cluster::v3::Cluster& cluster,
+    Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Upstream::ClusterFactoryContext& context,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager)
     : Upstream::BaseDynamicClusterImpl(cluster, context),
-      dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
+      dns_cache_manager_(std::move(cache_manager)), dns_cache_(std::move(cache)),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)),
       local_info_(context.serverFactoryContext().localInfo()),
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
@@ -311,12 +343,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     dynamic_host_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
+        context->requestStreamInfo()->filterState().getDataReadOnly<Router::StringAccessor>(
+            DynamicHostFilterStateKey);
   }
 
   absl::string_view raw_host;
@@ -338,12 +368,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                              .resolve(nullptr)
                              .factory_.implementsSecureTransport();
   uint32_t port = is_secure ? 443 : 80;
-  if (context->downstreamConnection()) {
+  if (context->requestStreamInfo()) {
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.upstream.dynamic_port");
+        context->requestStreamInfo()->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+            DynamicPortFilterStateKey);
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
       port = dynamic_port_filter_state->value();
@@ -450,18 +478,9 @@ ClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
 
-  auto& server_context = context.serverFactoryContext();
-
-  // The message validation visitor of Upstream::ClusterFactoryContext should be used for
-  // validating the cluster config.
-  Server::FactoryContextBaseImpl factory_context_base(
-      server_context.options(), server_context.mainThreadDispatcher(), server_context.api(),
-      server_context.localInfo(), server_context.admin(), server_context.runtime(),
-      server_context.singletonManager(), context.messageValidationVisitor(),
-      server_context.serverScope().store(), server_context.threadLocal());
-
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      factory_context_base);
+      context.serverFactoryContext(), context.messageValidationVisitor());
+
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {
     // This sets defaults which will only apply if using old style http config.
@@ -471,11 +490,17 @@ ClusterFactory::createClusterWithConfig(
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
 
-  auto new_cluster = std::shared_ptr<Cluster>(
-      new Cluster(cluster_config, proto_config, context, cache_manager_factory));
+  Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
+      cache_manager_factory.get();
+  auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
+  RETURN_IF_STATUS_NOT_OK(dns_cache_or_error);
+
+  auto new_cluster =
+      std::shared_ptr<Cluster>(new Cluster(cluster_config, std::move(dns_cache_or_error.value()),
+                                           proto_config, context, std::move(cache_manager)));
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-      factory_context_base);
+      context.serverFactoryContext().singletonManager());
   cluster_store_factory.get()->save(new_cluster->info()->name(), new_cluster);
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();

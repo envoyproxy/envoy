@@ -32,7 +32,7 @@ void Filter::close(Network::ConnectionCloseType close_type) {
   }
   ENVOY_CONN_LOG(debug, "close addr: {}, type: {}", read_callbacks_->connection(), addr_,
                  static_cast<int>(close_type));
-  read_callbacks_->connection().close(close_type);
+  read_callbacks_->connection().close(close_type, "go_downstream_close");
 }
 
 void Filter::write(Buffer::Instance& buf, bool end_stream) {
@@ -106,9 +106,6 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& data, bool end_stream) {
 
   auto ret = dynamic_lib_->envoyGoFilterOnDownstreamWrite(
       wrapper_, data.length(), reinterpret_cast<GoUint64>(slices), slice_num, end_stream);
-
-  // TODO: do not drain buffer by default
-  data.drain(data.length());
 
   delete[] slices;
 

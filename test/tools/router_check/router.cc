@@ -113,8 +113,8 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
     }
   }
 
-  return ToolConfig(std::move(request_headers), std::move(response_headers),
-                    check_config.input().random_value());
+  return {std::move(request_headers), std::move(response_headers),
+          static_cast<int>(check_config.input().random_value())};
 }
 
 ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
@@ -136,16 +136,15 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(
-      route_config, Router::OptionalHttpFilters(), *factory_context,
-      ProtobufMessage::getNullValidationVisitor(), false);
+      route_config, *factory_context, ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
     MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
-  return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api), Coverage(route_config));
+  return {std::move(factory_context), std::move(config), std::move(stats), std::move(api),
+          Coverage(route_config)};
 }
 
 void RouterCheckTool::assignUniqueRouteNames(
@@ -226,7 +225,7 @@ RouterCheckTool::RouterCheckTool(
 }
 
 Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
-  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  std::string contents = api.fileSystem().fileReadToEnd(file_path).value();
   if (absl::EndsWith(file_path, ".yaml")) {
     contents = MessageUtil::getJsonStringFromMessageOrError(ValueUtil::loadFromYaml(contents));
   }
@@ -238,7 +237,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
   envoy::RouterCheckToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
+  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes).value();
   TestUtility::loadFromFile(expected_routes, validation_config, *api);
   TestUtility::validate(validation_config);
 
@@ -316,7 +315,7 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
     failure.mutable_actual_cluster_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markClusterCovered(*tool_config.route_);
+    coverage_.markClusterCovered(tool_config.route_);
   }
   return matches;
 }
@@ -346,7 +345,7 @@ bool RouterCheckTool::compareVirtualCluster(
     failure.mutable_actual_virtual_cluster_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markVirtualClusterCovered(*tool_config.route_);
+    coverage_.markVirtualClusterCovered(tool_config.route_);
   }
   return matches;
 }
@@ -371,7 +370,7 @@ bool RouterCheckTool::compareVirtualHost(
     failure.mutable_actual_virtual_host_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markVirtualHostCovered(*tool_config.route_);
+    coverage_.markVirtualHostCovered(tool_config.route_);
   }
   return matches;
 }
@@ -394,7 +393,7 @@ bool RouterCheckTool::compareRewritePath(
     failure.mutable_actual_path_rewrite()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markPathRewriteCovered(*tool_config.route_);
+    coverage_.markPathRewriteCovered(tool_config.route_);
   }
   return matches;
 }
@@ -417,7 +416,7 @@ bool RouterCheckTool::compareRewriteHost(
     failure.mutable_actual_host_rewrite()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markHostRewriteCovered(*tool_config.route_);
+    coverage_.markHostRewriteCovered(tool_config.route_);
   }
   return matches;
 }
@@ -440,7 +439,7 @@ bool RouterCheckTool::compareRedirectPath(
     failure.mutable_actual_path_redirect()->set_value(actual);
   }
   if (matches && has_direct_response_entry) {
-    coverage_.markRedirectPathCovered(*tool_config.route_);
+    coverage_.markRedirectPathCovered(tool_config.route_);
   }
   return matches;
 }
@@ -463,7 +462,7 @@ bool RouterCheckTool::compareRedirectCode(
     failure.mutable_actual_code_redirect()->set_value(actual);
   }
   if (matches && has_direct_response_entry) {
-    coverage_.markRedirectCodeCovered(*tool_config.route_);
+    coverage_.markRedirectCodeCovered(tool_config.route_);
   }
   return matches;
 }
@@ -618,6 +617,7 @@ bool RouterCheckTool::runtimeMock(absl::string_view key,
 }
 
 Options::Options(int argc, char** argv) {
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,

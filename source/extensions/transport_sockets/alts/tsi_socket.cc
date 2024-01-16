@@ -1,9 +1,15 @@
 #include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/network/raw_buffer_socket.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,12 +53,12 @@ Network::PostIoAction TsiSocket::doHandshake() {
   ASSERT(!handshake_complete_);
   ENVOY_CONN_LOG(debug, "TSI: doHandshake", callbacks_->connection());
   if (!handshaker_next_calling_ && raw_read_buffer_.length() > 0) {
-    doHandshakeNext();
+    return doHandshakeNext();
   }
   return Network::PostIoAction::KeepOpen;
 }
 
-void TsiSocket::doHandshakeNext() {
+Network::PostIoAction TsiSocket::doHandshakeNext() {
   ENVOY_CONN_LOG(debug, "TSI: doHandshake next: received: {}", callbacks_->connection(),
                  raw_read_buffer_.length());
 
@@ -65,7 +71,7 @@ void TsiSocket::doHandshakeNext() {
       ENVOY_CONN_LOG(warn, "TSI: failed to create handshaker", callbacks_->connection());
       callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
                                      "failed_creating_handshaker");
-      return;
+      return Network::PostIoAction::Close;
     }
 
     handshaker_->setHandshakerCallbacks(*this);
@@ -74,7 +80,12 @@ void TsiSocket::doHandshakeNext() {
   handshaker_next_calling_ = true;
   Buffer::OwnedImpl handshaker_buffer;
   handshaker_buffer.move(raw_read_buffer_);
-  handshaker_->next(handshaker_buffer);
+  absl::Status status = handshaker_->next(handshaker_buffer);
+  if (!status.ok()) {
+    ENVOY_CONN_LOG(debug, "TSI: Handshake failed: status: {}", callbacks_->connection(), status);
+    return Network::PostIoAction::Close;
+  }
+  return Network::PostIoAction::KeepOpen;
 }
 
 Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result) {
@@ -83,10 +94,9 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
   ENVOY_CONN_LOG(debug, "TSI: doHandshake next done: status: {} to_send: {}",
                  callbacks_->connection(), next_result->status_, next_result->to_send_->length());
 
-  tsi_result status = next_result->status_;
-  tsi_handshaker_result* handshaker_result = next_result->result_.get();
-
-  if (status != TSI_INCOMPLETE_DATA && status != TSI_OK) {
+  absl::Status status = next_result->status_;
+  AltsHandshakeResult* handshake_result = next_result->result_.get();
+  if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "TSI: Handshake failed: status: {}", callbacks_->connection(), status);
     return Network::PostIoAction::Close;
   }
@@ -95,22 +105,12 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     raw_write_buffer_.move(*next_result->to_send_);
   }
 
-  if (status == TSI_OK && handshaker_result != nullptr) {
-    tsi_peer peer;
-    // returns TSI_OK assuming there is no fatal error. Asserting OK.
-    status = tsi_handshaker_result_extract_peer(handshaker_result, &peer);
-    ASSERT(status == TSI_OK);
-    Cleanup peer_cleanup([&peer]() { tsi_peer_destruct(&peer); });
-    ENVOY_CONN_LOG(debug, "TSI: Handshake successful: peer properties: {}",
-                   callbacks_->connection(), peer.property_count);
-    for (size_t i = 0; i < peer.property_count; ++i) {
-      ENVOY_CONN_LOG(debug, "  {}: {}", callbacks_->connection(), peer.properties[i].name,
-                     std::string(peer.properties[i].value.data, peer.properties[i].value.length));
-    }
+  if (status.ok() && handshake_result != nullptr) {
     if (handshake_validator_) {
       std::string err;
       TsiInfo tsi_info;
-      const bool peer_validated = handshake_validator_(peer, tsi_info, err);
+      tsi_info.peer_identity_ = handshake_result->peer_identity;
+      const bool peer_validated = handshake_validator_(tsi_info, err);
       if (peer_validated) {
         ENVOY_CONN_LOG(debug, "TSI: Handshake validation succeeded.", callbacks_->connection());
       } else {
@@ -120,46 +120,30 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
       }
       ProtobufWkt::Struct dynamic_metadata;
       ProtobufWkt::Value val;
-      val.set_string_value(tsi_info.name_);
+      val.set_string_value(tsi_info.peer_identity_);
       dynamic_metadata.mutable_fields()->insert({std::string("peer_identity"), val});
       callbacks_->connection().streamInfo().setDynamicMetadata(
           "envoy.transport_sockets.peer_information", dynamic_metadata);
-      ENVOY_CONN_LOG(debug, "TSI hanshake with peer: {}", callbacks_->connection(), tsi_info.name_);
+      ENVOY_CONN_LOG(debug, "TSI handshake with peer: {}", callbacks_->connection(),
+                     tsi_info.peer_identity_);
     } else {
       ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.", callbacks_->connection());
     }
 
-    const unsigned char* unused_bytes;
-    size_t unused_byte_size;
-
-    // returns TSI_OK assuming there is no fatal error. Asserting OK.
-    status =
-        tsi_handshaker_result_get_unused_bytes(handshaker_result, &unused_bytes, &unused_byte_size);
-    ASSERT(status == TSI_OK);
-    if (unused_byte_size > 0) {
+    if (!handshake_result->unused_bytes.empty()) {
       // All handshake data is consumed.
       ASSERT(raw_read_buffer_.length() == 0);
-      raw_read_buffer_.prepend(
-          absl::string_view{reinterpret_cast<const char*>(unused_bytes), unused_byte_size});
+      absl::string_view unused_bytes(
+          reinterpret_cast<const char*>(handshake_result->unused_bytes.data()),
+          handshake_result->unused_bytes.size());
+      raw_read_buffer_.prepend(unused_bytes);
     }
     ENVOY_CONN_LOG(debug, "TSI: Handshake successful: unused_bytes: {}", callbacks_->connection(),
-                   unused_byte_size);
-
-    // returns TSI_OK assuming there is no fatal error. Asserting OK.
-    tsi_zero_copy_grpc_protector* frame_protector;
-    grpc_core::ExecCtx exec_ctx;
-    status = tsi_handshaker_result_create_zero_copy_grpc_protector(
-        handshaker_result, &default_max_frame_size_, &frame_protector);
-    ASSERT(status == TSI_OK);
-
-    // TODO(yihuazhang): Check the return value once fake TSI frame protector
-    // used in tsi_socket_test.cc implements the interface returning the max frame size.
-    tsi_zero_copy_grpc_protector_max_frame_size(frame_protector, &actual_frame_size_to_use_);
-
+                   handshake_result->unused_bytes.size());
     // Reset the watermarks with actual negotiated max frame size.
     raw_read_buffer_.setWatermarks(
         std::max<size_t>(actual_frame_size_to_use_, callbacks_->connection().bufferLimit()));
-    frame_protector_ = std::make_unique<TsiFrameProtector>(frame_protector);
+    frame_protector_ = std::move(handshake_result->frame_protector);
 
     handshake_complete_ = true;
     if (raw_write_buffer_.length() == 0) {
@@ -328,15 +312,8 @@ Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, boo
 Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (!handshake_complete_) {
     Network::PostIoAction action = doHandshake();
-    // Envoy ALTS implements asynchronous tsi_handshaker_next() interface
-    // which returns immediately after scheduling a handshake request to
-    // the handshake service. The handshake response will be handled by a
-    // dedicated thread in a separate API within which handshake_complete_
-    // will be set to true if the handshake completes.
     ASSERT(!handshake_complete_);
-    ASSERT(action == Network::PostIoAction::KeepOpen);
-    // TODO(lizan): Handle synchronous handshake when TsiHandshaker supports it.
-    return {Network::PostIoAction::KeepOpen, 0, false};
+    return {action, 0, false};
   } else {
     ASSERT(frame_protector_);
     // Check if we need to flush outstanding handshake bytes.

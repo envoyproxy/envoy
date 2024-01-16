@@ -14,41 +14,23 @@ namespace Configuration {
 using ::testing::Return;
 using ::testing::ReturnRef;
 
-MockFactoryContext::MockFactoryContext()
-    : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
-      grpc_context_(scope_.symbolTable()), http_context_(scope_.symbolTable()),
-      router_context_(scope_.symbolTable()) {
-  ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
-  ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
-  ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-  ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
-  ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
-  ON_CALL(*this, getTransportSocketFactoryContext())
-      .WillByDefault(ReturnRef(transport_socket_factory_context_));
+MockFactoryContext::MockFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
-  ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
-  ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
-  ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
-  ON_CALL(*this, serverScope()).WillByDefault(ReturnRef(scope_));
-  ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
-  ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-  ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
-  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
-  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
-  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
-  ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
-  ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
-  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
-  ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
+
+  ON_CALL(*this, getTransportSocketFactoryContext())
+      .WillByDefault(ReturnRef(transport_socket_factory_context_));
+  ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
 }
 
 MockFactoryContext::~MockFactoryContext() = default;
 
-MockUpstreamHttpFactoryContext::MockUpstreamHttpFactoryContext() {
-  ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+MockUpstreamFactoryContext::MockUpstreamFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
 }

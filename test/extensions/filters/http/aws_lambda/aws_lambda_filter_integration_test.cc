@@ -23,6 +23,7 @@ public:
     // instance metadata and timing-out.
     TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "aws-user", 1 /*overwrite*/);
     TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1 /*overwrite*/);
+    TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1 /*overwrite*/);
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 

@@ -29,7 +29,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -253,7 +253,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
           quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(port)),
       *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, *stats_store_.rootScope(),
-      options, nullptr, connection_id_generator_);
+      options, nullptr, connection_id_generator_, quic_transport_socket_factory_ref);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -266,7 +266,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 
 IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     Network::ClientConnectionPtr&& conn,
-    absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) {
+    absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+    bool wait_till_connected) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
   if (!http2_options.has_value()) {
@@ -295,7 +296,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
   // in-connection version negotiation.
   auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                        host_description, downstream_protocol_);
+                                                        host_description, downstream_protocol_,
+                                                        wait_till_connected);
   if (downstream_protocol_ == Http::CodecType::HTTP3 && codec->disconnected()) {
     // Connection may get closed during version negotiation or handshake.
     // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
@@ -347,7 +349,15 @@ void HttpIntegrationTest::useAccessLog(
   ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format, formatters));
 }
 
-HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
+HttpIntegrationTest::~HttpIntegrationTest() {
+  // Make sure any open streams have been closed. If there's an open stream, the decoder will
+  // be out of scope, and so open streams result in writing to freed memory.
+  if (codec_client_) {
+    EXPECT_EQ(codec_client_->numActiveRequests(), 0)
+        << "test requires explicit cleanupUpstreamAndDownstream";
+  }
+  cleanupUpstreamAndDownstream();
+}
 
 void HttpIntegrationTest::initialize() {
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
@@ -361,7 +371,7 @@ void HttpIntegrationTest::initialize() {
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_);
+  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_, custom_alpns_);
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"}, test_server_);
@@ -1295,6 +1305,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
                                                   uint32_t max_count,
                                                   std::chrono::milliseconds timeout) {
+  autonomous_upstream_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
@@ -1323,6 +1334,10 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(
+          std::make_unique<Http::TestResponseHeaderMapImpl>(default_response_headers_));
+
   if (size >= max_size || count > max_count) {
     // header size includes keys too, so expect rejection when equal
     auto encoder_decoder = codec_client_->startRequest(big_headers);
@@ -1337,8 +1352,9 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
       codec_client_->close();
     }
   } else {
-    auto response =
-        sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, timeout);
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(big_headers);
+    RELEASE_ASSERT(response->waitForEndStream(timeout),
+                   fmt::format("unexpected timeout after ", timeout.count(), " ms"));
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }

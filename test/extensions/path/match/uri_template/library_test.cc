@@ -43,6 +43,36 @@ TEST(MatchTest, BasicUsage) {
   EXPECT_TRUE(matcher->match("/bar/en/us"));
 }
 
+TEST(MatchTest, MatchDoubleEqualsInWildcard) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.match.uri_template.uri_template_matcher
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+        path_template: "/bar/{lang}/{country=**}"
+)EOF";
+
+  Router::PathMatcherSharedPtr matcher = createMatcherFromYaml(yaml_string);
+  EXPECT_EQ(matcher->uriTemplate(), "/bar/{lang}/{country=**}");
+  EXPECT_EQ(matcher->name(), "envoy.path.match.uri_template.uri_template_matcher");
+
+  EXPECT_TRUE(matcher->match("/bar/en/us=="));
+}
+
+TEST(MatchTest, MatchDoubleEquals) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.match.uri_template.uri_template_matcher
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+        path_template: "/bar/{lang}/{country=**}"
+)EOF";
+
+  Router::PathMatcherSharedPtr matcher = createMatcherFromYaml(yaml_string);
+  EXPECT_EQ(matcher->uriTemplate(), "/bar/{lang}/{country=**}");
+  EXPECT_EQ(matcher->name(), "envoy.path.match.uri_template.uri_template_matcher");
+
+  EXPECT_TRUE(matcher->match("/bar/en==/us"));
+}
+
 } // namespace Match
 } // namespace UriTemplate
 } // namespace Extensions

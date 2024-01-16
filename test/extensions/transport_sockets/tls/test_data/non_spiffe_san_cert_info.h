@@ -1,3 +1,5 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_NON_SPIFFE_SAN_CERT_256_HASH[] =
     "610db7309c6a740a6129cdd0cd7b7b289291152156549a488d9f9911d5ac615b";

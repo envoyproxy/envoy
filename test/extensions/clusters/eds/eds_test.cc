@@ -148,7 +148,7 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
+    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -258,7 +258,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   initialize();
   try {
-    eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+    THROW_IF_NOT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   } catch (const EnvoyException& e) {
     eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
@@ -269,9 +269,9 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
 // Validate that onConfigUpdate() with empty cluster vector size ignores config.
 TEST_F(EdsTest, OnConfigUpdateEmpty) {
   initialize();
-  eds_callbacks_->onConfigUpdate({}, "");
+  EXPECT_TRUE(eds_callbacks_->onConfigUpdate({}, "").ok());
   Protobuf::RepeatedPtrField<std::string> removed_resources;
-  eds_callbacks_->onConfigUpdate({}, removed_resources, "");
+  EXPECT_TRUE(eds_callbacks_->onConfigUpdate({}, removed_resources, "").ok());
   EXPECT_EQ(2UL, stats_.findCounterByString("cluster.name.update_empty").value().get().value());
   EXPECT_TRUE(initialized_);
 }
@@ -284,7 +284,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   const auto decoded_resources = TestUtility::decodeResources(
       {cluster_load_assignment, cluster_load_assignment}, "cluster_name");
   try {
-    eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+    THROW_IF_NOT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   } catch (const EnvoyException& e) {
     eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
@@ -316,7 +316,7 @@ TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources, "cluster_name");
-  VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
+  EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
 
   EXPECT_TRUE(initialized_);
   EXPECT_EQ(1UL,
@@ -756,8 +756,9 @@ TEST_F(EdsTest, MalformedIPForHealthChecks) {
   initialize();
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException, "malformed IP address: foo.bar.com");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
+      EnvoyException, "malformed IP address: foo.bar.com");
 }
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
@@ -1819,7 +1820,6 @@ TEST_F(EdsTest, EndpointLocality) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
 TEST_F(EdsTest, EndpointCombineDuplicateLocalities) {
@@ -1868,7 +1868,6 @@ TEST_F(EdsTest, EndpointCombineDuplicateLocalities) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
 // Validate that onConfigUpdate() updates the endpoint locality of an existing endpoint.
@@ -1911,7 +1910,6 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 
   // Update locality now
   locality->set_region("space");
@@ -1933,6 +1931,12 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
 // locality weighted balancing isn't configured and the cluster does not use LB policy extensions.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.convert_legacy_lb_config", "false"}});
+
+  // Reset the cluster after the runtime change.
+  resetCluster();
+
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
@@ -2368,9 +2372,9 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
   initialize();
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "Unexpected non-zero priority for local cluster 'name'.");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
+      EnvoyException, "Unexpected non-zero priority for local cluster 'name'.");
 
   // Try an update which only has endpoints with P=0. This should go through.
   cluster_load_assignment.clear_endpoints();
@@ -2661,10 +2665,11 @@ TEST_F(EdsTest, MalformedIP) {
   initialize();
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "malformed IP address: foo.bar.com. Consider setting resolver_name or "
-                            "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
+      EnvoyException,
+      "malformed IP address: foo.bar.com. Consider setting resolver_name or "
+      "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
 class EdsAssignmentTimeoutTest : public EdsTest {
@@ -2828,10 +2833,9 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
 
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
-                            "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
+  EXPECT_EQ(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
+            "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
 class EdsCachedAssignmentTest : public testing::Test {
@@ -2894,14 +2898,14 @@ public:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    VERBOSE_EXPECT_NO_THROW(eds_callbacks_pre_->onConfigUpdate(decoded_resources.refvec_, ""));
+    EXPECT_TRUE(eds_callbacks_pre_->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
 
   void doOnConfigUpdateVerifyNoThrowPost(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    VERBOSE_EXPECT_NO_THROW(eds_callbacks_post_->onConfigUpdate(decoded_resources.refvec_, ""));
+    EXPECT_TRUE(eds_callbacks_post_->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
   // Emulates a CDS update that creates a new cluster object with the same name,
   // that waits for EDS response.

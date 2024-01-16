@@ -9,9 +9,9 @@ namespace Extensions {
 namespace Formatter {
 
 ::Envoy::Formatter::CommandParserPtr CELFormatterFactory::createCommandParserFromProto(
-    const Protobuf::Message&, Server::Configuration::CommonFactoryContext& context) {
+    const Protobuf::Message&, Server::Configuration::GenericFactoryContext& context) {
 #if defined(USE_CEL_PARSER)
-  return std::make_unique<CELFormatterCommandParser>(context);
+  return std::make_unique<CELFormatterCommandParser>(context.serverFactoryContext());
 #else
   UNREFERENCED_PARAMETER(context);
   throw EnvoyException("CEL is not available for use in this environment.");
@@ -24,7 +24,7 @@ ProtobufTypes::MessagePtr CELFormatterFactory::createEmptyConfigProto() {
 
 std::string CELFormatterFactory::name() const { return "envoy.formatter.cel"; }
 
-REGISTER_FACTORY(CELFormatterFactory, CELFormatterFactory::CommandParserFactory);
+REGISTER_FACTORY(CELFormatterFactory, ::Envoy::Formatter::CommandParserFactory);
 
 } // namespace Formatter
 } // namespace Extensions

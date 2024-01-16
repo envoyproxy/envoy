@@ -44,20 +44,12 @@ variables:
 
 ## Variable settings
 # Caches (tip: append a version suffix while testing caches)
-- name: cacheKeyName
-  value: envoy
 - name: cacheKeyVersion
-  value: v0
+  value: v3
 - name: cacheKeyBazel
   value: '.bazelversion | ./WORKSPACE | **/*.bzl, !mobile/**, !envoy-docs/**'
 - name: cacheKeyDocker
-  value: ".devcontainer/Dockerfile"
-# Docker build uses separate docker cache
-- name: cacheKeyDockerBuild
-  # VERSION.txt is included to refresh Docker images for release
-  value: '"publish_docker" | ci/Dockerfile-envoy | VERSION.txt'
-- name: cacheKeyDockerBuildVersion
-  value: v0
+  value: ".bazelrc"
 
 - name: pathCacheTemp
   value: /mnt/cache
@@ -88,11 +80,6 @@ stages:
       - env
       checkStageDeps:
       - env
-      concurrencyChecks: 10
-      macBuildStageDeps:
-      - env
-      windowsBuildStageDeps:
-      - env
 
 # Postsubmit main/release branches
 - ${{ if eq(variables.pipelinePostsubmit, true) }}:
@@ -104,9 +91,4 @@ stages:
       buildStageDeps:
       - env
       checkStageDeps:
-      - env
-      concurrencyChecks: 10
-      macBuildStageDeps:
-      - env
-      windowsBuildStageDeps:
       - env

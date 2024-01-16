@@ -32,6 +32,7 @@ std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
   }
   return args;
 }
+
 } // namespace
 
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
@@ -47,24 +48,25 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
 
   const std::string component_log_level_string =
-      "Comma separated list of component log levels. For example upstream:debug,config:trace";
+      "Comma-separated list of component log levels. For example upstream:debug,config:trace";
   const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
                   "\nDefault is \"{}\"",
                   Logger::Logger::DEFAULT_LOG_FORMAT);
 
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("envoy", ' ', VersionInfo::version());
   TCLAP::ValueArg<uint32_t> base_id(
-      "", "base-id", "base ID so that multiple envoys can run on the same host if needed", false, 0,
+      "", "base-id", "Base ID so that multiple envoys can run on the same host if needed", false, 0,
       "uint32_t", cmd);
   TCLAP::SwitchArg use_dynamic_base_id(
       "", "use-dynamic-base-id",
-      "the server chooses a base ID dynamically. Supersedes a static base ID. May not be used "
+      "The server chooses a base ID dynamically. Supersedes a static base ID. May not be used "
       "when the restart epoch is non-zero.",
       cmd, false);
   TCLAP::ValueArg<std::string> base_id_path(
-      "", "base-id-path", "path to which the base ID is written", false, "", "string", cmd);
+      "", "base-id-path", "Path to which the base ID is written", false, "", "string", cmd);
   TCLAP::ValueArg<uint32_t> concurrency("", "concurrency", "# of worker threads to run", false,
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
@@ -74,16 +76,16 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       false, "", "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
-                                        "allow unknown fields in static configuration (DEPRECATED)",
+                                        "Allow unknown fields in static configuration (DEPRECATED)",
                                         cmd, false);
   TCLAP::SwitchArg allow_unknown_static_fields("", "allow-unknown-static-fields",
-                                               "allow unknown fields in static configuration", cmd,
+                                               "Allow unknown fields in static configuration", cmd,
                                                false);
   TCLAP::SwitchArg reject_unknown_dynamic_fields("", "reject-unknown-dynamic-fields",
-                                                 "reject unknown fields in dynamic configuration",
+                                                 "Reject unknown fields in dynamic configuration",
                                                  cmd, false);
   TCLAP::SwitchArg ignore_unknown_dynamic_fields("", "ignore-unknown-dynamic-fields",
-                                                 "ignore unknown fields in dynamic configuration",
+                                                 "Ignore unknown fields in dynamic configuration",
                                                  cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
@@ -107,10 +109,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "Logger mode: enable file level log control (Fine-Grain Logger) or not", cmd, false);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
-  TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
+  TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "Hot restart epoch #", false, 0,
                                           "uint32_t", cmd);
   TCLAP::SwitchArg hot_restart_version_option("", "hot-restart-version",
-                                              "hot restart compatibility version", cmd);
+                                              "Hot restart compatibility version", cmd);
   TCLAP::ValueArg<std::string> service_cluster("", "service-cluster", "Cluster name", false, "",
                                                "string", cmd);
   TCLAP::ValueArg<std::string> service_node("", "service-node", "Node name", false, "", "string",
@@ -178,7 +180,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
   END_TRY
   MULTI_CATCH(
-      TCLAP::ArgException & e, { failure_function(e); }, { throw NoServingException(); });
+      TCLAP::ArgException & e, { failure_function(e); },
+      { throw NoServingException("NoServingException"); });
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
@@ -187,7 +190,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   cpuset_threads_ = cpuset_threads.getValue();
 
   if (log_level.isSet()) {
-    log_level_ = parseAndValidateLogLevel(log_level.getValue());
+    auto status_or_error = parseAndValidateLogLevel(log_level.getValue());
+    if (!status_or_error.status().ok()) {
+      logError(std::string(status_or_error.status().message()));
+    }
+    log_level_ = status_or_error.value();
   } else {
     log_level_ = default_log_level;
   }
@@ -285,7 +292,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
-    throw NoServingException();
+    throw NoServingException("NoServingException");
   }
 
   if (!disable_extensions.getValue().empty()) {
@@ -321,26 +328,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 }
 
-spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(absl::string_view log_level) {
-  if (log_level == "warn") {
-    return spdlog::level::level_enum::warn;
-  }
-
-  size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    spdlog::string_view_t spd_log_level = spdlog::level::level_string_views[i];
-    if (log_level == absl::string_view(spd_log_level.data(), spd_log_level.size())) {
-      level_to_use = i;
-      break;
-    }
-  }
-
-  if (level_to_use == std::numeric_limits<size_t>::max()) {
-    logError(fmt::format("error: invalid log level specified '{}'", log_level));
-  }
-  return static_cast<spdlog::level::level_enum>(level_to_use);
-}
-
 std::string OptionsImpl::allowedLogLevels() {
   std::string allowed_log_levels;
   for (auto level_string_view : spdlog::level::level_string_views) {
@@ -365,7 +352,11 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
       logError(fmt::format("error: component log level not correctly specified '{}'", level));
     }
     std::string log_name = log_name_level[0];
-    spdlog::level::level_enum log_level = parseAndValidateLogLevel(log_name_level[1]);
+    auto status_or_error = parseAndValidateLogLevel(log_name_level[1]);
+    if (!status_or_error.status().ok()) {
+      logError(std::string(status_or_error.status().message()));
+    }
+    spdlog::level::level_enum log_level = status_or_error.value();
     Logger::Logger* logger_to_change = Logger::Registry::logger(log_name);
     if (!logger_to_change) {
       logError(fmt::format("error: invalid component specified '{}'", log_name));
@@ -373,8 +364,6 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
     component_log_levels_.push_back(std::make_pair(log_name, log_level));
   }
 }
-
-uint32_t OptionsImpl::count() const { return count_; }
 
 void OptionsImpl::logError(const std::string& error) { throw MalformedArgvException(error); }
 
@@ -440,25 +429,11 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 }
 
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
-                         const std::string& service_zone, spdlog::level::level_enum log_level)
-    : log_level_(log_level), service_cluster_(service_cluster), service_node_(service_node),
-      service_zone_(service_zone) {}
-
-void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
-  for (const auto& name : names) {
-    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits('/', 1));
-
-    if (parts.size() != 2) {
-      ENVOY_LOG_MISC(warn, "failed to disable invalid extension name '{}'", name);
-      continue;
-    }
-
-    if (Registry::FactoryCategoryRegistry::disableFactory(parts[0], parts[1])) {
-      ENVOY_LOG_MISC(info, "disabled extension '{}'", name);
-    } else {
-      ENVOY_LOG_MISC(warn, "failed to disable unknown extension '{}'", name);
-    }
-  }
+                         const std::string& service_zone, spdlog::level::level_enum log_level) {
+  setLogLevel(log_level);
+  setServiceClusterName(service_cluster);
+  setServiceNodeName(service_node);
+  setServiceZone(service_zone);
 }
 
 } // namespace Envoy

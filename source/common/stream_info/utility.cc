@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/http/default_server_string.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_format.h"
 
@@ -36,7 +37,7 @@ const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, boo
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
-  static_assert(ResponseFlag::LastFlag == 0x4000000,
+  static_assert(ResponseFlag::LastFlag == 0x8000000,
                 "A flag has been added. Add the new flag to ALL_RESPONSE_STRINGS_FLAGS.");
   absl::flat_hash_map<std::string, ResponseFlag> res;
   for (auto [flag_strings, flag] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
@@ -313,7 +314,7 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
   case ProxyStatusError::TlsProtocolError:
     return TLS_PROTOCOL_ERROR;
   case ProxyStatusError::TlsCertificateError:
-    return TLS_CERTIFICATE_ERORR;
+    return TLS_CERTIFICATE_ERROR;
   case ProxyStatusError::TlsAlertReceived:
     return TLS_ALERT_RECEIVED;
   case ProxyStatusError::HttpRequestError:
@@ -366,7 +367,11 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   } else if (stream_info.hasResponseFlag(ResponseFlag::NoHealthyUpstream)) {
     return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
-    return ProxyStatusError::ConnectionTimeout;
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.proxy_status_upstream_request_timeout")) {
+      return ProxyStatusError::ConnectionTimeout;
+    }
+    return ProxyStatusError::HttpResponseTimeout;
   } else if (stream_info.hasResponseFlag(ResponseFlag::LocalReset)) {
     return ProxyStatusError::ConnectionTimeout;
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRemoteReset)) {

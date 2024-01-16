@@ -18,10 +18,10 @@ namespace ConnectGrpcBridge {
 namespace {
 
 struct RcDetailsValues {
-  // The Buf Connect gRPC bridge tried to buffer a unary request that was too large for the
+  // The Connect RPC to gRPC bridge tried to buffer a unary request that was too large for the
   // configured decoder buffer limit.
   const std::string ConnectBridgeUnaryRequestTooLarge = "connect_bridge_unary_request_too_large";
-  // The Buf Connect gRPC bridge tried to buffer a unary response that was too large for the
+  // The Connect RPC to gRPC bridge tried to buffer a unary response that was too large for the
   // configured encoder buffer limit.
   const std::string ConnectBridgeUnaryResponseTooLarge = "connect_bridge_unary_response_too_large";
 };
@@ -289,20 +289,31 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::decodeHeaders(Http::RequestHe
         compression[0]->value() != Http::CustomHeaders::get().AcceptEncodingValues.Identity) {
       unary_payload_frame_flags_ |= Envoy::Grpc::GRPC_FH_COMPRESSED;
     }
+
+    headers.removeContentLength();
+
+    if (end_stream) {
+      Grpc::Encoder().prependFrameHeader(unary_payload_frame_flags_, request_buffer_);
+      decoder_callbacks_->addDecodedData(request_buffer_, true);
+    }
   } else {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
-    if (query_parameters[ConnectGetParams::get().APIKey] == ConnectGetParams::get().APIValue) {
+    Http::Utility::QueryParamsMulti query_parameters =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    if (query_parameters.getFirstValue(ConnectGetParams::get().APIKey).value_or("") ==
+        ConnectGetParams::get().APIValue) {
       // Unary Connect Get protocol
       is_connect_unary_ = true;
 
       headers.setMethod(Http::Headers::get().MethodValues.Post);
       headers.setPath(removeQueryParameters(headers.getPathValue()));
 
-      auto message = query_parameters[ConnectGetParams::get().MessageKey];
-      auto base64 = query_parameters[ConnectGetParams::get().Base64Key];
-      auto encoding = query_parameters[ConnectGetParams::get().EncodingKey];
-      auto compression = query_parameters[ConnectGetParams::get().CompressionKey];
+      auto message =
+          query_parameters.getFirstValue(ConnectGetParams::get().MessageKey).value_or("");
+      auto base64 = query_parameters.getFirstValue(ConnectGetParams::get().Base64Key).value_or("");
+      auto encoding =
+          query_parameters.getFirstValue(ConnectGetParams::get().EncodingKey).value_or("");
+      auto compression =
+          query_parameters.getFirstValue(ConnectGetParams::get().CompressionKey).value_or("");
 
       if (base64 == "1") {
         message = Base64Url::decode(message);

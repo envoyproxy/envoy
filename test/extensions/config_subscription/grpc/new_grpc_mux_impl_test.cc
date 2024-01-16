@@ -310,6 +310,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
         }));
     // Expect an ack with the nonce.
     expectSendMessage(type_url, {}, {}, "111");
@@ -326,6 +327,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
         }));
     // No ack reply is expected in this case, as EDS is suspended.
     onDiscoveryResponse(std::move(response));
@@ -377,6 +379,7 @@ TEST_P(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
         }));
     onDiscoveryResponse(std::move(response));
   }
@@ -476,6 +479,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpGlobCollection) {
                                           const std::string&) {
         EXPECT_EQ(1, added_resources.size());
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        return absl::OkStatus();
       }));
   onDiscoveryResponse(std::move(response));
 }
@@ -533,6 +537,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[1].get().resource(), load_assignment));
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[2].get().resource(), load_assignment));
+        return absl::OkStatus();
       }));
   onDiscoveryResponse(std::move(response));
 }
@@ -610,6 +615,7 @@ TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
         }));
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
     expectSendMessage(type_url, {}, {}); // Ack.
@@ -654,6 +660,7 @@ TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
         }));
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
     expectSendMessage(type_url, {}, {}); // Ack.
@@ -705,6 +712,7 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
             EXPECT_EQ(1, added_resources.size());
             EXPECT_TRUE(
                 TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+            return absl::OkStatus();
           }));
       EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
       expectSendMessage(type_url, {}, {}); // Ack.
@@ -741,6 +749,7 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
             EXPECT_EQ(1, added_resources.size());
             EXPECT_TRUE(
                 TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+            return absl::OkStatus();
           }));
       EXPECT_CALL(*eds_resources_cache_, setResource("y", ProtoEq(load_assignment)));
       expectSendMessage(type_url, {}, {}); // Ack.

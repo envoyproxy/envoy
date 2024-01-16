@@ -18,18 +18,18 @@ namespace {
  */
 Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                         Server::AdminStream& admin_stream) {
-  Http::Utility::QueryParams query_params = admin_stream.queryParams();
-  auto iter = query_params.find("file");
+  Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
+  auto leafSuffix = query_params.getFirstValue("file");
   std::string prefix;
-  if (iter != query_params.end()) {
+  if (leafSuffix.has_value()) {
     prefix = "test/integration/admin_html/";
-  } else if (iter = query_params.find("src"); iter != query_params.end()) {
+  } else if (leafSuffix = query_params.getFirstValue("src"); leafSuffix.has_value()) {
     prefix = "source/server/admin/html/";
   } else {
     response.add("query param 'file' or 'src' missing");
     return Http::Code::BadRequest;
   }
-  absl::string_view leaf = iter->second;
+  absl::string_view leaf = leafSuffix.value();
 
   // ".." is not a good thing to allow into the path, even for a test server.
   if (leaf.find("..") != absl::string_view::npos) {
@@ -39,7 +39,11 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
 
   Filesystem::InstanceImpl file_system;
   std::string path = absl::StrCat(prefix, leaf);
-  TRY_ASSERT_MAIN_THREAD { response.add(file_system.fileReadToEnd(path)); }
+  TRY_ASSERT_MAIN_THREAD {
+    auto file_or_error = file_system.fileReadToEnd(path);
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    response.add(file_or_error.value());
+  }
   END_TRY
   catch (EnvoyException& e) {
     response.add(e.what());
@@ -61,7 +65,7 @@ public:
     std::string path = absl::StrCat("source/server/admin/html/", resource_name);
     Filesystem::InstanceImpl file_system;
     TRY_ASSERT_MAIN_THREAD {
-      buf = file_system.fileReadToEnd(path);
+      buf = file_system.fileReadToEnd(path).value();
       ENVOY_LOG_MISC(info, "Read {} bytes from {}", buf.size(), path);
     }
     END_TRY

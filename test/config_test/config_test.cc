@@ -8,9 +8,9 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/fmt.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -41,11 +41,14 @@ namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
 OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
-  return Envoy::Server::createTestOptionsImpl("", api.fileSystem().fileReadToEnd(src.configPath()),
-                                              src.localAddressIpVersion());
+  return Envoy::Server::createTestOptionsImpl(
+      "", api.fileSystem().fileReadToEnd(src.configPath()).value(), src.localAddressIpVersion());
 }
 
 static std::vector<absl::string_view> unsuported_win32_configs = {
+#if defined(WIN32)
+    "rbac_envoy.yaml",
+#endif
 #if defined(WIN32) && !defined(SO_ORIGINAL_DST)
     "configs_original-dst-cluster_proxy_config.yaml"
 #endif
@@ -65,7 +68,7 @@ public:
       return api_->threadFactory();
     }));
     ON_CALL(file_system_, fileReadToEnd(_))
-        .WillByDefault(Invoke([&](const std::string& file) -> std::string {
+        .WillByDefault(Invoke([&](const std::string& file) -> absl::StatusOr<std::string> {
           return api_->fileSystem().fileReadToEnd(file);
         }));
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));

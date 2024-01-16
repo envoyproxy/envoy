@@ -1,3 +1,5 @@
+#pragma once
+
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "gmock/gmock.h"

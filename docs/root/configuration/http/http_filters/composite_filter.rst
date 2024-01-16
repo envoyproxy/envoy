@@ -3,11 +3,6 @@
 Composite Filter
 ================
 
-.. attention::
-
-   The composite filter is in alpha and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
-
 The composite filter allows delegating filter actions to a filter specified by a
 :ref:`match result <arch_overview_matching_api>`. The purpose of this is to allow different filters
 or filter configurations to be selected based on the incoming request, allowing for more dynamic
@@ -22,6 +17,15 @@ on just the request headers.
 Delegation can fail if the filter factory attempted to use a callback not supported by the
 composite filter. In either case, the ``<stat_prefix>.composite.delegation_error`` stat will be
 incremented.
+
+This filter adds a map of the delegated filter name (of the action that is matched )and the root config filter name to the filter state with key
+``envoy.extensions.filters.http.composite.matched_actions``
+
+Contains a map of pairs `FILTER_CONFIG_NAME:ACTION_NAME`:
+
+  * ``FILTER_CONFIG_NAME``: root filter config name;
+  * ``ACTION_NAME``: delegated filter name of the action that is matched.
+
 
 Sample Envoy configuration
 --------------------------

@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
 
-// [#next-free-field: 7]
+// [#next-free-field: 10]
 message ZooKeeperProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy";
@@ -42,8 +42,8 @@ message ZooKeeperProxy {
   // if that is set. If it isn't, ZooKeeper's default is also 1Mb.
   google.protobuf.UInt32Value max_packet_bytes = 3;
 
-  // Whether to emit latency threshold metrics. If not set, defaults to false.
-  // If false, setting `default_latency_threshold` and `latency_threshold_overrides` will not have effect.
+  // Whether to emit latency threshold metrics. If not set, it defaults to false.
+  // If false, setting ``default_latency_threshold`` and ``latency_threshold_overrides`` will not have effect.
   bool enable_latency_threshold_metrics = 4;
 
   // The default latency threshold to decide the fast/slow responses and emit metrics (used for error budget calculation).
@@ -59,6 +59,15 @@ message ZooKeeperProxy {
   // threshold.
   // Specifying latency threshold overrides multiple times for one opcode is not allowed.
   repeated LatencyThresholdOverride latency_threshold_overrides = 6;
+
+  // Whether to emit per opcode request bytes metrics. If not set, it defaults to false.
+  bool enable_per_opcode_request_bytes_metrics = 7;
+
+  // Whether to emit per opcode response bytes metrics. If not set, it defaults to false.
+  bool enable_per_opcode_response_bytes_metrics = 8;
+
+  // Whether to emit per opcode decoder error metrics. If not set, it defaults to false.
+  bool enable_per_opcode_decoder_error_metrics = 9;
 }
 
 message LatencyThresholdOverride {

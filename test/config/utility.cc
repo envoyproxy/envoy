@@ -1310,7 +1310,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  initializeTls(options, *tls_context.mutable_common_tls_context());
+  initializeTls(options, *tls_context.mutable_common_tls_context(), false);
   if (options.ocsp_staple_required_) {
     tls_context.set_ocsp_staple_policy(
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE);
@@ -1319,7 +1319,8 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(
+    bool enable_early_data, std::vector<absl::string_view> custom_alpns) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1329,8 +1330,12 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data
   }
   configDownstreamTransportSocketWithTls(
       bootstrap_,
-      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
+      [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
+                      true);
+        for (absl::string_view alpn : custom_alpns) {
+          common_tls_context.add_alpn_protocols(alpn);
+        }
       },
       enable_early_data);
 }
@@ -1447,9 +1452,14 @@ void ConfigHelper::initializeTlsKeyLog(
 
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
-  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+    bool http3) {
+  if (!http3) {
+    // If it's HTTP/3, leave it empty as QUIC will derive the supported ALPNs from QUIC version by
+    // default.
+    common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+    common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+  }
 
   auto* validation_context = common_tls_context.mutable_validation_context();
   if (options.custom_validator_config_) {

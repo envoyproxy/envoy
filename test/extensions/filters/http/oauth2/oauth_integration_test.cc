@@ -175,6 +175,21 @@ resources:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
+  void cleanup() {
+    codec_client_->close();
+    if (fake_oauth2_connection_ != nullptr) {
+      AssertionResult result = fake_oauth2_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_oauth2_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+    if (fake_upstream_connection_ != nullptr) {
+      AssertionResult result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
   virtual void setOauthConfig() {
     // This config is same as when the 'auth_type: "URL_ENCODED_BODY"' is set as it's the default
     // value
@@ -209,6 +224,7 @@ typed_config:
           path_config_source:
             path: "{{ test_tmpdir }}/hmac_secret.yaml"
           resource_api_version: V3
+    use_refresh_token: true
     auth_scopes:
     - user
     - openid
@@ -228,6 +244,8 @@ typed_config:
         Http::Utility::parseSetCookieValue(headers, default_cookie_names_.bearer_token_);
     std::string hmac =
         Http::Utility::parseSetCookieValue(headers, default_cookie_names_.oauth_hmac_);
+    std::string refreshToken =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.refresh_token_);
 
     Http::TestRequestHeaderMapImpl validate_headers{{":authority", std::string(host)}};
 
@@ -239,18 +257,49 @@ typed_config:
     validate_headers.addReferenceKey(Http::Headers::get().Cookie,
                                      absl::StrCat(default_cookie_names_.bearer_token_, "=", token));
 
+    validate_headers.addReferenceKey(
+        Http::Headers::get().Cookie,
+        absl::StrCat(default_cookie_names_.refresh_token_, "=", refreshToken));
+
     OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_};
     validator.setParams(validate_headers, std::string(hmac_secret));
     return validator.isValid();
   }
 
   virtual void checkClientSecretInRequest(absl::string_view token_secret) {
-    std::string request_body = upstream_request_->body().toString();
-    const auto query_parameters = Http::Utility::parseFromBody(request_body);
-    auto it = query_parameters.find("client_secret");
+    std::string request_body = oauth2_request_->body().toString();
+    const auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
+    auto secret = query_parameters.getFirstValue("client_secret");
 
-    ASSERT_TRUE(it != query_parameters.end());
-    EXPECT_EQ(it->second, token_secret);
+    ASSERT_TRUE(secret.has_value());
+    EXPECT_EQ(secret.value(), token_secret);
+  }
+
+  void waitForOAuth2Response(absl::string_view token_secret) {
+    AssertionResult result =
+        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_oauth2_connection_->waitForNewStream(*dispatcher_, oauth2_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = oauth2_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+
+    ASSERT_TRUE(oauth2_request_->waitForHeadersComplete());
+
+    checkClientSecretInRequest(token_secret);
+
+    oauth2_request_->encodeHeaders(
+        Http::TestRequestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+        false);
+
+    envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
+    oauth_response.mutable_access_token()->set_value("bar");
+    oauth_response.mutable_refresh_token()->set_value("foo");
+    oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
+
+    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+    oauth2_request_->encodeData(buffer, true);
   }
 
   void doAuthenticationFlow(absl::string_view token_secret, absl::string_view hmac_secret) {
@@ -268,22 +317,7 @@ typed_config:
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
 
-    waitForNextUpstreamRequest(std::vector<uint64_t>({0, 1, 2, 3}));
-
-    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-
-    checkClientSecretInRequest(token_secret);
-
-    upstream_request_->encodeHeaders(
-        Http::TestRequestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-        false);
-
-    envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
-    oauth_response.mutable_access_token()->set_value("bar");
-    oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
-
-    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
-    upstream_request_->encodeData(buffer, true);
+    waitForOAuth2Response(token_secret);
 
     // We should get an immediate redirect back.
     response->waitForHeaders();
@@ -298,7 +332,7 @@ typed_config:
         response->headers(), default_cookie_names_.oauth_expires_);
 
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
-    codec_client_->close();
+    cleanup();
 
     // Now try sending the cookies back
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -319,7 +353,43 @@ typed_config:
     EXPECT_EQ("http://traffic.example.com/not/_oauth",
               response->headers().Location()->value().getStringView());
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
-    codec_client_->close();
+    cleanup();
+  }
+
+  void doRefreshTokenFlow(absl::string_view token_secret, absl::string_view hmac_secret) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    Http::TestRequestHeaderMapImpl headers{
+        {":method", "GET"},          {":path", "/request1"},
+        {":scheme", "http"},         {"x-forwarded-proto", "http"},
+        {":authority", "authority"}, {"Cookie", "RefreshToken=efddf321;BearerToken=ff1234fc"},
+        {":authority", "authority"}, {"authority", "Bearer token"}};
+
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+
+    waitForOAuth2Response(token_secret);
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+    RELEASE_ASSERT(result, result.message());
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(response_size_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    EXPECT_TRUE(
+        validateHmac(response->headers(), headers.Host()->value().getStringView(), hmac_secret));
+
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(response_size_, response->body().size());
+
+    cleanup();
   }
 
   const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken",
@@ -328,6 +398,10 @@ typed_config:
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;
   FakeStreamPtr lds_stream_{};
+  const uint64_t response_size_ = 512;
+
+  FakeHttpConnectionPtr fake_oauth2_connection_{};
+  FakeStreamPtr oauth2_request_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthIntegrationTest,
@@ -354,6 +428,8 @@ TEST_P(OauthIntegrationTest, UnauthenticatedFlow) {
   // We should get an immediate redirect back.
   response->waitForHeaders();
   EXPECT_EQ("302", response->headers().getStatusValue());
+
+  cleanup();
 }
 
 TEST_P(OauthIntegrationTest, AuthenticationFlow) {
@@ -378,6 +454,30 @@ TEST_P(OauthIntegrationTest, AuthenticationFlow) {
   test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
   // 3. Do another one authentication flow.
   doAuthenticationFlow("token_secret_1", "hmac_secret_1");
+}
+
+TEST_P(OauthIntegrationTest, RefreshTokenFlow) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+
+  initialize();
+
+  // 1. Do one authentication flow.
+  doRefreshTokenFlow("token_secret", "hmac_secret");
+
+  // 2. Reload secrets.
+  EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);
+  EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("token_secret.yaml"));
+  test_server_->waitForCounterEq("sds.token.update_success", 2, std::chrono::milliseconds(5000));
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("hmac_secret.yaml"));
+  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  // 3. Do another one refresh token flow.
+  doRefreshTokenFlow("token_secret_1", "hmac_secret_1");
 }
 
 // Regression test(issue #22678) where (incorrectly)using server's init manager(initialized state)
@@ -481,13 +581,12 @@ typed_config:
   }
 
   void checkClientSecretInRequest(absl::string_view token_secret) override {
-    EXPECT_FALSE(
-        upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+    EXPECT_FALSE(oauth2_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
     const std::string basic_auth_token = absl::StrCat("foo:", token_secret);
     const std::string encoded_token =
         Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto token_secret_expected = absl::StrCat("Basic ", encoded_token);
-    EXPECT_EQ(token_secret_expected, upstream_request_->headers()
+    EXPECT_EQ(token_secret_expected, oauth2_request_->headers()
                                          .get(Http::CustomHeaders::get().Authorization)[0]
                                          ->value()
                                          .getStringView());
@@ -527,6 +626,8 @@ TEST_P(OauthIntegrationTest, MissingStateParam) {
   // contain the state param.
   response->waitForHeaders();
   EXPECT_EQ("401", response->headers().getStatusValue());
+
+  cleanup();
 }
 
 } // namespace

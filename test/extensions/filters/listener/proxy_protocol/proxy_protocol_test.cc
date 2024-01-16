@@ -10,6 +10,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
@@ -17,7 +18,6 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -65,7 +65,8 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr) {
+        init_manager_(nullptr),
+        listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -76,7 +77,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr,
@@ -99,14 +100,10 @@ public:
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
+  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+    return listener_info_;
   }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
@@ -211,6 +208,7 @@ public:
   }
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
@@ -230,6 +228,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
 };
 
 // Parameterize the listener socket address version.
@@ -858,6 +857,13 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1069,6 +1075,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
   connect(false);
   write(buffer, 17);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1171,6 +1184,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
       }));
   connect(false);
   write(buffer, 10);
@@ -1922,6 +1942,13 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
 
   connect(false);
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -1945,7 +1972,8 @@ public:
             socket_->connectionInfoProvider().localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr) {
+        init_manager_(nullptr),
+        listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -1956,7 +1984,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(
         local_dst_address_, Network::Address::InstanceConstSharedPtr(),
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
@@ -1988,14 +2016,10 @@ public:
   Stats::Scope& listenerScope() override { return *stats_store_.rootScope(); }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
+  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+    return listener_info_;
   }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
@@ -2060,6 +2084,7 @@ public:
   }
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -2079,6 +2104,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
 };
 
 // Parameterize the listener socket address version.

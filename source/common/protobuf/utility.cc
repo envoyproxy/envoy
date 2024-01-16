@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/documentation_url.h"
 #include "source/common/common/fmt.h"
+#include "source/common/protobuf/deterministic_hash.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/visitor.h"
@@ -114,48 +115,40 @@ uint64_t fractionalPercentDenominatorToInt(
 
 } // namespace ProtobufPercentHelper
 
-MissingFieldException::MissingFieldException(const std::string& field_name,
-                                             const Protobuf::Message& message)
-    : EnvoyException(
-          fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString())) {}
-
-ProtoValidationException::ProtoValidationException(const std::string& validation_error,
-                                                   const Protobuf::Message& message)
-    : EnvoyException(fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                 message.DebugString())) {
-  ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
-}
-
 void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_name,
                                                     const Protobuf::Message& message) {
-  throw MissingFieldException(field_name, message);
+  std::string error =
+      fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString());
+  throwEnvoyExceptionOrPanic(error);
 }
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
-  throw ProtoValidationException(validation_error, message);
+  std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
+                                  message.DebugString());
+  throwEnvoyExceptionOrPanic(error);
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
-  std::string text_format;
-
-#ifdef ENVOY_ENABLE_FULL_PROTOS
-  {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
+    return DeterministicProtoHash::hash(message);
+  } else {
+    std::string text_format;
     Protobuf::TextFormat::Printer printer;
     printer.SetExpandAny(true);
     printer.SetUseFieldNumber(true);
     printer.SetSingleLineMode(true);
     printer.SetHideUnknownFields(true);
     printer.PrintToString(message, &text_format);
+    return HashUtil::xxHash64(text_format);
   }
 #else
-  absl::StrAppend(&text_format, message.SerializeAsString());
+  return HashUtil::xxHash64(message.SerializeAsString());
 #endif
-
-  return HashUtil::xxHash64(text_format);
 }
 
-#ifndef ENVOY_ENABLE_FULL_PROTOS
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
 // NOLINTNEXTLINE(readability-identifier-naming)
 bool MessageLiteDifferencer::Equals(const Protobuf::Message& message1,
                                     const Protobuf::Message& message2) {
@@ -339,7 +332,7 @@ void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
 }
 
 void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message) {
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   any_message.PackFrom(message);
 #else
   any_message.set_type_url(message.GetTypeName());
@@ -348,14 +341,14 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
-    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                     message.GetDescriptor()->full_name(),
-                                     any_message.DebugString()));
+    throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
+                                           message.GetDescriptor()->full_name(),
+                                           any_message.DebugString()));
 #else
   if (!message.ParseFromString(any_message.value())) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
 #endif
   }
@@ -363,7 +356,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
 
 absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
                                           Protobuf::Message& message) {
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     return absl::InternalError(absl::StrCat("Unable to unpack as ",
                                             message.GetDescriptor()->full_name(), ": ",
@@ -376,6 +369,17 @@ absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
   }
   // Ok Status is returned if `UnpackTo` succeeded.
   return absl::OkStatus();
+}
+
+std::string MessageUtil::convertToStringForLogs(const Protobuf::Message& message, bool pretty_print,
+                                                bool always_print_primitive_fields) {
+#ifdef ENVOY_ENABLE_YAML
+  return getJsonStringFromMessageOrError(message, pretty_print, always_print_primitive_fields);
+#else
+  UNREFERENCED_PARAMETER(pretty_print);
+  UNREFERENCED_PARAMETER(always_print_primitive_fields);
+  return message.DebugString();
+#endif
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -605,7 +609,7 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
   // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
   // this can fail.
   if (!dst.ParseFromString(src.SerializeAsString())) {
-    throw EnvoyException("Unable to deserialize during wireCast()");
+    throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
   }
 }
 
@@ -728,7 +732,7 @@ absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
 void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
   const auto result = validateDurationNoThrow(duration, max_seconds_value);
   if (!result.ok()) {
-    throw DurationUtil::OutOfRangeException(std::string(result.message()));
+    throwEnvoyExceptionOrPanic(std::string(result.message()));
   }
 }
 

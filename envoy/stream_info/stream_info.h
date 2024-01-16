@@ -91,8 +91,10 @@ enum ResponseFlag {
   OverloadManager = 0x2000000,
   // DNS resolution failed.
   DnsResolutionFailed = 0x4000000,
+  // Drop certain percentage of overloaded traffic.
+  DropOverLoad = 0x8000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DnsResolutionFailed,
+  LastFlag = DropOverLoad,
 };
 
 /**
@@ -156,6 +158,8 @@ struct ResponseCodeDetailValues {
   const std::string ClusterNotFound = "cluster_not_found";
   // The request was rejected by the router filter because the cluster was in maintenance mode.
   const std::string MaintenanceMode = "maintenance_mode";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
+  const std::string DropOverload = "drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.
@@ -231,6 +235,8 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_remote_close";
   const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
       "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamResetClose =
+      "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
 };
@@ -339,6 +345,9 @@ public:
   absl::optional<MonotonicTime> lastDownstreamAckReceived() const {
     return last_downstream_ack_received_;
   }
+  absl::optional<MonotonicTime> lastDownstreamHeaderRxByteReceived() const {
+    return last_downstream_header_rx_byte_received_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -360,6 +369,10 @@ public:
     ASSERT(!last_downstream_ack_received_);
     last_downstream_ack_received_ = time_source.monotonicTime();
   }
+  void onLastDownstreamHeaderRxByteReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_header_rx_byte_received_);
+    last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
+  }
 
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
@@ -373,6 +386,8 @@ private:
   absl::optional<MonotonicTime> downstream_handshake_complete_;
   // The time the final ack was received from the client.
   absl::optional<MonotonicTime> last_downstream_ack_received_;
+  // The time when the last header byte was received.
+  absl::optional<MonotonicTime> last_downstream_header_rx_byte_received_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -610,12 +625,8 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param std::string name denotes the name of the route.
-   */
-  virtual void setRouteName(absl::string_view name) PURE;
-
-  /**
-   * @return std::string& the name of the route.
+   * @return std::string& the name of the route. The name is get from the route() and it is
+   *         empty if there is no route.
    */
   virtual const std::string& getRouteName() const PURE;
 
@@ -694,6 +705,11 @@ public:
    * calculations should be made relative to this value.
    */
   virtual MonotonicTime startTimeMonotonic() const PURE;
+
+  /**
+   * @return returns the time source.
+   */
+  virtual TimeSource& timeSource() const PURE;
 
   /**
    * Sets the upstream information for this stream.
@@ -842,16 +858,6 @@ public:
   virtual Tracing::Reason traceReason() const PURE;
 
   /**
-   * @param filter_chain_name Network filter chain name of the downstream connection.
-   */
-  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
-
-  /**
-   * @return Network filter chain name of the downstream connection.
-   */
-  virtual const std::string& filterChainName() const PURE;
-
-  /**
    * @param attempt_count, the number of times the request was attempted upstream.
    */
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
@@ -910,6 +916,20 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * Checked by streams after finishing serving the request.
+   * @return bool true if the connection should be drained once this stream has
+   * finished sending and receiving.
+   */
+  virtual bool shouldDrainConnectionUponCompletion() const PURE;
+
+  /**
+   * Called if the connection decides to drain itself after serving this request.
+   * @param should_drain true to close the connection once this stream has
+   * finished sending and receiving.
+   */
+  virtual void setShouldDrainConnectionUponCompletion(bool should_drain) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

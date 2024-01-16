@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
@@ -80,17 +81,15 @@ public:
   const Protobuf::MethodDescriptor& service_method_;
 };
 
-class OpenTelemetryGrpcTraceExporter : Logger::Loggable<Logger::Id::tracing> {
+class OpenTelemetryGrpcTraceExporter : public OpenTelemetryTraceExporter {
 public:
   OpenTelemetryGrpcTraceExporter(const Grpc::RawAsyncClientSharedPtr& client);
 
-  bool log(const ExportTraceServiceRequest& request);
+  bool log(const ExportTraceServiceRequest& request) override;
 
 private:
   OpenTelemetryGrpcTraceExporterClient client_;
 };
-
-using OpenTelemetryGrpcTraceExporterPtr = std::unique_ptr<OpenTelemetryGrpcTraceExporter>;
 
 } // namespace OpenTelemetry
 } // namespace Tracers

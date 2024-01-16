@@ -79,7 +79,7 @@ private:
 };
 
 static std::unique_ptr<Http1Harness> harness;
-static void reset_harness() { harness = nullptr; }
+static void resetHarness() { harness = nullptr; }
 
 // Fuzzing strategy
 // Unconstrained fuzzing, rely on corpus for coverage
@@ -89,7 +89,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     Http1Settings server_settings = fromHttp1Settings();
     Http1Settings client_settings = fromHttp1Settings();
     harness = std::make_unique<Http1Harness>(server_settings, client_settings);
-    atexit(reset_harness);
+    atexit(resetHarness);
   }
 
   Buffer::OwnedImpl httpmsg;

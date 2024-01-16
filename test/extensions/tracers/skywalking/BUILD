@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
     "envoy_package",
 )
 load(
@@ -41,14 +42,19 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_cc_library(
+    name = "skywalking_test_helper_lib",
+    hdrs = ["skywalking_test_helper.h"],
+)
+
 envoy_extension_cc_test(
     name = "skywalking_test_helper",
-    srcs = ["skywalking_test_helper.h"],
     extension_names = ["envoy.tracers.skywalking"],
     external_deps = [
         "cpp2sky",
     ],
     deps = [
+        ":skywalking_test_helper_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//test/test_common:utility_lib",

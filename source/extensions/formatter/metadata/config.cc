@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Formatter {
 
 ::Envoy::Formatter::CommandParserPtr MetadataFormatterFactory::createCommandParserFromProto(
-    const Protobuf::Message&, Server::Configuration::CommonFactoryContext&) {
+    const Protobuf::Message&, Server::Configuration::GenericFactoryContext&) {
   return std::make_unique<MetadataFormatterCommandParser>();
 }
 
@@ -19,7 +19,7 @@ ProtobufTypes::MessagePtr MetadataFormatterFactory::createEmptyConfigProto() {
 
 std::string MetadataFormatterFactory::name() const { return "envoy.formatter.metadata"; }
 
-REGISTER_FACTORY(MetadataFormatterFactory, MetadataFormatterFactory::CommandParserFactory);
+REGISTER_FACTORY(MetadataFormatterFactory, ::Envoy::Formatter::CommandParserFactory);
 
 } // namespace Formatter
 } // namespace Extensions

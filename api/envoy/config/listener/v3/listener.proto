@@ -199,7 +199,12 @@ message Listener {
   // before a connection is created.
   // UDP Listener filters can be specified when the protocol in the listener socket address in
   // :ref:`protocol <envoy_v3_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`.
+  // <envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>` and no
+  // :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` is specified in :ref:`udp_listener_config <envoy_v3_api_field_config.listener.v3.Listener.udp_listener_config>`.
+  // QUIC listener filters can be specified when :ref:`quic_options
+  // <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` is
+  // specified in :ref:`udp_listener_config <envoy_v3_api_field_config.listener.v3.Listener.udp_listener_config>`.
+  // They are processed sequentially right before connection creation. And like TCP Listener filters, they can be used to manipulate the connection metadata and socket. But the difference is that they can't be used to pause connection creation.
   repeated ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
@@ -244,7 +249,7 @@ message Listener {
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries. The socket options can be updated for a listener when
   // :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
-  // is `true`. Otherwise, if socket options change during a listener update the update will be rejected
+  // is ``true``. Otherwise, if socket options change during a listener update the update will be rejected
   // to make it clear that the options were not updated.
   repeated core.v3.SocketOption socket_options = 13;
 

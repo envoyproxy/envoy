@@ -17,6 +17,8 @@
 
 package api
 
+import "errors"
+
 // ****************** filter status start ******************//
 type StatusType int
 
@@ -126,14 +128,10 @@ type HeaderMap interface {
 
 	// RangeWithCopy calls f sequentially for each key and value copied from the map.
 	RangeWithCopy(f func(key, value string) bool)
-
-	// ByteSize return size of HeaderMap
-	ByteSize() uint64
 }
 
 type RequestHeaderMap interface {
 	HeaderMap
-	Protocol() string
 	Scheme() string
 	Method() string
 	Host() string
@@ -200,12 +198,6 @@ type DataBufferBase interface {
 	// buffer becomes too large, Write will panic with ErrTooLarge.
 	WriteUint64(p uint64) error
 
-	// Peek returns n bytes from buffer, without draining any buffered data.
-	// If n > readable buffer, nil will be returned.
-	// It can be used in codec to check first-n-bytes magic bytes
-	// Note: do not change content in return bytes, use write instead
-	Peek(n int) []byte
-
 	// Bytes returns all bytes from buffer, without draining any buffered data.
 	// It can be used to get fixed-length content, such as headers, body.
 	// Note: do not change content in return bytes, use write instead
@@ -255,6 +247,25 @@ type DestroyReason int
 const (
 	Normal    DestroyReason = 0
 	Terminate DestroyReason = 1
+)
+
+// For each AccessLogType's meaning, see
+// https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage
+// Currently, only some downstream access log types are supported
+type AccessLogType int
+
+const (
+	AccessLogNotSet                                  AccessLogType = 0
+	AccessLogTcpUpstreamConnected                    AccessLogType = 1
+	AccessLogTcpPeriodic                             AccessLogType = 2
+	AccessLogTcpConnectionEnd                        AccessLogType = 3
+	AccessLogDownstreamStart                         AccessLogType = 4
+	AccessLogDownstreamPeriodic                      AccessLogType = 5
+	AccessLogDownstreamEnd                           AccessLogType = 6
+	AccessLogUpstreamPoolReady                       AccessLogType = 7
+	AccessLogUpstreamPeriodic                        AccessLogType = 8
+	AccessLogUpstreamEnd                             AccessLogType = 9
+	AccessLogDownstreamTunnelSuccessfullyEstablished AccessLogType = 10
 )
 
 const (
@@ -349,6 +360,9 @@ const (
 	FlushWriteAndDelay ConnectionCloseType = 2
 	// Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
 	Abort ConnectionCloseType = 3
+	// Do not write/flush any pending data and immediately raise
+	// ConnectionEvent::LocalClose. Envoy will try to close the connection with RST flag.
+	AbortReset ConnectionCloseType = 4
 )
 
 func (t ConnectionCloseType) String() string {
@@ -361,6 +375,8 @@ func (t ConnectionCloseType) String() string {
 		return "FlushWriteAndDelay"
 	case Abort:
 		return "Abort"
+	case AbortReset:
+		return "AbortReset"
 	}
 	return "unknown"
 }
@@ -408,3 +424,13 @@ func (t ConnectionInfoType) String() string {
 	}
 	return "unknown"
 }
+
+// *************** errors start **************//
+var (
+	ErrInternalFailure = errors.New("internal failure")
+	ErrValueNotFound   = errors.New("value not found")
+	// Failed to serialize the value when we fetch the value as string
+	ErrSerializationFailure = errors.New("serialization failure")
+)
+
+// *************** errors end **************//

@@ -106,7 +106,7 @@ private:
 FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
   sendLocalResponse(200, "not send", "body", {});
   int* badptr = nullptr;
-  *badptr = 0;
+  *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
   return FilterDataStatus::Continue;
 }
 

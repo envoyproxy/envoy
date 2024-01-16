@@ -113,10 +113,11 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
-    ON_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
-        .WillByDefault(testing::Return(config.get()));
-    ON_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
-        .WillByDefault(testing::Return(config.get()));
+    EXPECT_CALL(*decoder_callbacks.route_, traversePerFilterConfig(_, _))
+        .WillOnce(Invoke([&](const std::string&,
+                             std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+          cb(*config);
+        }));
 
     {
       Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -161,10 +162,10 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {":status", "200"},
       };
 
-      const Http::RequestHeaderMap* request_headers_pointer =
+      Http::RequestHeaderMap* request_headers_pointer =
           Http::StaticEmptyHeaders::get().request_headers.get();
-      EXPECT_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
-          .WillOnce(testing::Return(request_headers_pointer));
+      EXPECT_CALL(encoder_callbacks, requestHeaders())
+          .WillOnce(testing::Return(makeOptRefFromPtr(request_headers_pointer)));
 
       EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
 
@@ -196,8 +197,8 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {":status", "200"},
       };
 
-      EXPECT_CALL(encoder_callbacks.stream_info_, getRequestHeaders())
-          .WillOnce(testing::Return(nullptr));
+      EXPECT_CALL(encoder_callbacks, requestHeaders())
+          .WillOnce(testing::Return(Http::RequestHeaderMapOptRef{}));
 
       EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
 
@@ -237,8 +238,11 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
     };
 
     // If the decoding phase is not performed then try to get the config from the encoding phase.
-    EXPECT_CALL(encoder_callbacks, mostSpecificPerFilterConfig())
-        .WillRepeatedly(testing::Return(config.get()));
+    EXPECT_CALL(*encoder_callbacks.route_, traversePerFilterConfig(_, _))
+        .WillOnce(Invoke([&](const std::string&,
+                             std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+          cb(*config);
+        }));
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
 
@@ -273,11 +277,6 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
         {"global-flag-header", "global-flag-header-value"},
         {":status", "200"},
     };
-
-    EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
-        .WillRepeatedly(testing::Return(nullptr));
-    EXPECT_CALL(encoder_callbacks, mostSpecificPerFilterConfig())
-        .WillRepeatedly(testing::Return(nullptr));
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, true));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, true));

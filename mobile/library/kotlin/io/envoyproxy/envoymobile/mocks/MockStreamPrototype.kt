@@ -7,10 +7,12 @@ import java.util.concurrent.Executor
  *
  * @param onStart Closure that will be called each time a new stream is started from the prototype.
  */
-class MockStreamPrototype internal constructor(private val onStart: ((stream: MockStream) -> Unit)?) : StreamPrototype(MockEnvoyEngine()) {
+class MockStreamPrototype
+internal constructor(private val onStart: ((stream: MockStream) -> Unit)?) :
+  StreamPrototype(MockEnvoyEngine()) {
   override fun start(executor: Executor): Stream {
     val callbacks = createCallbacks(executor)
-    val stream = MockStream(MockEnvoyHTTPStream(callbacks, false, 0))
+    val stream = MockStream(MockEnvoyHTTPStream(callbacks, false))
     onStart?.invoke(stream)
     return stream
   }

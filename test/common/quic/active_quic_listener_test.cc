@@ -6,6 +6,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
@@ -14,7 +15,6 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #include "source/common/runtime/runtime_impl.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/server/configuration_impl.h"
@@ -192,7 +192,10 @@ protected:
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Return(filter_chain_));
-    EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
+    EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count * 2);
+    EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+        .Times(connection_count)
+        .WillRepeatedly(Return(true));
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Invoke([](Network::Connection& connection,
@@ -393,6 +396,28 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
       static_cast<const EnvoyQuicServerConnection*>(session->connection())->actuallyDeferSend());
 #endif
   readFromClientSockets();
+}
+
+class MockNonDispatchedUdpPacketHandler : public Network::NonDispatchedUdpPacketHandler {
+public:
+  MOCK_METHOD(void, handle, (uint32_t worker_index, const Network::UdpRecvData& packet));
+};
+
+TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
+  initialize();
+  MockNonDispatchedUdpPacketHandler mock_packet_forwarding;
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = mock_packet_forwarding;
+  quic_listener_->shutdownListener(options);
+  quic::QuicBufferedPacketStore* const buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
+  maybeConfigureMocks(/* connection_count = */ 0);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  EXPECT_CALL(mock_packet_forwarding, handle(_, _));
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_EQ(0u, quic_dispatcher_->NumSessions());
 }
 
 TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {

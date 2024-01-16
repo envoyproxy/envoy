@@ -11,7 +11,6 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::testCharInTable;
 
 void HeaderValidatorUtils::validateAllCharactersInUrlPath(
     ::Envoy::Http::ServerHeaderValidator& validator, absl::string_view path,

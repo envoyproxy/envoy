@@ -1,11 +1,11 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -39,7 +39,6 @@ envoy_cc_library(
     deps = [
         ":config_utility_lib",
         ":context_lib",
-        ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
         ":reset_header_parser_lib",
@@ -96,6 +95,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:matchers_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -298,6 +298,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/http:stateful_session_interface",
         "//envoy/local_info:local_info_interface",
+        "//envoy/router:router_filter_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
@@ -335,7 +336,7 @@ envoy_cc_library(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:upstream_http_factory_context_lib",
+        "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
@@ -419,30 +420,14 @@ envoy_cc_library(
     ],
     hdrs = ["header_parser.h"],
     deps = [
-        ":header_formatter_lib",
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "header_formatter_lib",
-    hdrs = ["header_formatter.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//envoy/router:string_accessor_interface",
-        "//envoy/stream_info:filter_state_interface",
-        "//envoy/stream_info:stream_info_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/config:metadata_lib",
-        "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/json:json_loader_lib",
     ],
 )
 

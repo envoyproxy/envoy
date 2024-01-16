@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <memory>
+#include <vector>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -13,8 +15,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/instance_impl.h"
 #include "source/server/process_context_impl.h"
-#include "source/server/server.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
@@ -57,6 +59,7 @@ namespace {
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
+  NiceMock<Upstream::MockClusterManager> cm;
   Stats::TestUtil::TestStore store;
   Event::SimulatedTimeSystem time_system;
   Stats::Counter& c = store.counter("hello");
@@ -66,7 +69,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   store.textReadout("text").set("is important");
 
   std::list<Stats::SinkPtr> sinks;
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
   // Make sure that counters have been latched even if there are no sinks.
   EXPECT_EQ(1UL, c.value());
   EXPECT_EQ(0, c.latch());
@@ -87,7 +90,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
   }));
   c.inc();
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 
   // Histograms don't currently work with the isolated store so test those with a mock store.
   NiceMock<Stats::MockStore> mock_store;
@@ -109,7 +112,52 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.histograms().size(), 1);
     EXPECT_TRUE(snapshot.textReadouts().empty());
   }));
-  InstanceUtil::flushMetricsToSinks(sinks, mock_store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, mock_store, cm, time_system);
+}
+
+TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
+  InSequence s;
+
+  NiceMock<Upstream::MockClusterManager> cm;
+  Stats::TestUtil::TestStore store;
+  Event::SimulatedTimeSystem time_system;
+  Stats::Counter& c = store.counter("hello");
+  c.inc();
+  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
+  store.gauge("again", Stats::Gauge::ImportMode::Uninitialized).set(10);
+
+  std::list<Stats::SinkPtr> sinks;
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
+  // Make sure that counters have been latched even if there are no sinks.
+  EXPECT_EQ(1UL, c.value());
+  EXPECT_EQ(0, c.latch());
+
+  Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
+  sinks.emplace_back(sink);
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    ASSERT_EQ(snapshot.counters().size(), 1);
+    EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
+    EXPECT_EQ(snapshot.counters()[0].delta_, 1);
+
+    ASSERT_EQ(snapshot.gauges().size(), 2);
+    auto world_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("world") == 0;
+                                 });
+    ASSERT_TRUE(world_it != snapshot.gauges().end());
+    EXPECT_EQ(world_it->get().value(), 5);
+
+    auto again_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("again") == 0;
+                                 });
+    ASSERT_TRUE(again_it != snapshot.gauges().end());
+    EXPECT_EQ(again_it->get().value(), 10);
+
+    ASSERT_EQ(snapshot.textReadouts().size(), 0);
+  }));
+  c.inc();
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
 class RunHelperTest : public testing::Test {
@@ -210,12 +258,12 @@ protected:
                                              : std::make_unique<Init::ManagerImpl>("Server");
 
     server_ = std::make_unique<InstanceImpl>(
-        *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart_,
-        stats_store_, fakelock_, component_factory_,
+        *init_manager_, options_, time_system_, hooks, restart_, stats_store_, fakelock_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
+    server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                        component_factory_);
     EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
 
@@ -229,11 +277,11 @@ protected:
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
     init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
-        *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
-        stats_store_, fakelock_, component_factory_,
+        *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+    server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                        component_factory_);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
@@ -594,35 +642,78 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   server_thread->join();
 }
 
-TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
-  bool workers_started = false;
-  absl::Notification workers_started_fired, workers_started_block;
-  // Expect drainParentListeners not to be called before workers start.
-  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+class ServerInstanceImplWorkersTest : public ServerInstanceImplTest {
+protected:
+  ServerInstanceImplWorkersTest() {
+    bool workers_started = false;
 
-  // Run the server in a separate thread so we can test different lifecycle stages.
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    auto hooks = CustomListenerHooks([&]() {
-      workers_started = true;
-      workers_started_fired.Notify();
-      workers_started_block.WaitForNotification();
+    // Expect drainParentListeners not to be called before workers start.
+    EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+    // Run the server in a separate thread so we can test different lifecycle stages.
+    server_thread_ = Thread::threadFactoryForTest().createThread([&] {
+      auto hooks = CustomListenerHooks([&]() {
+        workers_started = true;
+        workers_started_fired_.Notify();
+        workers_started_block_.WaitForNotification();
+      });
+      initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+      server_->run();
+      server_ = nullptr;
+      thread_local_ = nullptr;
     });
-    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
-    server_->run();
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
 
-  workers_started_fired.WaitForNotification();
-  EXPECT_TRUE(workers_started);
+    workers_started_fired_.WaitForNotification();
+    EXPECT_TRUE(workers_started);
+    EXPECT_CALL(restart_, drainParentListeners);
+  }
+
+  ~ServerInstanceImplWorkersTest() {
+    server_->dispatcher().post([&] { server_->shutdown(); });
+    server_thread_->join();
+  }
+
+  absl::Notification workers_started_fired_;
+  absl::Notification workers_started_block_;
+  Thread::ThreadPtr server_thread_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplWorkersTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplWorkersTest, DrainParentListenerAfterWorkersStarted) {
   EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+  workers_started_block_.Notify();
+}
 
-  EXPECT_CALL(restart_, drainParentListeners);
-  workers_started_block.Notify();
+TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
+  absl::Notification drain_closes_started, drain_complete;
+  workers_started_block_.Notify();
 
-  server_->dispatcher().post([&] { server_->shutdown(); });
-  server_thread->join();
+  DrainManager& drain_manager = server_->drainManager();
+
+  // To reproduce the race condition from
+  // https://github.com/envoyproxy/envoy/issues/31457 we make sure that the
+  // infinite drainClose spin-loop (mimicing high traffic) is running before we
+  // initiate the drain sequence.
+  auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
+    bool closed = drain_manager.drainClose();
+    drain_closes_started.Notify();
+    while (!closed) {
+      closed = drain_manager.drainClose();
+    }
+  });
+  drain_closes_started.WaitForNotification();
+
+  // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
+  // wait for that to complete.
+  server_->dispatcher().post(
+      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+
+  drain_complete.WaitForNotification();
+  drain_thread->join();
 }
 
 // A test target which never signals that it is ready.
@@ -1227,13 +1318,13 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "LogToFile test string");
   Logger::Registry::getSink()->flush();
-  std::string log = server_->api().fileSystem().fileReadToEnd(path);
+  std::string log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_GT(log.size(), 0);
   EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
-  log = server_->api().fileSystem().fileReadToEnd(path);
+  log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
 }
 
@@ -1254,13 +1345,13 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_.reset(new InstanceImpl(
+      *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr));
   EXPECT_THROW_WITH_MESSAGE(
-      server_.reset(new InstanceImpl(*init_manager_, options_, time_system_,
-                                     std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
-                                     hooks_, restart_, stats_store_, fakelock_, component_factory_,
-                                     std::make_unique<NiceMock<Random::MockRandomGenerator>>(),
-                                     *thread_local_, Thread::threadFactoryForTest(),
-                                     Filesystem::fileSystemForTest(), nullptr)),
+      server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                          component_factory_),
       EnvoyException,
       "At least one of --config-path or --config-yaml or Options::configProto() should be "
       "non-empty");

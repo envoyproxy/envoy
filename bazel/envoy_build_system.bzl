@@ -28,8 +28,7 @@ load(
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
     _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
-    _envoy_select_envoy_mobile_request_compression = "envoy_select_envoy_mobile_request_compression",
-    _envoy_select_envoy_mobile_stats_reporting = "envoy_select_envoy_mobile_stats_reporting",
+    _envoy_select_envoy_mobile_xds = "envoy_select_envoy_mobile_xds",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
     _envoy_select_signal_trace = "envoy_select_signal_trace",
@@ -62,7 +61,6 @@ load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
-    "MOBILE_PACKAGE_VISIBILITY",
 )
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
@@ -82,10 +80,8 @@ def envoy_extension_package(enabled_default = True, default_visibility = EXTENSI
         flag_values = {":enabled": "True"},
     )
 
-def envoy_mobile_package():
-    # Mobile packages should only be visible to other mobile packages, not any other
-    # parts of the Envoy codebase.
-    envoy_extension_package(default_visibility = MOBILE_PACKAGE_VISIBILITY)
+def envoy_mobile_package(default_visibility = ["//visibility:public"]):
+    envoy_extension_package(default_visibility = default_visibility)
 
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
@@ -100,6 +96,7 @@ def _envoy_directory_genrule_impl(ctx):
         outputs = [tree],
         command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
         env = {"GENRULE_OUTPUT_DIR": tree.path},
+        toolchain = None,
     )
     return [DefaultInfo(files = depset([tree]))]
 
@@ -236,9 +233,8 @@ envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
-envoy_select_envoy_mobile_request_compression = _envoy_select_envoy_mobile_request_compression
-envoy_select_envoy_mobile_stats_reporting = _envoy_select_envoy_mobile_stats_reporting
 envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
+envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc

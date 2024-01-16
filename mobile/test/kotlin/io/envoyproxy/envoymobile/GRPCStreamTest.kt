@@ -21,10 +21,7 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient)
-      .newGRPCStreamPrototype()
-      .start(Executor {})
-      .sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
 
     assertThat(sentData.size()).isEqualTo(5 + message1.array().count())
   }
@@ -36,10 +33,7 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient)
-      .newGRPCStreamPrototype()
-      .start(Executor {})
-      .sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
 
     assertThat(sentData.toByteArray()[0]).isEqualTo(0)
   }
@@ -51,12 +45,10 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient)
-      .newGRPCStreamPrototype()
-      .start(Executor {})
-      .sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
 
-    val size = ByteBuffer.wrap(sentData.toByteArray().sliceArray(1 until 5)).order(ByteOrder.BIG_ENDIAN).int
+    val size =
+      ByteBuffer.wrap(sentData.toByteArray().sliceArray(1 until 5)).order(ByteOrder.BIG_ENDIAN).int
     assertThat(size).isEqualTo(message1.array().count())
   }
 
@@ -67,27 +59,20 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient)
-      .newGRPCStreamPrototype()
-      .start(Executor {})
-      .sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
 
-    assertThat(sentData.toByteArray().sliceArray(5 until sentData.size())).isEqualTo(message1.array())
+    assertThat(sentData.toByteArray().sliceArray(5 until sentData.size()))
+      .isEqualTo(message1.array())
   }
 
   @Test
   fun `cancel calls a stream callback`() {
     val countDownLatch = CountDownLatch(1)
     val streamClient = MockStreamClient { stream ->
-      stream.onCancel = {
-        countDownLatch.countDown()
-      }
+      stream.onCancel = { countDownLatch.countDown() }
     }
 
-    GRPCClient(streamClient)
-      .newGRPCStreamPrototype()
-      .start(Executor {})
-      .cancel()
+    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).cancel()
 
     assertThat(countDownLatch.await(2000, TimeUnit.MILLISECONDS)).isTrue()
   }
@@ -97,7 +82,8 @@ class GRPCStreamTest {
   @Test(timeout = 1000L)
   fun `headers callback passes headers`() {
     val countDownLatch = CountDownLatch(1)
-    val expectedHeaders = ResponseHeaders(mapOf("grpc-status" to listOf("1"), "x-other" to listOf("foo", "bar")))
+    val expectedHeaders =
+      ResponseHeaders(mapOf("grpc-status" to listOf("1"), "x-other" to listOf("foo", "bar")))
     var stream: MockStream? = null
     val streamClient = MockStreamClient { stream = it }
 
@@ -117,14 +103,16 @@ class GRPCStreamTest {
   @Test(timeout = 1000L)
   fun `trailers callback passes trailers`() {
     val countDownLatch = CountDownLatch(1)
-    val expectedTrailers = ResponseTrailers(mapOf("x-foo" to listOf("bar"), "x-baz" to listOf("1", "2")))
+    val expectedTrailers =
+      ResponseTrailers(mapOf("x-foo" to listOf("bar"), "x-baz" to listOf("1", "2")))
     var stream: MockStream? = null
     val streamClient = MockStreamClient { stream = it }
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
       .setOnResponseTrailers { trailers, _ ->
-        assertThat(trailers.caseSensitiveHeaders()).isEqualTo(expectedTrailers.caseSensitiveHeaders())
+        assertThat(trailers.caseSensitiveHeaders())
+          .isEqualTo(expectedTrailers.caseSensitiveHeaders())
         countDownLatch.countDown()
       }
       .start(Executor {})
@@ -164,21 +152,30 @@ class GRPCStreamTest {
     val streamClient = MockStreamClient { stream = it }
 
     val firstMessage = byteArrayOf(0x1, 0x2, 0x3, 0x4, 0x5)
-    val firstMessageBuffer = ByteBuffer.wrap(
-      byteArrayOf(
-        0x0, // Compression flag
-        0x0, 0x0, 0x0, 0x5 // Length bytes
-      ) + firstMessage
-    )
+    val firstMessageBuffer =
+      ByteBuffer.wrap(
+        byteArrayOf(
+          0x0, // Compression flag
+          0x0,
+          0x0,
+          0x0,
+          0x5 // Length bytes
+        ) + firstMessage
+      )
 
     val secondMessage = byteArrayOf(0x6, 0x7, 0x8, 0x9, 0x0, 0x1)
-    val secondMessageBufferPart1 = ByteBuffer.wrap(
-      byteArrayOf(
-        0x0, // Compression flag
-        0x0, 0x0, 0x0, 0x6 // Length bytes
-      ) + secondMessage.sliceArray(0 until 2)
-    )
-    val secondMessageBufferPart2 = ByteBuffer.wrap(secondMessage.sliceArray(2 until secondMessage.count()))
+    val secondMessageBufferPart1 =
+      ByteBuffer.wrap(
+        byteArrayOf(
+          0x0, // Compression flag
+          0x0,
+          0x0,
+          0x0,
+          0x6 // Length bytes
+        ) + secondMessage.sliceArray(0 until 2)
+      )
+    val secondMessageBufferPart2 =
+      ByteBuffer.wrap(secondMessage.sliceArray(2 until secondMessage.count()))
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
@@ -212,12 +209,16 @@ class GRPCStreamTest {
       }
       .start(Executor {})
 
-    val emptyMessage = ByteBuffer.wrap(
-      byteArrayOf(
-        0x0, // Compression flag
-        0x0, 0x0, 0x0, 0x0 // Length bytes
+    val emptyMessage =
+      ByteBuffer.wrap(
+        byteArrayOf(
+          0x0, // Compression flag
+          0x0,
+          0x0,
+          0x0,
+          0x0 // Length bytes
+        )
       )
-    )
 
     stream?.receiveData(emptyMessage, false)
     countDownLatch.await()
@@ -229,20 +230,28 @@ class GRPCStreamTest {
     var stream: MockStream? = null
     val streamClient = MockStreamClient { stream = it }
 
-    val emptyMessageBuffer = ByteBuffer.wrap(
-      byteArrayOf(
-        0x0, // Compression flag
-        0x0, 0x0, 0x0, 0x0 // Length bytes
+    val emptyMessageBuffer =
+      ByteBuffer.wrap(
+        byteArrayOf(
+          0x0, // Compression flag
+          0x0,
+          0x0,
+          0x0,
+          0x0 // Length bytes
+        )
       )
-    )
 
     val secondMessage = byteArrayOf(0x6, 0x7, 0x8, 0x9, 0x0, 0x1)
-    val secondMessageBuffer = ByteBuffer.wrap(
-      byteArrayOf(
-        0x0, // Compression flag
-        0x0, 0x0, 0x0, 0x6 // Length bytes
-      ) + secondMessage
-    )
+    val secondMessageBuffer =
+      ByteBuffer.wrap(
+        byteArrayOf(
+          0x0, // Compression flag
+          0x0,
+          0x0,
+          0x0,
+          0x6 // Length bytes
+        ) + secondMessage
+      )
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()

@@ -80,7 +80,7 @@ public:
   Rds::ConfigConstSharedPtr config() const override { return base_.config(); }
   const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
-  void onConfigUpdate() override { base_.onConfigUpdate(); }
+  absl::Status onConfigUpdate() override { return base_.onConfigUpdate(); }
   ConfigConstSharedPtr configCast() const override;
   void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                  std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
@@ -154,7 +154,7 @@ public:
   const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
 
-  void onConfigUpdate() override;
+  absl::Status onConfigUpdate() override;
   ConfigConstSharedPtr configCast() const override;
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
@@ -189,13 +189,11 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-      const OptionalHttpFilters& optional_http_filters,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
-                                  const OptionalHttpFilters& optional_http_filters,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator) override;
 

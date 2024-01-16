@@ -39,6 +39,7 @@ const static bool should_log = true;
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
+  FUNCTION(basic_auth)                                                                             \
   FUNCTION(cache_filter)                                                                           \
   FUNCTION(client)                                                                                 \
   FUNCTION(config)                                                                                 \
@@ -54,6 +55,7 @@ const static bool should_log = true;
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
+  FUNCTION(geolocation)                                                                            \
   FUNCTION(grpc)                                                                                   \
   FUNCTION(happy_eyeballs)                                                                         \
   FUNCTION(hc)                                                                                     \
@@ -303,6 +305,9 @@ public:
    * Same as before, with boolean returned to use in log macros.
    */
   static bool useFineGrainLogger();
+
+  // Change the log level for all loggers (fine grained or otherwise) to the level provided.
+  static void changeAllLogLevels(spdlog::level::level_enum level);
 
   static void enableFineGrainLogger();
   static void disableFineGrainLogger();
