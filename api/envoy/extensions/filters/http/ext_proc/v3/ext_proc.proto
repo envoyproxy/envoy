@@ -226,7 +226,7 @@ message MetadataOptions {
       overwrite_with_empty = 1;
 
       // Merge the more-specific config into the less-specific config. With this
-      // option, more-specifig config is always a strict superset of less-specific
+      // option, more-specific config is always a strict superset of less-specific
       // config.
       merge = 2;
     }
