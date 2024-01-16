@@ -330,8 +330,8 @@ public:
   std::string toString() const { return ""; }
   bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
   Message::ValidationResult validate(const Buffer::Instance&, const uint64_t, uint64_t&,
-                                     uint64_t& left) {
-    return left == 0 ? Message::ValidationOK : Message::ValidationFailed;
+                                     uint64_t&) {
+    return Message::ValidationOK;
   }
 };
 
@@ -350,6 +350,11 @@ public:
     uint64_t pos = start_pos;
     uint64_t left = length;
     validation_result_ = Sequence<Types...>::validate(data, start_pos, pos, left);
+    if (validation_result_ != Message::ValidationOK) {
+      return validation_result_;
+    }
+    // verify that parser iterated over entire message and nothing is left.
+    validation_result_ = left == 0 ? Message::ValidationOK : Message::ValidationFailed;
     return validation_result_;
   }
   std::string toString() const override { return Sequence<Types...>::toString(); }
