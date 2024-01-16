@@ -1712,7 +1712,7 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   auto* timeout = route->mutable_timeout();
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
   // response_timeout.
-  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+  timeout->set_seconds(TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 
 envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::http2ToHttp3ProtocolOptions(
