@@ -665,7 +665,7 @@ INSTANTIATE_TEST_SUITE_P(BackendEncryptedMessagesTests, PostgresProxyUpstreamSSL
                              // Correct response from the server (encrypt).
                              std::make_tuple("S", true, DecoderImpl::State::InitState),
                              // Correct response from the server (do not encrypt).
-                             std::make_tuple("E", false, DecoderImpl::State::InitState),
+                             std::make_tuple("N", false, DecoderImpl::State::InitState),
                              // Incorrect response from the server. Move to out-of-sync state.
                              std::make_tuple("W", false, DecoderImpl::State::OutOfSyncState),
                              std::make_tuple("WRONG", false, DecoderImpl::State::OutOfSyncState)));
