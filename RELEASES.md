@@ -112,10 +112,14 @@ deadline of 3 weeks.
     release, please also make sure there's a stable maintainer signed up for next quarter,
     and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
-* Create a pull request with that commit and **wait for tests to
-  pass**.
+* Create a pull request with that commit and **wait for tests to pass**.
 * Once the tests have passed, and the PR has landed, CI will automatically create the tagged release and corresponding release branch.
-* Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@googlegroups.com envoy-users@googlegroups.com envoy-dev@googlegroups.com envoy-maintainers@googlegroups.com - include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
+* Craft a witty/uplifting email and send it to all the email aliases:
+envoy-announce@googlegroups.com
+envoy-users@googlegroups.com
+envoy-dev@googlegroups.com
+envoy-maintainers@googlegroups.com -
+include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
 * Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
