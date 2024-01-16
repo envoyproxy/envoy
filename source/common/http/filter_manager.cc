@@ -1777,9 +1777,25 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
   onEncoderFilterBelowWriteBufferLowWatermark();
 }
 
+void FilterManager::resetStream(StreamResetReason reason,
+                                absl::string_view transport_failure_reason) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.abort_filter_chain_on_stream_reset")) {
+    // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
+    // are running.
+    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+      state_.decoder_filter_chain_aborted_ = true;
+    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+      state_.encoder_filter_chain_aborted_ = true;
+    }
+  }
+
+  filter_manager_callbacks_.resetStream(reason, transport_failure_reason);
+}
+
 void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,
                                          absl::string_view transport_failure_reason) {
-  parent_.filter_manager_callbacks_.resetStream(reset_reason, transport_failure_reason);
+  parent_.resetStream(reset_reason, transport_failure_reason);
 }
 
 uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }

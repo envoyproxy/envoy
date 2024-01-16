@@ -46,9 +46,9 @@ public:
   void TearDown();
 
 protected:
-  envoy_engine_t& rawEngine() {
+  envoy_engine_t rawEngine() {
     absl::MutexLock l(&engine_lock_);
-    return engine_->engine_;
+    return reinterpret_cast<envoy_engine_t>(engine_->engine_);
   }
   virtual void initialize() override;
   void createEnvoy() override;

@@ -66,7 +66,11 @@ public:
   MOCK_METHOD(IoUringSocket&, addServerSocket,
               (os_fd_t fd, Buffer::Instance& read_buf, Event::FileReadyCb cb,
                bool enable_close_event));
+  MOCK_METHOD(IoUringSocket&, addClientSocket,
+              (os_fd_t fd, Event::FileReadyCb cb, bool enable_close_event));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Request*, submitConnectRequest,
+              (IoUringSocket & socket, const Network::Address::InstanceConstSharedPtr& address));
   MOCK_METHOD(Request*, submitReadRequest, (IoUringSocket & socket));
   MOCK_METHOD(Request*, submitWriteRequest,
               (IoUringSocket & socket, const Buffer::RawSliceVector& slices));
