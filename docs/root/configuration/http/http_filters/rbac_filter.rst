@@ -33,8 +33,10 @@ The RBAC filter outputs statistics in the ``http.<stat_prefix>.rbac.`` namespace
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 
-For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>`
-can be used to add an extra prefix to output the statistics in the ``http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.`` namespace.
+For the allowed and denied statistics, the :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
+and :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>`
+can be used to add an extra prefix to output the statistics in the ``http.<stat_prefix>.rbac.<rules_stat_prefix>.`` and
+``http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.`` namespace, respectively.
 
 .. csv-table::
   :header: Name, Type, Description

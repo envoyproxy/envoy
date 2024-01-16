@@ -35,6 +35,7 @@ struct RoleBasedAccessControlFilterStats {
 };
 
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
+                                                const std::string& rules_prefix,
                                                 const std::string& shadow_rules_prefix,
                                                 Stats::Scope& scope);
 

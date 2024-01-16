@@ -11,11 +11,12 @@ namespace Common {
 namespace RBAC {
 
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
+                                                const std::string& rules_prefix,
                                                 const std::string& shadow_rules_prefix,
                                                 Stats::Scope& scope) {
   const std::string final_prefix = Envoy::statPrefixJoin(prefix, "rbac.");
   return {
-      ENFORCE_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))
+      ENFORCE_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix + rules_prefix))
           SHADOW_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix + shadow_rules_prefix))};
 }
 
