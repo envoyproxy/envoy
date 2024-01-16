@@ -11,6 +11,54 @@ index 6aeff6d..c43864c 100644
      cel::runtime_internal::kPayloadUrlMissingAttributePath;
  
  CelValue CelValue::CreateDuration(absl::Duration value) {
+diff --git a/eval/public/containers/container_backed_map_impl.h b/eval/public/containers/container_backed_map_impl.h
+index 6092eef..7548bbf 100644
+--- a/eval/public/containers/container_backed_map_impl.h
++++ b/eval/public/containers/container_backed_map_impl.h
+@@ -30,6 +30,7 @@ class CelMapBuilder : public CelMap {
+     return values_map_.contains(cel_key);
+   }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override {
+     return &key_list_;
+   }
+diff --git a/eval/public/containers/internal_field_backed_map_impl.h b/eval/public/containers/internal_field_backed_map_impl.h
+index ec773d9..caa2f3a 100644
+--- a/eval/public/containers/internal_field_backed_map_impl.h
++++ b/eval/public/containers/internal_field_backed_map_impl.h
+@@ -43,6 +43,7 @@ class FieldBackedMapImpl : public CelMap {
+   // Presence test function.
+   absl::StatusOr<bool> Has(const CelValue& key) const override;
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override;
+ 
+  protected:
+diff --git a/eval/public/structs/cel_proto_lite_wrap_util.cc b/eval/public/structs/cel_proto_lite_wrap_util.cc
+index 4cb21e5..35fdf7f 100644
+--- a/eval/public/structs/cel_proto_lite_wrap_util.cc
++++ b/eval/public/structs/cel_proto_lite_wrap_util.cc
+@@ -172,6 +172,7 @@ class DynamicMap : public CelMap {
+ 
+   int size() const override { return values_->fields_size(); }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override {
+     return &key_list_;
+   }
+diff --git a/eval/public/structs/cel_proto_wrap_util.cc b/eval/public/structs/cel_proto_wrap_util.cc
+index fabb594..86a314c 100644
+--- a/eval/public/structs/cel_proto_wrap_util.cc
++++ b/eval/public/structs/cel_proto_wrap_util.cc
+@@ -137,6 +137,7 @@ class DynamicMap : public CelMap {
+ 
+   int size() const override { return values_->fields_size(); }
+ 
++  using CelMap::ListKeys;
+   absl::StatusOr<const CelList*> ListKeys() const override {
+     return &key_list_;
+   }
 diff --git a/internal/strings.cc b/internal/strings.cc
 index dc5a118..24457ab 100644
 --- a/internal/strings.cc
