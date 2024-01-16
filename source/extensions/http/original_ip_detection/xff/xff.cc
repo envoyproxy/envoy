@@ -23,16 +23,6 @@ XffIPDetection::XffIPDetection(
 XffIPDetection::XffIPDetection(uint32_t xff_num_trusted_hops)
     : xff_num_trusted_hops_(xff_num_trusted_hops), recurse_(false) {}
 
-XffIPDetection::XffIPDetection(
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& trusted_cidrs, bool recurse)
-    : xff_num_trusted_hops_(0), recurse_(recurse) {
-  xff_trusted_cidrs_.reserve(trusted_cidrs.size());
-  for (const envoy::config::core::v3::CidrRange& entry : trusted_cidrs) {
-    auto cidr = Network::Address::CidrRange::create(entry);
-    xff_trusted_cidrs_.push_back(cidr);
-  }
-}
-
 Envoy::Http::OriginalIPDetectionResult
 XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
   if (!xff_trusted_cidrs_.empty()) {
