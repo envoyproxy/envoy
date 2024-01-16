@@ -114,6 +114,7 @@ deadline of 3 weeks.
   * Get a review and merge.
 * Create a pull request with that commit and **wait for tests to pass**.
 * Once the tests have passed, and the PR has landed, CI will automatically create the tagged release and corresponding release branch.
+* If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
 * Craft a witty/uplifting email and send it to all the email aliases:
 envoy-announce@googlegroups.com
 envoy-users@googlegroups.com
