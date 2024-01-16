@@ -8,21 +8,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: connection limit
-  change: |
-    fixed a use-after-free bug in the connection limit filter.
-- area: subset load balancer
-  change: |
-    Fixed a bug where
-    :ref:`overprovisioning_factor<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>` and
-    :ref:`weighted_priority_health <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.weighted_priority_health>`
-    values were not respected when subset load balacing was enabled. The default values of 140 and false were always used.
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
-- area: extension_discovery_service
-  change: |
-    Fixed a bug causing crash if ECDS is used with upstream HTTP filters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
