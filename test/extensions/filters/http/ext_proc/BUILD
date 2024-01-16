@@ -140,8 +140,8 @@ envoy_extension_cc_test(
     shard_count = 4,
     tags = [
         "cpu:3",
+        "skip_on_windows",
     ],
-    tags = ["skip_on_windows"],
     deps = [
         ":logging_test_filter_lib",
         ":utils_lib",
@@ -168,8 +168,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = [
         "cpu:3",
+        "skip_on_windows",
     ],
-    tags = ["skip_on_windows"],
     deps = [
         ":test_processor_lib",
         ":utils_lib",
