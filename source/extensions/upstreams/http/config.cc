@@ -189,7 +189,6 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     Server::Configuration::ServerFactoryContext& server_context)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
           getHttpOptions(options), server_context.messageValidationVisitor())),
-      http2_options_(Http2::Utility::initializeAndValidateOptions(getHttp2Options(options))),
       http3_options_(getHttp3Options(options)),
       common_http_protocol_options_(options.common_http_protocol_options()),
       upstream_http_protocol_options_(
@@ -202,7 +201,11 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       header_validator_factory_(createHeaderValidatorFactory(options, server_context)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
-      use_alpn_(options.has_auto_config()) {}
+      use_alpn_(options.has_auto_config()) {
+  auto options_or_error = Http2::Utility::initializeAndValidateOptions(getHttp2Options(options));
+  THROW_IF_STATUS_NOT_OK(options_or_error, throw);
+  http2_options_ = options_or_error.value();
+}
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
@@ -212,10 +215,13 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     bool use_downstream_protocol, bool use_http2,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(http1_settings, validation_visitor)),
-      http2_options_(Http2::Utility::initializeAndValidateOptions(http2_options)),
       common_http_protocol_options_(common_options),
       upstream_http_protocol_options_(upstream_options),
-      use_downstream_protocol_(use_downstream_protocol), use_http2_(use_http2) {}
+      use_downstream_protocol_(use_downstream_protocol), use_http2_(use_http2) {
+  auto options_or_error = Http2::Utility::initializeAndValidateOptions(http2_options);
+  THROW_IF_STATUS_NOT_OK(options_or_error, throw);
+  http2_options_ = options_or_error.value();
+}
 
 LEGACY_REGISTER_FACTORY(ProtocolOptionsConfigFactory, Server::Configuration::ProtocolOptionsFactory,
                         "envoy.upstreams.http.http_protocol_options");

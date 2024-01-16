@@ -4394,7 +4394,7 @@ public:
       : empty_proto_(empty_proto), config_(config) {}
 
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return empty_proto_(); }
-  Upstream::ProtocolOptionsConfigConstSharedPtr
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsConfig(const Protobuf::Message& msg) {
     return config_(msg);
   }
@@ -4418,7 +4418,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
     return parent_.createEmptyProtocolOptionsProto();
   }
-  Upstream::ProtocolOptionsConfigConstSharedPtr
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsConfig(const Protobuf::Message& msg,
                               Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return parent_.createProtocolOptionsConfig(msg);
@@ -4451,7 +4451,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
     return parent_.createEmptyProtocolOptionsProto();
   }
-  Upstream::ProtocolOptionsConfigConstSharedPtr
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsConfig(const Protobuf::Message& msg,
                               Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return parent_.createProtocolOptionsConfig(msg);

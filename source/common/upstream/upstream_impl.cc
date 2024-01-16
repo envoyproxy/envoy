@@ -80,7 +80,7 @@ parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
-ProtocolOptionsConfigConstSharedPtr
+absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
@@ -121,9 +121,10 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
 
   for (const auto& it : config.typed_extension_protocol_options()) {
     auto& name = it.first;
-    auto object = createProtocolOptionsConfig(name, it.second, factory_context);
-    if (object != nullptr) {
-      options[name] = std::move(object);
+    auto object_or_error = createProtocolOptionsConfig(name, it.second, factory_context);
+    THROW_IF_STATUS_NOT_OK(object_or_error, throw);
+    if (object_or_error.value() != nullptr) {
+      options[name] = std::move(object_or_error.value());
     }
   }
 

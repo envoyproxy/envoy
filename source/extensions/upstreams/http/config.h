@@ -44,7 +44,7 @@ public:
                                 const ProtocolOptionsConfigImpl& options);
 
   const Envoy::Http::Http1Settings http1_settings_;
-  const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::Http3ProtocolOptions http3_options_{};
   const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
@@ -64,7 +64,7 @@ public:
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {
 public:
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsConfig(
       const Protobuf::Message& config,
       Server::Configuration::ProtocolOptionsFactoryContext& context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
