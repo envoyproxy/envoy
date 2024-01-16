@@ -108,7 +108,9 @@ protected:
     auto cidr3 = config.mutable_xff_trusted_cidrs()->add_cidrs();
     cidr3->set_address_prefix("2001:db8:7e57:1::");
     cidr3->mutable_prefix_len()->set_value(64);
-    config.mutable_xff_trusted_cidrs()->set_recurse(true);
+    config.mutable_xff_trusted_cidrs()->mutable_recurse()->set_value(true);
+    // Set xff_num_trusted_hops to ensure XffIPDetection overrides it when xff_trusted_cidrs is set.
+    config.set_xff_num_trusted_hops(3);
     xff_extension_ = std::make_shared<XffIPDetection>(config);
   }
 
