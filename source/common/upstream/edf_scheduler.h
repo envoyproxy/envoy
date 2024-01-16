@@ -97,7 +97,8 @@ public:
     // {0.24000000000000002 and 0.24} (respectively). This small difference will
     // cause a "wrong" pick compared to when starting from an empty scheduler
     // and picking 23 times. Adding a small value to each weight circumvents
-    // this problem.
+    // this problem. This was added as a result of the following comment:
+    // https://github.com/envoyproxy/envoy/pull/31592#issuecomment-1877663769.
     auto aug_calculate_weight = [&calculate_weight](const C& entry) -> double {
       return calculate_weight(entry) + 1e-10;
     };
@@ -130,8 +131,8 @@ public:
     double max_pick_time = 0.0;
     // Emulate a per-entry addition to a deadline that is applicable to N picks.
     for (size_t i = 0; i < entries.size(); ++i) {
-      // Add the entry with c'_i picks. As there were c'_i picks, the entry's
-      // next deadline is (c'_i + 1) / w_i.
+      // Add the entry with p'_i picks. As there were p'_i picks, the entry's
+      // next deadline is (p'_i + 1) / w_i.
       const double weight = aug_calculate_weight(*entries[i]);
       const double pick_time = floor_picks[i] / weight;
       const double deadline = pick_time + 1.0 / weight;
