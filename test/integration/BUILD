@@ -438,7 +438,7 @@ envoy_sh_test(
     ],
     tags = [
         "nocoverage",
-        "skip_on_windows"
+        "skip_on_windows",
     ],
 )
 
