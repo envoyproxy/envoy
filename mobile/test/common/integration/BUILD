@@ -19,7 +19,7 @@ envoy_cc_test(
         "sandboxNetwork": "standard",
     },
     repository = "@envoy",
-    shard_count = 4,
+    shard_count = 6,
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",

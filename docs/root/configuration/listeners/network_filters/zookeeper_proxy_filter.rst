@@ -41,6 +41,8 @@ Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.
 
 *_resp_bytes* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_response_bytes_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_response_bytes_metrics>` is set to ``true``.
 
+*_decoder_error* are per-opcode metrics and will only be emitted when :ref:`enable_per_opcode_decoder_error_metrics <envoy_v3_api_field_extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy.enable_per_opcode_decoder_error_metrics>` is set to ``true``.
+
 The following counters are available:
 
 .. csv-table::
@@ -48,6 +50,34 @@ The following counters are available:
   :widths: 1, 1, 2
 
   decoder_error, Counter, Number of times a message wasn't decoded
+  connect_decoder_error, Counter, Number of times a connect request or response message wasn't decoded
+  ping_decoder_error, Counter, Number of times a ping request or response message wasn't decoded
+  auth_decoder_error, Counter, Number of times a auth request or response message wasn't decoded
+  getdata_decoder_error, Counter, Number of times a getdata request or response message wasn't decoded
+  create_decoder_error, Counter, Number of times a create request or response message wasn't decoded
+  create2_decoder_error, Counter, Number of times a create2 request or response message wasn't decoded
+  createcontainer_decoder_error, Counter, Number of times a createcontainer request or response message wasn't decoded
+  createttl_decoder_error, Counter, Number of times a createttl request or response message wasn't decoded
+  setdata_decoder_error, Counter, Number of times a setdata request or response message wasn't decoded
+  getchildren_decoder_error, Counter, Number of times a getchildren request or response message wasn't decoded
+  getchildren2_decoder_error, Counter, Number of times a getchildren2 request or response message wasn't decoded
+  getephemerals_decoder_error, Counter, Number of times a getephemerals request or response message wasn't decoded
+  getallchildrennumber_decoder_error, Counter, Number of times a getallchildrennumber request or response message wasn't decoded
+  delete_decoder_error, Counter, Number of times a delete request or response message wasn't decoded
+  exists_decoder_error, Counter, Number of times a exists request or response message wasn't decoded
+  getacl_decoder_error, Counter, Number of times a getacl request or response message wasn't decoded
+  setacl_decoder_error, Counter, Number of times a setacl request or response message wasn't decoded
+  sync_decoder_error, Counter, Number of times a sync request or response message wasn't decoded
+  multi_decoder_error, Counter, Number of times a multi request or response message wasn't decoded
+  reconfig_decoder_error, Counter, Number of times a reconfig request or response message wasn't decoded
+  close_decoder_error, Counter, Number of times a close request or response message wasn't decoded
+  setauth_decoder_error, Counter, Number of times a setauth request or response message wasn't decoded
+  setwatches_decoder_error, Counter, Number of times a setwatches request or response message wasn't decoded
+  setwatches2_decoder_error, Counter, Number of times a setwatches2 request or response message wasn't decoded
+  addwatch_decoder_error, Counter, Number of times a addwatch request or response message wasn't decoded
+  checkwatches_decoder_error, Counter, Number of times a checkwatches request or response message wasn't decoded
+  removewatches_decoder_error, Counter, Number of times a removewatches request or response message wasn't decoded
+  check_decoder_error, Counter, Number of times a check request or response message wasn't decoded
   request_bytes, Counter, Number of bytes in decoded request messages
   connect_rq_bytes, Counter, Number of bytes in decoded connect request messages
   ping_rq_bytes, Counter, Number of bytes in decoded ping request messages

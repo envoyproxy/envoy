@@ -49,6 +49,15 @@ struct NamedFilterFactoryCb {
   FilterFactoryCb callback_;
 };
 
+enum class DownstreamStreamResetReason : uint32_t {
+  // The stream was reset because of the connection was closed.
+  ConnectionTermination,
+  // The stream was reset because of the connection was closed locally.
+  LocalConnectionTermination,
+  // Protocol error.
+  ProtocolError,
+};
+
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(const std::string& stat_prefix, CodecFactoryPtr codec,
@@ -56,13 +65,14 @@ public:
                    std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
                    std::vector<AccessLogInstanceSharedPtr>&& access_logs,
+                   const CodeOrFlags& code_or_flags,
                    Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix),
         stats_(GenericFilterStats::generateStats(stat_prefix_, context.scope())),
-        codec_factory_(std::move(codec)), route_config_provider_(std::move(route_config_provider)),
-        factories_(std::move(factories)), drain_decision_(context.drainDecision()),
-        tracer_(std::move(tracer)), tracing_config_(std::move(tracing_config)),
-        access_logs_(std::move(access_logs)),
+        code_or_flags_(code_or_flags), codec_factory_(std::move(codec)),
+        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
+        drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
+        tracing_config_(std::move(tracing_config)), access_logs_(std::move(access_logs)),
         time_source_(context.serverFactoryContext().timeSource()) {}
 
   // FilterConfig
@@ -79,6 +89,7 @@ public:
     return makeOptRefFromPtr<const Tracing::ConnectionManagerTracingConfig>(tracing_config_.get());
   }
   GenericFilterStats& stats() override { return stats_; }
+  const CodeOrFlags& codeOrFlags() const override { return code_or_flags_; }
   const std::vector<AccessLogInstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
@@ -96,6 +107,7 @@ private:
 
   const std::string stat_prefix_;
   GenericFilterStats stats_;
+  const CodeOrFlags& code_or_flags_;
 
   CodecFactoryPtr codec_factory_;
 
@@ -127,7 +139,6 @@ public:
     // StreamFilterCallbacks
     Envoy::Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
     const CodecFactory& downstreamCodec() override { return parent_.downstreamCodec(); }
-    void resetStream() override { parent_.resetStream(); }
     const RouteEntry* routeEntry() const override { return parent_.routeEntry(); }
     const RouteSpecificFilterConfig* perFilterConfig() const override {
       if (const auto* entry = parent_.routeEntry(); entry != nullptr) {
@@ -157,8 +168,9 @@ public:
     }
 
     // DecoderFilterCallback
-    void sendLocalReply(Status status, ResponseUpdateFunction&& func) override {
-      parent_.sendLocalReply(status, std::move(func));
+    void sendLocalReply(Status status, absl::string_view data,
+                        ResponseUpdateFunction func) override {
+      parent_.sendLocalReply(status, data, std::move(func));
     }
     void continueDecoding() override { parent_.continueDecoding(); }
     void onResponseStart(ResponsePtr response) override {
@@ -232,10 +244,11 @@ public:
 
   Envoy::Event::Dispatcher& dispatcher();
   const CodecFactory& downstreamCodec();
-  void resetStream();
+  void resetStream(DownstreamStreamResetReason reason);
+  StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
   const RouteEntry* routeEntry() const { return cached_route_entry_.get(); }
 
-  void sendLocalReply(Status status, ResponseUpdateFunction&&);
+  void sendLocalReply(Status status, absl::string_view data, ResponseUpdateFunction func);
   void continueDecoding();
   void onResponseStart(StreamResponsePtr response);
   void onResponseFrame(StreamFramePtr frame);
@@ -312,6 +325,7 @@ private:
   std::list<StreamFramePtr> response_stream_frames_;
   bool response_stream_end_{false};
   bool response_filter_chain_complete_{false};
+  bool local_reply_{false};
 
   RouteEntryConstSharedPtr cached_route_entry_;
 
@@ -323,8 +337,6 @@ private:
 
   StreamInfo::StreamInfoImpl stream_info_;
 
-  Stats::TimespanPtr request_timer_;
-
   OptRef<const Tracing::ConnectionManagerTracingConfig> connection_manager_tracing_config_;
   Tracing::SpanPtr active_span_;
 };
@@ -335,9 +347,13 @@ class Filter : public Envoy::Network::ReadFilter,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
                public ServerCodecCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, TimeSource& time_source, Runtime::Loader& runtime)
-      : config_(std::move(config)), stats_(config_->stats()),
-        drain_decision_(config_->drainDecision()), time_source_(time_source), runtime_(runtime) {
+  Filter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
+      : config_(std::move(config)),
+        stats_helper_(config_->codeOrFlags(), config_->stats(), context.scope()),
+        drain_decision_(config_->drainDecision()),
+        time_source_(context.serverFactoryContext().timeSource()),
+        runtime_(context.serverFactoryContext().runtime()),
+        cluster_manager_(context.serverFactoryContext().clusterManager()) {
     server_codec_ = config_->codecFactory().createServerCodec();
     server_codec_->setCodecCallbacks(*this);
   }
@@ -366,7 +382,9 @@ public:
       return;
     }
     downstream_connection_closed_ = true;
-    resetStreamsForUnexpectedError();
+    resetDownstreamAllStreams(event == Network::ConnectionEvent::LocalClose
+                                  ? DownstreamStreamResetReason::LocalConnectionTermination
+                                  : DownstreamStreamResetReason::ConnectionTermination);
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
@@ -399,7 +417,7 @@ public:
   const auto& frameHandlersForTest() { return frame_handlers_; }
 
   // This may be called multiple times in some scenarios. But it is safe.
-  void resetStreamsForUnexpectedError();
+  void resetDownstreamAllStreams(DownstreamStreamResetReason reason);
   // This may be called multiple times in some scenarios. But it is safe.
   void closeDownstreamConnection();
 
@@ -422,11 +440,13 @@ private:
   bool downstream_connection_closed_{};
 
   FilterConfigSharedPtr config_{};
-  GenericFilterStats& stats_;
+  GenericFilterStatsHelper stats_helper_;
+
   const Network::DrainDecision& drain_decision_;
   bool stream_drain_decision_{};
   TimeSource& time_source_;
   Runtime::Loader& runtime_;
+  Upstream::ClusterManager& cluster_manager_;
 
   ServerCodecPtr server_codec_;
 

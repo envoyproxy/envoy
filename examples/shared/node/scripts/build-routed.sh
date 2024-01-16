@@ -3,9 +3,9 @@
 yarn
 yarn build
 
-BASE=$(yq -c < ../xds/lds.tmpl.yml)
+BASE=$(yq -c < /var/lib/envoy/lds.tmpl.yml)
 ASSETS=$(find dist -type f)
 echo "$ASSETS" \
     | jq  --arg base "$BASE" -Rs -f /usr/local/share/routes.jq \
- > ../xds/lds.update.yml
-mv -f ../xds/lds.update.yml ../xds/lds.yml
+ > /var/lib/envoy/lds.update.yml
+mv -f /var/lib/envoy/lds.update.yml /var/lib/envoy/lds.yml

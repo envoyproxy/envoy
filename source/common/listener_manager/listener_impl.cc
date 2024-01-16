@@ -223,7 +223,9 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
   if (config.has_internal_listener()) {
     return absl::StrCat("envoy_internal_", config.name());
   }
-  return Network::Address::resolveProtoAddress(config.address())->asString();
+  auto address_or_error = Network::Address::resolveProtoAddress(config.address());
+  THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+  return address_or_error.value()->asString();
 }
 } // namespace
 
@@ -308,7 +310,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   } else {
     // All the addresses should be same socket type, so get the first address's socket type is
     // enough.
-    auto address = Network::Address::resolveProtoAddress(config.address());
+    auto address_or_error = Network::Address::resolveProtoAddress(config.address());
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    auto address = std::move(address_or_error.value());
     checkIpv4CompatAddress(address, config.address());
     addresses_.emplace_back(address);
     address_opts_list.emplace_back(std::ref(config.socket_options()));
@@ -321,8 +325,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                         "support same socket type for all the addresses.",
                         name_));
       }
-      auto additional_address =
+      auto addresses_or_error =
           Network::Address::resolveProtoAddress(config.additional_addresses(i).address());
+      THROW_IF_STATUS_NOT_OK(addresses_or_error, throw);
+      auto additional_address = std::move(addresses_or_error.value());
       checkIpv4CompatAddress(address, config.additional_addresses(i).address());
       addresses_.emplace_back(additional_address);
       if (config.additional_addresses(i).has_socket_options()) {
