@@ -389,6 +389,11 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
 class HotRestartedUdpListenerImplTest : public UdpListenerImplTest {
 public:
+  void SetUp() override {
+#ifdef WIN32
+    GTEST_SKIP("Hot restart is not supported on Windows.");
+#endif
+  }
   void setup() {
     io_handle_ = &useHotRestartSocket(registrar_);
     // File event should be created listening to no events (i.e. disabled).
