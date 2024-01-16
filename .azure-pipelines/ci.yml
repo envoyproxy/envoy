@@ -348,4 +348,4 @@ steps:
     ${{ if ne(parameters.artifactName, '') }}:
       artifactName: ${{ parameters.artifactName }}
   timeoutInMinutes: 10
-  condition: and(eq(${{ parameters.publishEnvoy }}, 'true'), ne('${{ parameters.ciTarget }}', 'release.server_only'))
+  condition: and(eq(${{ parameters.publishEnvoy }}, 'true'))
