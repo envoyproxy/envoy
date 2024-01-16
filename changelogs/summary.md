@@ -17,7 +17,7 @@
 * Internal redirects: support passing headers from response to request.
 * Add implementation of the `drop_overload` Cluster API.
 * HTTP/2: discard the `Host` header when `:authority` is present.
-* grpc_http1_bridge: add ``<ignore_query_params>`` option.
+* grpc_http1_bridge: add `<ignore_query_params>` option.
 * Access Log: Add `EMIT_TIME` command operator.
 * ECDS now supports composite filter.
 * Enable new oghttp2 codec for HTTP/2 connections.
