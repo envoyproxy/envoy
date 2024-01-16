@@ -59,7 +59,7 @@ typed_config:
                                            filename);
     config_helper_.prependFilter(filter);
 
-    // Set resource tracking on connection pools so we can explicit check when
+    // Set resource tracking on connection pools so we can explicitly check when
     // they're created and torn down.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
