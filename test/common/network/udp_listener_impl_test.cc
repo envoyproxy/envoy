@@ -391,7 +391,7 @@ class HotRestartedUdpListenerImplTest : public UdpListenerImplTest {
 public:
   void SetUp() override {
 #ifdef WIN32
-    GTEST_SKIP("Hot restart is not supported on Windows.");
+    GTEST_SKIP() << "Hot restart is not supported on Windows.";
 #endif
   }
   void setup() {
