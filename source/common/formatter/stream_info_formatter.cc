@@ -1364,6 +1364,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                         return stream_info.startTime();
                       }));
             }}},
+          {"EMIT_TIME",
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](const std::string& format, absl::optional<size_t>) {
+              return std::make_unique<SystemTimeFormatter>(
+                  format,
+                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.timeSource().systemTime();
+                      }));
+            }}},
           {"DYNAMIC_METADATA",
            {CommandSyntaxChecker::PARAMS_REQUIRED,
             [](const std::string& format, absl::optional<size_t> max_length) {

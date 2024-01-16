@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "dict_util_test.cc",
         "event_scheduler_test.cc",
         "logger_test.cc",
+        "naming_test.cc",
         "span_test.cc",
         "time_util_test.cc",
         "tracer_stats_test.cc",

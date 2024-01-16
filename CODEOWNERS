@@ -112,12 +112,12 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
-/*/extensions/filters/http/grpc_json_transcoder @nareddyt @lizan
+/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
-/*/extensions/filters/http/connect_grpc_bridge @UNOWNED @UNOWNED
+/*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
 /*/extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
 /*/extensions/grpc_credentials/example @wozz @htuch
@@ -131,8 +131,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
-/*/extensions/resource_monitors/common @eziskind @htuch
-/*/extensions/resource_monitors/fixed_heap @eziskind @htuch
+/*/extensions/resource_monitors/common @eziskind @htuch @nezdolik
+/*/extensions/resource_monitors/fixed_heap @eziskind @htuch @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
 /*/extensions/retry/priority @alyssawilk @mattklein123
 /*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
@@ -305,13 +305,13 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
 # upstream load balancing policies
-/*/extensions/load_balancing_policies/common @wbpcode @tonya11en
-/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/common @wbpcode @tonya11en @nezdolik
+/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en @nezdolik
 /*/extensions/load_balancing_policies/random @wbpcode @tonya11en
-/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en
-/*/extensions/load_balancing_policies/ring_hash @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/maglev @wbpcode @UNOWNED
-/*/extensions/load_balancing_policies/subset @wbpcode @zuercher
+/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en @nezdolik
+/*/extensions/load_balancing_policies/ring_hash @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/maglev @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
@@ -332,6 +332,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 
 /*/extensions/health_checkers/common @zuercher @botengyao
+
+# Lua cluster specifier
+/*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

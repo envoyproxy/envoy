@@ -16,28 +16,6 @@ namespace Dubbo {
 namespace {
 
 constexpr absl::string_view VERSION_KEY = "version";
-constexpr absl::string_view UNKNOWN_RESPONSE_STATUS = "UnknownResponseStatus";
-
-#define ENUM_TO_STRING_VIEW(X)                                                                     \
-  case Common::Dubbo::ResponseStatus::X:                                                           \
-    static constexpr absl::string_view X##_VIEW = #X;                                              \
-    return X##_VIEW;
-
-absl::string_view responseStatusToStringView(Common::Dubbo::ResponseStatus status) {
-  switch (status) {
-    ENUM_TO_STRING_VIEW(Ok);
-    ENUM_TO_STRING_VIEW(ClientTimeout);
-    ENUM_TO_STRING_VIEW(ServerTimeout);
-    ENUM_TO_STRING_VIEW(BadRequest);
-    ENUM_TO_STRING_VIEW(BadResponse);
-    ENUM_TO_STRING_VIEW(ServiceNotFound);
-    ENUM_TO_STRING_VIEW(ServiceError);
-    ENUM_TO_STRING_VIEW(ServerError);
-    ENUM_TO_STRING_VIEW(ClientError);
-    ENUM_TO_STRING_VIEW(ServerThreadpoolExhaustedError);
-  }
-  return UNKNOWN_RESPONSE_STATUS;
-}
 
 Common::Dubbo::ResponseStatus genericStatusToStatus(StatusCode code) {
   switch (code) {
@@ -48,29 +26,6 @@ Common::Dubbo::ResponseStatus genericStatusToStatus(StatusCode code) {
   default:
     return Common::Dubbo::ResponseStatus::ServerError;
   }
-}
-
-StatusCode statusToGenericStatus(Common::Dubbo::ResponseStatus status) {
-  switch (status) {
-  case Common::Dubbo::ResponseStatus::Ok:
-    return StatusCode::kOk;
-  case Common::Dubbo::ResponseStatus::ClientTimeout:
-  case Common::Dubbo::ResponseStatus::ServerTimeout:
-    return StatusCode::kUnknown;
-  case Common::Dubbo::ResponseStatus::BadRequest:
-    return StatusCode::kInvalidArgument;
-  case Common::Dubbo::ResponseStatus::BadResponse:
-    return StatusCode::kUnknown;
-  case Common::Dubbo::ResponseStatus::ServiceNotFound:
-    return StatusCode::kNotFound;
-  case Common::Dubbo::ResponseStatus::ServiceError:
-  case Common::Dubbo::ResponseStatus::ServerError:
-  case Common::Dubbo::ResponseStatus::ClientError:
-    return StatusCode::kUnavailable;
-  case Common::Dubbo::ResponseStatus::ServerThreadpoolExhaustedError:
-    return StatusCode::kResourceExhausted;
-  }
-  return StatusCode::kUnavailable;
 }
 
 } // namespace
@@ -121,7 +76,7 @@ void DubboRequest::erase(absl::string_view key) {
   typed_request->mutableAttachment()->remove(key);
 }
 
-void DubboResponse::refreshGenericStatus() {
+void DubboResponse::refreshStatus() {
   ASSERT(inner_metadata_ != nullptr);
   ASSERT(inner_metadata_->hasResponse() && inner_metadata_->hasResponseStatus());
 
@@ -130,19 +85,22 @@ void DubboResponse::refreshGenericStatus() {
   const auto status = inner_metadata_->context().responseStatus();
   const auto optional_type = inner_metadata_->response().responseType();
 
+  // The final status is not ok if the response status is not ResponseStatus::Ok
+  // anyway.
+  bool response_ok = (status == Common::Dubbo::ResponseStatus::Ok);
+
+  // The final status is not ok if the response type is ResponseWithException or
+  // ResponseWithExceptionWithAttachments even if the response status is Ok.
   if (status == Common::Dubbo::ResponseStatus::Ok) {
     ASSERT(optional_type.has_value());
     auto type = optional_type.value_or(RpcResponseType::ResponseWithException);
     if (type == RpcResponseType::ResponseWithException ||
         type == RpcResponseType::ResponseWithExceptionWithAttachments) {
-      status_ = Status(StatusCode::kUnavailable, "exception_via_upstream");
-      return;
+      response_ok = false;
     }
-    status_ = absl::OkStatus();
-    return;
   }
 
-  status_ = Status(statusToGenericStatus(status), responseStatusToStringView(status));
+  status_ = StreamStatus(static_cast<uint8_t>(status), response_ok);
 }
 
 DubboCodecBase::DubboCodecBase(Common::Dubbo::DubboCodecPtr codec) : codec_(std::move(codec)) {}
@@ -152,15 +110,15 @@ ResponsePtr DubboServerCodec::respond(Status status, absl::string_view,
   const auto* typed_request = dynamic_cast<const DubboRequest*>(&origin_request);
   ASSERT(typed_request != nullptr);
 
-  Common::Dubbo::ResponseStatus response_status;
+  Common::Dubbo::ResponseStatus response_status = genericStatusToStatus(status.code());
+
   absl::optional<Common::Dubbo::RpcResponseType> optional_type;
   absl::string_view content;
-  if (status.ok()) {
-    response_status = Common::Dubbo::ResponseStatus::Ok;
+
+  if (response_status == Common::Dubbo::ResponseStatus::Ok) {
     optional_type.emplace(Common::Dubbo::RpcResponseType::ResponseWithException);
     content = "exception_via_proxy";
   } else {
-    response_status = genericStatusToStatus(status.code());
     content = status.message();
   }
 

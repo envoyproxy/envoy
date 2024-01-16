@@ -8,27 +8,25 @@
 namespace Envoy {
 namespace Server {
 
+using ListenerMetadataPack =
+    Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory>;
+
 class ListenerInfoImpl : public Network::ListenerInfo {
 public:
   explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener& config)
-      : config_(config), typed_metadata_(config_.metadata()),
+      : metadata_(config.metadata()), direction_(config.traffic_direction()),
         is_quic_(config.udp_listener_config().has_quic_options()) {}
-  ListenerInfoImpl() : typed_metadata_(config_.metadata()) {}
+  ListenerInfoImpl() = default;
 
-  // Allow access to the underlying protobuf as an internal detail.
-  const envoy::config::listener::v3::Listener& config() const { return config_; }
   // Network::ListenerInfo
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return config_.traffic_direction();
-  }
+  envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
   bool isQuic() const override { return is_quic_; }
 
 private:
-  const envoy::config::listener::v3::Listener config_;
-  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
-      typed_metadata_;
+  const ListenerMetadataPack metadata_;
+  const envoy::config::core::v3::TrafficDirection direction_{};
   const bool is_quic_{};
 };
 

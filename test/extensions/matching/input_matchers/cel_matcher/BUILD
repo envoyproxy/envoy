@@ -15,12 +15,14 @@ envoy_package()
 envoy_cc_test_library(
     name = "cel_matcher_test_lib",
     hdrs = ["cel_matcher_test.h"],
+    tags = ["skip_on_windows"],
 )
 
 envoy_extension_cc_test(
     name = "cel_matcher_test",
     srcs = ["cel_matcher_test.cc"],
     extension_names = ["envoy.matching.matchers.cel_matcher"],
+    tags = ["skip_on_windows"],
     deps = [
         ":cel_matcher_test_lib",
         "//source/common/matcher:matcher_lib",

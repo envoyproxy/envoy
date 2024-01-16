@@ -642,35 +642,78 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   server_thread->join();
 }
 
-TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
-  bool workers_started = false;
-  absl::Notification workers_started_fired, workers_started_block;
-  // Expect drainParentListeners not to be called before workers start.
-  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+class ServerInstanceImplWorkersTest : public ServerInstanceImplTest {
+protected:
+  ServerInstanceImplWorkersTest() {
+    bool workers_started = false;
 
-  // Run the server in a separate thread so we can test different lifecycle stages.
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    auto hooks = CustomListenerHooks([&]() {
-      workers_started = true;
-      workers_started_fired.Notify();
-      workers_started_block.WaitForNotification();
+    // Expect drainParentListeners not to be called before workers start.
+    EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+    // Run the server in a separate thread so we can test different lifecycle stages.
+    server_thread_ = Thread::threadFactoryForTest().createThread([&] {
+      auto hooks = CustomListenerHooks([&]() {
+        workers_started = true;
+        workers_started_fired_.Notify();
+        workers_started_block_.WaitForNotification();
+      });
+      initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+      server_->run();
+      server_ = nullptr;
+      thread_local_ = nullptr;
     });
-    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
-    server_->run();
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
 
-  workers_started_fired.WaitForNotification();
-  EXPECT_TRUE(workers_started);
+    workers_started_fired_.WaitForNotification();
+    EXPECT_TRUE(workers_started);
+    EXPECT_CALL(restart_, drainParentListeners);
+  }
+
+  ~ServerInstanceImplWorkersTest() {
+    server_->dispatcher().post([&] { server_->shutdown(); });
+    server_thread_->join();
+  }
+
+  absl::Notification workers_started_fired_;
+  absl::Notification workers_started_block_;
+  Thread::ThreadPtr server_thread_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplWorkersTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplWorkersTest, DrainParentListenerAfterWorkersStarted) {
   EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+  workers_started_block_.Notify();
+}
 
-  EXPECT_CALL(restart_, drainParentListeners);
-  workers_started_block.Notify();
+TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
+  absl::Notification drain_closes_started, drain_complete;
+  workers_started_block_.Notify();
 
-  server_->dispatcher().post([&] { server_->shutdown(); });
-  server_thread->join();
+  DrainManager& drain_manager = server_->drainManager();
+
+  // To reproduce the race condition from
+  // https://github.com/envoyproxy/envoy/issues/31457 we make sure that the
+  // infinite drainClose spin-loop (mimicing high traffic) is running before we
+  // initiate the drain sequence.
+  auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
+    bool closed = drain_manager.drainClose();
+    drain_closes_started.Notify();
+    while (!closed) {
+      closed = drain_manager.drainClose();
+    }
+  });
+  drain_closes_started.WaitForNotification();
+
+  // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
+  // wait for that to complete.
+  server_->dispatcher().post(
+      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+
+  drain_complete.WaitForNotification();
+  drain_thread->join();
 }
 
 // A test target which never signals that it is ready.

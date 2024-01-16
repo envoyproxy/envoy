@@ -551,6 +551,15 @@ typed_config:
     // verify content-type
     EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
 
+    // verify two values
+    auto values = response->headers().get(Http::LowerCaseString("x-two-values"));
+    if (values.size() == 2) {
+      EXPECT_EQ("foo", values[0]->value().getStringView());
+      EXPECT_EQ("bar", values[1]->value().getStringView());
+    } else {
+      EXPECT_EQ(values.size(), 2);
+    }
+
     cleanup();
   }
 

@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -236,5 +237,26 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "grpc_stream_mocks",
+    hdrs = ["mocks.h"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:grpc_stream_interface",
+    ],
+)
+
+envoy_cc_test(
+    name = "grpc_mux_failover_test",
+    srcs = ["grpc_mux_failover_test.cc"],
+    deps = [
+        ":grpc_stream_mocks",
+        "//source/extensions/config_subscription/grpc:grpc_mux_failover_lib",
+        "//source/extensions/config_subscription/grpc:grpc_stream_interface",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/config:config_mocks",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

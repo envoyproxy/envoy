@@ -231,7 +231,9 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
-    admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
+    auto address_or_error = Network::Address::resolveProtoAddress(admin.address());
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    admin_.address_ = std::move(address_or_error.value());
   }
   admin_.socket_options_ = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   if (!admin.socket_options().empty()) {

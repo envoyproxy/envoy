@@ -359,6 +359,21 @@ envoy_cc_test_binary(
     ],
 )
 
+envoy_cc_test_binary(
+    name = "hotrestart_small_main",
+    srcs = ["hotrestart_main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
+    deps = [
+        "//source/exe:main_common_lib",
+        "//source/exe:platform_impl_lib",
+        "//source/exe:process_wide_lib",
+        "//source/exe:stripped_main_base_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+    ],
+)
+
 envoy_py_test(
     name = "hotrestart_handoff_test",
     size = "medium",
@@ -366,7 +381,18 @@ envoy_py_test(
         "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
-    data = [":hotrestart_main"],
+    args = [
+        "--envoy-binary=$(location :hotrestart_main)",
+        "--h3-request=$(location //tools/h3_request)",
+        "--ca-certs=$(location //test/config/integration/certs:cacert.pem)",
+        "--ca-key=$(location //test/config/integration/certs:cakey.pem)",
+    ],
+    data = [
+        ":hotrestart_main",
+        "//test/config/integration/certs:cacert.pem",
+        "//test/config/integration/certs:cakey.pem",
+        "//tools/h3_request",
+    ],
     main = select({
         "//bazel:disable_hot_restart_or_admin": "null_test.py",
         "//conditions:default": "hotrestart_handoff_test.py",
@@ -379,6 +405,7 @@ envoy_py_test(
     ],
     deps = [
         requirement("aiohttp"),
+        requirement("cryptography"),
     ],
 )
 
@@ -401,14 +428,15 @@ envoy_sh_test(
 )
 
 envoy_sh_test(
-    name = "run_envoy_test",
+    name = "run_envoy_small_test",
     size = "large",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = [":hotrestart_main"],
+    cc_binary = [":hotrestart_small_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cc_test(
@@ -1844,6 +1872,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        "//source/common/stream_info:utility_lib",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//source/extensions/upstreams/http/udp:config",

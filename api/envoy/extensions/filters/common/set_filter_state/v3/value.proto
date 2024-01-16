@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Set-Filter-State filter state value]
 
 // A filter state key and value pair.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message FilterStateValue {
   enum SharedWithUpstream {
     // Object is not shared with the upstream internal connections.
@@ -32,10 +32,15 @@ message FilterStateValue {
   oneof key {
     option (validate.required) = true;
 
-    // Filter state object key. The key is expected to be registered via an object factory, see
-    // :ref:`the well-known filter state keys <well_known_filter_state>`.
+    // Filter state object key. The key is used to lookup the object factory, unless :ref:`factory_key
+    // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>` is set. See
+    // :ref:`the well-known filter state keys <well_known_filter_state>` for a list of valid object keys.
     string object_key = 1 [(validate.rules).string = {min_len: 1}];
   }
+
+  // Optional filter object factory lookup key. See :ref:`the well-known filter state keys <well_known_filter_state>`
+  // for a list of valid factory keys.
+  string factory_key = 6;
 
   oneof value {
     option (validate.required) = true;

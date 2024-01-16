@@ -7,6 +7,7 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 import "envoy/type/matcher/v3/path.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -73,7 +74,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -130,6 +131,12 @@ message OAuth2Config {
   // `RFC 6749 section 6 <https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_), provided that the OAuth server supports that.
   // Default value is false.
   google.protobuf.BoolValue use_refresh_token = 12;
+
+  // The default lifetime in seconds of the access token, if omitted by the authorization server.
+  //
+  // If this value is not set, it will default to ``0s``. In this case, the expiry must be set by
+  // the authorization server or the OAuth flow will fail.
+  google.protobuf.Duration default_expires_in = 13;
 }
 
 // Filter config.
