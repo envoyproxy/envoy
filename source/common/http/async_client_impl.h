@@ -276,6 +276,7 @@ private:
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   std::shared_ptr<NullRouteImpl> route_;
+  std::unique_ptr<Router::RetryPolicy> retry_policy_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};

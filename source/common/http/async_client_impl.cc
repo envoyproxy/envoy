@@ -1,16 +1,17 @@
 #include "source/common/http/async_client_impl.h"
 
-#include <chrono>
-#include <map>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "envoy/router/router.h"
 #include "source/common/grpc/common.h"
+#include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/upstream/retry_factory.h"
 
 namespace Envoy {
 namespace Http {
@@ -82,11 +83,24 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<NullRouteImpl>(parent_.cluster_->name(), parent_.singleton_manager_,
-                                             options.timeout, options.hash_policy,
-                                             options.retry_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
+  const Router::RetryPolicy* retry_policy = options.parsed_retry_policy;
+  if (options.retry_policy.has_value()) {
+    Upstream::RetryExtensionFactoryContextImpl factory_context(
+        parent_.singleton_manager_);
+    retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
+        options.retry_policy.value(),
+        ProtobufMessage::getNullValidationVisitor(), factory_context);
+    retry_policy = retry_policy_.get();
+  }
+  if (retry_policy == nullptr) {
+    retry_policy_ = std::make_unique<Router::RetryPolicyImpl>();
+    retry_policy = retry_policy_.get();
+  }
+  route_ = std::make_shared<NullRouteImpl>(
+      parent_.cluster_->name(), options.timeout,
+      options.hash_policy, retry_policy);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
