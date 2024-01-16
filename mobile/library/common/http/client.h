@@ -190,6 +190,8 @@ private:
 
     void setFinalStreamIntel(StreamInfo::StreamInfo& stream_info);
 
+    void latchError();
+
   private:
     bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
 
@@ -198,7 +200,6 @@ private:
     void sendErrorToBridge();
     envoy_stream_intel streamIntel();
     envoy_final_stream_intel& finalStreamIntel();
-    envoy_error streamError();
 
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;

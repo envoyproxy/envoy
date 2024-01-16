@@ -249,8 +249,12 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
 
 void Client::DirectStreamCallbacks::closeStream(bool end_stream) {
   remote_end_stream_received_ |= end_stream;
-  // Latch stream intel on stream completion, as the stream info will go away.
-  direct_stream_.saveFinalStreamIntel();
+  if (end_stream) {
+    // Latch stream intel on stream completion, as the stream info will go away.
+    // If end_stream is false this is the stream reset case and data is latched
+    // in resetStream
+    direct_stream_.saveFinalStreamIntel();
+  }
 
   auto& client = direct_stream_.parent_;
   auto stream = client.getStream(direct_stream_.stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS);
@@ -296,7 +300,6 @@ void Client::DirectStreamCallbacks::onError() {
   // TODO(goaway): What is the expected behavior when an error is received, held, and then another
   // error occurs (e.g., timeout)?
 
-  error_ = streamError();
   if (explicit_flow_control_ && response_headers_forwarded_ && bytes_to_send_ == 0) {
     ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
@@ -414,31 +417,35 @@ void Client::DirectStream::saveFinalStreamIntel() {
                                   envoy_final_stream_intel_);
 }
 
-envoy_error Client::DirectStreamCallbacks::streamError() {
+void Client::DirectStreamCallbacks::latchError() {
+  if (error_.has_value()) {
+  }
   envoy_error error{};
+  error_ = error;
+
   OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
   if (!request_decoder) {
-    return error;
+    error_->message = envoy_nodata;
+    return;
   }
   const auto& info = request_decoder->streamInfo();
 
   if (info.responseCode().has_value()) {
-    error.error_code = Bridge::Utility::errorCodeFromLocalStatus(
+    error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
-    error.error_code = ENVOY_REQUEST_TIMEOUT;
+    error_->error_code = ENVOY_REQUEST_TIMEOUT;
   } else {
-    error.error_code = ENVOY_STREAM_RESET;
+    error_->error_code = ENVOY_STREAM_RESET;
   }
 
   if (info.responseCodeDetails().has_value()) {
-    error.message = Data::Utility::copyToBridgeData(info.responseCodeDetails().value());
+    error_->message = Data::Utility::copyToBridgeData(info.responseCodeDetails().value());
   } else {
-    error.message = envoy_nodata;
+    error_->message = envoy_nodata;
   }
 
-  error.attempt_count = info.attemptCount().value_or(0);
-  return error;
+  error_->attempt_count = info.attemptCount().value_or(0);
 }
 
 Client::DirectStream::DirectStream(envoy_stream_t stream_handle, Client& http_client)
@@ -453,7 +460,8 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   // This seems in line with other codec implementations, and so the assumption is that this is in
   // line with upstream expectations.
   // TODO(goaway): explore an upstream fix to get the HCM to clean up ActiveStream itself.
-  saveFinalStreamIntel(); // Take a snapshot now in case the stream gets destroyed.
+  saveFinalStreamIntel();   // Take a snapshot now in case the stream gets destroyed.
+  callbacks_->latchError(); // Latch the error in case the stream gets destroyed.
   runResetCallbacks(reason);
   if (!parent_.getStream(stream_handle_, GetStreamFilters::ALLOW_FOR_ALL_STREAMS)) {
     // We don't assert here, because Envoy will issue a stream reset if a stream closes remotely
