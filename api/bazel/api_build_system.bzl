@@ -146,9 +146,9 @@ def api_proto_package(
         has_services = has_services,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go"]
+    compilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
+        compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
 
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
@@ -162,6 +162,13 @@ def api_proto_package(
             "@io_bazel_rules_go//proto/wkt:struct_go_proto",
             "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
+            "@com_github_planetscale_vtprotobuf//types/known/anypb",
+            "@com_github_planetscale_vtprotobuf//types/known/durationpb",
+            "@com_github_planetscale_vtprotobuf//types/known/emptypb",
+            "@com_github_planetscale_vtprotobuf//types/known/fieldmaskpb",
+            "@com_github_planetscale_vtprotobuf//types/known/structpb",
+            "@com_github_planetscale_vtprotobuf//types/known/timestamppb",
+            "@com_github_planetscale_vtprotobuf//types/known/wrapperspb",
         ]
     )
     go_proto_library(
