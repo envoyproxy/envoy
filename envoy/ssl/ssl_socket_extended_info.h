@@ -43,7 +43,7 @@ public:
                                       const std::string& error_details, uint8_t tls_alert) PURE;
 };
 
-using ValidateResultCallbackPtr = std::unique_ptr<ValidateResultCallback>;
+using ValidateResultCallbackPtr = std::shared_ptr<ValidateResultCallback>;
 
 class SslExtendedSocketInfo {
 public:

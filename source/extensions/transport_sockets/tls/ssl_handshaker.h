@@ -72,8 +72,7 @@ private:
       Envoy::Ssl::ClientValidationStatus::NotValidated};
   SslHandshakerImpl& ssl_handshaker_;
   // Latch the in-flight async cert validation callback.
-  // nullopt if there is none.
-  OptRef<ValidateResultCallbackImpl> cert_validate_result_callback_;
+  std::weak_ptr<ValidateResultCallbackImpl> cert_validate_result_callback_;
   // Stores the TLS alert.
   uint8_t cert_validation_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
   // Stores the validation result if there is any.

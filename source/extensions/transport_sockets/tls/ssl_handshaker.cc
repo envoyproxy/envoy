@@ -30,8 +30,8 @@ void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
 }
 
 SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
-  if (cert_validate_result_callback_.has_value()) {
-    cert_validate_result_callback_->onSslHandshakeCancelled();
+  if (auto callback = cert_validate_result_callback_.lock(); callback != nullptr) {
+    callback->onSslHandshakeCancelled();
   }
 }
 
@@ -47,7 +47,7 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
 void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded, bool async) {
   cert_validation_result_ =
       succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
-  if (cert_validate_result_callback_.has_value()) {
+  if (!cert_validate_result_callback_.expired()) {
     cert_validate_result_callback_.reset();
     // Resume handshake.
     if (async) {
@@ -57,9 +57,9 @@ void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded,
 }
 
 Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCallback() {
-  auto callback = std::make_unique<ValidateResultCallbackImpl>(
+  auto callback = std::make_shared<ValidateResultCallbackImpl>(
       ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
-  cert_validate_result_callback_ = *callback;
+  cert_validate_result_callback_ = callback;
   cert_validation_result_ = Ssl::ValidateStatus::Pending;
   return callback;
 }
