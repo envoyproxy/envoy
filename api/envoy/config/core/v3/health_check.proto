@@ -181,8 +181,8 @@ message HealthCheck {
     repeated Payload receive = 2;
 
     // When setting this value, it tries to attempt health check request with ProxyProtocol.
-    // When `send` is presented, they are sent after preceding ProxyProtocol header.
-    // Only ProxyProtocol header is sent when `send` is not presented.
+    // When ``send`` is presented, they are sent after preceding ProxyProtocol header.
+    // Only ProxyProtocol header is sent when ``send`` is not presented.
     ProxyProtocolConfig proxy_protocol_config = 3;
   }
 
