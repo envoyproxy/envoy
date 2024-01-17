@@ -86,7 +86,6 @@ bool DrainManagerImpl::drainClose() const {
 }
 
 Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(dispatcher_.isThreadSafe());
 
   if (draining_) {
@@ -117,7 +116,7 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
 }
 
 void DrainManagerImpl::addDrainCompleteCallback(std::function<void()> cb) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  ASSERT(dispatcher_.isThreadSafe());
   ASSERT(draining_);
 
   // If the drain-tick-timer is active, add the callback to the queue. If not defined
@@ -130,7 +129,7 @@ void DrainManagerImpl::addDrainCompleteCallback(std::function<void()> cb) {
 }
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  ASSERT(dispatcher_.isThreadSafe());
   ASSERT(drain_complete_cb);
 
   // If we've already started draining (either through direct invocation or through

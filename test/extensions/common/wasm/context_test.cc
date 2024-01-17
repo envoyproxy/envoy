@@ -51,6 +51,7 @@ public:
     return MockIndexOperator(index);
   }
   MOCK_METHOD(absl::optional<CelValue>, MockIndexOperator, (CelValue), (const));
+  using CelMap::ListKeys;
   MOCK_METHOD(absl::StatusOr<const CelList*>, ListKeys, (), (const, override));
   MOCK_METHOD(int, size, (), (const, override));
 };

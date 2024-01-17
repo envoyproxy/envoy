@@ -90,8 +90,9 @@ deadline of 3 weeks.
 | 1.25.0  | 2023/01/15 | 2023/01/18 |   +3 days  | 2024/01/18  |
 | 1.26.0  | 2023/04/15 | 2023/04/18 |   +3 days  | 2024/04/18  |
 | 1.27.0  | 2023/07/14 | 2023/07/27 |  +13 days  | 2024/07/27  |
-| 1.28.0  | 2023/10/16 | 2023/10/19 |  +3 days   | 2024/10/19  |
-| 1.29.0  | 2024/01/16 |            |            |             |
+| 1.28.0  | 2023/10/16 | 2023/10/19 |   +3 days  | 2024/10/19  |
+| 1.29.0  | 2024/01/16 | 2024/01/16 |    0 days  | 2025/01/16  |
+| 1.30.0  | 2024/04/16 |            |            |             |
 
 ### Cutting a major release
 
@@ -106,24 +107,28 @@ deadline of 3 weeks.
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
   * Check to see if any security/stable version release notes are duplicated in
     the major version release notes. These should not be duplicated.
-  * Switch the repo to "release" mode by running `bazel run @envoy_repo//:release`. See the [project
-    tool](tools/project/README.md#bazel-run-toolsprojectrelease) for further information. This tool
+  * Switch the repo to "release" mode by running `bazel run @envoy_repo//:release`. This tool
     will create a commit with the necessary changes for a release.
   * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
     release, please also make sure there's a stable maintainer signed up for next quarter,
     and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
-* Create a pull request with the commit created by the project tool and **wait for tests to
-  pass**.
+* Create a pull request with that commit and **wait for tests to pass**.
 * Once the tests have passed, and the PR has landed, CI will automatically create the tagged release and corresponding release branch.
-* Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@ envoy-users@ envoy-dev@ envoy-maintainers
+* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
+  necessary changes to continue development.
+* Create a pull request with that commit.
+* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
+* If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
+* Craft a witty/uplifting email and send it to all the email aliases:
+envoy-announce@googlegroups.com
+envoy-users@googlegroups.com
+envoy-dev@googlegroups.com
+envoy-maintainers@googlegroups.com -
+include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
+* Announce in [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH) and [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76) slack channels.
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
-* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. See the [project
-  tool](tools/project/README.md#bazel-run-toolsprojectdev) for further information. This tool will create a commit with the
-  necessary changes to continue development.
-* Create a pull request with commit created by the project tool.
-* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
 
 
 ## Security release schedule

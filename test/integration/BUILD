@@ -359,6 +359,21 @@ envoy_cc_test_binary(
     ],
 )
 
+envoy_cc_test_binary(
+    name = "hotrestart_small_main",
+    srcs = ["hotrestart_main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
+    deps = [
+        "//source/exe:main_common_lib",
+        "//source/exe:platform_impl_lib",
+        "//source/exe:process_wide_lib",
+        "//source/exe:stripped_main_base_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+    ],
+)
+
 envoy_py_test(
     name = "hotrestart_handoff_test",
     size = "medium",
@@ -413,14 +428,15 @@ envoy_sh_test(
 )
 
 envoy_sh_test(
-    name = "run_envoy_test",
+    name = "run_envoy_small_test",
     size = "large",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = [":hotrestart_main"],
+    cc_binary = [":hotrestart_small_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cc_test(

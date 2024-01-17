@@ -409,6 +409,9 @@ message TLSProperties {
 
     // The subject field of the certificate.
     string subject = 2;
+
+    // The issuer field of the certificate.
+    string issuer = 3;
   }
 
   // Version of TLS that was negotiated.
