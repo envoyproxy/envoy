@@ -1107,23 +1107,21 @@ Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
   return okStatus();
 }
 
-Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, size_t padding) {
-  RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
-                                       frame->hd.flags, frame->data.padlen));
+Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                                   size_t padding) {
+  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, type, flags, padding));
 
-  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
     return okStatus();
   }
 
-  // Track bytes sent and received.
-  if (frame->hd.type != METADATA_FRAME_TYPE) {
-    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
-  }
-  if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-    stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
-  }
+  // Track bytes received.
+  stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
+  stream->remote_end_stream_ = flags & NGHTTP2_FLAG_END_STREAM;
+  stream->decodeData();
+  return okStatus();
 }
 
 Status ConnectionImpl::onGoAway(uint32_t error_code) {
@@ -1134,7 +1132,62 @@ Status ConnectionImpl::onGoAway(uint32_t error_code) {
   return okStatus();
 }
 
-Status onHeaders(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, int headers_category);
+Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags,
+                                 int headers_category) {
+  StreamImpl* stream = getStreamUnchecked(stream_id);
+  if (!stream) {
+    return okStatus();
+  }
+  // Track bytes received.
+  stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
+
+  stream->remote_end_stream_ = flags & NGHTTP2_FLAG_END_STREAM;
+  if (!stream->cookies_.empty()) {
+    HeaderString key(Headers::get().Cookie);
+    stream->headers().addViaMove(std::move(key), std::move(stream->cookies_));
+  }
+
+  switch (headers_category) {
+  case NGHTTP2_HCAT_RESPONSE:
+  case NGHTTP2_HCAT_REQUEST: {
+    stream->decodeHeaders();
+    break;
+  }
+
+  case NGHTTP2_HCAT_HEADERS: {
+    // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
+    // if local is not complete.
+    if (!stream->deferred_reset_) {
+      if (adapter_->IsServerSession() || stream->received_noninformational_headers_) {
+        ASSERT(stream->remote_end_stream_);
+        stream->decodeTrailers();
+      } else {
+        // We're a client session and still waiting for non-informational headers.
+        stream->decodeHeaders();
+      }
+    }
+    break;
+  }
+
+  default:
+    // We do not currently support push.
+    ENVOY_BUG(false, "push not supported");
+  }
+
+  return okStatus();
+}
+
+Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
+  ENVOY_CONN_LOG(trace, "remote reset: {} {}", connection_, stream_id, error_code);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
+  if (!stream) {
+    return okStatus();
+  }
+  stream->remote_rst_ = true;
+  stats_.rx_reset_.inc();
+  return okStatus();
+}
+
 Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   ASSERT(connection_.state() == Network::Connection::State::Open);
@@ -1154,8 +1207,8 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_DATA) {
-    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type,
-                       frame->hd.flags, frame->data.padlen);
+    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags,
+                       frame->data.padlen);
   }
 
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
@@ -1174,6 +1227,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           {static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
     }
     onSettings(settings);
+    return okStatus();
   }
 
   StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
@@ -1185,58 +1239,13 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   if (frame->hd.type != METADATA_FRAME_TYPE) {
     stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
-  if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-    stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+
+  if (frame->hd.type == NGHTTP2_HEADERS) {
+    return onHeaders(frame->hd.stream_id, frame->hd.length, frame->hd.flags, frame->headers.cat);
   }
 
-  switch (frame->hd.type) {
-  case NGHTTP2_HEADERS: {
-    stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
-    if (!stream->cookies_.empty()) {
-      HeaderString key(Headers::get().Cookie);
-      stream->headers().addViaMove(std::move(key), std::move(stream->cookies_));
-    }
-
-    switch (frame->headers.cat) {
-    case NGHTTP2_HCAT_RESPONSE:
-    case NGHTTP2_HCAT_REQUEST: {
-      stream->decodeHeaders();
-      break;
-    }
-
-    case NGHTTP2_HCAT_HEADERS: {
-      // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
-      // if local is not complete.
-      if (!stream->deferred_reset_) {
-        if (adapter_->IsServerSession() || stream->received_noninformational_headers_) {
-          ASSERT(stream->remote_end_stream_);
-          stream->decodeTrailers();
-        } else {
-          // We're a client session and still waiting for non-informational headers.
-          stream->decodeHeaders();
-        }
-      }
-      break;
-    }
-
-    default:
-      // We do not currently support push.
-      ENVOY_BUG(false, "push not supported");
-    }
-
-    break;
-  }
-  case NGHTTP2_DATA: {
-    stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
-    stream->decodeData();
-    break;
-  }
-  case NGHTTP2_RST_STREAM: {
-    ENVOY_CONN_LOG(trace, "remote reset: {}", connection_, frame->rst_stream.error_code);
-    stream->remote_rst_ = true;
-    stats_.rx_reset_.inc();
-    break;
-  }
+  if (frame->hd.type == NGHTTP2_RST_STREAM) {
+    return onRstStream(frame->hd.stream_id, frame->rst_stream.error_code);
   }
 
   return okStatus();

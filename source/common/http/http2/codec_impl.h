@@ -696,8 +696,8 @@ private:
   Status onPing(uint64_t opaque_data, bool is_ack);
   Status onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, size_t padding);
   Status onGoAway(uint32_t error_code);
-  Status onSettings(std::vector<Http2Setting> settings);
-  Status onHeaders(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, int headers_category);
+  Status onHeaders(int32_t stream_id, size_t length, uint8_t flags, int headers_category);
+  Status onRstStream(int32_t stream_id, uint32_t error_code);
   Status onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
