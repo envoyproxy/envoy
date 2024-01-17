@@ -268,7 +268,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks,
-                                                 Server::OverloadManager& overload_manager, bool uhv_enabled) {
+                                                 Server::OverloadManager& overload_manager,
+                                                 bool uhv_enabled) {
   // TODO(#29503): figure out how admin will interact with UHV. For now UHV is not used in admin
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),

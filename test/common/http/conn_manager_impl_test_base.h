@@ -302,7 +302,7 @@ public:
       header_validator_config_;
   Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
       header_validator_config_overrides_;
-  TestScopedRuntime scoped_runtime_;  
+  TestScopedRuntime scoped_runtime_;
 };
 
 class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,

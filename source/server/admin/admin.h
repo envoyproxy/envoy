@@ -134,7 +134,8 @@ public:
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks,
-                                        Server::OverloadManager& overload_manager, bool uhv_enabled) override;
+                                        Server::OverloadManager& overload_manager,
+                                        bool uhv_enabled) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }

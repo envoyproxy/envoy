@@ -314,7 +314,8 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
 }
 
 void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   header_validator_config_.mutable_uri_path_normalization_options()->set_skip_path_normalization(
       !normalize_path_);
   header_validator_config_.mutable_uri_path_normalization_options()->set_skip_merging_slashes(
@@ -339,7 +340,8 @@ void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
 void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
     HeaderValidator::ValidationResult validation_result,
     ServerHeaderValidator::RequestHeadersTransformationResult transformation_result) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
@@ -369,7 +371,8 @@ void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
 void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
     HeaderValidator::ValidationResult validation_result,
     HeaderValidator::TransformationResult transformation_result, bool expect_response) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
   EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([validation_result, transformation_result, expect_response]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();

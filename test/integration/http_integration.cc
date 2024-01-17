@@ -302,8 +302,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
   // in-connection version negotiation.
   auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                        host_description, enable_uhv, downstream_protocol_,
-                                                        wait_till_connected);
+                                                        host_description, enable_uhv,
+                                                        downstream_protocol_, wait_till_connected);
   if (downstream_protocol_ == Http::CodecType::HTTP3 && codec->disconnected()) {
     // Connection may get closed during version negotiation or handshake.
     // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate

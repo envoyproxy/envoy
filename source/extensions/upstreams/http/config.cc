@@ -112,7 +112,7 @@ makeHeaderValidatorFactory(const ::envoy::config::core::v3::TypedExtensionConfig
       Envoy::Config::Utility::getFactory<Envoy::Http::HeaderValidatorFactoryConfig>(config);
   if (!factory) {
     throwEnvoyExceptionOrPanic(
-      fmt::format("Header validator extension not found: '{}'", config.name()));
+        fmt::format("Header validator extension not found: '{}'", config.name()));
   }
 
   Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory =

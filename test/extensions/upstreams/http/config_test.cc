@@ -197,8 +197,9 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfig) {
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
-  // If UHV is disabled with the default value of envoy.reloadable_features.enable_universal_header_validator
-  // config is accepted and UHV factory is nullptr
+  // If UHV is disabled with the default value of
+  // envoy.reloadable_features.enable_universal_header_validator config is accepted and UHV factory
+  // is nullptr
   EXPECT_EQ(nullptr, config.header_validator_factory_);
 #endif
 }
