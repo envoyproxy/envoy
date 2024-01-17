@@ -1024,6 +1024,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   if (all_clusters_initialized && ads_mux_) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     if (last_recorded_warming_clusters_count_ == 0 && !warming_clusters_.empty()) {
+      resume_cds_.reset();
       resume_cds_ = ads_mux_->pause(type_url);
     } else if (last_recorded_warming_clusters_count_ > 0 && warming_clusters_.empty()) {
       resume_cds_.reset();
