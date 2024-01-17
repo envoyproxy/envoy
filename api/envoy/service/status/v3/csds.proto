@@ -189,7 +189,7 @@ message ClientConfig {
   // For xDS clients, the scope in which the data is used.
   // For example, gRPC indicates the data plane target or that the data is
   // associated with gRPC server(s).
-  string client_scope = 10;
+  string client_scope = 4;
 }
 
 message ClientStatusResponse {
