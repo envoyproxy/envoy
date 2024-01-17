@@ -302,21 +302,19 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   bool close_downstream = true;
 
   chargeResponseTiming();
-  LocalExceptionErrorType error_code = LocalExceptionErrorType::Overflow;
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
-    stats_.incResponseLocalException(parent_.cluster(), error_code);
+    stats_.incResponseLocalException(parent_.cluster(), reason);
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            false /* Don't close the downstream connection. */);
     close_downstream = false;
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    error_code = LocalExceptionErrorType::LocalConnectionFailure;
+    FALLTHRU;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    error_code = LocalExceptionErrorType::RemoteConnectionFailure;
+    FALLTHRU;
   case ConnectionPool::PoolFailureReason::Timeout:
-    error_code = LocalExceptionErrorType::Timeout;
     upstream_host_->outlierDetector().putResult(poolFailureReasonToResult(reason));
 
     // Error occurred after an underflow response, propagate the reset to the downstream.
@@ -329,7 +327,7 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
       if (response_state_ == ResponseState::Started) {
         stats_.incClosePartialResponse(parent_.cluster());
       }
-      stats_.incResponseLocalException(parent_.cluster(), error_code);
+      stats_.incResponseLocalException(parent_.cluster(), reason);
       parent_.sendLocalReply(
           AppException(AppExceptionType::InternalError,
                        fmt::format("connection failure before response {}: {} '{}'",

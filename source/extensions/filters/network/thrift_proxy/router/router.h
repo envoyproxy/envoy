@@ -122,15 +122,6 @@ struct RouterNamedStats {
   }
 };
 
-enum class LocalExceptionErrorType {
-  Overflow,
-  LocalConnectionFailure,
-  RemoteConnectionFailure,
-  Timeout,
-  MaintenanceMode,
-  NoHealthyUpstream,
-};
-
 /**
  * Stats for use in the router.
  */
@@ -150,17 +141,13 @@ public:
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
         upstream_resp_exception_local_(stat_name_set_->add("thrift.upstream_resp_exception_local")),
         upstream_resp_exception_local_overflow_(
-            stat_name_set_->add("thrift.upstream_resp_exception_local_overflow")),
+            stat_name_set_->add("thrift.upstream_resp_exception_local.overflow")),
         upstream_resp_exception_local_local_connection_failure_(
-            stat_name_set_->add("thrift.upstream_resp_exception_local_local_connection_failure")),
+            stat_name_set_->add("thrift.upstream_resp_exception_local.local_connection_failure")),
         upstream_resp_exception_local_remote_connection_failure_(
-            stat_name_set_->add("thrift.upstream_resp_exception_local_remote_connection_failure")),
+            stat_name_set_->add("thrift.upstream_resp_exception_local.remote_connection_failure")),
         upstream_resp_exception_local_timeout_(
-            stat_name_set_->add("thrift.upstream_resp_exception_local_timeout")),
-        upstream_resp_exception_local_maintenance_mode_(
-            stat_name_set_->add("thrift.upstream_resp_exception_local_maintenance_mode")),
-        upstream_resp_exception_local_no_healthy_upstream_(
-            stat_name_set_->add("thrift.upstream_resp_exception_local_no_healthy_upstream")),
+            stat_name_set_->add("thrift.upstream_resp_exception_local.timeout")),
         upstream_resp_exception_remote_(
             stat_name_set_->add("thrift.upstream_resp_exception_remote")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
@@ -270,31 +257,29 @@ public:
    * upstream.
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
    */
-  void incResponseLocalException(const Upstream::ClusterInfo& cluster,
-                                 LocalExceptionErrorType error_code) const {
+  void incResponseLocalException(
+      const Upstream::ClusterInfo& cluster,
+      absl::optional<ConnectionPool::PoolFailureReason> reason = absl::nullopt) const {
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_);
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_);
-    switch (error_code) {
-    case LocalExceptionErrorType::Overflow:
-      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_overflow_);
-      break;
-    case LocalExceptionErrorType::LocalConnectionFailure:
-      incClusterScopeCounter(cluster, nullptr,
-                             upstream_resp_exception_local_local_connection_failure_);
-      break;
-    case LocalExceptionErrorType::RemoteConnectionFailure:
-      incClusterScopeCounter(cluster, nullptr,
-                             upstream_resp_exception_local_remote_connection_failure_);
-      break;
-    case LocalExceptionErrorType::Timeout:
-      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_timeout_);
-      break;
-    case LocalExceptionErrorType::MaintenanceMode:
-      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_maintenance_mode_);
-      break;
-    case LocalExceptionErrorType::NoHealthyUpstream:
-      incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_no_healthy_upstream_);
-      break;
+
+    if (reason.has_value()) {
+      switch (reason.value()) {
+      case ConnectionPool::PoolFailureReason::Overflow:
+        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_overflow_);
+        break;
+      case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+        incClusterScopeCounter(cluster, nullptr,
+                               upstream_resp_exception_local_local_connection_failure_);
+        break;
+      case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+        incClusterScopeCounter(cluster, nullptr,
+                               upstream_resp_exception_local_remote_connection_failure_);
+        break;
+      case ConnectionPool::PoolFailureReason::Timeout:
+        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_timeout_);
+        break;
+      }
     }
   }
 
@@ -414,8 +399,6 @@ private:
   const Stats::StatName upstream_resp_exception_local_local_connection_failure_;
   const Stats::StatName upstream_resp_exception_local_remote_connection_failure_;
   const Stats::StatName upstream_resp_exception_local_timeout_;
-  const Stats::StatName upstream_resp_exception_local_maintenance_mode_;
-  const Stats::StatName upstream_resp_exception_local_no_healthy_upstream_;
   const Stats::StatName upstream_resp_exception_remote_;
   const Stats::StatName upstream_resp_invalid_type_;
   const Stats::StatName upstream_resp_decoding_error_;
@@ -549,7 +532,7 @@ protected:
     if (cluster_->maintenanceMode()) {
       stats().named_.upstream_rq_maintenance_mode_.inc();
       if (metadata->messageType() == MessageType::Call) {
-        stats().incResponseLocalException(*cluster_, LocalExceptionErrorType::MaintenanceMode);
+        stats().incResponseLocalException(*cluster_);
       }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("maintenance mode for cluster '{}'", cluster_name)),
@@ -570,7 +553,7 @@ protected:
     if (!conn_pool_data) {
       stats().named_.no_healthy_upstream_.inc();
       if (metadata->messageType() == MessageType::Call) {
-        stats().incResponseLocalException(*cluster_, LocalExceptionErrorType::NoHealthyUpstream);
+        stats().incResponseLocalException(*cluster_);
       }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("no healthy upstream for '{}'", cluster_name)),
