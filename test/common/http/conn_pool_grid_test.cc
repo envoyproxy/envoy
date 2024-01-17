@@ -921,7 +921,7 @@ TEST_F(ConnectivityGridTest, Http3FailedH2SuceedsInline) {
   // Because the second pool immediately succeeded, newStream should return nullptr.
   EXPECT_EQ(grid_->newStream(decoder_, callbacks_,
                              {/*can_send_early_data_=*/true,
-                               /*can_use_http3_=*/true}),
+                              /*can_use_http3_=*/true}),
             nullptr);
 }
 

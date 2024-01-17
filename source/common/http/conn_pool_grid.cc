@@ -189,7 +189,8 @@ void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(
   connection_attempts_.clear();
 }
 
-std::pair<bool, ConnectivityGrid::StreamCreationResult> ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+std::pair<bool, ConnectivityGrid::StreamCreationResult>
+ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
   absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
   if (!next_pool.has_value()) {
     // If there are no other pools to try, return false.
