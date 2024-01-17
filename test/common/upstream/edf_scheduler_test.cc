@@ -35,8 +35,8 @@ public:
     for (size_t i = 0; i < contents1.size(); ++i) {
       // Given 2 queues and some number of picks P, where one queue is created empty
       // and P picks are performed, and the other queue is created using
-      // `EdfScheduler::createWithPicks()` thier deadlines may be a bit different
-      // due to floating point arithemetic differences. The comparison code uses
+      // `EdfScheduler::createWithPicks()` their deadlines may be a bit different
+      // due to floating point arithmetic differences. The comparison code uses
       // a NEAR comparison to account for such differences.
       EXPECT_NEAR(contents1[i].deadline_, contents2[i].deadline_, 1e-5)
           << "inequal deadline in element " << i;
