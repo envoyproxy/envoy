@@ -13,6 +13,7 @@ envoy_package()
 envoy_cc_mock(
     name = "ext_proc_mocks",
     hdrs = ["mocks.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_proc:client_interface",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
@@ -22,6 +23,7 @@ envoy_cc_mock(
 envoy_proto_library(
     name = "ext_proc_unit_test_fuzz_proto",
     srcs = ["ext_proc_unit_test_fuzz.proto"],
+    tags = ["skip_on_windows"],
     deps = [
         "//test/fuzz:common_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg",
@@ -33,6 +35,7 @@ envoy_cc_fuzz_test(
     name = "ext_proc_unit_test_fuzz",
     srcs = ["ext_proc_unit_test_fuzz.cc"],
     corpus = "ext_proc_corpus",
+    tags = ["skip_on_windows"],
     deps = [
         ":ext_proc_mocks",
         ":ext_proc_unit_test_fuzz_proto_cc_proto",
