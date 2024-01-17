@@ -223,7 +223,7 @@ void ClientIntegrationTest::basicTest() {
   } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
     ASSERT_EQ(2, last_stream_final_intel_.upstream_protocol);
   } else {
-    // This verifies the H3 attempt was made due to the quic hints
+    // This verifies the H3 attempt was made due to the quic hints.
     absl::MutexLock l(&engine_lock_);
     std::string stats = engine_->dumpStats();
     EXPECT_TRUE((absl::StrContains(stats, "cluster.base.upstream_cx_http3_total: 1"))) << stats;
@@ -570,6 +570,23 @@ TEST_P(ClientIntegrationTest, ResetAfterResponseHeaders) {
   ASSERT_EQ(cc_.on_error_calls, 1);
 }
 
+TEST_P(ClientIntegrationTest, ResetAfterResponseHeadersExplicit) {
+  explicit_flow_control_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_RESPONSE_HEADERS, "yes");
+  default_request_headers_.addCopy(AutonomousStream::RESPONSE_DATA_BLOCKS, "1");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  // Read the body chunk. This releases the error.
+  stream_->readData(100);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
 TEST_P(ClientIntegrationTest, ResetAfterHeaderOnlyResponse) {
   autonomous_allow_incomplete_streams_ = true;
   initialize();
@@ -612,7 +629,6 @@ TEST_P(ClientIntegrationTest, ResetAfterData) {
 TEST_P(ClientIntegrationTest, CancelBeforeRequestHeadersSent) {
   autonomous_upstream_ = false;
   initialize();
-  ConditionalInitializer headers_callback;
 
   stream_->cancel();
 
@@ -691,16 +707,6 @@ TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStream) {
   autonomous_upstream_ = false;
 
   initialize();
-  ConditionalInitializer headers_callback;
-
-  stream_prototype_->setOnHeaders(
-      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
-                                envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
-        headers_callback.setReady();
-        return nullptr;
-      });
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
 
@@ -867,6 +873,81 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   if (upstreamProtocol() != Http::CodecType::HTTP1) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
+}
+
+TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
+  autonomous_upstream_ = false;
+  initialize();
+  ConditionalInitializer headers_callback;
+
+  stream_prototype_->setOnHeaders(
+      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
+                                envoy_stream_intel) {
+        cc_.status = absl::StrCat(headers->httpStatus());
+        cc_.on_headers_calls++;
+        headers_callback.setReady();
+        return nullptr;
+      });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+
+  // Send response headers but no body.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  // Make sure the headers are sent up.
+  headers_callback.waitReady();
+  // Reset the stream.
+  upstream_request_->encodeResetStream();
+
+  // Encoding data should not be problematic.
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+  // Make sure cancel isn't problematic.
+  stream_->cancel();
+}
+
+TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
+  explicit_flow_control_ = true;
+  autonomous_upstream_ = false;
+  initialize();
+  ConditionalInitializer headers_callback;
+
+  stream_prototype_->setOnHeaders(
+      [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
+                                envoy_stream_intel) {
+        cc_.status = absl::StrCat(headers->httpStatus());
+        cc_.on_headers_calls++;
+        headers_callback.setReady();
+        return nullptr;
+      });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+
+  // Send response headers and body but no fin.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1, false);
+  upstream_request_->encodeResetStream();
+  if (getCodecType() != Http::CodecType::HTTP3) {
+    // Make sure the headers are sent up.
+    headers_callback.waitReady();
+  }
+
+  // Encoding data should not be problematic.
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+  // Make sure cancel isn't problematic.
+  stream_->cancel();
 }
 
 TEST_P(ClientIntegrationTest, Proxying) {

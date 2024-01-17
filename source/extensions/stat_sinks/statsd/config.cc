@@ -23,8 +23,9 @@ StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
           config, server.messageValidationContext().staticValidationVisitor());
   switch (statsd_sink.statsd_specifier_case()) {
   case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::kAddress: {
-    Network::Address::InstanceConstSharedPtr address =
-        Network::Address::resolveProtoAddress(statsd_sink.address());
+    auto address_or_error = Network::Address::resolveProtoAddress(statsd_sink.address());
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    Network::Address::InstanceConstSharedPtr address = address_or_error.value();
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
     return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
                                                            false, statsd_sink.prefix());

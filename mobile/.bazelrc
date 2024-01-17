@@ -298,7 +298,6 @@ build:mobile-remote-ci-macos-swift --config=ios
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --define=signal_trace=disabled
 build:mobile-remote-ci-macos-swift --define=envoy_mobile_request_compression=disabled
-build:mobile-remote-ci-macos-swift --define=envoy_mobile_stats_reporting=disabled
 build:mobile-remote-ci-macos-swift --define=envoy_mobile_swift_cxx_interop=disabled
 build:mobile-remote-ci-macos-swift --define=google_grpc=disabled
 build:mobile-remote-ci-macos-swift --define=envoy_mobile_xds=disabled

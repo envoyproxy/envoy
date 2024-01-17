@@ -162,6 +162,7 @@ public:
                                      proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
+  quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
 };
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
@@ -201,7 +202,7 @@ public:
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr) {}
+                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr, {}) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();

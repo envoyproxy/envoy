@@ -73,6 +73,7 @@ The following sandboxes are available:
     rbac
     redis
     route-mirror
+    single-page-app
     skywalking
     tls-inspector
     tls-sni

@@ -26,6 +26,15 @@ go_proto_compiler(
     visibility = ["//visibility:public"],
 )
 
+go_proto_compiler(
+    name = "vtprotobuf_plugin_go",
+    options = ["features=marshal_strict+size"],
+    plugin = "@com_github_planetscale_vtprotobuf//cmd/protoc-gen-go-vtproto",
+    suffix = "_vtproto.pb.go",
+    valid_archive = False,
+    visibility = ["//visibility:public"],
+)
+
 json_data(
     name = "repository_locations",
     data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),

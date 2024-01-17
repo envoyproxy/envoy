@@ -29,6 +29,57 @@ void CryptoMbContext::scheduleCallback(enum RequestStatus status) {
   schedulable_->scheduleCallbackNextIteration();
 }
 
+bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
+  if (ec_key_ == nullptr) {
+    return false;
+  }
+
+  const EC_GROUP* group = EC_KEY_get0_group(ec_key_.get());
+  priv_key_ = EC_KEY_get0_private_key(ec_key_.get());
+  if (group == nullptr || priv_key_ == nullptr) {
+    return false;
+  }
+
+  const BIGNUM* order = EC_GROUP_get0_order(group);
+  if (order == nullptr) {
+    return false;
+  }
+
+  // Create an ephemeral key.
+  ctx_ = bssl::UniquePtr<BN_CTX>(BN_CTX_new());
+  if (ctx_ == nullptr) {
+    return false;
+  }
+  BN_CTX_start(ctx_.get());
+  k_ = BN_CTX_get(ctx_.get());
+  if (!k_) {
+    return false;
+  }
+  do {
+    if (!BN_rand_range(k_, order)) {
+      return false;
+    }
+  } while (BN_is_zero(k_));
+
+  // Extent with zero paddings as CryptoMB expects in_buf_ being sign length.
+  int len = BN_num_bits(order);
+  size_t buf_len = (len + 7) / 8;
+  if (8 * in_len < static_cast<unsigned long>(len)) {
+    in_buf_ = std::make_unique<uint8_t[]>(buf_len);
+    memcpy(in_buf_.get() + buf_len - in_len, in, in_len); // NOLINT(safe-memcpy)
+  } else {
+    in_buf_ = std::make_unique<uint8_t[]>(in_len);
+    memcpy(in_buf_.get(), in, in_len); // NOLINT(safe-memcpy)
+  }
+
+  sig_len_ = ECDSA_size(ec_key_.get());
+  if (sig_len_ > MAX_SIGNATURE_SIZE) {
+    return false;
+  }
+
+  return true;
+}
+
 bool CryptoMbRsaContext::rsaInit(const uint8_t* in, size_t in_len) {
   if (rsa_ == nullptr) {
     return false;
@@ -70,13 +121,11 @@ int calculateDigest(const EVP_MD* md, const uint8_t* in, size_t in_len, unsigned
   return 1;
 }
 
-ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops,
-                                                     uint8_t* out, size_t* out_len, size_t max_out,
-                                                     uint16_t signature_algorithm,
+ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops, uint8_t*,
+                                                     size_t*, size_t, uint16_t signature_algorithm,
                                                      const uint8_t* in, size_t in_len) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
-  unsigned int out_len_unsigned;
 
   if (ops == nullptr) {
     return ssl_private_key_failure;
@@ -105,20 +154,17 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
     return ssl_private_key_failure;
   }
 
-  if (max_out < ECDSA_size(ec_key.get())) {
+  // Create MB context which will be used for this particular
+  // signing/decryption.
+  CryptoMbEcdsaContextSharedPtr mb_ctx =
+      std::make_shared<CryptoMbEcdsaContext>(std::move(ec_key), ops->dispatcher_, ops->cb_);
+
+  if (!mb_ctx->ecdsaInit(hash, hash_len)) {
     return ssl_private_key_failure;
   }
 
-  // Borrow "out" because it has been already initialized to the max_out size.
-  if (!ECDSA_sign(0, hash, hash_len, out, &out_len_unsigned, ec_key.get())) {
-    return ssl_private_key_failure;
-  }
-
-  if (out_len_unsigned > max_out) {
-    return ssl_private_key_failure;
-  }
-  *out_len = out_len_unsigned;
-  return ssl_private_key_success;
+  ops->addToQueue(mb_ctx);
+  return ssl_private_key_retry;
 }
 
 ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
@@ -386,10 +432,16 @@ void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) 
 }
 
 void CryptoMbQueue::processRequests() {
-  if (type_ == KeyType::Rsa) {
+  switch (type_) {
+  case KeyType::Rsa:
     // Record queue size statistic value for histogram.
     stats_.rsa_queue_sizes_.recordValue(request_queue_.size());
     processRsaRequests();
+    break;
+  case KeyType::Ec:
+    // Record queue size statistic value for histogram.
+    stats_.ecdsa_queue_sizes_.recordValue(request_queue_.size());
+    processEcdsaRequests();
   }
   request_queue_.clear();
 }
@@ -464,6 +516,80 @@ void CryptoMbQueue::processRsaRequests() {
     ctx_status = status[req_num];
     mb_ctx->scheduleCallback(ctx_status);
   }
+}
+
+void CryptoMbQueue::processEcdsaRequests() {
+  uint8_t sig_r[MULTIBUFF_BATCH][32];
+  uint8_t sig_s[MULTIBUFF_BATCH][32];
+  uint8_t* pa_sig_r[MULTIBUFF_BATCH] = {sig_r[0], sig_r[1], sig_r[2], sig_r[3],
+                                        sig_r[4], sig_r[5], sig_r[6], sig_r[7]};
+  uint8_t* pa_sig_s[MULTIBUFF_BATCH] = {sig_s[0], sig_s[1], sig_s[2], sig_s[3],
+                                        sig_s[4], sig_s[5], sig_s[6], sig_s[7]};
+  const unsigned char* digest[MULTIBUFF_BATCH] = {nullptr};
+  const BIGNUM* eph_key[MULTIBUFF_BATCH] = {nullptr};
+  const BIGNUM* priv_key[MULTIBUFF_BATCH] = {nullptr};
+
+  /* Build arrays of pointers for call */
+  for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
+    CryptoMbEcdsaContextSharedPtr mb_ctx =
+        std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
+    digest[req_num] = mb_ctx->in_buf_.get();
+    eph_key[req_num] = mb_ctx->k_;
+    priv_key[req_num] = mb_ctx->priv_key_;
+  }
+
+  ENVOY_LOG(debug, "Multibuffer ECDSA process {} requests", request_queue_.size());
+
+  uint32_t ecdsa_sts =
+      ipp_->mbxNistp256EcdsaSignSslMb8(pa_sig_r, pa_sig_s, digest, eph_key, priv_key);
+
+  enum RequestStatus status[MULTIBUFF_BATCH] = {RequestStatus::Retry};
+
+  for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
+    CryptoMbEcdsaContextSharedPtr mb_ctx =
+        std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
+    enum RequestStatus ctx_status;
+    if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} success", req_num);
+      if (postprocessEcdsaRequest(mb_ctx, pa_sig_r[req_num], pa_sig_s[req_num])) {
+        status[req_num] = RequestStatus::Success;
+      } else {
+        status[req_num] = RequestStatus::Error;
+      }
+    } else {
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} failure", req_num);
+      status[req_num] = RequestStatus::Error;
+    }
+
+    ctx_status = status[req_num];
+    mb_ctx->scheduleCallback(ctx_status);
+
+    // End context to invalid the ephemeral key.
+    BN_CTX_end(mb_ctx->ctx_.get());
+  }
+}
+
+bool CryptoMbQueue::postprocessEcdsaRequest(CryptoMbEcdsaContextSharedPtr mb_ctx,
+                                            const uint8_t* pa_sig_r, const uint8_t* pa_sig_s) {
+  ECDSA_SIG* sig = ECDSA_SIG_new();
+  if (sig == nullptr) {
+    return false;
+  }
+  BIGNUM* sig_r = BN_bin2bn(pa_sig_r, 32, nullptr);
+  BIGNUM* sig_s = BN_bin2bn(pa_sig_s, 32, nullptr);
+  ECDSA_SIG_set0(sig, sig_r, sig_s);
+
+  // Marshal signature into out_buf_.
+  CBB cbb;
+  if (!CBB_init_fixed(&cbb, mb_ctx->out_buf_, mb_ctx->sig_len_) || !ECDSA_SIG_marshal(&cbb, sig) ||
+      !CBB_finish(&cbb, nullptr, &mb_ctx->out_len_)) {
+    CBB_cleanup(&cbb);
+    ECDSA_SIG_free(sig);
+    return false;
+  }
+
+  ECDSA_SIG_free(sig);
+  return true;
 }
 
 CryptoMbPrivateKeyConnection::CryptoMbPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,
