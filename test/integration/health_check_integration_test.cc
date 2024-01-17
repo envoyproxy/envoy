@@ -556,6 +556,10 @@ public:
     auto health_check = addHealthCheck(cluster_data.cluster_);
     health_check->mutable_tcp_health_check()->mutable_send()->set_text("50696E67"); // "Ping"
     health_check->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");  // "Pong"
+    if (proxy_protocol_config_ != nullptr) {
+      health_check->mutable_tcp_health_check()->mutable_proxy_protocol_config()->CopyFrom(
+          *proxy_protocol_config_);
+    }
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -568,6 +572,9 @@ public:
     ASSERT_TRUE(cluster_data.host_fake_raw_connection_->waitForData(
         FakeRawConnection::waitForInexactMatch("Ping")));
   }
+
+protected:
+  std::unique_ptr<envoy::config::core::v3::ProxyProtocolConfig> proxy_protocol_config_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpHealthCheckIntegrationTest,
@@ -605,6 +612,23 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointWrongResponseTcp) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that a healthy endpoint returns a valid TCP health check response with ProxyProtocol.
+TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcpWithProxyProtocol) {
+  proxy_protocol_config_ = std::make_unique<envoy::config::core::v3::ProxyProtocolConfig>();
+  proxy_protocol_config_->set_version(envoy::config::core::v3::ProxyProtocolConfig_Version_V1);
+
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initTcpHealthCheck(cluster_idx);
+
+  AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
 // Tests that no TCP health check response results in timeout and unhealthy endpoint.
