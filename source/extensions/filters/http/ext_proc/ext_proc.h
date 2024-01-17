@@ -250,52 +250,65 @@ public:
     return grpc_service_;
   }
 
-  const absl::optional<const std::vector<std::string>>&
-  untypedForwardingMetadataNamespaces() const {
+  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
     return untyped_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
+  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
     return typed_forwarding_namespaces_;
   }
-  const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
+  const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
 
 private:
+  enum MergeBehavior {
+    // Merge the values
+    Merge,
+    // Overwrite the field value iff provided is not empty
+    Overwrite,
+    // Overwrite the field value allowing empty
+    OverwriteWithEmpty,
+  };
+
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
   initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
   absl::optional<envoy::config::core::v3::GrpcService>
   initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  absl::optional<std::vector<std::string>>
+  std::vector<std::string>
   initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns);
 
-  absl::optional<std::vector<std::string>> initUntypedForwardingNamespaces(
+  std::vector<std::string> initUntypedForwardingNamespaces(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  absl::optional<std::vector<std::string>> initTypedForwardingNamespaces(
+  std::vector<std::string> initTypedForwardingNamespaces(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  absl::optional<std::vector<std::string>> initUntypedReceivingNamespaces(
+  std::vector<std::string> initUntypedReceivingNamespaces(
+      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  MergeBehavior initMergeBehavior(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
   mergeProcessingMode(const FilterConfigPerRoute& less_specific,
                       const FilterConfigPerRoute& more_specific);
 
-  absl::optional<std::vector<std::string>>
-  mergeNamespaces(const absl::optional<std::vector<std::string>>& less_specific,
-                  const absl::optional<std::vector<std::string>>& more_specific);
+  std::vector<std::string>
+  mergeNamespaces(const std::vector<std::string>& less_specific,
+                  const std::vector<std::string>& more_specific,
+                  const MergeBehavior merge_behavior);
 
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
 
-  const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
-  const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
+  const MergeBehavior merge_behavior_;
+  const std::vector<std::string> untyped_forwarding_namespaces_;
+  const std::vector<std::string> typed_forwarding_namespaces_;
+  const std::vector<std::string> untyped_receiving_namespaces_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,

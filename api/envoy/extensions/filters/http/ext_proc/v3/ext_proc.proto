@@ -214,23 +214,25 @@ message ExternalProcessor {
 // dynamic metadata. Specifically, which namespaces to send to the server, whether
 // metadata returned by the server may be written, and how that metadata may be written.
 message MetadataOptions {
+  // Defines how overrides apply when evaluating more-specific config against
+  // less-specific config. Defaults to "merge".
+  enum MergeBehavior {
+    // Merge the more-specific config's namespace list into the less-specific config's
+    // namespace list. With this option, more-specific config is always a strict superset
+    // of less-specific config.
+    merge = 0;
+
+    // Allows overwriting a namespace list if the more-specific config is
+    // non-empty. An empty more-specific config will cause the less-specific
+    // config to be used.
+    overwrite = 1;
+
+    // Allows overwriting a namespace list with an empty namespace list to
+    // effectively disable the less-specific config.
+    overwrite_with_empty = 2;
+  }
+
   message MetadataNamespaces {
-    enum MergeBehavior {
-      // Allows overwriting a namespace list if the more-specific config is
-      // non-empty. An empty more-specific config will cause the less-specific
-      // config to be used.
-      overwrite = 0;
-
-      // Allows overwriting a namespace list with an empty namespace list to
-      // effectively disable the less-specific config.
-      overwrite_with_empty = 1;
-
-      // Merge the more-specific config into the less-specific config. With this
-      // option, more-specific config is always a strict superset of less-specific
-      // config.
-      merge = 2;
-    }
-
     // Specifies a list of metadata namespaces whose values, if present,
     // will be passed to the ext_proc service as an opaque *protobuf::Struct*.
     repeated string untyped = 1;
@@ -240,12 +242,6 @@ message MetadataOptions {
     // envoy and the external processing server to share the protobuf message
     // definition for safe parsing.
     repeated string typed = 2;
-
-    // [#not-implemented-hide:]
-    // TODO(jbohanon) implement
-    // Specifies how more-specific config (e.g. on a virtual host or route) is
-    // handled when merging into less-specific config (e.g. listener).
-    MergeBehavior merge_behavior = 3;
   }
 
   // Describes which typed or untyped dynamic metadata namespaces to forward to
@@ -256,6 +252,10 @@ message MetadataOptions {
   // the external processing server. Set to empty or leave unset to disallow writing
   // any received dynamic metadata. Receiving of typed metadata is not supported.
   MetadataNamespaces receiving_namespaces = 2;
+
+  // Specifies how more-specific config (e.g. on a virtual host or route) is
+  // handled when merging into less-specific config (e.g. listener).
+  MergeBehavior namespaces_merge_behavior = 3;
 }
 
 // The HeaderForwardingRules structure specifies what headers are
