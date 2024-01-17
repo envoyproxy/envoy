@@ -58,6 +58,7 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/grpc:status",
@@ -113,6 +114,7 @@ envoy_cc_library(
     name = "client_lib",
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
+    tags = ["skip_on_windows"],
     deps = [
         ":client_interface",
         "//envoy/grpc:async_client_interface",
