@@ -86,10 +86,11 @@ int reasonToReset(StreamResetReason reason) {
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 
-ReceivedSettingsImpl::ReceivedSettingsImpl(const nghttp2_settings& settings) {
-  for (uint32_t i = 0; i < settings.niv; ++i) {
-    if (settings.iv[i].settings_id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
-      concurrent_stream_limit_ = settings.iv[i].value;
+ReceivedSettingsImpl::ReceivedSettingsImpl(
+    const std::vector<http2::adapter::Http2Setting>& settings) {
+  for (const auto& [id, value] : settings) {
+    if (id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
+      concurrent_stream_limit_ = value;
       break;
     }
   }
@@ -1169,7 +1170,13 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    onSettings(frame->settings);
+    std::vector<http2::adapter::Http2Setting> settings;
+    for (const nghttp2_settings_entry& entry :
+         absl::MakeSpan(frame->settings.iv, frame->settings.niv)) {
+      settings.push_back(
+          {static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
+    }
+    onSettings(settings);
   }
 
   StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
