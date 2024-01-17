@@ -42,6 +42,39 @@ bool FakeIppCryptoImpl::mbxGetSts(uint32_t status, unsigned req_num) {
   return !((status >> req_num) & 1UL);
 }
 
+uint32_t FakeIppCryptoImpl::mbxNistp256EcdsaSignSslMb8(uint8_t* pa_sign_r[8], uint8_t* pa_sign_s[8],
+                                                       const uint8_t* const pa_msg[8],
+                                                       const BIGNUM* const pa_eph_skey[8],
+                                                       const BIGNUM* const pa_reg_skey[8]) {
+
+  uint32_t status = 0xff;
+
+  for (int i = 0; i < 8; i++) {
+    EC_KEY* key;
+    ECDSA_SIG* sig;
+
+    if (pa_eph_skey[i] == nullptr) {
+      break;
+    }
+
+    key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+    EC_KEY_set_private_key(key, pa_reg_skey[i]);
+
+    // Length of the message representative is equal to length of r (order of EC subgroup).
+    sig = ECDSA_do_sign(pa_msg[i], 32, key);
+
+    BN_bn2bin(sig->r, pa_sign_r[i]);
+    BN_bn2bin(sig->s, pa_sign_s[i]);
+
+    ECDSA_SIG_free(sig);
+    EC_KEY_free(key);
+
+    status = mbxSetSts(status, i, !inject_errors_);
+  }
+
+  return status;
+}
+
 uint32_t FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
     const uint8_t* const from_pa[8], uint8_t* const to_pa[8], const BIGNUM* const p_pa[8],
     const BIGNUM* const q_pa[8], const BIGNUM* const dp_pa[8], const BIGNUM* const dq_pa[8],

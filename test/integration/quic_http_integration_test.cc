@@ -1496,7 +1496,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
     socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
     socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    timeSystem().advanceTimeWait(std::chrono::seconds(TSAN_TIMEOUT_FACTOR));
+    timeSystem().advanceTimeWait(std::chrono::seconds(TIMEOUT_FACTOR));
   }
 
   ASSERT_TRUE(response->waitForEndStream());
