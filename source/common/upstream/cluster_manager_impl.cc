@@ -1026,7 +1026,6 @@ void ClusterManagerImpl::updateClusterCounts() {
     if (last_recorded_warming_clusters_count_ == 0 && !warming_clusters_.empty()) {
       resume_cds_ = ads_mux_->pause(type_url);
     } else if (last_recorded_warming_clusters_count_ > 0 && warming_clusters_.empty()) {
-      ASSERT(resume_cds_ != nullptr);
       resume_cds_.reset();
     }
   }
