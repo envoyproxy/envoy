@@ -87,7 +87,7 @@ int reasonToReset(StreamResetReason reason) {
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 
 ReceivedSettingsImpl::ReceivedSettingsImpl(
-    const std::vector<http2::adapter::Http2Setting>& settings) {
+    absl::Span<const http2::adapter::Http2Setting> settings) {
   for (const auto& [id, value] : settings) {
     if (id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
       concurrent_stream_limit_ = value;

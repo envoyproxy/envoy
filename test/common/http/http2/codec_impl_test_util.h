@@ -40,7 +40,7 @@ public:
 protected:
   // Stores SETTINGS parameters contained in |settings_frame| to make them available via
   // getRemoteSettingsParameterValue().
-  void onSettingsFrame(const std::vector<http2::adapter::Http2Setting> settings) {
+  void onSettingsFrame(absl::Span<const http2::adapter::Http2Setting> settings) {
     for (const auto& [id, value] : settings) {
       auto result = settings_.insert(std::make_pair(id, value));
       // It is possible to have duplicate settings parameters, each new parameter replaces any
@@ -93,7 +93,7 @@ public:
 
 protected:
   // Overrides ServerConnectionImpl::onSettings().
-  void onSettings(const std::vector<http2::adapter::Http2Setting>& settings) override {
+  void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) override {
     onSettingsFrame(settings);
   }
 
@@ -131,7 +131,7 @@ public:
 
 protected:
   // Overrides ClientConnectionImpl::onSettings().
-  void onSettings(const std::vector<http2::adapter::Http2Setting>& settings) override {
+  void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) override {
     onSettingsFrame(settings);
   }
 };
