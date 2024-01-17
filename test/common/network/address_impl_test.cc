@@ -408,7 +408,7 @@ TEST(PipeInstanceTest, PermissionFail) {
 
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_THROW_WITH_REGEX(sock.bind(address), EnvoyException, "Failed to create socket with mode");
+  EXPECT_NE(sock.bind(address).return_value_, 0);
 }
 
 TEST(PipeInstanceTest, AbstractNamespacePermission) {
