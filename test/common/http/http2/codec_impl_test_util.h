@@ -47,8 +47,7 @@ protected:
       // existing value.
       // https://tools.ietf.org/html/rfc7540#section-6.5
       if (!result.second) {
-        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {} with value {}",
-                       id, value);
+        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {} with value {}", id, value);
         settings_.erase(result.first);
         // Guaranteed success here.
         settings_.insert(std::make_pair(id, value));
@@ -94,7 +93,9 @@ public:
 
 protected:
   // Overrides ServerConnectionImpl::onSettings().
-  void onSettings(const std::vector<http2::adapter::Http2Setting>& settings) override { onSettingsFrame(settings); }
+  void onSettings(const std::vector<http2::adapter::Http2Setting>& settings) override {
+    onSettingsFrame(settings);
+  }
 
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };
@@ -130,7 +131,9 @@ public:
 
 protected:
   // Overrides ClientConnectionImpl::onSettings().
-  void onSettings(const std::vector<http2::adapter::Http2Setting>& settings) override { onSettingsFrame(settings); }
+  void onSettings(const std::vector<http2::adapter::Http2Setting>& settings) override {
+    onSettingsFrame(settings);
+  }
 };
 
 } // namespace Http2
