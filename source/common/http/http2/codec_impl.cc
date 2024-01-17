@@ -1097,6 +1097,47 @@ enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
   }
 }
 
+Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
+  if (is_ack) {
+    ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, opaque_data);
+
+    onKeepaliveResponse();
+  }
+  return okStatus();
+}
+
+Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, size_t padding) {
+  RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
+                                       frame->hd.flags, frame->data.padlen));
+
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+  if (!stream) {
+    return okStatus();
+  }
+
+  // Track bytes sent and received.
+  if (frame->hd.type != METADATA_FRAME_TYPE) {
+    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+  }
+  if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
+    stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+  }
+
+}
+
+Status ConnectionImpl::onGoAway(uint32_t error_code) {
+  if (!raised_goaway_) {
+    raised_goaway_ = true;
+    callbacks().onGoAway(ngHttp2ErrorCodeToErrorCode(error_code));
+  }
+  return okStatus();
+}
+
+Status ConnectionImpl::onSettings(std::vector<Http2Setting> settings) {
+
+}
+
+Status onHeaders(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, int headers_category);
 Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   ASSERT(connection_.state() == Network::Connection::State::Open);
@@ -1106,31 +1147,25 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   // and CONTINUATION frames in onBeforeFrameReceived().
   ASSERT(frame->hd.type != NGHTTP2_CONTINUATION);
 
-  if ((frame->hd.type == NGHTTP2_PING) && (frame->ping.hd.flags & NGHTTP2_FLAG_ACK)) {
+  if (frame->hd.type == NGHTTP2_PING) {
     // The ``opaque_data`` should be exactly what was sent in the ping, which is
     // was the current time when the ping was sent. This can be useful while debugging
     // to match the ping and ack.
     uint64_t data;
     safeMemcpy(&data, &(frame->ping.opaque_data));
-    ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
-
-    onKeepaliveResponse();
-    return okStatus();
+    return onPing(data, frame->ping.hd.flags & NGHTTP2_FLAG_ACK);
   }
 
   if (frame->hd.type == NGHTTP2_DATA) {
-    RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
-                                       frame->hd.flags, frame->data.padlen));
+    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type,
+                       frame->hd.flags, frame->data.padlen);
   }
 
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
   // notifications are the same as a normal GOAWAY.
   // TODO: handle multiple GOAWAY frames.
-  if (frame->hd.type == NGHTTP2_GOAWAY && !raised_goaway_) {
-    ASSERT(frame->hd.stream_id == 0);
-    raised_goaway_ = true;
-    callbacks().onGoAway(ngHttp2ErrorCodeToErrorCode(frame->goaway.error_code));
-    return okStatus();
+  if (frame->hd.type == NGHTTP2_GOAWAY) {
+    return onGoAway(frame->goaway.error_code);
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
