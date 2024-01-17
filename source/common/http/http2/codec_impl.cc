@@ -1134,10 +1134,6 @@ Status ConnectionImpl::onGoAway(uint32_t error_code) {
   return okStatus();
 }
 
-Status ConnectionImpl::onSettings(std::vector<Http2Setting> settings) {
-
-}
-
 Status onHeaders(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, int headers_category);
 Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
@@ -1171,6 +1167,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
     std::vector<http2::adapter::Http2Setting> settings;
+    settings.reserve(frame->settings.niv);
     for (const nghttp2_settings_entry& entry :
          absl::MakeSpan(frame->settings.iv, frame->settings.niv)) {
       settings.push_back(
