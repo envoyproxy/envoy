@@ -35,6 +35,7 @@
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
 #include "quiche/http2/adapter/http2_adapter.h"
+#include "quiche/http2/adapter/http2_protocol.h"
 #include "quiche/http2/adapter/oghttp2_adapter.h"
 
 namespace Envoy {
@@ -50,7 +51,7 @@ constexpr uint64_t H2_FRAME_HEADER_SIZE = 9;
 
 class ReceivedSettingsImpl : public ReceivedSettings {
 public:
-  explicit ReceivedSettingsImpl(const nghttp2_settings& settings);
+  explicit ReceivedSettingsImpl(const std::vector<http2::adapter::Http2Setting>& settings);
 
   // ReceivedSettings
   const absl::optional<uint32_t>& maxConcurrentStreams() const override {
@@ -596,7 +597,7 @@ protected:
   void sendSettingsHelperOld(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                              bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
-  virtual void onSettings(const nghttp2_settings& settings) {
+  virtual void onSettings(const std::vector<http2::adapter::Http2Setting>& settings) {
     ReceivedSettingsImpl received_settings(settings);
     callbacks().onSettings(received_settings);
   }
