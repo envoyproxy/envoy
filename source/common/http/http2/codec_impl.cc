@@ -88,9 +88,9 @@ using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 
 ReceivedSettingsImpl::ReceivedSettingsImpl(
     const std::vector<http2::adapter::Http2Setting>& settings) {
-  for (const http2::adapter::Http2Setting& setting : settings) {
-    if (setting.id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
-      concurrent_stream_limit_ = setting.value;
+  for (const auto& [id, value] : settings) {
+    if (id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
+      concurrent_stream_limit_ = value;
       break;
     }
   }
@@ -1138,8 +1138,8 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     std::vector<http2::adapter::Http2Setting> settings;
     for (const nghttp2_settings_entry& entry :
          absl::MakeSpan(frame->settings.iv, frame->settings.niv)) {
-      settings.push_back(http2::adapter::Http2Setting{
-          static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
+      settings.push_back(
+          {static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
     }
     onSettings(settings);
   }
