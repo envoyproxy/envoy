@@ -601,6 +601,14 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   std::string command_name = absl::AsciiStrToLower(request->asArray()[0].asString());
 
+  if (command_name == Common::Redis::SupportedCommands::hello()) {
+    // Respond to HELLO locally
+    // Adding this before auth, since hello will be issued before auth command
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().UnKnownCommandHello));
+    return nullptr;
+
+  }
+
   if (command_name == Common::Redis::SupportedCommands::auth()) {
     if (request->asArray().size() < 2) {
       onInvalidRequest(callbacks);
