@@ -17,7 +17,6 @@ namespace ExternalProcessing {
 
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
-using envoy::extensions::filters::http::ext_proc::v3::MetadataOptions;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::type::v3::StatusCode;
 
