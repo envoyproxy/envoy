@@ -146,6 +146,13 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
     )
+    go_repository(
+        name = "com_github_planetscale_vtprotobuf",
+        importpath = "github.com/planetscale/vtprotobuf",
+        sum = "h1:nve54OLsoKDQhb8ZnnHHUyvAK3vjBiwTEJeC3UsqzJ8=",
+        version = "v0.5.1-0.20231205081218-d930d8ac92f8",
+        build_external = "external",
+    )
 
     protoc_gen_jsonschema_go_dependencies()
 

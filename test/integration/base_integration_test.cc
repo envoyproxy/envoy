@@ -537,7 +537,7 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
 
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
-  const int num_iterations = TSAN_TIMEOUT_FACTOR * 1000;
+  const int num_iterations = TIMEOUT_FACTOR * 1000;
   for (int i = 0; i < num_iterations; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
