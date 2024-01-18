@@ -216,7 +216,8 @@ FilterConfigPerRoute::mergeNamespaces(const std::vector<std::string>& less_speci
       return more_specific;
     }
     return less_specific;
-  case MergeBehavior::Merge:
+  default:
+    // Merge is the default condidition.
     std::vector<std::string> vec{less_specific.begin(), less_specific.end()};
     for (const auto& elem : more_specific) {
       vec.emplace_back(elem);
