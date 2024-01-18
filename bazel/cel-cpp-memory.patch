@@ -1,0 +1,44 @@
+From 09a072b4bb5a75e1df15beba29a9f13b1948ff8b Mon Sep 17 00:00:00 2001
+From: Ivan Prisyazhnyy <john.koepi@gmail.com>
+Date: Thu, 18 Jan 2024 13:55:29 +0000
+Subject: [PATCH] Fix: use of sized deallocation in base/memory.h wo check
+
+Dependant projects that do not use `-fsized-deallocation`
+would not compile with the call to delete(void*, size_t, align).
+
+There are other places that already check for
+`defined(__cpp_sized_deallocation)` and this patch just shares
+this practice.
+
+Testing:
+
+    // fix .bazelrc to have:
+    build --cxxopt=-fno-sized-deallocation
+
+    $ bazel build --verbose_failures //base:\*
+
+Signed-off-by: Ivan Prisyazhnyy <john.koepi@gmail.com>
+---
+ base/memory.h | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/base/memory.h b/base/memory.h
+index 3552e19a..c310128a 100644
+--- a/base/memory.h
++++ b/base/memory.h
+@@ -89,8 +89,14 @@ class Allocator {
+ 
+   void deallocate(pointer p, size_type n) {
+     if (!allocation_only_) {
+-      ::operator delete(static_cast<void*>(p), n * sizeof(T),
++#if defined(__cpp_sized_deallocation) && __cpp_sized_deallocation >= 201309L
++      ::operator delete(static_cast<void *>(p), n * sizeof(T),
+                         static_cast<std::align_val_t>(alignof(T)));
++#else
++      ::operator delete(static_cast<void *>(p),
++                        static_cast<std::align_val_t>(alignof(T)));
++      static_cast<void>(n); // unused
++#endif
+     }
+   }
+
