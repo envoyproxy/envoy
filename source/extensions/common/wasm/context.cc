@@ -36,11 +36,22 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#endif
+
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/field_access.h"
 #include "eval/public/containers/field_backed_list_impl.h"
 #include "eval/public/containers/field_backed_map_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "include/proxy-wasm/pairs_util.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
@@ -456,6 +467,11 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   // In order to delegate to the StreamActivation method, we have to set the
   // context properties to match the Wasm context properties in all callbacks
   // (e.g. onLog or onEncodeHeaders) for the duration of the call.
+  if (root_local_info_) {
+    local_info_ = root_local_info_;
+  } else if (plugin_) {
+    local_info_ = &plugin()->localInfo();
+  }
   activation_info_ = info;
   activation_request_headers_ = request_headers_ ? request_headers_ : access_log_request_headers_;
   activation_response_headers_ =

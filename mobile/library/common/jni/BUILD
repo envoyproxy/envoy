@@ -164,6 +164,11 @@ cc_binary(
         # Without this option the app crashes when launched
         # on arm64 emulator which is not covered by CI.
         "-ldl",
+        # Brotli compressor includes libm, so Envoy itself gets it by default.
+        # Envoy Mobile doesn't include Brotli compressor, so libm doesn't get
+        # included in the build, but several parts of Envoy rely on libm, for
+        # example, for std::pow, so we link it in here.
+        "-lm",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],

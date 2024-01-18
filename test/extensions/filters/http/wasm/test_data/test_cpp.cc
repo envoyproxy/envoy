@@ -147,7 +147,7 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
     }
   } else if (test == "metadata") {
     std::string value;
-    if (!getValue({"node", "metadata", "wasm_node_get_key"}, &value)) {
+    if (!getValue({"xds", "node", "metadata", "wasm_node_get_key"}, &value)) {
       logDebug("missing node metadata");
     }
     auto r = setFilterStateStringValue("wasm_request_set_key", "wasm_request_set_value");
