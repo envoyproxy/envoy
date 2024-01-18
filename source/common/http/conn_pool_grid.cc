@@ -213,15 +213,15 @@ ConnectivityGrid::ConnectivityGrid(
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
     Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
-    : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
-      priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
+    : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
+      transport_socket_options_(transport_socket_options), state_(state),
+      next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
               host_->address()->ip()->port()),
-      quic_info_(quic_info) {
+      quic_info_(quic_info), priority_(priority) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
