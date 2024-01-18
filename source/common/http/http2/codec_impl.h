@@ -220,7 +220,6 @@ protected:
 
     StreamImpl* base() { return this; }
     void resetStreamWorker(StreamResetReason reason);
-    static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
@@ -595,8 +594,6 @@ protected:
                     bool disable_push);
   void sendSettingsHelper(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                           bool disable_push);
-  void sendSettingsHelperOld(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                             bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
   virtual void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) {
     ReceivedSettingsImpl received_settings(settings);
