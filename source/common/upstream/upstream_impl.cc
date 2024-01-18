@@ -450,7 +450,8 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   // Clear all old EDS health flags first.
   HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
     HostImpl::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
   }
 
@@ -462,7 +463,8 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
     HostImpl::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DRAINING:
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
       HostImpl::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     }
     break;
