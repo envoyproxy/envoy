@@ -6,9 +6,6 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
-using testing::NiceMock;
-using testing::Return;
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -49,10 +46,18 @@ class AwsRequestSigningIntegrationTest : public testing::TestWithParam<Network::
                                          public HttpIntegrationTest {
 public:
   AwsRequestSigningIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
-        credentials_("akid", "secret"),
-        credentials_provider_(new NiceMock<MockCredentialsProvider>()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     skipPortUsageValidation();
+    // set some environment credentials so the test cases perform signing correctly
+    TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
+    TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
+    TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
+  }
+
+  ~AwsRequestSigningIntegrationTest() override {
+    TestEnvironment::unsetEnvVar("AWS_ACCESS_KEY_ID");
+    TestEnvironment::unsetEnvVar("AWS_SECRET_ACCESS_KEY");
+    TestEnvironment::unsetEnvVar("AWS_SESSION_TOKEN");
   }
 
   void createUpstreams() override {
@@ -74,15 +79,12 @@ public:
 
 protected:
   bool downstream_filter_ = true;
-  Credentials credentials_;
-  NiceMock<MockCredentialsProvider>* credentials_provider_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AwsRequestSigningIntegrationTest,
                          testing::ValuesIn({Network::Address::IpVersion::v4}));
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationDownstream) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
 
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, true);
   HttpIntegrationTest::initialize();
@@ -106,7 +108,6 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationDownstream) {
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationDownstream) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
 
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4A, true);
   HttpIntegrationTest::initialize();
@@ -131,7 +132,6 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationDownstream) {
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstream) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
 
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, false);
   addUpstreamProtocolOptions();
@@ -156,7 +156,6 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstream) {
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
 
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4A, false);
   addUpstreamProtocolOptions();
