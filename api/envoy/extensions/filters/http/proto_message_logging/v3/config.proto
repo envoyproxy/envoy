@@ -211,8 +211,8 @@ message ProtoMessageLoggingConfig {
 
   // The proto descriptor set binary for the gRPC services.
   oneof descriptor_set {
-    // It could be passed by a local file through `Datasource.filename` or
-    // embedded in the `Datasource.inline_bytes`.
+    // It could be passed by a local file through ``Datasource.filename`` or
+    // embedded in the ``Datasource.inline_bytes``.
     config.core.v3.DataSource data_source = 1;
 
     // Unimplemented, the key of proto descriptor TypedMetadata.
@@ -226,8 +226,8 @@ message ProtoMessageLoggingConfig {
 
   // Specify the message logging info.
   // The key is the fully qualified gRPC method name.
-  // `${package}.${Service}.${Method}`, like
-  // `endpoints.examples.bookstore.BookStore.GetShelf`
+  // ``${package}.${Service}.${Method}``, like
+  // ``endpoints.examples.bookstore.BookStore.GetShelf``
   //
   // The value is the message logging information for individual gRPC methods.
   map<string, MethodLogging> logging_by_method = 4;
