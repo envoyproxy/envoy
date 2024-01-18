@@ -23,6 +23,7 @@ public:
    * before doing any conversions. When the passed in duration exceeds INT32_MAX max seconds, the
    * output will be clipped to yield INT32_MAX seconds and 0 microseconds for the
    * output argument. We clip to INT32_MAX to guard against overflowing the timeval structure.
+   * ENVOY_BUGs if the duration is negative.
    * @tparam Duration std::chrono duration type, e.g. seconds, milliseconds, ...
    * @param d duration value
    * @param tv output parameter that will be updated
