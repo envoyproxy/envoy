@@ -40,6 +40,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
         "//source/extensions/filters/http/aws_request_signing:config",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
     ],
