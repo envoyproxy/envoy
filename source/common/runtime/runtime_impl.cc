@@ -20,6 +20,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/http/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -29,6 +30,7 @@
 #include "re2/re2.h"
 
 #ifdef ENVOY_ENABLE_QUIC
+#include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
@@ -44,20 +46,21 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 }
 
 void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
-  absl::flat_hash_map<std::string, bool> quiche_flags_override;
   for (const auto& it : flag_map) {
-#ifdef ENVOY_ENABLE_QUIC
-    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
-        it.second.bool_value_.has_value()) {
-      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
-          it.second.bool_value_.value();
-    }
-#endif
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
     }
   }
 #ifdef ENVOY_ENABLE_QUIC
+  absl::flat_hash_map<std::string, bool> quiche_flags_override;
+  for (const auto& it : flag_map) {
+    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
+        it.second.bool_value_.has_value()) {
+      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
+          it.second.bool_value_.value();
+    }
+  }
+
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 #endif
   // Make sure ints are parsed after the flag allowing deprecated ints is parsed.
@@ -68,6 +71,21 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
   }
   markRuntimeInitialized();
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+// Set Envoy-specific QUICHE flag defaults.
+bool setQuicheFlagDefaults() {
+  SetQuicReloadableFlag(quic_disable_version_draft_29, true);
+  SetQuicReloadableFlag(quic_default_to_bbr, true);
+  SetQuicFlag(quic_header_size_limit_includes_overhead, false);
+  SetQuicFlag(quic_buffered_data_threshold,
+              2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  return true;
+}
+
+// This will be dynamically initialized before the first line in main().
+bool unused_flag_init = setQuicheFlagDefaults();
+#endif
 
 } // namespace
 
