@@ -1,6 +1,12 @@
 # See bazel/README.md for details on how this system works.
 CONTRIB_EXTENSIONS = {
     #
+    # Compression
+    #
+
+    "envoy.compression.qatzip.compressor":                      "//contrib/qat/compression/qatzip/compressor/source:config",
+
+    #
     # HTTP filters
     #
     "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
@@ -66,6 +72,7 @@ CONTRIB_EXTENSIONS = {
     #
     "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
     "envoy.generic_proxy.codecs.dubbo":                         "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
+    "envoy.generic_proxy.codecs.kafka":                         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
 
     #
     # xDS delegates

@@ -13,5 +13,5 @@ envoy_extension_package()
 envoy_proto_library(
     name = "uri_template_rewrite_segements",
     srcs = ["rewrite_segments.proto"],
-    deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
+    deps = ["@com_github_cncf_xds//udpa/annotations:pkg"],
 )

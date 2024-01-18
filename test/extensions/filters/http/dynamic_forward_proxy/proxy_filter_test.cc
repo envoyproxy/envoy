@@ -41,17 +41,18 @@ public:
   }
 
   void setupSocketMatcher() {
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
     transport_socket_match_ = new NiceMock<Upstream::MockTransportSocketMatcher>(
         Network::UpstreamTransportSocketFactoryPtr(transport_socket_factory_));
-    factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+    factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
         ->transport_socket_matcher_.reset(transport_socket_match_);
     dfp_cluster_ =
         std::make_shared<NiceMock<Extensions::Common::DynamicForwardProxy::MockDfpCluster>>();
     auto cluster = std::dynamic_pointer_cast<Extensions::Common::DynamicForwardProxy::DfpCluster>(
         dfp_cluster_);
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-        factory_context_);
+        *factory_context_.server_factory_context_.singleton_manager_);
     cluster_store_factory.get()->save("fake_cluster", cluster);
   }
 
@@ -59,10 +60,11 @@ public:
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-        factory_context_);
+        *factory_context_.server_factory_context_.singleton_manager_);
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cluster_store_factory,
-                                                         factory_context_);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        this->get(), cluster_store_factory, factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -77,20 +79,20 @@ public:
     // kind we need to do DNS entries for.
     CustomClusterType cluster_type;
     cluster_type.set_name("envoy.clusters.dynamic_forward_proxy");
-    factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->cluster_type_ =
+    factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+        ->cluster_type_ =
         std::make_unique<const envoy::config::cluster::v3::Cluster::CustomClusterType>(
             cluster_type);
 
     // Configure max pending to 1 so we can test circuit breaking.
-    factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
-        0, 1, 0, 0, 0, 100);
+    factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+        ->resetResourceManager(0, 1, 0, 0, 0, 100);
   }
 
   ~ProxyFilterTest() override {
-    EXPECT_TRUE(
-        factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_
-            ->pendingRequests()
-            .canCreate());
+    EXPECT_TRUE(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->resource_manager_->pendingRequests()
+                    .canCreate());
   }
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr get() override {
@@ -118,7 +120,7 @@ TEST_F(ProxyFilterTest, HttpDefaultPort) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
@@ -146,7 +148,7 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
@@ -174,7 +176,7 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
@@ -203,7 +205,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
@@ -223,7 +225,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
   filter2->setDecoderFilterCallbacks(callbacks_);
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_());
@@ -247,7 +249,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -267,7 +269,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
   filter2->setDecoderFilterCallbacks(callbacks_);
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_());
@@ -280,9 +282,9 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
             filter2->decodeHeaders(request_headers_, false));
 
   // Cluster circuit breaker overflow counter won't be incremented.
-  EXPECT_EQ(0,
-            factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->trafficStats()
-                ->upstream_rq_pending_overflow_.value());
+  EXPECT_EQ(0, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .cluster_.info_->trafficStats()
+                   ->upstream_rq_pending_overflow_.value());
   filter2->onDestroy();
   EXPECT_CALL(*handle, onDestroy());
   filter_->onDestroy();
@@ -301,19 +303,20 @@ TEST_F(ProxyFilterTest, NoCluster) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
 // No cluster type leads to skipping DNS lookups.
 TEST_F(ProxyFilterTest, NoClusterType) {
-  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->cluster_type_ = nullptr;
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->cluster_type_ = nullptr;
 
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -321,13 +324,14 @@ TEST_F(ProxyFilterTest, NoClusterType) {
 TEST_F(ProxyFilterTest, NonDynamicForwardProxy) {
   CustomClusterType cluster_type;
   cluster_type.set_name("envoy.cluster.static");
-  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->cluster_type_ =
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->cluster_type_ =
       std::make_unique<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type);
 
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -341,7 +345,7 @@ TEST_F(ProxyFilterTest, HostRewrite) {
   ProxyPerRouteConfig config(proto_config);
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -372,7 +376,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   ProxyPerRouteConfig config(proto_config);
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -400,12 +404,13 @@ TEST_F(ProxyFilterTest, SubClusterNotExists) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
   // get DFPCluster, not exists.
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq("DFPCluster:foo:80")));
   // "true" means another thread already created it.
   EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
       .WillOnce(Return(std::make_pair(true, absl::nullopt)));
@@ -418,16 +423,18 @@ TEST_F(ProxyFilterTest, SubClusterNotExists) {
 
 // Thread local cluster exists.
 TEST_F(ProxyFilterTest, SubClusterExists) {
-  factory_context_.cluster_manager_.initializeThreadLocalClusters({"DFPCluster:foo:80"});
+  factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"DFPCluster:foo:80"});
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
   // get DFPCluster, exists.
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq("DFPCluster:foo:80")));
   EXPECT_CALL(*(dfp_cluster_.get()), touch(_)).WillOnce(Return(true));
   // should not create.
   EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _)).Times(0);
@@ -442,12 +449,13 @@ TEST_F(ProxyFilterTest, SubClusterOverflow) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
   // get DFPCluster
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq("DFPCluster:foo:80")));
   // reach the max_sub_clusters limitation.
   EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
       .WillOnce(Return(std::make_pair(false, absl::nullopt)));
@@ -465,12 +473,12 @@ TEST_F(ProxyFilterTest, SubClusterOverflow) {
 // DFP cluster is removed early.
 TEST_F(ProxyFilterTest, DFPClusterIsGone) {
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-      factory_context_);
+      *factory_context_.server_factory_context_.singleton_manager_);
   cluster_store_factory.get()->remove("fake_cluster");
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).Times(0);
@@ -490,12 +498,13 @@ TEST_F(ProxyFilterTest, SubClusterInitTimeout) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*(dfp_cluster_.get()), enableSubCluster()).WillOnce(Return(true));
   // get DFPCluster, not exists.
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(Eq("DFPCluster:foo:80")));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq("DFPCluster:foo:80")));
   // "true" means another thread already created it.
   EXPECT_CALL(*(dfp_cluster_.get()), createSubClusterConfig(_, _, _))
       .WillOnce(Return(std::make_pair(true, absl::nullopt)));
@@ -521,9 +530,11 @@ public:
     proto_config.set_save_upstream_address(true);
 
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
-        factory_context_);
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cluster_store_factory,
-                                                         factory_context_);
+        factory_context_.serverFactoryContext().singletonManager());
+
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        this->get(), cluster_store_factory, factory_context_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
 
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -547,7 +558,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
   host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
@@ -598,7 +609,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
@@ -649,7 +660,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   host_info->address_ = nullptr;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())

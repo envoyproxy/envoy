@@ -12,8 +12,8 @@ static constexpr absl::string_view StatusCodeTag = "status_code";
 static constexpr absl::string_view UrlTag = "url";
 } // namespace
 
-const Http::LowerCaseString& skywalkingPropagationHeaderKey() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "sw8");
+const Tracing::TraceContextHandler& skywalkingPropagationHeaderKey() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "sw8");
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
@@ -54,7 +54,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   auto sw8_header =
       tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});
   if (sw8_header.has_value()) {
-    trace_context.setByReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
+    skywalkingPropagationHeaderKey().setRefKey(trace_context, sw8_header.value());
 
     // Rewrite operation name with latest upstream request path for the EXIT span.
     absl::string_view upstream_request_path = trace_context.path();

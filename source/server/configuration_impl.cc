@@ -119,7 +119,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
     ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
-    server.secretManager().addStaticSecret(secrets[i]);
+    THROW_IF_NOT_OK(server.secretManager().addStaticSecret(secrets[i]));
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
@@ -231,7 +231,9 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
-    admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
+    auto address_or_error = Network::Address::resolveProtoAddress(admin.address());
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    admin_.address_ = std::move(address_or_error.value());
   }
   admin_.socket_options_ = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   if (!admin.socket_options().empty()) {
@@ -254,12 +256,12 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
 }
 
 void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                     Instance& server) {
+                                     FactoryContext& factory_context) {
   const auto& admin = bootstrap.admin();
 
   for (const auto& access_log : admin.access_log()) {
     AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+        AccessLog::AccessLogFactory::fromProto(access_log, factory_context);
     admin_.access_logs_.emplace_back(current_access_log);
   }
 
@@ -268,7 +270,7 @@ void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstr
                                           admin.access_log_path()};
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
         file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
-        server.accessLogManager()));
+        factory_context.serverFactoryContext().accessLogManager()));
   }
 }
 

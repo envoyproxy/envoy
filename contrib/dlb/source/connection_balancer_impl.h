@@ -8,9 +8,9 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/listener_manager/active_tcp_listener.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/listener_managers/listener_manager/active_tcp_listener.h"
 
 #include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
 #include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.validate.h"
@@ -88,7 +88,7 @@ public:
 
   Envoy::Network::ConnectionBalancerSharedPtr
   createConnectionBalancerFromProto(const Protobuf::Message& config,
-                                    Server::Configuration::FactoryContext& context) override;
+                                    Server::Configuration::FactoryContext&) override;
 
   std::string name() const override { return "envoy.network.connection_balance.dlb"; }
 

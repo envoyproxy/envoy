@@ -175,6 +175,12 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   ProtobufWkt::Struct s;
   (*s.mutable_fields())["ab"].set_string_value("fgh");
   (*s.mutable_fields())["cde"].set_string_value("ij");
+  ProtobufWkt::Struct s2;
+  (*s2.mutable_fields())["ab"].set_string_value("ij");
+  (*s2.mutable_fields())["cde"].set_string_value("fgh");
+  ProtobufWkt::Struct s3;
+  (*s3.mutable_fields())["ac"].set_string_value("fgh");
+  (*s3.mutable_fields())["cdb"].set_string_value("ij");
 
   ProtobufWkt::Any a1;
   a1.PackFrom(s);
@@ -184,11 +190,26 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   a2.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
   ProtobufWkt::Any a3 = a1;
   a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ProtobufWkt::Any a4, a5;
+  a4.PackFrom(s2);
+  a5.PackFrom(s3);
 
-  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
-  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
-  EXPECT_NE(0, MessageUtil::hash(a1));
-  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+  TestScopedRuntime runtime_;
+  for (std::string runtime_value : {"true", "false"}) {
+    // TODO(ravenblack): when the runtime flag is removed, keep the expects
+    // but remove the loop around them and the extra output.
+    runtime_.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", runtime_value}});
+    EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2)) << runtime_value;
+    EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3)) << runtime_value;
+    EXPECT_NE(0, MessageUtil::hash(a1)) << runtime_value;
+    // Same keys and values but with the values in a different order should not have
+    // the same hash.
+    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a4)) << runtime_value;
+    // Different keys with the values in the same order should not have the same hash.
+    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a5)) << runtime_value;
+    // Struct without 'any' around it should not hash the same as struct inside 'any'.
+    EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1)) << runtime_value;
+  }
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
@@ -1682,29 +1703,29 @@ TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;
     duration.set_seconds(-1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
   }
   {
     ProtobufWkt::Duration duration;
     duration.set_nanos(-1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
   }
   {
     ProtobufWkt::Duration duration;
     duration.set_nanos(1000000000);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
   }
   {
     ProtobufWkt::Duration duration;
     duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
   }
   {
     ProtobufWkt::Duration duration;
     constexpr int64_t kMaxInt64Nanoseconds =
         std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
     duration.set_seconds(kMaxInt64Nanoseconds + 1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
   }
 }
 
@@ -1869,7 +1890,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
       {"envoy.features.fail_on_any_deprecated_feature", "true"},
   });
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      checkForDeprecation(base), Envoy::EnvoyException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
   EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
@@ -1880,7 +1901,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed))
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      checkForDeprecation(base), Envoy::EnvoyException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
 }
 
@@ -1891,7 +1912,7 @@ TEST_F(DeprecatedFieldsTest,
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      checkForDeprecation(base), Envoy::EnvoyException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
   // The config will be rejected, so the feature will not be used.
 
@@ -1914,7 +1935,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowedWi
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      checkForDeprecation(base), Envoy::EnvoyException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
   // The config will be rejected, so the feature will not be used.
 
@@ -1942,7 +1963,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated", " false"}});
 
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      checkForDeprecation(base), Envoy::EnvoyException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
 
   // Verify that even when the enable_all_deprecated_features is enabled the
@@ -1950,7 +1971,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
   mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
 
   EXPECT_THROW_WITH_REGEX(
-      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      checkForDeprecation(base), Envoy::EnvoyException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
 }
 
@@ -1964,7 +1985,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
         EXPECT_THROW_WITH_REGEX(
-            checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+            checkForDeprecation(base), Envoy::EnvoyException,
             "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
       });
 }
@@ -2056,16 +2077,14 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT", "false"}});
 
   // Make sure this is set up right.
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
-                          Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), Envoy::EnvoyException,
                           "Using the default now-deprecated value DEPRECATED_DEFAULT");
 
   // Verify that even when the enable_all_deprecated_features is enabled the
   // enum is disallowed.
   mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
 
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
-                          Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), Envoy::EnvoyException,
                           "Using the default now-deprecated value DEPRECATED_DEFAULT");
 }
 
@@ -2074,8 +2093,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container()->set_deprecated_enum(
       envoy::test::deprecation_test::Base::DEPRECATED_FATAL);
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
-                          Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), Envoy::EnvoyException,
                           "Using deprecated value DEPRECATED_FATAL");
 
   mergeValues(
@@ -2095,8 +2113,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnumGlobalOverride)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container()->set_deprecated_enum(
       envoy::test::deprecation_test::Base::DEPRECATED_FATAL);
-  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base),
-                          Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), Envoy::EnvoyException,
                           "Using deprecated value DEPRECATED_FATAL");
 
   mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});

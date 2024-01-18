@@ -50,7 +50,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.
-  auto propagation_header = trace_context.getByKey(skywalkingPropagationHeaderKey());
+  auto propagation_header = skywalkingPropagationHeaderKey().get(trace_context);
   if (!propagation_header.has_value()) {
     // Although a sampling flag can be added to the propagation header, it will be ignored by most
     // of SkyWalking agent. The agent will enable tracing anyway if it see the propagation header.

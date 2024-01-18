@@ -202,7 +202,8 @@ enum class LocalErrorStatus {
   ContinueAndResetStream,
 };
 
-// These are events that upstream filters can register for, via the addUpstreamCallbacks function.
+// These are events that upstream HTTP filters can register for, via the addUpstreamCallbacks
+// function.
 class UpstreamCallbacks {
 public:
   virtual ~UpstreamCallbacks() = default;
@@ -214,7 +215,7 @@ public:
   virtual void onUpstreamConnectionEstablished() PURE;
 };
 
-// These are filter callbacks specific to upstream filters, accessible via
+// These are filter callbacks specific to upstream HTTP filters, accessible via
 // StreamFilterCallbacks::upstreamCallbacks()
 class UpstreamStreamFilterCallbacks {
 public:
@@ -426,14 +427,14 @@ public:
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
   /**
-   * Return a handle to the upstream callbacks. This is valid for upstream filters, and nullopt for
-   * downstream filters.
+   * Return a handle to the upstream callbacks. This is valid for upstream HTTP filters, and nullopt
+   * for downstream HTTP filters.
    */
   virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
 
   /**
-   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
-   * for upstream filters.
+   * Return a handle to the downstream callbacks. This is valid for downstream HTTP filters, and
+   * nullopt for upstream HTTP filters.
    */
   virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
 
@@ -757,13 +758,14 @@ public:
    * host list of the routed cluster, the host should be selected first.
    * @param host The override host address.
    */
-  virtual void setUpstreamOverrideHost(absl::string_view host) PURE;
+  virtual void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) PURE;
 
   /**
    * @return absl::optional<absl::string_view> optional override host for the upstream
    * load balancing.
    */
-  virtual absl::optional<absl::string_view> upstreamOverrideHost() const PURE;
+  virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+  upstreamOverrideHost() const PURE;
 };
 
 /**

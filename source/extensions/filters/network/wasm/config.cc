@@ -16,7 +16,7 @@ namespace Wasm {
 Network::FilterFactoryCb WasmFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::wasm::v3::Wasm& proto_config,
     Server::Configuration::FactoryContext& context) {
-  context.api().customStatNamespaces().registerStatNamespace(
+  context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
       Extensions::Common::Wasm::CustomStatNamespace);
   auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
   return [filter_config](Network::FilterManager& filter_manager) -> void {

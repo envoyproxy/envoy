@@ -13,6 +13,7 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 SINGLETON_MANAGER_REGISTRATION(generic_route_config_provider_manager);
+SINGLETON_MANAGER_REGISTRATION(generic_proxy_code_or_flag_stats);
 
 std::pair<CodecFactoryPtr, ProxyFactoryPtr>
 Factory::factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
@@ -41,18 +42,19 @@ Factory::routeConfigProviderFromProto(const ProxyConfig& config,
     }
 
     return route_config_provider_manager.createRdsRouteConfigProvider(
-        config.generic_rds(), context.getServerFactoryContext(), config.stat_prefix(),
+        config.generic_rds(), context.serverFactoryContext(), config.stat_prefix(),
         context.initManager());
   } else {
     return route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context.getServerFactoryContext());
+        config.route_config(), context.serverFactoryContext());
   }
 }
 
-std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
-    const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-    const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-
+std::vector<NamedFilterFactoryCb>
+Factory::filtersFactoryFromProto(const ProtobufWkt::RepeatedPtrField<TypedExtensionConfig>& filters,
+                                 const TypedExtensionConfig& codec_config,
+                                 const std::string stats_prefix,
+                                 Envoy::Server::Configuration::FactoryContext& context) {
   std::vector<NamedFilterFactoryCb> factories;
   bool has_terminal_filter = false;
   std::string terminal_filter_name;
@@ -63,6 +65,10 @@ std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
     }
 
     auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
+
+    // Validate codec to see if this filter is compatible with the codec.
+    const auto validate_codec_status = factory.validateCodec(codec_config);
+    THROW_IF_NOT_OK_REF(validate_codec_status);
 
     ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
     ASSERT(message != nullptr);
@@ -87,11 +93,20 @@ std::vector<NamedFilterFactoryCb> Factory::filtersFactoryFromProto(
 Envoy::Network::FilterFactoryCb
 Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
                                            Envoy::Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
 
   std::shared_ptr<RouteConfigProviderManager> route_config_provider_manager =
-      context.singletonManager().getTyped<RouteConfigProviderManager>(
+      server_context.singletonManager().getTyped<RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(generic_route_config_provider_manager),
-          [&context] { return std::make_shared<RouteConfigProviderManagerImpl>(context.admin()); });
+          [&server_context] {
+            return std::make_shared<RouteConfigProviderManagerImpl>(server_context.admin());
+          });
+
+  // Pinned singleton and we needn't to keep the shared_ptr.
+  std::shared_ptr<CodeOrFlags> code_or_flags =
+      server_context.singletonManager().getTyped<CodeOrFlags>(
+          SINGLETON_MANAGER_REGISTERED_NAME(generic_proxy_code_or_flag_stats),
+          [&server_context] { return std::make_shared<CodeOrFlags>(server_context); }, true);
 
   auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
@@ -105,7 +120,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       tracer = tracer_manager->getOrCreateTracer(&proto_config.tracing().provider());
     }
     tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
-        context.direction(), proto_config.tracing());
+        context.listenerInfo().direction(), proto_config.tracing());
   }
 
   // Access log configuration.
@@ -116,11 +131,15 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
     access_logs.push_back(current_access_log);
   }
 
+  const std::string stat_prefix = fmt::format("generic_proxy.{}.", proto_config.stat_prefix());
+
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
-      proto_config.stat_prefix(), std::move(factories.first),
+      stat_prefix, std::move(factories.first),
       routeConfigProviderFromProto(proto_config, context, *route_config_provider_manager),
-      filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
-      std::move(tracer), std::move(tracing_config), std::move(access_logs), context);
+      filtersFactoryFromProto(proto_config.filters(), proto_config.codec_config(), stat_prefix,
+                              context),
+      std::move(tracer), std::move(tracing_config), std::move(access_logs), *code_or_flags,
+      context);
 
   return [route_config_provider_manager, tracer_manager, config, &context,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
@@ -130,8 +149,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       return;
     }
 
-    filter_manager.addReadFilter(std::make_shared<Filter>(
-        config, context.mainThreadDispatcher().timeSource(), context.runtime()));
+    filter_manager.addReadFilter(std::make_shared<Filter>(config, context));
   };
 }
 

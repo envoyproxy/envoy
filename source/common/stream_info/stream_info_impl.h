@@ -134,6 +134,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
+  TimeSource& timeSource() const override { return time_source_; }
+
   absl::optional<std::chrono::nanoseconds> duration(absl::optional<MonotonicTime> time) const {
     if (!time) {
       return {};

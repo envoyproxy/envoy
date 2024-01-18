@@ -68,21 +68,17 @@ TEST(DubboRequestTest, DubboRequestTest) {
     EXPECT_EQ("fake_service", request.host());
     EXPECT_EQ("fake_service", request.path());
     EXPECT_EQ("fake_method", request.method());
-    EXPECT_EQ("fake_version", request.getByKey("version").value());
+    EXPECT_EQ("fake_version", request.get("version").value());
   }
 
   // Get and set headers.
   {
-    EXPECT_EQ("fake_group", request.getByKey("group").value());
+    EXPECT_EQ("fake_group", request.get("group").value());
 
-    EXPECT_EQ(false, request.getByKey("custom_key").has_value());
+    EXPECT_EQ(false, request.get("custom_key").has_value());
 
-    request.setByKey("custom_key", "custom_value");
-    EXPECT_EQ("custom_value", request.getByKey("custom_key").value());
-    request.setByReference("custom_key1", "custom_value1");
-    EXPECT_EQ("custom_value1", request.getByKey("custom_key1").value());
-    request.setByReferenceKey("custom_key2", "custom_value2");
-    EXPECT_EQ("custom_value2", request.getByKey("custom_key2").value());
+    request.set("custom_key", "custom_value");
+    EXPECT_EQ("custom_value", request.get("custom_key").value());
   }
 
   // Iterate headers.
@@ -92,8 +88,8 @@ TEST(DubboRequestTest, DubboRequestTest) {
       attachment_size++;
       return true;
     });
-    // Version is not part of attachments. So there are only 4 attachments.
-    EXPECT_EQ(4, attachment_size);
+    // Version is not part of attachments. So there are only 2 attachments.
+    EXPECT_EQ(2, attachment_size);
   }
 }
 
@@ -111,73 +107,61 @@ TEST(DubboResponseTest, DubboResponseTest) {
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
-    EXPECT_EQ(StatusCode::kOk, response.status().code());
+    EXPECT_EQ(20, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithException));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("exception_via_upstream", response.status().message());
+    EXPECT_EQ(20, response.status().code());
   }
   {
     DubboResponse response(createDubboResponse(
         request, ResponseStatus::Ok, RpcResponseType::ResponseWithExceptionWithAttachments));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("exception_via_upstream", response.status().message());
+    EXPECT_EQ(20, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ClientTimeout, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ("ClientTimeout", response.status().message());
+    EXPECT_EQ(30, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServerTimeout, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ("ServerTimeout", response.status().message());
+    EXPECT_EQ(31, response.status().code());
   }
   {
     DubboResponse response(createDubboResponse(request, ResponseStatus::BadRequest, absl::nullopt));
-    EXPECT_EQ(StatusCode::kInvalidArgument, response.status().code());
-    EXPECT_EQ("BadRequest", response.status().message());
+    EXPECT_EQ(40, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::BadResponse, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnknown, response.status().code());
-    EXPECT_EQ("BadResponse", response.status().message());
+    EXPECT_EQ(50, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServiceNotFound, absl::nullopt));
-    EXPECT_EQ(StatusCode::kNotFound, response.status().code());
-    EXPECT_EQ("ServiceNotFound", response.status().message());
+    EXPECT_EQ(60, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServiceError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("ServiceError", response.status().message());
+    EXPECT_EQ(70, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ServerError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("ServerError", response.status().message());
+    EXPECT_EQ(80, response.status().code());
   }
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::ClientError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kUnavailable, response.status().code());
-    EXPECT_EQ("ClientError", response.status().message());
+    EXPECT_EQ(90, response.status().code());
   }
   {
     DubboResponse response(createDubboResponse(
         request, ResponseStatus::ServerThreadpoolExhaustedError, absl::nullopt));
-    EXPECT_EQ(StatusCode::kResourceExhausted, response.status().code());
-    EXPECT_EQ("ServerThreadpoolExhaustedError", response.status().message());
+    EXPECT_EQ(100, response.status().code());
   }
 
   // Getter and setter do nothing for response.
@@ -185,13 +169,9 @@ TEST(DubboResponseTest, DubboResponseTest) {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
 
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
-    response.setByKey("custom_key", "custom_value");
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
-    response.setByReference("custom_key", "custom_value");
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
-    response.setByReferenceKey("custom_key", "custom_value");
-    EXPECT_EQ(false, response.getByKey("custom_key").has_value());
+    EXPECT_EQ(false, response.get("custom_key").has_value());
+    response.set("custom_key", "custom_value");
+    EXPECT_EQ(false, response.get("custom_key").has_value());
   }
 
   // Iterate headers.

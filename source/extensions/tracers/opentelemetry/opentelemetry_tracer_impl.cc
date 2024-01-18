@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -41,6 +42,20 @@ tryCreateSamper(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemet
     sampler = factory->createSampler(sampler_config.typed_config(), context);
   }
   return sampler;
+}
+
+OTelSpanKind getSpanKind(const Tracing::Config& config) {
+  // If this is downstream span that be created by 'startSpan' for downstream request, then
+  // set the span type based on the spawnUpstreamSpan flag and traffic direction:
+  // * If separate tracing span will be created for upstream request, then set span type to
+  //   SERVER because the downstream span should be server span in trace chain.
+  // * If separate tracing span will not be created for upstream request, that means the
+  //   Envoy will not be treated as independent hop in trace chain and then set span type
+  //   based on the traffic direction.
+  return (config.spawnUpstreamSpan() ? ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER
+          : config.operationName() == Tracing::OperationName::Egress
+              ? ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT
+              : ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
 }
 
 } // namespace
@@ -99,17 +114,18 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // Get tracer from TLS and start span.
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   SpanContextExtractor extractor(trace_context);
+  const auto span_kind = getSpanKind(config);
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
-    Tracing::SpanPtr new_open_telemetry_span =
-        tracer.startSpan(config, operation_name, stream_info.startTime(), tracing_decision);
+    Tracing::SpanPtr new_open_telemetry_span = tracer.startSpan(
+        operation_name, stream_info.startTime(), tracing_decision, trace_context, span_kind);
     return new_open_telemetry_span;
   } else {
     // Try to extract the span context. If we can't, just return a null span.
     absl::StatusOr<SpanContext> span_context = extractor.extractSpanContext();
     if (span_context.ok()) {
-      return tracer.startSpan(config, operation_name, stream_info.startTime(),
-                              span_context.value());
+      return tracer.startSpan(operation_name, stream_info.startTime(), span_context.value(),
+                              trace_context, span_kind);
     } else {
       ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
       return std::make_unique<Tracing::NullSpan>();

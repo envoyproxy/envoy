@@ -2,7 +2,6 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/engine.h"
-#include "library/common/engine_handle.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
@@ -11,24 +10,25 @@ namespace Envoy {
 // thread is not torn down, we end up with TSAN failures during shutdown due to a data race
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
-struct TestEngineHandle {
-  envoy_engine_t handle_;
-  TestEngineHandle(envoy_engine_callbacks callbacks, const std::string& level) {
-    handle_ = init_engine(callbacks, {}, {});
+struct TestEngine {
+  std::unique_ptr<Engine> engine_;
+  envoy_engine_t handle() { return reinterpret_cast<envoy_engine_t>(engine_.get()); }
+  TestEngine(envoy_engine_callbacks callbacks, const std::string& level) {
+    engine_.reset(new Envoy::Engine(callbacks, {}, {}));
     Platform::EngineBuilder builder;
     auto bootstrap = builder.generateBootstrap();
     std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
-    run_engine(handle_, yaml.c_str(), level.c_str());
+    engine_->run(yaml.c_str(), level.c_str());
   }
 
-  envoy_status_t terminate() { return terminate_engine(handle_, /* release */ false); }
+  envoy_status_t terminate() { return engine_->terminate(); }
 
-  ~TestEngineHandle() { terminate_engine(handle_, /* release */ true); }
+  ~TestEngine() { engine_->terminate(); }
 };
 
 class EngineTest : public testing::Test {
 public:
-  std::unique_ptr<TestEngineHandle> engine_;
+  std::unique_ptr<TestEngine> engine_;
 };
 
 typedef struct {
@@ -51,14 +51,14 @@ TEST_F(EngineTest, EarlyExit) {
                                    } /*on_exit*/,
                                    &test_context /*context*/};
 
-  engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
-  envoy_engine_t handle = engine_->handle_;
+  engine_ = std::make_unique<TestEngine>(callbacks, level);
+  envoy_engine_t handle = engine_->handle();
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  start_stream(handle, 0, {}, false, 0);
+  start_stream(handle, 0, {}, false);
 
   engine_.reset();
 }
@@ -74,26 +74,20 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
                                    } /*on_engine_running*/,
                                    [](void*) -> void {} /*on_exit*/, &test_context /*context*/};
 
-  engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
-  envoy_engine_t handle = engine_->handle_;
+  engine_ = std::make_unique<TestEngine>(callbacks, level);
+  envoy_engine_t handle = engine_->handle();
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification getClusterManagerInvoked;
-  // Scheduling on the dispatcher should work, the engine is running.
-  EXPECT_EQ(ENVOY_SUCCESS, EngineHandle::runOnEngineDispatcher(
-                               handle, [&getClusterManagerInvoked](Envoy::Engine& engine) {
-                                 engine.getClusterManager();
-                                 getClusterManagerInvoked.Notify();
-                               }));
-
-  // Validate that we actually invoked the function.
-  EXPECT_TRUE(getClusterManagerInvoked.WaitForNotificationWithTimeout(absl::Seconds(1)));
+  envoy_data stats_data;
+  // Running engine functions should work because the engine is running
+  EXPECT_EQ(ENVOY_SUCCESS, dump_stats(handle, &stats_data));
+  release_envoy_data(stats_data);
 
   engine_->terminate();
 
   // Now that the engine has been shut down, we no longer expect scheduling to work.
-  EXPECT_EQ(ENVOY_FAILURE, EngineHandle::runOnEngineDispatcher(
-                               handle, [](Envoy::Engine& engine) { engine.getClusterManager(); }));
+  EXPECT_EQ(ENVOY_FAILURE, dump_stats(handle, &stats_data));
 
   engine_.reset();
 }

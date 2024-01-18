@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include "source/common/common/assert.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -25,7 +27,8 @@ absl::string_view requestMethodToString(RequestMethod method) {
     }
   }
 
-  throw std::out_of_range("unknown request method type");
+  IS_ENVOY_BUG("unknown method");
+  return "";
 }
 
 RequestMethod requestMethodFromString(absl::string_view str) {
@@ -35,7 +38,8 @@ RequestMethod requestMethodFromString(absl::string_view str) {
     }
   }
 
-  throw std::out_of_range("unknown request method type");
+  IS_ENVOY_BUG("unknown method");
+  return REQUEST_METHOD_LOOKUP[0].first;
 }
 
 } // namespace Platform

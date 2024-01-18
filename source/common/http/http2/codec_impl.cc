@@ -86,10 +86,11 @@ int reasonToReset(StreamResetReason reason) {
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 
-ReceivedSettingsImpl::ReceivedSettingsImpl(const nghttp2_settings& settings) {
-  for (uint32_t i = 0; i < settings.niv; ++i) {
-    if (settings.iv[i].settings_id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
-      concurrent_stream_limit_ = settings.iv[i].value;
+ReceivedSettingsImpl::ReceivedSettingsImpl(
+    absl::Span<const http2::adapter::Http2Setting> settings) {
+  for (const auto& [id, value] : settings) {
+    if (id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
+      concurrent_stream_limit_ = value;
       break;
     }
   }
@@ -661,9 +662,10 @@ ConnectionImpl::StreamDataFrameSource::SelectPayloadLength(size_t max_length) {
     if (stream_.local_end_stream_ && length == stream_.pending_send_data_->length()) {
       end_data = true;
       if (stream_.pending_trailers_to_encode_) {
-        send_fin_ = false;
         stream_.submitTrailers(*stream_.pending_trailers_to_encode_);
         stream_.pending_trailers_to_encode_.reset();
+      } else {
+        send_fin_ = true;
       }
     }
     return {static_cast<int64_t>(length), end_data};
@@ -1062,6 +1064,19 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = stream_id;
+  if (type == NGHTTP2_PING && (flags & NGHTTP2_FLAG_ACK)) {
+    return okStatus();
+  }
+
+  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
+  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
+  // timeout for another timeout period. This will still timeout the connection if there is no
+  // activity, but if there is frame activity we assume the connection is still healthy and the
+  // PING ACK may be delayed behind other frames.
+  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
+    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+  }
+
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
@@ -1104,15 +1119,6 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return okStatus();
   }
 
-  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
-  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
-  // timeout for another timeout period. This will still timeout the connection if there is no
-  // activity, but if there is frame activity we assume the connection is still healthy and the
-  // PING ACK may be delayed behind other frames.
-  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
-    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
-  }
-
   if (frame->hd.type == NGHTTP2_DATA) {
     RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
                                        frame->hd.flags, frame->data.padlen));
@@ -1129,7 +1135,13 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    onSettings(frame->settings);
+    std::vector<http2::adapter::Http2Setting> settings;
+    for (const nghttp2_settings_entry& entry :
+         absl::MakeSpan(frame->settings.iv, frame->settings.niv)) {
+      settings.push_back(
+          {static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
+    }
+    onSettings(settings);
   }
 
   StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
@@ -2128,6 +2140,18 @@ int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   // For a server connection, we should never get push promise frames.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(frame->headers.cat == NGHTTP2_HCAT_REQUEST || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
+    StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+    if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
+      // Check if there is already the :authority header
+      const auto result = stream->headers().get(Http::Headers::get().Host);
+      if (!result.empty()) {
+        // Discard the host header value
+        return 0;
+      }
+      // Otherwise use host value as :authority
+    }
+  }
   return saveHeader(frame, std::move(name), std::move(value));
 }
 

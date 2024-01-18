@@ -34,6 +34,7 @@ public:
   void expectCreateConnection(bool trigger_connected = true) {
     connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
+    connection_->streamInfo().setAttemptCount(1);
     conn_info.connection_ = connection_;
 
     conn_info.host_description_ = Upstream::makeTestHost(
@@ -153,6 +154,26 @@ TEST_F(AsyncTcpClientImplTest, TestGetDispatcher) {
   EXPECT_EQ(&dispatcher_, &client_->dispatcher());
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestGetStreamInfo) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_TRUE(client_->getStreamInfo().has_value());
+  EXPECT_EQ(1, client_->getStreamInfo()->attemptCount());
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestGetStreamInfoNullOpt) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_TRUE(client_->getStreamInfo().has_value());
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_FALSE(client_->connected());
+  ASSERT_FALSE(client_->getStreamInfo().has_value());
 }
 
 TEST_F(AsyncTcpClientImplTest, TestTimingStats) {

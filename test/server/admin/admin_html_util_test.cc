@@ -27,7 +27,7 @@ const Admin::UrlHandler handler() {
 class AdminHtmlUtilTest : public testing::Test {
 protected:
   Buffer::OwnedImpl response_;
-  Http::Utility::QueryParams query_params_;
+  Http::Utility::QueryParamsMulti query_params_;
 };
 
 TEST_F(AdminHtmlUtilTest, RenderTableBegin) {
@@ -54,8 +54,8 @@ TEST_F(AdminHtmlUtilTest, RenderRenderEndpointTableRowNoQuery) {
 }
 
 TEST_F(AdminHtmlUtilTest, RenderRenderEndpointTableRowWithQuery) {
-  query_params_["boolparam"] = "on";
-  query_params_["strparam"] = "str value";
+  query_params_.overwrite("boolparam", "on");
+  query_params_.overwrite("strparam", "str value");
   AdminHtmlUtil::renderEndpointTableRow(response_, handler(), query_params_, 31415, false, false);
   std::string out = response_.toString();
   EXPECT_THAT(out,

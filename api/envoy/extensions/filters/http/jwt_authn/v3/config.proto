@@ -242,7 +242,6 @@ message JwtProvider {
   //
   string payload_in_metadata = 9;
 
-  // [#not-implemented-hide:]
   // Normalizes the payload representation in the request metadata.
   NormalizePayload normalize_payload_in_metadata = 18;
 
@@ -321,13 +320,13 @@ message JwtProvider {
   // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;
 
-  // [#not-implemented-hide:]
   // Clears route cache in order to allow JWT token to correctly affect
   // routing decisions. Filter clears all cached routes when:
   //
   // 1. The field is set to ``true``.
   //
-  // 2. At least one ``claim_to_headers`` header is added to the request.
+  // 2. At least one ``claim_to_headers`` header is added to the request OR
+  //    if ``payload_in_metadata`` is set.
   //
   bool clear_route_cache = 17;
 }

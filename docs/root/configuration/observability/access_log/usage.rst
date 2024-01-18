@@ -157,7 +157,9 @@ The following command operators are supported:
 
   .. code-block:: none
 
-    %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%
+    %START_TIME(%Y/%m/%dT%H:%M:%S%z)%
+
+    %START_TIME(%s)%
 
     # To include millisecond fraction of the second (.000 ... .999). E.g. 1527590590.528.
     %START_TIME(%s.%3f)%
@@ -167,6 +169,14 @@ The following command operators are supported:
     %START_TIME(%s.%9f)%
 
   In typed JSON logs, START_TIME is always rendered as a string.
+
+.. _config_access_log_format_emit_time:
+
+%EMIT_TIME%
+  The time when log entry is emitted including milliseconds.
+
+  EMIT_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %REQUEST_HEADERS_BYTES%
   HTTP
@@ -448,6 +458,15 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%UPSTREAM_CONNECTION_POOL_READY_DURATION%
+  HTTP/TCP
+    Total duration in milliseconds from when the upstream request was created to when the connection pool is ready.
+
+  UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 .. _config_access_log_format_response_flags:
 
 %RESPONSE_FLAGS% / %RESPONSE_FLAGS_LONG%
@@ -491,8 +510,11 @@ HTTP only
   **DownstreamProtocolError**, **DPE**, The downstream request had an HTTP protocol error.
   **UpstreamProtocolError**, **UPE**, The upstream response had an HTTP protocol error.
   **UpstreamMaxStreamDurationReached**, **UMSDR**, The upstream request reached max stream duration.
+  **ResponseFromCacheFilter**, **RFCF**, The response was served from an Envoy cache filter.
+  **NoFilterConfigFound**, **NFCF**, The request is terminated because filter configuration was not received within the permitted warming deadline.
   **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
+  **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
 
 UDP
   Not implemented ("-").
@@ -1138,6 +1160,10 @@ UDP
   * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
   * UpstreamPeriodic - On any HTTP Router filter periodic log record.
   * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
+  * UdpTunnelUpstreamConnected - When UDP Proxy filter has successfully established an upstream connection.
+                                 Note: It is only relevant for UDP tunneling over HTTP.
+  * UdpPeriodic - On any UDP Proxy filter periodic log record.
+  * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

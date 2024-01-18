@@ -101,8 +101,21 @@ public:
     auto histogram = std::make_unique<NiceMock<Stats::MockParentHistogram>>();
 
     histogram_t* hist = hist_alloc();
-    for (uint64_t value = 1; value <= 10; value++) {
-      hist_insert_intscale(hist, is_delta ? value + 10 : value, 0, 1);
+
+    // Using the default histogram boundaries for testing. For delta histogram, it's expected that
+    // even indexes will have count of 1, and 0 otherwise. For cumulative histogram, it's expected
+    // that odd indexes will have count of 1, and 0 otherwise.
+    std::vector<double> values;
+    if (is_delta) {
+      values = {0.2, 3, 16, 75, 400, 2000, 7500, 50000, 500000, 3000000};
+    } else {
+      // The last value will be used to test a scenario of a bucket which is outside the defined
+      // histogram bounds.
+      values = {0.7, 7, 35, 200, 750, 4000, 20000, 200000, 1500000, 4000000};
+    }
+
+    for (auto value : values) {
+      hist_insert(hist, value, 1);
     }
 
     histogram_ptrs_.push_back(hist);
@@ -205,7 +218,8 @@ public:
     EXPECT_EQ(10, data_point.count());
 
     const int default_buckets_count = 19;
-    EXPECT_EQ(default_buckets_count, data_point.bucket_counts().size());
+    // The buckets count needs to be one element bigger than the bounds size.
+    EXPECT_EQ(default_buckets_count + 1, data_point.bucket_counts().size());
     EXPECT_EQ(default_buckets_count, data_point.explicit_bounds().size());
     EXPECT_EQ(expected_time_ns_, data_point.time_unix_nano());
 
@@ -213,12 +227,17 @@ public:
       EXPECT_EQ(AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
                 metric.histogram().aggregation_temporality());
 
-      EXPECT_GE(data_point.sum(), 160);
+      EXPECT_GE(data_point.sum(), 3559994.2);
     } else {
       EXPECT_EQ(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
                 metric.histogram().aggregation_temporality());
 
-      EXPECT_GE(data_point.sum(), 55);
+      EXPECT_GE(data_point.sum(), 5724992.7);
+    }
+
+    for (int idx = 0; idx < data_point.bucket_counts().size(); idx++) {
+      int expected_value = (is_delta) ? (1 - (idx % 2)) : (idx % 2);
+      EXPECT_EQ(expected_value, data_point.bucket_counts()[idx]);
     }
   }
 

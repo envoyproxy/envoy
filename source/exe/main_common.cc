@@ -16,9 +16,9 @@
 #include "source/server/config_validation/server.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/hot_restart_nop_impl.h"
+#include "source/server/instance_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
-#include "source/server/server.h"
+#include "source/server/options_impl_base.h"
 
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/str_split.h"
@@ -39,10 +39,12 @@ StrippedMainBase::CreateInstanceFunction createFunction() {
          Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
          Buffer::WatermarkFactorySharedPtr watermark_factory) {
         auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
-        return std::make_unique<Server::InstanceImpl>(
-            init_manager, options, time_system, local_address, hooks, restarter, store,
-            access_log_lock, component_factory, std::move(random_generator), tls, thread_factory,
-            file_system, std::move(process_context), watermark_factory);
+        auto server = std::make_unique<Server::InstanceImpl>(
+            init_manager, options, time_system, hooks, restarter, store, access_log_lock,
+            std::move(random_generator), tls, thread_factory, file_system,
+            std::move(process_context), watermark_factory);
+        server->initialize(local_address, component_factory);
+        return server;
       };
 }
 
@@ -64,7 +66,8 @@ bool MainCommonBase::run() {
   case Server::Mode::Validate:
     return Server::validateConfig(
         options_, Network::Utility::getLocalAddress(options_.localAddressIpVersion()),
-        component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem());
+        component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem(),
+        process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : absl::nullopt);
   case Server::Mode::InitOnly:
     PERF_DUMP();
     return true;

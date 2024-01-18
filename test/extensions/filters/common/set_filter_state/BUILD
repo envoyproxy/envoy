@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/common/set_filter_state:filter_config_lib",
+        "//source/server:generic_factory_context_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",

@@ -1,6 +1,8 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
+#include <algorithm>
 #include <array>
+#include <climits>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -530,7 +532,15 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
   }
   // Set the verify_depth
   if (config_->maxVerifyDepth().has_value()) {
-    SSL_CTX_set_verify_depth(ctx, config_->maxVerifyDepth().value());
+    uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
+#if BORINGSSL_API_VERSION >= 29
+    // Older BoringSSLs behave like OpenSSL 1.0.x and exclude the leaf from the
+    // depth but include the trust anchor. Newer BoringSSLs match OpenSSL 1.1.x
+    // and later in excluding both the leaf and trust anchor. `maxVerifyDepth`
+    // documents the older behavior, so adjust the value to match.
+    max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
+#endif
+    SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
   }
 }
 
