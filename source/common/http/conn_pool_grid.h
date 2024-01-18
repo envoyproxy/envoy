@@ -80,10 +80,9 @@ public:
     StreamCreationResult newStream();
 
     // Called on pool failure or timeout to kick off another connection attempt.
-    // Returns true and the StreamCreationResult if there is a failover pool and a
-    // connection has been attempted, false and a StreamCreationResult which
-    // should be ignored if all pools have been tried.
-    std::pair<bool, StreamCreationResult> tryAnotherConnection();
+    // Returns the StreamCreationResult if there is a failover pool and a
+    // connection has been attempted, an empty optional otherwise.
+    absl::optional<StreamCreationResult> tryAnotherConnection();
 
     // Called by a ConnectionAttempt when the underlying pool fails.
     void onConnectionAttemptFailed(ConnectionAttemptCallbacks* attempt,
