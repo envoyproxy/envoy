@@ -892,15 +892,19 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
     }
   }
 
-  return std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
-      config.http_protocol_options(), config.http2_protocol_options(),
-      config.common_http_protocol_options(),
-      (config.has_upstream_http_protocol_options()
-           ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
-                 config.upstream_http_protocol_options())
-           : absl::nullopt),
-      config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-      config.has_http2_protocol_options(), validation_visitor);
+  auto options_or_error =
+      ClusterInfoImpl::HttpProtocolOptionsConfigImpl::createProtocolOptionsConfig(
+          config.http_protocol_options(), config.http2_protocol_options(),
+          config.common_http_protocol_options(),
+          (config.has_upstream_http_protocol_options()
+               ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
+                     config.upstream_http_protocol_options())
+               : absl::nullopt),
+          config.protocol_selection() ==
+              envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
+          config.has_http2_protocol_options(), validation_visitor);
+  THROW_IF_STATUS_NOT_OK(options_or_error, throw);
+  return options_or_error.value();
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
