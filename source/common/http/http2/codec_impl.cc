@@ -1101,6 +1101,9 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t typ
 }
 
 Status ConnectionImpl::onGoAway(uint32_t error_code) {
+  // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
+  // notifications are the same as a normal GOAWAY.
+  // TODO: handle multiple GOAWAY frames.
   if (!raised_goaway_) {
     raised_goaway_ = true;
     callbacks().onGoAway(ngHttp2ErrorCodeToErrorCode(error_code));
@@ -1183,43 +1186,35 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     uint64_t data;
     safeMemcpy(&data, &(frame->ping.opaque_data));
     return onPing(data, frame->ping.hd.flags & NGHTTP2_FLAG_ACK);
-  }
-
-  if (frame->hd.type == NGHTTP2_DATA) {
+  } else if (frame->hd.type == NGHTTP2_DATA) {
     return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags,
                        frame->data.padlen);
-  }
-
-  // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
-  // notifications are the same as a normal GOAWAY.
-  // TODO: handle multiple GOAWAY frames.
-  if (frame->hd.type == NGHTTP2_GOAWAY) {
+  } else if (frame->hd.type == NGHTTP2_GOAWAY) {
+    ASSERT(frame->hd.stream_id == 0);
     return onGoAway(frame->goaway.error_code);
-  }
-
-  if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    std::vector<http2::adapter::Http2Setting> settings;
-    settings.reserve(frame->settings.niv);
-    for (const nghttp2_settings_entry& entry :
-         absl::MakeSpan(frame->settings.iv, frame->settings.niv)) {
-      settings.push_back(
-          {static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
+  } else if (frame->hd.type == NGHTTP2_SETTINGS) {
+    if (frame->hd.flags == NGHTTP2_FLAG_NONE) {
+      std::vector<http2::adapter::Http2Setting> settings;
+      settings.reserve(frame->settings.niv);
+      for (const nghttp2_settings_entry& entry :
+           absl::MakeSpan(frame->settings.iv, frame->settings.niv)) {
+        settings.push_back(
+            {static_cast<http2::adapter::Http2SettingsId>(entry.settings_id), entry.value});
+      }
+      onSettings(settings);
     }
-    onSettings(settings);
     return okStatus();
-  }
-
-  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
-  if (!stream) {
-    return okStatus();
-  }
-
-  if (frame->hd.type == NGHTTP2_HEADERS) {
+  } else if (frame->hd.type == NGHTTP2_HEADERS) {
     return onHeaders(frame->hd.stream_id, frame->hd.length, frame->hd.flags, frame->headers.cat);
-  }
-
-  if (frame->hd.type == NGHTTP2_RST_STREAM) {
+  } else if (frame->hd.type == NGHTTP2_RST_STREAM) {
     return onRstStream(frame->hd.stream_id, frame->rst_stream.error_code);
+  } else {
+    StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+    if (!stream) {
+      return okStatus();
+    }
+    // Track bytes received.
+    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   return okStatus();
