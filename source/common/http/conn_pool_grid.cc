@@ -90,7 +90,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   }
 
   // If the next connection attempt does not immediately fail, let it proceed.
-  if (tryAnotherConnection()) {
+  if (tryAnotherConnection().has_value()) {
     return;
   }
 
@@ -189,19 +189,19 @@ void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(
   connection_attempts_.clear();
 }
 
-bool ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+absl::optional<ConnectivityGrid::StreamCreationResult>
+ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
   absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
   if (!next_pool.has_value()) {
-    // If there are no other pools to try, return false.
-    return false;
+    // If there are no other pools to try, return an empty optional.
+    return {};
   }
   // Create a new connection attempt for the next pool. If we reach this point
   // return true regardless of if newStream resulted in an immediate result or
   // an async call, as either way the attempt will result in success/failure
   // callbacks.
   current_ = next_pool.value();
-  newStream();
-  return true;
+  return newStream();
 }
 
 ConnectivityGrid::ConnectivityGrid(
@@ -327,7 +327,12 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
-    wrapped_callbacks_.front()->tryAnotherConnection();
+    absl::optional<StreamCreationResult> result =
+        wrapped_callbacks_.front()->tryAnotherConnection();
+    if (result.has_value() && result.value() == StreamCreationResult::ImmediateResult) {
+      // As above, if we have an immediate success, return nullptr.
+      return nullptr;
+    }
   }
   return ret;
 }
