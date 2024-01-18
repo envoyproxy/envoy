@@ -129,14 +129,15 @@ FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
   }
   return absl::nullopt;
 }
-static std::vector<envoy::config::core::v3::HeaderValue>
-initMetadata(const ExtProcPerRoute& config) {
+namespace {
+std::vector<envoy::config::core::v3::HeaderValue> initMetadata(const ExtProcPerRoute& config) {
   std::vector<envoy::config::core::v3::HeaderValue> metadata;
   for (const auto& header : config.overrides().metadata()) {
     metadata.emplace_back(header);
   }
   return metadata;
 }
+} // namespace
 
 absl::optional<ProcessingMode>
 FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_specific,
@@ -148,9 +149,10 @@ FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_speci
                                                     : less_specific.processingMode();
 }
 
+namespace {
 // replace all entries with the same name or append one.
-static void mergeHeaderValue(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
-                             const envoy::config::core::v3::HeaderValue& header) {
+void mergeHeaderValue(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
+                      const envoy::config::core::v3::HeaderValue& header) {
   size_t count = 0;
   for (auto& dest : metadata) {
     if (dest.key() == header.key()) {
@@ -163,7 +165,7 @@ static void mergeHeaderValue(std::vector<envoy::config::core::v3::HeaderValue>& 
   }
 }
 
-static std::vector<envoy::config::core::v3::HeaderValue>
+std::vector<envoy::config::core::v3::HeaderValue>
 mergeMetadata(const FilterConfigPerRoute& less_specific,
               const FilterConfigPerRoute& more_specific) {
   std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.metadata());
@@ -174,6 +176,7 @@ mergeMetadata(const FilterConfigPerRoute& less_specific,
 
   return metadata;
 }
+} // namespace
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
@@ -902,10 +905,10 @@ static ProcessingMode allDisabledMode() {
   return pm;
 }
 
+namespace {
 // replace all entries with the same name or append one.
-static void
-mergeHeaderValue(Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
-                 const envoy::config::core::v3::HeaderValue& header) {
+void mergeHeaderValue(Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
+                      const envoy::config::core::v3::HeaderValue& header) {
   size_t count = 0;
   for (auto& dest : metadata) {
     if (dest.key() == header.key()) {
@@ -917,6 +920,7 @@ mergeHeaderValue(Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderVal
     metadata.Add()->CopyFrom(header);
   }
 }
+} // namespace
 
 void Filter::mergePerRouteConfig() {
   if (route_config_merged_) {
