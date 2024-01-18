@@ -260,7 +260,6 @@ public:
     return untyped_receiving_namespaces_;
   }
 
-private:
   enum MergeBehavior {
     // Merge the values
     Merge,
@@ -270,14 +269,20 @@ private:
     OverwriteWithEmpty,
   };
 
+  static std::vector<std::string> mergeNamespaces(const std::vector<std::string>& less_specific,
+                                                  const std::vector<std::string>& more_specific,
+                                                  const MergeBehavior merge_behavior);
+
+  MergeBehavior mergeBehavior() const { return merge_behavior_; }
+
+private:
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
   initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
   absl::optional<envoy::config::core::v3::GrpcService>
   initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  std::vector<std::string>
-  initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns);
+  std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns);
 
   std::vector<std::string> initUntypedForwardingNamespaces(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
@@ -288,17 +293,12 @@ private:
   std::vector<std::string> initUntypedReceivingNamespaces(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  MergeBehavior initMergeBehavior(
-      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+  MergeBehavior
+  initMergeBehavior(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
   absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
   mergeProcessingMode(const FilterConfigPerRoute& less_specific,
                       const FilterConfigPerRoute& more_specific);
-
-  std::vector<std::string>
-  mergeNamespaces(const std::vector<std::string>& less_specific,
-                  const std::vector<std::string>& more_specific,
-                  const MergeBehavior merge_behavior);
 
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
@@ -430,7 +430,10 @@ private:
   bool sent_immediate_response_ = false;
 
   // Set to true when the mergePerRouteConfig() method has been called.
-  absl::optional<FilterConfigPerRoute> route_config_merged_;
+  bool route_config_merged_ = false;
+  std::vector<std::string> merged_untyped_forwarding_namespaces_{};
+  std::vector<std::string> merged_typed_forwarding_namespaces_{};
+  std::vector<std::string> merged_untyped_receiving_namespaces_{};
 };
 
 extern std::string responseCaseToString(

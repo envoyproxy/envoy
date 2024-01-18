@@ -17,8 +17,8 @@ namespace ExternalProcessing {
 
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
-using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::extensions::filters::http::ext_proc::v3::MetadataOptions;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::type::v3::StatusCode;
 
 using envoy::service::ext_proc::v3::ImmediateResponse;
@@ -177,19 +177,21 @@ FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
   return absl::nullopt;
 }
 
-FilterConfigPerRoute::MergeBehavior FilterConfigPerRoute::initMergeBehavior(const ExtProcPerRoute& config) {
+FilterConfigPerRoute::MergeBehavior
+FilterConfigPerRoute::initMergeBehavior(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options()) {
     return Merge;
   }
   switch (config.overrides().metadata_options().namespaces_merge_behavior()) {
-    case envoy::extensions::filters::http::ext_proc::v3::MetadataOptions_MergeBehavior_merge:
-      return Merge;
-    case envoy::extensions::filters::http::ext_proc::v3::MetadataOptions_MergeBehavior_overwrite:
-      return Overwrite;
-    case envoy::extensions::filters::http::ext_proc::v3::MetadataOptions_MergeBehavior_overwrite_with_empty:
-      return OverwriteWithEmpty;
-    default:
-      return Merge;
+  case envoy::extensions::filters::http::ext_proc::v3::MetadataOptions_MergeBehavior_merge:
+    return Merge;
+  case envoy::extensions::filters::http::ext_proc::v3::MetadataOptions_MergeBehavior_overwrite:
+    return Overwrite;
+  case envoy::extensions::filters::http::ext_proc::v3::
+      MetadataOptions_MergeBehavior_overwrite_with_empty:
+    return OverwriteWithEmpty;
+  default:
+    return Merge;
   }
 }
 
@@ -203,31 +205,30 @@ FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_speci
                                                     : less_specific.processingMode();
 }
 
-std::vector<std::string> FilterConfigPerRoute::mergeNamespaces(
-    const std::vector<std::string>& less_specific,
-    const std::vector<std::string>& more_specific,
-    const MergeBehavior merge_behavior) {
+std::vector<std::string>
+FilterConfigPerRoute::mergeNamespaces(const std::vector<std::string>& less_specific,
+                                      const std::vector<std::string>& more_specific,
+                                      const MergeBehavior merge_behavior) {
   switch (merge_behavior) {
-    case MergeBehavior::OverwriteWithEmpty:
+  case MergeBehavior::OverwriteWithEmpty:
+    return more_specific;
+  case MergeBehavior::Overwrite:
+    if (!more_specific.empty()) {
       return more_specific;
-    case MergeBehavior::Overwrite:
-      if (!more_specific.empty()) {
-        return more_specific;
-      }
-      return less_specific;
-    case MergeBehavior::Merge:
-      std::vector<std::string> vec{less_specific.begin(), less_specific.end()};
-      for (const auto& elem : more_specific) {
-        vec.emplace_back(elem);
-      }
-      return vec;
+    }
+    return less_specific;
+  case MergeBehavior::Merge:
+    std::vector<std::string> vec{less_specific.begin(), less_specific.end()};
+    for (const auto& elem : more_specific) {
+      vec.emplace_back(elem);
+    }
+    return vec;
   }
 }
 
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
-      grpc_service_(initGrpcService(config)),
-      merge_behavior_(initMergeBehavior(config)),
+      grpc_service_(initGrpcService(config)), merge_behavior_(initMergeBehavior(config)),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)) {}
@@ -239,18 +240,15 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
                                                             : less_specific.grpcService()),
       merge_behavior_(more_specific.merge_behavior_),
-      untyped_forwarding_namespaces_(
-          mergeNamespaces(less_specific.untypedForwardingMetadataNamespaces(),
-                          more_specific.untypedForwardingMetadataNamespaces(),
-                          more_specific.merge_behavior_)),
-      typed_forwarding_namespaces_(
-          mergeNamespaces(less_specific.typedForwardingMetadataNamespaces(),
-                          more_specific.typedForwardingMetadataNamespaces(),
-                          more_specific.merge_behavior_)),
-      untyped_receiving_namespaces_(
-          mergeNamespaces(less_specific.untypedReceivingMetadataNamespaces(),
-                          more_specific.untypedReceivingMetadataNamespaces(),
-                          more_specific.merge_behavior_)) {}
+      untyped_forwarding_namespaces_(mergeNamespaces(
+          less_specific.untypedForwardingMetadataNamespaces(),
+          more_specific.untypedForwardingMetadataNamespaces(), more_specific.merge_behavior_)),
+      typed_forwarding_namespaces_(mergeNamespaces(
+          less_specific.typedForwardingMetadataNamespaces(),
+          more_specific.typedForwardingMetadataNamespaces(), more_specific.merge_behavior_)),
+      untyped_receiving_namespaces_(mergeNamespaces(
+          less_specific.untypedReceivingMetadataNamespaces(),
+          more_specific.untypedReceivingMetadataNamespaces(), more_specific.merge_behavior_)) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -1065,9 +1063,11 @@ static ProcessingMode allDisabledMode() {
 }
 
 void Filter::mergePerRouteConfig() {
-  if (route_config_merged_.has_value()) {
+  if (route_config_merged_) {
     return;
   }
+
+  route_config_merged_ = true;
 
   absl::optional<FilterConfigPerRoute> merged_config;
 
@@ -1078,7 +1078,7 @@ void Filter::mergePerRouteConfig() {
       ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
       return;
     }
-    if (!merged_config) {
+    if (!merged_config.has_value()) {
       merged_config.emplace(*typed_cfg);
     } else {
       merged_config.emplace(FilterConfigPerRoute(merged_config.value(), *typed_cfg));
@@ -1088,8 +1088,6 @@ void Filter::mergePerRouteConfig() {
   if (!merged_config.has_value()) {
     return;
   }
-
-  route_config_merged_.emplace(merged_config.value());
 
   if (merged_config->disabled()) {
     // Rather than introduce yet another flag, use the processing mode
@@ -1102,35 +1100,37 @@ void Filter::mergePerRouteConfig() {
   }
   if (merged_config->processingMode().has_value()) {
     ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
-    decoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
-    encoding_state_.setProcessingMode(*(route_config_merged_->processingMode()));
+    decoding_state_.setProcessingMode(*(merged_config->processingMode()));
+    encoding_state_.setProcessingMode(*(merged_config->processingMode()));
   }
   if (merged_config->grpcService().has_value()) {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
-    grpc_service_ = *route_config_merged_->grpcService();
-    config_with_hash_key_.setConfig(*route_config_merged_->grpcService());
+    grpc_service_ = *merged_config->grpcService();
+    config_with_hash_key_.setConfig(*merged_config->grpcService());
   }
 
   ENVOY_LOG(trace,
             "Setting new untyped forwarding metadata namespaces from per-route configuration");
-  decoding_state_.setUntypedForwardingMetadataNamespaces(
-      route_config_merged_->untypedForwardingMetadataNamespaces());
-  encoding_state_.setUntypedForwardingMetadataNamespaces(
-      route_config_merged_->untypedForwardingMetadataNamespaces());
+  merged_untyped_forwarding_namespaces_ = FilterConfigPerRoute::mergeNamespaces(
+      decoding_state_.untypedForwardingMetadataNamespaces(),
+      merged_config->untypedForwardingMetadataNamespaces(), merged_config->mergeBehavior());
+  decoding_state_.setUntypedForwardingMetadataNamespaces(merged_untyped_forwarding_namespaces_);
+  encoding_state_.setUntypedForwardingMetadataNamespaces(merged_untyped_forwarding_namespaces_);
 
-  ENVOY_LOG(trace,
-            "Setting new typed forwarding metadata namespaces from per-route configuration");
-  decoding_state_.setTypedForwardingMetadataNamespaces(
-      route_config_merged_->typedForwardingMetadataNamespaces());
-  encoding_state_.setTypedForwardingMetadataNamespaces(
-      route_config_merged_->typedForwardingMetadataNamespaces());
+  ENVOY_LOG(trace, "Setting new typed forwarding metadata namespaces from per-route configuration");
+  merged_typed_forwarding_namespaces_ = FilterConfigPerRoute::mergeNamespaces(
+      decoding_state_.typedForwardingMetadataNamespaces(),
+      merged_config->typedForwardingMetadataNamespaces(), merged_config->mergeBehavior());
+  decoding_state_.setTypedForwardingMetadataNamespaces(merged_typed_forwarding_namespaces_);
+  encoding_state_.setTypedForwardingMetadataNamespaces(merged_typed_forwarding_namespaces_);
 
   ENVOY_LOG(trace,
             "Setting new untyped receiving metadata namespaces from per-route configuration");
-  decoding_state_.setUntypedReceivingMetadataNamespaces(
-      route_config_merged_->untypedReceivingMetadataNamespaces());
-  encoding_state_.setUntypedReceivingMetadataNamespaces(
-      route_config_merged_->untypedReceivingMetadataNamespaces());
+  merged_untyped_receiving_namespaces_ = FilterConfigPerRoute::mergeNamespaces(
+      decoding_state_.untypedReceivingMetadataNamespaces(),
+      merged_config->untypedReceivingMetadataNamespaces(), merged_config->mergeBehavior());
+  decoding_state_.setUntypedReceivingMetadataNamespaces(merged_untyped_receiving_namespaces_);
+  encoding_state_.setUntypedReceivingMetadataNamespaces(merged_untyped_receiving_namespaces_);
 }
 
 std::string responseCaseToString(const ProcessingResponse::ResponseCase response_case) {
