@@ -9,72 +9,32 @@ static_resources:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
             name: local_route
             virtual_hosts:
-            - name: local_service
-              domains:
-              - "*"
+            - domains:
+              - '*'
+              name: local_service
               routes:
-              # Regex rewrite would invalidate SigV4 unless request signing occurs during Cluster upstream
-              - match:
-                  prefix: '/app1'
-                route:
-                  regex_rewrite:
-                    pattern:
-                      regex: "^/app1$"
-                    substitution: /rewritten/app1
-                  cluster: outbound_proxy
-                typed_per_filter_config:
-                  envoy.filters.http.dynamic_forward_proxy:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig
-                    host_rewrite_literal: app1.application.internal
-          http_filters:
-          - name: envoy.filters.http.dynamic_forward_proxy
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
-              dns_cache_config:
-                name: dynamic_forward_proxy_cache_config
-                dns_lookup_family: V4_ONLY
-                typed_dns_resolver_config:
-                  name: envoy.network.dns_resolver.cares
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
-                    use_resolvers_as_fallback: true
-                    resolvers:
-                    - socket_address:
-                        address: "127.0.0.1"
-                        port_value: 53
-                    dns_resolver_options:
-                      use_tcp_for_dns_lookups: true
-                      no_default_search_domain: true
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+              - match: {prefix: "/"}
+                route: {cluster: default_service}
   clusters:
-  - name: outbound_proxy
-    lb_policy: CLUSTER_PROVIDED
-    cluster_type:
-      name: envoy.clusters.dynamic_forward_proxy
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-        dns_cache_config:
-          name: dynamic_forward_proxy_cache_config
-          dns_lookup_family: V4_ONLY
-          typed_dns_resolver_config:
-            name: envoy.network.dns_resolver.cares
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
-              use_resolvers_as_fallback: true
-              resolvers:
-              - socket_address:
-                  address: "127.0.0.1"
-                  port_value: 53
-              dns_resolver_options:
-                use_tcp_for_dns_lookups: true
-                no_default_search_domain: true
+  - name: default_service
+    load_assignment:
+      cluster_name: default_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10001
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions

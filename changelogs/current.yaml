@@ -18,7 +18,7 @@ removed_config_or_runtime:
 new_features:
 - area: aws_request_signing
   change: |
-    Update ``aws_request_signing`` filter to support use as an upstream http filter. This allows successful calculation of
+    Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
 
 deprecated:

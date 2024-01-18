@@ -81,12 +81,12 @@ To resolve this situation, the AWS Request Signing Filter can be configured as a
 calculated as a final step before the HTTP request is forwarded upstream, ensuring signatures are correctly calculated over the updated
 HTTP fields.
 
-An example of configuring this filter as an upstream HTTP filter:
+Configuring this filter as an upstream HTTP filter is done in a similar way to downstream filters, but using :ref:`http_filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter>` within the cluster configuration.
 
 .. literalinclude:: _include/aws-request-signing-filter-upstream.yaml
     :language: yaml
-    :lines: 56-100
-    :lineno-start: 56
+    :lines: 47-57
+    :lineno-start: 47
     :linenos:
     :caption: :download:`aws-request-signing-filter-upstream.yaml <_include/aws-request-signing-filter-upstream.yaml>`
 
