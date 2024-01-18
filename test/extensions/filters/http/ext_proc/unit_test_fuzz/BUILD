@@ -23,7 +23,6 @@ envoy_cc_mock(
 envoy_proto_library(
     name = "ext_proc_unit_test_fuzz_proto",
     srcs = ["ext_proc_unit_test_fuzz.proto"],
-    tags = ["skip_on_windows"],
     deps = [
         "//test/fuzz:common_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg",
