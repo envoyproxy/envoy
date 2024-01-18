@@ -1186,13 +1186,16 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     uint64_t data;
     safeMemcpy(&data, &(frame->ping.opaque_data));
     return onPing(data, frame->ping.hd.flags & NGHTTP2_FLAG_ACK);
-  } else if (frame->hd.type == NGHTTP2_DATA) {
+  }
+  if (frame->hd.type == NGHTTP2_DATA) {
     return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags,
                        frame->data.padlen);
-  } else if (frame->hd.type == NGHTTP2_GOAWAY) {
+  }
+  if (frame->hd.type == NGHTTP2_GOAWAY) {
     ASSERT(frame->hd.stream_id == 0);
     return onGoAway(frame->goaway.error_code);
-  } else if (frame->hd.type == NGHTTP2_SETTINGS) {
+  }
+  if (frame->hd.type == NGHTTP2_SETTINGS) {
     if (frame->hd.flags == NGHTTP2_FLAG_NONE) {
       std::vector<http2::adapter::Http2Setting> settings;
       settings.reserve(frame->settings.niv);
@@ -1204,15 +1207,15 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       onSettings(settings);
     }
     return okStatus();
-  } else if (frame->hd.type == NGHTTP2_HEADERS) {
+  }
+  if (frame->hd.type == NGHTTP2_HEADERS) {
     return onHeaders(frame->hd.stream_id, frame->hd.length, frame->hd.flags, frame->headers.cat);
-  } else if (frame->hd.type == NGHTTP2_RST_STREAM) {
+  }
+  if (frame->hd.type == NGHTTP2_RST_STREAM) {
     return onRstStream(frame->hd.stream_id, frame->rst_stream.error_code);
-  } else {
-    StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
-    if (!stream) {
-      return okStatus();
-    }
+  }
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+  if (stream != nullptr && frame->hd.type != METADATA_FRAME_TYPE) {
     // Track bytes received.
     stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
