@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.resource_monitors.downstream_connections.v3;
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
