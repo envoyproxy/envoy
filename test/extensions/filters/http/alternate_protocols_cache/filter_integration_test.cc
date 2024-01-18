@@ -59,6 +59,16 @@ typed_config:
                                            filename);
     config_helper_.prependFilter(filter);
 
+    // Set resource tracking on connection pools so we can explicitly check when
+    // they're created and torn down.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* static_resources = bootstrap.mutable_static_resources();
+      auto* cluster = static_resources->mutable_clusters(0);
+      auto* circuit_breakers = cluster->mutable_circuit_breakers();
+      circuit_breakers->add_thresholds()->mutable_max_connection_pools()->set_value(100);
+      circuit_breakers->mutable_thresholds(0)->set_track_remaining(true);
+    });
+
     upstream_tls_ = true;
     // This configures the upstream to use the connection grid (automatically
     // selecting protocol and allowing HTTP/3)
@@ -217,6 +227,8 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
   FakeHttpConnectionPtr h3_connection;
   waitForNextUpstreamConnection(std::vector<uint64_t>{1}, TestUtility::DefaultTimeout,
                                 h3_connection);
+  // Of the 100 connection pools configured, the grid registers as taking up one.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools", 99);
 
   // The created stream will reset.
   FakeStreamPtr upstream_request2;
@@ -242,6 +254,11 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
 
   checkSimpleRequestSuccess(request_size, response_size, response.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+
+  cleanupUpstreamAndDownstream();
+  // Wait for the grid to be torn down to make sure it is not problematic.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                               100);
 }
 
 TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
@@ -286,6 +303,8 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
 
   // Wait for both connections to be attempted.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  // Of the 100 connection pools configured, the grid registers as taking up one.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools", 99);
 
   // Unblock Http3.
   block_http3.Notify();
@@ -299,6 +318,11 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
   // Make sure the response is completed.
   ASSERT_TRUE(response->waitForEndStream(timeout));
   checkSimpleRequestSuccess(request_size, response_size, response.get());
+
+  cleanupUpstreamAndDownstream();
+  // Wait for the grid to be torn down to make sure it is not problematic.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                               100);
 }
 
 TEST_P(FilterIntegrationTest, AltSvcIgnoredWithProxyConfig) {

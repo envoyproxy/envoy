@@ -308,6 +308,11 @@ case $CI_TARGET in
                 if [[ "$GO_FILE" = *.validate.go ]]; then
                     sed -i '1s;^;//go:build !disable_pgv\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
                 fi
+                # TODO(https://github.com/planetscale/vtprotobuf/pull/122) do this directly in the generator.
+                # Make vtprotobuf opt-in as it has some impact on binary sizes
+                if [[ "$GO_FILE" = *.vtproto.pb.go ]]; then
+                    sed -i '1s;^;//go:build vtprotobuf\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                fi
             done <<< "$(find "$INPUT_DIR" -name "*.go")"
         done
         ;;

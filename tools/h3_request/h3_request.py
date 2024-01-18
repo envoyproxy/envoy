@@ -92,10 +92,13 @@ class Http3Client(QuicConnectionProtocol):
             ],
             end_stream=not post_stdin,
         )
+        self.transmit()
         if post_stdin:
             async for data in _stream_stdin_generator():
                 self._http.send_data(stream_id=stream_id, data=data, end_stream=False)
+                self.transmit()
             self._http.send_data(stream_id=stream_id, data=b'', end_stream=True)
+            self.transmit()
 
         await future
 
