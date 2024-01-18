@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: adaptive concurrency filter stats
+  change: |
+    Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
