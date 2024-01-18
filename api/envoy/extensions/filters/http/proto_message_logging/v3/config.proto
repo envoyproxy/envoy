@@ -3,34 +3,30 @@ syntax = "proto3";
 package envoy.extensions.filters.http.proto_message_logging.v3;
 
 import "envoy/config/core/v3/base.proto";
-
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_message_logging.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/proto_message_logging/v3;proto_message_loggingv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: Proto Message Logging]
-//
+// Proto Message Logging :ref:`configuration overview
+// <config_http_filters_proto_message_logging>`.
 // [#extension: envoy.filters.http.proto_message_logging]
 //
-// Overview
-// --------
-// This filter supports logging scrubbed gRPC requests/responses(proto messages)
+// ProtoMessageLogging filter supports logging scrubbed gRPC requests/responses(proto messages)
 // as google.protobuf.Struct and storing results
 // in the dynamic metadata `envoy.filters.http.proto_message_logging` for later access.
 //
-// Assumptions
-// -----------
-//
+// # Assumptions
 // This filter assumes it is only applicable for gRPC with Protobuf as payload.
 //
-// Process Flow
-// ------------
-//
+// # Process Flow
 // On the request path, it will check
 //
 // 1. if the incoming gRPC request is configured, the filter tries to:
@@ -53,9 +49,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // 2. otherwise, pass through the response.
 //
-// Config Requirements
-// -------------------
-//
+// # Config Requirements
 // Here are config requirements
 //
 // 1. the log target field should be among the following primitive types: `string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`, `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
@@ -64,8 +58,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // 3. the intermediate type could also be repeated.
 //
-// Output Format
-// -------------
+// # Output Format
 // The logged requests and responses will be  will be added in the dynamic ``metadata<google.protobuf.Struct>`` with the same layout of the message.
 //
 // For the default `FIRST_AND_LAST` mode, it will be like:
@@ -93,9 +86,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   }
 //
 //
-// Example for `FIRST_AND_LAST` mode
-// -------
-//
+// # Example for `FIRST_AND_LAST` mode
 // Let's say we have the following definition for the bi-streaming request
 // `pkg.svc.Method`.
 //
@@ -205,19 +196,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //        }
 //     }
 //   }
+
 message ProtoMessageLoggingConfig {
+
   // The proto descriptor set binary for the gRPC services.
-  //
-
-  enum LogMode {
-    LogMode_UNSPECIFIED = 0;
-
-    // The filter will log the first and the last message for
-    // for streaming cases, containing
-    // client-side streaming, server-side streaming or bi-directional streaming.
-    FIRST_AND_LAST = 1;
-  }
-
   oneof descriptor_set {
     // It could be passed by a local file through `Datasource.filename` or
     // embedded in the `Datasource.inline_bytes`.
@@ -228,6 +210,15 @@ message ProtoMessageLoggingConfig {
     // for proto descriptors, so that these filters can share one copy of proto
     // descriptor in memory.
     string proto_descriptor_typed_metadata = 2;
+  }
+
+  enum LogMode {
+    LogMode_UNSPECIFIED = 0;
+
+    // The filter will log the first and the last message for
+    // for streaming cases, containing
+    // client-side streaming, server-side streaming or bi-directional streaming.
+    FIRST_AND_LAST = 1;
   }
 
   LogMode mode = 3;
