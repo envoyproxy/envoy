@@ -248,7 +248,7 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
     // Wake up periodically to run the client dispatcher.
-    if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TSAN_TIMEOUT_FACTOR)) {
+    if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
       return true;
     }
 

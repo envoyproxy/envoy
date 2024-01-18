@@ -33,8 +33,10 @@
 #include "source/common/http/utility.h"
 
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "nghttp2/nghttp2.h"
 #include "quiche/http2/adapter/http2_adapter.h"
+#include "quiche/http2/adapter/http2_protocol.h"
 #include "quiche/http2/adapter/oghttp2_adapter.h"
 
 namespace Envoy {
@@ -50,7 +52,7 @@ constexpr uint64_t H2_FRAME_HEADER_SIZE = 9;
 
 class ReceivedSettingsImpl : public ReceivedSettings {
 public:
-  explicit ReceivedSettingsImpl(const nghttp2_settings& settings);
+  explicit ReceivedSettingsImpl(absl::Span<const http2::adapter::Http2Setting> settings);
 
   // ReceivedSettings
   const absl::optional<uint32_t>& maxConcurrentStreams() const override {
@@ -272,7 +274,6 @@ protected:
 
     StreamImpl* base() { return this; }
     void resetStreamWorker(StreamResetReason reason);
-    static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
@@ -647,10 +648,8 @@ protected:
                     bool disable_push);
   void sendSettingsHelper(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                           bool disable_push);
-  void sendSettingsHelperOld(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                             bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
-  virtual void onSettings(const nghttp2_settings& settings) {
+  virtual void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) {
     ReceivedSettingsImpl received_settings(settings);
     callbacks().onSettings(received_settings);
   }
@@ -745,9 +744,11 @@ private:
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
-  Status onPing(uint64_t ping_id, bool is_ack);
-  Status onGoAway(Http2ErrorCode error_code);
-  Status onRstStream(Http2StreamId stream_id, Http2ErrorCode error_code);
+  Status onPing(uint64_t opaque_data, bool is_ack);
+  Status onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, size_t padding);
+  Status onGoAway(uint32_t error_code);
+  Status onHeaders(int32_t stream_id, size_t length, uint8_t flags, int headers_category);
+  Status onRstStream(int32_t stream_id, uint32_t error_code);
   Status onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
