@@ -47,7 +47,7 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", tcmalloc::MallocExtension::GetStats());
 }
 
-void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {
+void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine(Api::Api& api) {
   ENVOY_LOG_MISC(debug, "Started tcmallocProcessBackgroundActionsThreadRoutine");
   while (true) {
     Thread::ReleasableLockGuard guard(mutex_);
@@ -114,8 +114,20 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", buffer.get());
 }
 
-void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {
-  ENVOY_LOG_MISC(debug, "Started tcmallocProcessBackgroundActionsThreadRoutine");
+void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine(Api::Api& api) {
+  ENVOY_LOG_MISC(debug, "Started {}", TCMALLOC_ROUTINE_THREAD_ID);
+  if (bytes_to_release_ > 0) {
+    tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(TCMALLOC_ROUTINE_THREAD_ID);
+    memory_release_timer_ = tcmalloc_routine_dispatcher_.createTimer([this]() -> void {
+      allocator_manager_stats_.released_by_timer_.inc();
+        Thread::ReleasableLockGuard guard(mutex_);
+        if (terminating_) {
+          guard.release();
+          memory_release_timer_->disableTimer();
+          return;
+        }
+      memory_release_timer_->enableTimer(memory_release_interval_msec_);
+    });
   while (true) {
     Thread::ReleasableLockGuard guard(mutex_);
     if (terminating_) {
@@ -142,7 +154,7 @@ uint64_t Stats::totalPageHeapUnmapped() { return 0; }
 uint64_t Stats::totalPageHeapFree() { return 0; }
 uint64_t Stats::totalPhysicalBytes() { return 0; }
 void Stats::dumpStatsToLog() {}
-void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine() {}
+void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine(Api::Api&) {}
 
 } // namespace Memory
 } // namespace Envoy
