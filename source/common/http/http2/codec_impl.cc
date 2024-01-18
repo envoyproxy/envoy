@@ -201,21 +201,6 @@ void ConnectionImpl::ServerStreamImpl::destroy() {
   StreamImpl::destroy();
 }
 
-static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
-  uint8_t flags = 0;
-  if (header.key().isReference()) {
-    flags |= NGHTTP2_NV_FLAG_NO_COPY_NAME;
-  }
-  if (header.value().isReference()) {
-    flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
-  }
-  const absl::string_view header_key = header.key().getStringView();
-  const absl::string_view header_value = header.value().getStringView();
-  headers.push_back({removeConst<uint8_t>(header_key.data()),
-                     removeConst<uint8_t>(header_value.data()), header_key.size(),
-                     header_value.size(), flags});
-}
-
 http2::adapter::HeaderRep getRep(const HeaderString& str) {
   if (str.isReference()) {
     return str.getStringView();
@@ -1130,6 +1115,7 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
     return okStatus();
   }
   // Track bytes received.
+  stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
   stream->remote_end_stream_ = flags & NGHTTP2_FLAG_END_STREAM;
@@ -1174,6 +1160,8 @@ Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
   if (!stream) {
     return okStatus();
   }
+  // Track bytes received.
+  stream->bytes_meter_->addWireBytesReceived(/*frame_length=*/4 + H2_FRAME_HEADER_SIZE);
   stream->remote_rst_ = true;
   stats_.rx_reset_.inc();
   return okStatus();
@@ -1224,11 +1212,6 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
   if (!stream) {
     return okStatus();
-  }
-
-  // Track bytes sent and received.
-  if (frame->hd.type != METADATA_FRAME_TYPE) {
-    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   if (frame->hd.type == NGHTTP2_HEADERS) {
