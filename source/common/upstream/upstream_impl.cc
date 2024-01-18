@@ -441,7 +441,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-    HostImpl::healthFlagClear(Host::HealthFlag::DRAINING_EDS_HEALTH);
+    HostImpl::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
   }
 
   // Set the appropriate EDS health flag.
@@ -453,7 +453,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
     break;
   case envoy::config::core::v3::DRAINING:
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-      HostImpl::healthFlagSet(Host::HealthFlag::DRAINING_EDS_HEALTH);
+      HostImpl::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     }
     break;
   case envoy::config::core::v3::DEGRADED:
@@ -1534,7 +1534,7 @@ namespace {
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
          host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) ||
-         host.healthFlagGet(Host::HealthFlag::DRAINING_EDS_HEALTH);
+         host.healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING);
 }
 
 } // namespace
