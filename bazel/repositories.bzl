@@ -1462,5 +1462,5 @@ def _com_github_maxmind_libmaxminddb():
     )
     native.bind(
         name = "maxmind",
-        actual = "@envoy//bazel/foreign_cc:maxmind_linux_apple",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux_darwin",
     )
