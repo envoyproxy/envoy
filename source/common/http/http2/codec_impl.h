@@ -626,7 +626,7 @@ protected:
   // Same as getStream, but without the ASSERT.
   const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
   StreamImpl* getStreamUnchecked(int32_t stream_id);
-  int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
+  int saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value);
 
   /**
    * Copies any frames pending internally by nghttp2 into outbound buffer.
@@ -759,7 +759,7 @@ private:
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                   uint32_t error_code);
   int onError(absl::string_view error);
-  virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
+  virtual int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
   // Pass through invoking with the actual stream.
   Status onStreamClose(int32_t stream_id, uint32_t error_code);
@@ -817,7 +817,7 @@ private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
-  int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
+  int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t) override;
   void dumpStreams(std::ostream& os, int indent_level) const override;
@@ -844,7 +844,7 @@ private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
-  int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
+  int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
