@@ -216,7 +216,8 @@ bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
 
 ResponseFlagFilter::ResponseFlagFilter(
     const envoy::config::accesslog::v3::ResponseFlagFilter& config) {
-  // Preallocate the vector to avoid frequent reallocations. 64 should be enough for most use cases.
+  // Preallocate the vector to avoid frequent heap allocations. 64 should be enough for most use
+  // cases.
   configured_flags_.resize(64, false);
   for (int i = 0; i < config.flags_size(); i++) {
     absl::optional<uint16_t> response_flag =

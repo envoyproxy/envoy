@@ -109,7 +109,7 @@ absl::optional<uint16_t> ResponseFlagUtils::toResponseFlag(absl::string_view fla
   return absl::nullopt;
 }
 
-CustomResponseFlagRegister::CustomResponseFlagRegister(absl::string_view flag,
+CustomResponseFlag::CustomResponseFlag(absl::string_view flag,
                                                        absl::string_view flag_long) {
   flag_ = ResponseFlagUtils::registerCustomFlag(flag, flag_long);
 }
