@@ -1137,23 +1137,8 @@ Status ConnectionImpl::onGoAway(uint32_t error_code) {
   return okStatus();
 }
 
-Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
-  ENVOY_CONN_LOG(trace, "recv frame type=RST_STREAM stream_id={}", connection_, stream_id);
-  StreamImpl* stream = getStreamUnchecked(stream_id);
-  if (!stream) {
-    return okStatus();
-  }
-  ENVOY_CONN_LOG(trace, "remote reset: {} {}", connection_, stream_id, error_code);
-  // Track bytes received.
-  stream->bytes_meter_->addWireBytesReceived(/*frame_length=*/4 + H2_FRAME_HEADER_SIZE);
-  stream->remote_rst_ = true;
-  stats_.rx_reset_.inc();
-  return okStatus();
-}
-
 Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags,
                                  int headers_category) {
-  ENVOY_CONN_LOG(trace, "recv frame type=HEADERS stream_id={}", connection_, stream_id);
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
     return okStatus();
@@ -1195,6 +1180,20 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
     ENVOY_BUG(false, "push not supported");
   }
 
+  return okStatus();
+}
+
+Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
+  ENVOY_CONN_LOG(trace, "recv frame type=RST_STREAM stream_id={}", connection_, stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
+  if (!stream) {
+    return okStatus();
+  }
+  ENVOY_CONN_LOG(trace, "remote reset: {} {}", connection_, stream_id, error_code);
+  // Track bytes received.
+  stream->bytes_meter_->addWireBytesReceived(/*frame_length=*/4 + H2_FRAME_HEADER_SIZE);
+  stream->remote_rst_ = true;
+  stats_.rx_reset_.inc();
   return okStatus();
 }
 

@@ -310,8 +310,10 @@ case $CI_TARGET in
                 fi
                 # TODO(https://github.com/planetscale/vtprotobuf/pull/122) do this directly in the generator.
                 # Make vtprotobuf opt-in as it has some impact on binary sizes
-                if [[ "$GO_FILE" = *.vtproto.pb.go ]]; then
-                    sed -i '1s;^;//go:build vtprotobuf\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                if [[ "$GO_FILE" = *_vtproto.pb.go ]]; then
+                    if ! grep -q 'package ignore' "$GO_FILE"; then
+                        sed -i '1s;^;//go:build vtprotobuf\n// +build vtprotobuf\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                    fi
                 fi
             done <<< "$(find "$INPUT_DIR" -name "*.go")"
         done
