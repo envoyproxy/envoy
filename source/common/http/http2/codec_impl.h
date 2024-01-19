@@ -220,7 +220,6 @@ protected:
 
     StreamImpl* base() { return this; }
     void resetStreamWorker(StreamResetReason reason);
-    static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
@@ -595,8 +594,6 @@ protected:
                     bool disable_push);
   void sendSettingsHelper(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                           bool disable_push);
-  void sendSettingsHelperOld(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                             bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
   virtual void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) {
     ReceivedSettingsImpl received_settings(settings);
@@ -693,6 +690,11 @@ private:
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
+  Status onPing(uint64_t opaque_data, bool is_ack);
+  Status onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, size_t padding);
+  Status onGoAway(uint32_t error_code);
+  Status onHeaders(int32_t stream_id, size_t length, uint8_t flags, int headers_category);
+  Status onRstStream(int32_t stream_id, uint32_t error_code);
   Status onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
