@@ -29,6 +29,7 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+RUNTIME_GUARD(envoy_reloadable_features_abort_filter_chain_on_stream_reset);
 RUNTIME_GUARD(envoy_reloadable_features_allow_absolute_url_with_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_zombie_streams);
@@ -47,6 +48,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_connect_udp_support);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_zone_routing_different_zone_counts);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
+RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_change_http_status);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_handle_empty_response);
 RUNTIME_GUARD(envoy_reloadable_features_handle_uppercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_hmac_base64_encoding_only);

@@ -26,7 +26,6 @@ envoy_cc_library(
         "@envoy//source/common/upstream:default_local_address_selector_factory",
         "@envoy//source/common/watchdog:abort_action_config",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
-        "@envoy//source/extensions/compression/brotli/compressor:config",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
         "@envoy//source/extensions/filters/http/alternate_protocols_cache:config",

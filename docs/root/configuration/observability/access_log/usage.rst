@@ -510,6 +510,8 @@ HTTP only
   **DownstreamProtocolError**, **DPE**, The downstream request had an HTTP protocol error.
   **UpstreamProtocolError**, **UPE**, The upstream response had an HTTP protocol error.
   **UpstreamMaxStreamDurationReached**, **UMSDR**, The upstream request reached max stream duration.
+  **ResponseFromCacheFilter**, **RFCF**, The response was served from an Envoy cache filter.
+  **NoFilterConfigFound**, **NFCF**, The request is terminated because filter configuration was not received within the permitted warming deadline.
   **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
   **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.

@@ -6,9 +6,20 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/context.h"
 
+// CEL-CPP does not enforce unused parameter checks consistently, so we relax it here.
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Extensions {
