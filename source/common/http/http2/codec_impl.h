@@ -175,8 +175,13 @@ protected:
     nghttp2_session_callbacks* callbacks_;
   };
 
-  class Http2Visitor : public http2::Http2VisitorInterface {
+  class Http2Visitor : public http2::adapter::Http2VisitorInterface {
    public:
+    using Http2ErrorCode = http2::adapter::Http2ErrorCode;
+    using Http2PingId = http2::adapter::Http2PingId;
+    using Http2Setting = http2::adapter::Http2Setting;
+    using Http2StreamId = http2::adapter::Http2StreamId;
+
     explicit Http2Visitor(ConnectionImpl* connection);
 
     int64_t OnReadyToSend(absl::string_view serialized) override;
@@ -202,24 +207,24 @@ protected:
     void OnRstStream(Http2StreamId stream_id, Http2ErrorCode error_code) override;
     bool OnCloseStream(Http2StreamId stream_id,
                        Http2ErrorCode error_code) override;
-    void OnPriorityForStream(Http2StreamId stream_id,
-                             Http2StreamId parent_stream_id, int weight,
-                             bool exclusive) override {}
+    void OnPriorityForStream(Http2StreamId /*stream_id*/,
+                             Http2StreamId /*parent_stream_id*/, int /*weight*/,
+                             bool /*exclusive*/) override {}
     void OnPing(Http2PingId ping_id, bool is_ack) override;
-    void OnPushPromiseForStream(Http2StreamId stream_id,
-                                Http2StreamId promised_stream_id) override {}
+    void OnPushPromiseForStream(Http2StreamId /*stream_id*/,
+                                Http2StreamId /*promised_stream_id*/) override {}
     bool OnGoAway(Http2StreamId last_accepted_stream_id,
                   Http2ErrorCode error_code,
                   absl::string_view opaque_data) override;
-    void OnWindowUpdate(Http2StreamId stream_id, int window_increment) override {}
+    void OnWindowUpdate(Http2StreamId /*stream_id*/, int /*window_increment*/) override {}
     int OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
                           size_t length, uint8_t flags) override;
     int OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
                     uint8_t flags, uint32_t error_code) override;
     bool OnInvalidFrame(Http2StreamId stream_id,
                         InvalidFrameError error) override;
-    void OnBeginMetadataForStream(Http2StreamId stream_id,
-                                  size_t payload_length) override {}
+    void OnBeginMetadataForStream(Http2StreamId /*stream_id*/,
+                                  size_t /*payload_length*/) override {}
     bool OnMetadataForStream(Http2StreamId stream_id,
                              absl::string_view metadata) override;
     bool OnMetadataEndForStream(Http2StreamId stream_id) override;

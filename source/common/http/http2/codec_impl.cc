@@ -1039,15 +1039,6 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
                  static_cast<uint64_t>(type), static_cast<uint64_t>(flags), stream_id);
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
-  // In slow networks, HOL blocking can prevent the ping response from coming in a reasonable
-  // amount of time. To avoid HOL blocking influence, if we receive *any* frame extend the
-  // timeout for another timeout period. This will still timeout the connection if there is no
-  // activity, but if there is frame activity we assume the connection is still healthy and the
-  // PING ACK may be delayed behind other frames.
-  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
-    keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
-  }
-
   current_stream_id_ = stream_id;
   if (type == NGHTTP2_PING && (flags & NGHTTP2_FLAG_ACK)) {
     return okStatus();
@@ -1068,17 +1059,6 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
   auto status = okStatus();
   if (type != NGHTTP2_HEADERS && type != NGHTTP2_DATA) {
     status = trackInboundFrames(stream_id, length, type, flags, 0);
-  }
-
-  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
-  if (stream != nullptr) {
-    // Track bytes sent and received.
-    if (frame->hd.type != METADATA_FRAME_TYPE) {
-      stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
-    }
-    if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-      stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
-    }
   }
 
   return status;
@@ -1724,7 +1704,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 }
 
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
-  return connection_->onSend(serialized.data(), serialized.size());
+  return connection_->onSend(static_cast<const uint8_t*>(serialized.data()), serialized.size());
 }
 
 bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
@@ -1735,7 +1715,7 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
 }
 
 bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id, absl::string_view data) {
-  return 0 == connection_->onData(stream_id, data.data(), data.size());
+  return 0 == connection_->onData(stream_id, static_cast<const uint8_t*>(data.data()), data.size());
 }
 
 bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
