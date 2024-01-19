@@ -176,7 +176,7 @@ bug_fixes:
 - area: postgres proxy
   change: |
     Fix a race condition that may result from upstream servers refusing to switch to TLS.
-    
+
 removed_config_or_runtime:
 - area: http
   change: |
