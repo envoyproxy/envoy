@@ -124,6 +124,8 @@ public:
                            absl::string_view uri);
 };
 
+static std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                            const std::string& default_value);
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

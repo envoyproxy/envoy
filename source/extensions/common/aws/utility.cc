@@ -381,6 +381,13 @@ bool Utility::addInternalClusterStatic(
   return true;
 }
 
+std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                            const std::string& default_value) {
+  const char* value = getenv(variable_name.c_str());
+  return (value != nullptr) && (value[0] != '\0') ? value : default_value;
+}
+
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

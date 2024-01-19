@@ -186,26 +186,20 @@ bool CredentialsFileCredentialsProvider::needsRefresh() {
   return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
-std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
-                                            const std::string& default_value) {
-  const char* value = getenv(variable_name.c_str());
-  return (value != nullptr) && (value[0] != '\0') ? value : default_value;
-}
-
 void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
   // Default path plus current home directory. Will fall back to / if HOME environment variable does
   // not exist
 
-  const auto home = getEnvironmentVariableOrDefault("HOME", "");
+  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
   const auto default_credentials_file_path =
       absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
 
   const auto credentials_file =
       getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
 
-  const auto profile = getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  const auto profile = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 
   ENVOY_LOG(debug, "Credentials file path = {}, profile = {}", credentials_file, profile);
 
