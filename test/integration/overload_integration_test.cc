@@ -64,7 +64,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response->body());
   EXPECT_EQ(
-      Http::Headers::get().EnvoyOverloaded.True,
+      Http::Headers::get().EnvoyOverloadedValues.True,
       response->headers().get(Http::Headers::get().EnvoyOverloaded)[0]->value().getStringView());
   codec_client_->close();
 
@@ -76,7 +76,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response->body());
   EXPECT_EQ(
-      Http::Headers::get().EnvoyOverloaded.True,
+      Http::Headers::get().EnvoyOverloadedValues.True,
       response->headers().get(Http::Headers::get().EnvoyOverloaded)[0]->value().getStringView());
   codec_client_->close();
 
