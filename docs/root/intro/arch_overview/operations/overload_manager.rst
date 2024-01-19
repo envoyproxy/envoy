@@ -55,5 +55,5 @@ connections and requests are processed. Each action interprets the input states 
 some may ignore the *scaling* state altogether, taking effect only when *saturated*.
 
 Note that dropping an HTTP request will cause the :ref:`x-envoy-overloaded
-<config_http_filters_router_x-envoy-overloaded_set>` header to be set in the local reply
+<config_http_conn_man_headers_x-envoy-overloaded>` header to be set in the local reply
 sent by the connection manager.
