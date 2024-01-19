@@ -647,6 +647,7 @@ public:
   MOCK_METHOD(bool, unixSocketInternal, ());
   MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
   MOCK_METHOD(bool, skipXffAppend, (), (const));
+  MOCK_METHOD(bool, skipOverloadAppend, (), (const));
   MOCK_METHOD(const std::string&, via, (), (const));
   MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));
   MOCK_METHOD(const std::vector<Http::ClientCertDetailsType>&, setCurrentClientCertDetails, (),

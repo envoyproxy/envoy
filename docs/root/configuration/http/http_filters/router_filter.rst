@@ -404,8 +404,8 @@ x-envoy-overloaded
 
 Envoy will set this header on the downstream response
 if a request was dropped due to either :ref:`maintenance mode
-<config_http_filters_router_runtime_maintenance_mode>` or upstream :ref:`circuit breaking
-<arch_overview_circuit_break>`.
+<config_http_filters_router_runtime_maintenance_mode>`, upstream :ref:`circuit breaking
+<arch_overview_circuit_break>` or :ref:`overload manager<arch_overview_overload_manager>`.
 
 .. _config_http_filters_router_stats:
 

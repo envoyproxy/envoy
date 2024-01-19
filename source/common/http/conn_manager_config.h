@@ -400,6 +400,12 @@ public:
   virtual bool skipXffAppend() const PURE;
 
   /**
+   * @return bool don't append the overload header to a local reply of a request which
+   * has been dropped due to Overload Manager.
+   */
+  virtual bool skipOverloadAppend() const PURE;
+
+  /**
    * @return const absl::optional<std::string>& value of via header to add to requests and response
    *                                            headers if set.
    */

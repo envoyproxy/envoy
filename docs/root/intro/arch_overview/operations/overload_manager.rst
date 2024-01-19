@@ -53,3 +53,7 @@ Actions
 When a trigger changes state, the value is sent to registered actions, which can then affect how
 connections and requests are processed. Each action interprets the input states differently, and
 some may ignore the *scaling* state altogether, taking effect only when *saturated*.
+
+Note that dropping an HTTP request will cause the :ref:`x-envoy-overloaded
+<config_http_filters_router_x-envoy-overloaded_set>` header to be set in the local reply
+sent by the connection manager.

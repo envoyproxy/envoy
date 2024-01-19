@@ -63,6 +63,9 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response->body());
+  EXPECT_EQ(
+      Http::Headers::get().EnvoyOverloaded.True,
+      response->headers().get(Http::Headers::get().EnvoyOverloaded)[0]->value().getStringView());
   codec_client_->close();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -72,6 +75,9 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response->body());
+  EXPECT_EQ(
+      Http::Headers::get().EnvoyOverloaded.True,
+      response->headers().get(Http::Headers::get().EnvoyOverloaded)[0]->value().getStringView());
   codec_client_->close();
 
   // Deactivate overload state and check that new requests are accepted.

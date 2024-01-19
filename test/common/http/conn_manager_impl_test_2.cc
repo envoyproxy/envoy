@@ -2387,6 +2387,11 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("503", headers.getStatusValue());
+        EXPECT_EQ(Http::Headers::get().EnvoyOverloaded.True,
+                  response->headers()
+                      .get(Http::Headers::get().EnvoyOverloaded)[0]
+                      ->value()
+                      .getStringView());
       }));
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
@@ -2503,6 +2508,7 @@ TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStrea
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
       .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("503", headers.getStatusValue());
+        EXPECT_EQ("true", getHeader(headers, "x-envoy-overload"));
       }));
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
