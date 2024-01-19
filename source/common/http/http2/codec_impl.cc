@@ -1703,7 +1703,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 }
 
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
-  return connection_->onSend(static_cast<const uint8_t*>(serialized.data()), serialized.size());
+  return connection_->onSend(reinterpret_cast<const uint8_t*>(serialized.data()), serialized.size());
 }
 
 bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
@@ -1714,11 +1714,11 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
 }
 
 bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id, absl::string_view data) {
-  return 0 == connection_->onData(stream_id, static_cast<const uint8_t*>(data.data()), data.size());
+  return 0 == connection_->onData(stream_id, reinterpret_cast<const uint8_t*>(data.data()), data.size());
 }
 
 bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
-  auto status = connection_->onBeginHeaders(frame);
+  auto status = connection_->onBeginHeaders(stream_id);
   return 0 == connection_->setAndCheckCodecCallbackStatus(
       std::move(status));
 }
