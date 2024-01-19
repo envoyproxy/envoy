@@ -1494,8 +1494,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
-int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name,
-                               HeaderString&& value) {
+int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
     // We have seen 1 or 2 crashes where we get a headers callback but there is no associated
@@ -1708,8 +1707,8 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
         name.setCopy(reinterpret_cast<const char*>(raw_name), name_length);
         HeaderString value;
         value.setCopy(reinterpret_cast<const char*>(raw_value), value_length);
-        return static_cast<ConnectionImpl*>(user_data)->onHeader(frame->hd.stream_id, std::move(name),
-                                                                 std::move(value));
+        return static_cast<ConnectionImpl*>(user_data)->onHeader(frame->hd.stream_id,
+                                                                 std::move(name), std::move(value));
       });
 
   nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
@@ -2044,8 +2043,7 @@ Status ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   return okStatus();
 }
 
-int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name,
-                                   HeaderString&& value) {
+int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
   return saveHeader(stream_id, std::move(name), std::move(value));
 }
@@ -2145,8 +2143,7 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   return okStatus();
 }
 
-int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name,
-                                   HeaderString&& value) {
+int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
     StreamImpl* stream = getStreamUnchecked(stream_id);
     if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
