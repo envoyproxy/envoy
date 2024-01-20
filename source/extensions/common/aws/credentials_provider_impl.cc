@@ -197,7 +197,7 @@ void CredentialsFileCredentialsProvider::refresh() {
       absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
 
   const auto credentials_file =
-      getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
+      Utility::getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
 
   const auto profile = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 

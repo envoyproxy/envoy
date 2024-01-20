@@ -122,10 +122,12 @@ public:
   addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
                            const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
                            absl::string_view uri);
+
+  static std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                                    const std::string& default_value);
+
 };
 
-static std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
-                                                   const std::string& default_value);
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

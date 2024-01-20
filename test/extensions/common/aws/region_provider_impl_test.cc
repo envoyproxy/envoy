@@ -3,6 +3,7 @@
 #include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -11,16 +12,14 @@ namespace Aws {
 
 class EnvironmentRegionProviderTest : public testing::Test {
 public:
-  ~EnvironmentRegionProviderTest() override { TestEnvironment::unsetEnvVar("AWS_REGION"); }
+  // ~EnvironmentRegionProviderTest() override { TestEnvironment::unsetEnvVar("AWS_REGION"); }
 
   EnvironmentRegionProvider provider_;
 };
 
-class StaticRegionProviderTest : public testing::Test {
+class EnvoyConfigRegionProviderTest : public testing::Test {
 public:
-  StaticRegionProviderTest() : provider_("test-region") {}
-
-  StaticRegionProvider provider_;
+  EnvoyConfigRegionProvider provider_;
 };
 
 TEST_F(EnvironmentRegionProviderTest, SomeRegion) {
@@ -30,7 +29,7 @@ TEST_F(EnvironmentRegionProviderTest, SomeRegion) {
 
 TEST_F(EnvironmentRegionProviderTest, NoRegion) { EXPECT_FALSE(provider_.getRegion().has_value()); }
 
-TEST_F(StaticRegionProviderTest, SomeRegion) {
+TEST_F(EnvoyConfigRegionProviderTest, SomeRegion) {
   EXPECT_EQ("test-region", provider_.getRegion().value());
 }
 

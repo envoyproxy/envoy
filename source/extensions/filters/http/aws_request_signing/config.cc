@@ -9,6 +9,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/region_provider_impl.h"
 #include "source/extensions/common/aws/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/sigv4a_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
@@ -52,9 +53,11 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   auto& server_context = context.serverFactoryContext();
 
+auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+auto region = region_provider->getRegion().value_or("no-region");
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), config.region(),
+          server_context.api(), makeOptRef(server_context), region,
           Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
@@ -67,12 +70,12 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     // Verify that we have not specified a region set formatted region for sigv4 algorithm
-    if (isARegionSet(config.region())) {
+    if (isARegionSet(region)) {
       throw EnvoyException("SigV4 region string cannot contain wildcards or commas. Region sets "
                            "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        config.service_name(), config.region(), credentials_provider,
+        config.service_name(), region, credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   }
 
@@ -89,9 +92,12 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     const AwsRequestSigningProtoPerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+      auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+auto region = region_provider->getRegion().value_or("no-region");
+
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context.api(), makeOptRef(context), per_route_config.aws_request_signing().region(),
+          context.api(), makeOptRef(context), region,
           Extensions::Common::Aws::Utility::fetchMetadata);
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       per_route_config.aws_request_signing().match_excluded_headers().begin(),
@@ -105,13 +111,13 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
         context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     // Verify that we have not specified a region set formatted region for sigv4 algorithm
-    if (isARegionSet(per_route_config.aws_request_signing().region())) {
+    if (isARegionSet(region)) {
       throw EnvoyException("SigV4 region string cannot contain wildcards or commas. Region sets "
                            "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         per_route_config.aws_request_signing().service_name(),
-        per_route_config.aws_request_signing().region(), credentials_provider,
+        region, credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
   }
 

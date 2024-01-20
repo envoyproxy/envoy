@@ -1,3 +1,4 @@
+
 #include "source/extensions/common/aws/region_provider_impl.h"
 
 namespace Envoy {
@@ -5,19 +6,34 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-static const char AWS_REGION[] = "AWS_REGION";
+// static const char AWS_REGION[] = "AWS_REGION";
 
-StaticRegionProvider::StaticRegionProvider(const std::string& region) : region_(region) {}
+absl::optional<std::string> EnvoyConfigRegionProvider::getRegion() { 
+    ENVOY_LOG_MISC(debug, "called EnvoyConfigRegionProvider::getRegion");
+return "envoyconfig"; }
 
-absl::optional<std::string> StaticRegionProvider::getRegion() { return {region_}; }
+absl::optional<std::string> EnvironmentRegionProvider::getRegion() {     ENVOY_LOG_MISC(debug, "called EnvironmentRegionProvider::getRegion");
+return "environment"; }
 
-absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
-  const auto region = std::getenv(AWS_REGION);
-  if (region == nullptr) {
-    return absl::nullopt;
+absl::optional<std::string> AWSProfileRegionProvider::getRegion() {     ENVOY_LOG_MISC(debug, "called AWSProfileRegionProvider::getRegion");
+return "profile"; }
+absl::optional<std::string> AWSConfigRegionProvider::getRegion() {     ENVOY_LOG_MISC(debug, "called AWSConfigRegionProvider::getRegion");
+return "config"; }
+
+RegionProviderChain::RegionProviderChain(const RegionProviderChainFactories& factories) {
+  add(factories.createEnvironmentRegionProvider());
+  add(factories.createEnvoyConfigRegionProvider());
+  add(factories.createAWSProfileRegionProvider());
+  add(factories.createAWSConfigRegionProvider());
+}
+
+absl::optional<std::string> RegionProviderChain::getRegion() {
+  ENVOY_LOG_MISC(debug, "called RegionProviderChain::getRegion");
+  for (auto& provider : providers_) {
+    const auto region = provider->getRegion();
+      return region;
   }
-  ENVOY_LOG(debug, "Found environment region {}={}", AWS_REGION, region);
-  return {region};
+  return absl::nullopt;
 }
 
 } // namespace Aws
