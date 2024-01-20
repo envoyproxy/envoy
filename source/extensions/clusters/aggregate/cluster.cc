@@ -188,6 +188,13 @@ AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* con
   return nullptr;
 }
 
+Upstream::HostConstVectorSharedPtr
+AggregateClusterLoadBalancer::getallHosts(Upstream::LoadBalancerContext* context) {
+  if (load_balancer_) {
+    return load_balancer_->getallHosts(context);
+  }
+  return nullptr;
+}
 absl::optional<Upstream::SelectedPoolAndConnection>
 AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
                                                        const Upstream::Host& host,

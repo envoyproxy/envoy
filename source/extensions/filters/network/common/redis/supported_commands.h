@@ -56,6 +56,13 @@ struct SupportedCommands {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "multi", "exec", "discard");
   }
 
+    /**
+   * @return commands which handle Redis commands without keys.
+   */
+  static const absl::flat_hash_set<std::string>& noKeyCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall");
+    }
+
   /**
    * @return auth command
    */

@@ -2062,6 +2062,13 @@ HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEnt
   return lb_->peekAnotherHost(context);
 }
 
+// Make the ThreadLocalClusterManagerImpl class accessible by changing its access specifier or adding a friend declaration.
+HostConstVectorSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::getallHosts(
+    LoadBalancerContext* context) {
+  
+  return lb_->getallHosts(context);
+}
+
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {

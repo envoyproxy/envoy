@@ -46,6 +46,18 @@ Common::Redis::Client::PoolRequest* makeSingleServerRequest(
   return handler;
 }
 
+Common::Redis::Client::PoolRequest* makeNoKeyRequest(
+    const RouteSharedPtr& route, int32_t shard_index, Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks,
+    Common::Redis::Client::Transaction& transaction) {
+  std::string key = std::string();
+  Extensions::NetworkFilters::RedisProxy::ConnPool::InstanceImpl* req_instance =
+        dynamic_cast<Extensions::NetworkFilters::RedisProxy::ConnPool::InstanceImpl*>(
+            route->upstream(key).get());
+  auto handler = req_instance->makeRequestNoKey(shard_index, ConnPool::RespVariant(incoming_request),
+                                                       callbacks, transaction);
+  return handler;
+}
+
 /**
  * Make request and maybe mirror the request based on the mirror policies of the route.
  * @param route supplies the route matched with the request.
@@ -233,6 +245,84 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
   onChildResponse(Common::Redis::Utility::makeError(Response::get().UpstreamFailure), index);
 }
 
+
+NoKeyAllPrimaryRequest::~NoKeyAllPrimaryRequest() {
+#ifndef NDEBUG
+  for (const PendingRequest& request : pending_requests_) {
+    ASSERT(!request.handle_);
+  }
+#endif
+}
+
+void NoKeyAllPrimaryRequest::cancel() {
+  for (PendingRequest& request : pending_requests_) {
+    if (request.handle_) {
+      request.handle_->cancel();
+      request.handle_ = nullptr;
+    }
+  }
+}
+
+void NoKeyAllPrimaryRequest::onChildFailure(int32_t index) {
+  onChildResponse(Common::Redis::Utility::makeError(Response::get().UpstreamFailure), index);
+}
+
+SplitRequestPtr NoKeyRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                    SplitCallbacks& callbacks, CommandStats& command_stats,
+                                    TimeSource& time_source, bool delay_command_latency,
+                                    const StreamInfo::StreamInfo& stream_info) {
+  std::unique_ptr<NoKeyRequest> request_ptr{
+      new NoKeyRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  std::string key = std::string();
+  const auto& route = router.upstreamPool(key, stream_info);
+  if (route) {
+    Extensions::NetworkFilters::RedisProxy::ConnPool::InstanceImpl* instance =
+        dynamic_cast<Extensions::NetworkFilters::RedisProxy::ConnPool::InstanceImpl*>(
+            route->upstream(key).get());
+    int32_t numofRedisShards = instance->getNumofRedisShards();
+    if (numofRedisShards > 0) {
+      request_ptr->num_pending_responses_ = numofRedisShards;
+    }
+    else{
+      ENVOY_LOG(debug, "Upstreams not found: '{}'", incoming_request->toString());
+      callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+      //request_ptr->onChildResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost),0);
+    }
+  }
+  else{
+    ENVOY_LOG(debug, "route not found: '{}'", incoming_request->toString());
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    //request_ptr->onChildResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost),0);
+  }
+  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
+
+  // Identify the response type based on the subcommand , needs to be written very clean 
+  // along with subcommand identification for each command
+  // For now keeping it ugly like this and assuming we only add support for script comand.
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  request_ptr->pending_responses_.reserve(request_ptr->num_pending_responses_);
+  
+  for (int32_t i = 0; i < request_ptr->num_pending_responses_; i++) {
+    request_ptr->pending_requests_.emplace_back(*request_ptr, i);
+    PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+    const auto route = router.upstreamPool(key, stream_info);
+    if (route) {
+      pending_request.handle_= makeNoKeyRequest(route, i,base_request, pending_request, callbacks.transaction());
+    }
+
+    if (!pending_request.handle_) {
+      pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    }
+  }
+
+  if (request_ptr->num_pending_responses_ > 0) {
+    return request_ptr;
+  }
+
+  return nullptr;
+}
+
 SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool delay_command_latency,
@@ -273,6 +363,63 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
   }
 
   return nullptr;
+}
+
+bool areAllResponsesSame(const std::vector<Common::Redis::RespValuePtr>& responses) {
+    if (responses.empty()) {
+        return true; 
+    }
+
+    const Common::Redis::RespValue* first_response = responses.front().get();
+    for (const auto& response : responses) {
+        if (!response || !first_response || *(response.get()) != *first_response) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void NoKeyRequest::onChildResponse(Common::Redis::RespValuePtr&& value, int32_t index) {
+  pending_requests_[index].handle_ = nullptr;
+
+  if (index >= static_cast<int32_t>(pending_responses_.size())) {
+        // Resize the vector to accommodate the new index
+        pending_responses_.resize(index + 1);
+  }
+  ENVOY_LOG(debug,"response recived for index: '{}'", index);
+
+  if (value->type() == Common::Redis::RespType::Error){
+    error_count_++;
+    response_index_=index;
+  }
+  // Move the value into the pending_responses at the specified index
+  pending_responses_[index] = std::move(value);
+
+  ASSERT(num_pending_responses_ > 0);
+  if (--num_pending_responses_ == 0) {
+    if (error_count_ > 0 ){
+      if (!pending_responses_.empty()) {
+        ENVOY_LOG(debug, "Error Response received: '{}'", pending_responses_[response_index_]->toString());
+        Common::Redis::RespValuePtr response = std::move(pending_responses_[response_index_]);
+        callbacks_.onResponse(std::move(response));
+        pending_responses_.clear();
+      }
+    } else if(! areAllResponsesSame(pending_responses_)) {
+      ENVOY_LOG(debug, "all response not same: '{}'", pending_responses_[0]->toString());
+      callbacks_.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("all responses not same")));
+      if (!pending_responses_.empty())    
+        pending_responses_.clear();
+    }else {
+      updateStats(error_count_ == 0);
+      if (!pending_responses_.empty()) {
+      Common::Redis::RespValuePtr response = std::move(pending_responses_[0]);
+      ENVOY_LOG(debug, "response: {}", response->toString()); 
+      callbacks_.onResponse(std::move(response));
+      pending_responses_.clear();
+      }
+    }
+  }
 }
 
 void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
@@ -557,7 +704,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
-      transaction_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
+      transaction_handler_(*router_),nokeyrequest_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
                                           POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
@@ -581,6 +728,9 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   for (const std::string& command : Common::Redis::SupportedCommands::transactionCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, transaction_handler_);
+  }
+  for (const std::string& command : Common::Redis::SupportedCommands::noKeyCommands()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, nokeyrequest_handler_);
   }
 }
 

@@ -104,6 +104,20 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
 }
 
+// This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
+// failing due to InstanceImpl going away.
+Common::Redis::Client::PoolRequest*
+InstanceImpl::makeRequestNoKey(int32_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+                          Common::Redis::Client::Transaction& transaction) {
+  return tls_->getTyped<ThreadLocalPool>().makeRequestNoKey(shard_index, std::move(request), callbacks,
+                                                       transaction);
+}
+
+int32_t InstanceImpl::getNumofRedisShards() {
+  
+  return tls_->getTyped<ThreadLocalPool>().getNumofRedisShards();
+}
+
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
@@ -341,6 +355,69 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     onRequestCompleted();
     return nullptr;
   }
+}
+
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool:: makeRequestNoKey(int32_t shard_index, RespVariant&& request,
+                                           PoolCallbacks& callbacks,
+                                           Common::Redis::Client::Transaction& transaction) {
+  if (cluster_ == nullptr) {
+    ASSERT(client_map_.empty());
+    ASSERT(host_set_member_update_cb_handle_ == nullptr);
+    return nullptr;
+  }
+
+  // If there is an active transaction, no key commands are not allowed for now.
+  if (transaction.active_ && transaction.connection_established_) {
+    onRequestCompleted();
+    return nullptr;
+  }
+
+  Upstream::HostConstVectorSharedPtr hosts = cluster_->loadBalancer().getallHosts(nullptr);
+  if (!hosts) {
+    ENVOY_LOG(debug, "host not found:");
+    onRequestCompleted();
+    return nullptr;
+  }
+  Upstream::HostConstSharedPtr host = (*hosts)[shard_index];
+  pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
+  PendingRequest& pending_request = pending_requests_.back();
+
+  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
+  if (!client) {
+    ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
+    pending_request.request_handler_ = nullptr;
+    onRequestCompleted();
+    client_map_.erase(host);
+    return nullptr;
+  }
+  pending_request.request_handler_ = client->redis_client_->makeRequest(
+        getRequest(pending_request.incoming_request_), pending_request);
+
+
+  if (pending_request.request_handler_) {
+    return &pending_request;
+  } else {
+    onRequestCompleted();
+    return nullptr;
+  }
+}
+
+int32_t InstanceImpl::ThreadLocalPool::getNumofRedisShards() {
+
+  int32_t numofRedisShards =0;
+  Upstream::HostConstVectorSharedPtr hosts = cluster_->loadBalancer().getallHosts(nullptr);
+  if (!hosts) {
+    ENVOY_LOG(debug, "host not found:");
+    return numofRedisShards;
+  }
+  for (const auto& host : *hosts) {
+    ENVOY_LOG(debug, "Health status of host '{}' is '{}'", host->address()->asString(),
+              host->healthStatus());
+      numofRedisShards++;
+  }
+
+  return numofRedisShards;
 }
 
 Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestToHost(

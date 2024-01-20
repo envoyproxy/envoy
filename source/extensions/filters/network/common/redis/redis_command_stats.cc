@@ -30,6 +30,8 @@ RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
   stat_name_set_->rememberBuiltin(
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
+  stat_name_set_->rememberBuiltins(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::noKeyCommands());
 }
 
 Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,

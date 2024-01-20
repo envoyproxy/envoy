@@ -91,6 +91,48 @@ protected:
 };
 
 /**
+ * NoKeyAllhostRequest is a base class for commands which has no keys but has to be applied on all primaries.
+ */
+class NoKeyAllPrimaryRequest : public SplitRequestBase {
+public:
+  ~NoKeyAllPrimaryRequest() override;
+
+  // RedisProxy::CommandSplitter::SplitRequest
+  void cancel() override;
+
+protected:
+  NoKeyAllPrimaryRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                      TimeSource& time_source, bool delay_command_latency)
+      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {
+  }
+  struct PendingRequest : public ConnPool::PoolCallbacks {
+    PendingRequest(NoKeyAllPrimaryRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
+
+    // ConnPool::PoolCallbacks
+    void onResponse(Common::Redis::RespValuePtr&& value) override {
+      parent_.onChildResponse(std::move(value), index_);
+    }
+    void onFailure() override { parent_.onChildFailure(index_); }
+
+    NoKeyAllPrimaryRequest& parent_;
+    const int32_t index_;
+    Common::Redis::Client::PoolRequest* handle_{};
+  };
+
+  virtual void onChildResponse(Common::Redis::RespValuePtr&& value, int32_t index) PURE;
+  void onChildFailure(int32_t index);
+
+  SplitCallbacks& callbacks_;
+
+  std::vector<Common::Redis::RespValuePtr> pending_responses_;
+  std::vector<PendingRequest> pending_requests_;
+  int32_t num_pending_responses_;
+  uint32_t error_count_{0};
+  int32_t response_index_{0};
+
+};
+
+/**
  * SingleServerRequest is a base class for commands that hash to a single backend.
  */
 class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallbacks {
@@ -172,6 +214,22 @@ private:
   Common::Redis::RespValuePtr response_;
 };
 
+class NoKeyRequest : public NoKeyAllPrimaryRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  NoKeyRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                bool delay_command_latency)
+      : NoKeyAllPrimaryRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+
+  // RedisProxy::CommandSplitter::NoKeyAllPrimaryRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, int32_t index) override;
+
+};
 /**
  * SimpleRequest hashes the first argument as the key.
  */
@@ -393,6 +451,7 @@ private:
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   CommandHandlerFactory<TransactionRequest> transaction_handler_;
+  CommandHandlerFactory<NoKeyRequest> nokeyrequest_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;

@@ -144,6 +144,7 @@ public:
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  HostConstVectorSharedPtr getallHosts(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
   absl::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,

@@ -60,6 +60,10 @@ Prefix::Prefix(
 
 ConnPool::InstanceSharedPtr Prefix::upstream(const std::string& command) const {
 
+  if ( command.empty() ){
+    return upstream_;
+  }
+
   if (read_upstream_) {
     std::string to_lower_string = absl::AsciiStrToLower(command);
     if (Common::Redis::SupportedCommands::isReadCommand(to_lower_string)) {
@@ -96,6 +100,11 @@ PrefixRoutes::PrefixRoutes(
 RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key,
                                           const StreamInfo::StreamInfo& stream_info) {
   PrefixSharedPtr value = nullptr;
+  if (key.empty() ){
+    value = catch_all_route_;
+    return value;
+  }
+
   if (case_insensitive_) {
     std::string copy = absl::AsciiStrToLower(key);
     value = prefix_lookup_table_.findLongestPrefix(copy.c_str());

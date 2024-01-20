@@ -203,6 +203,27 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
+    Upstream::HostConstVectorSharedPtr getallHosts(Upstream::LoadBalancerContext*) override {
+      size_t count = 0;
+      if (!shard_vector_) {
+        return nullptr;
+      }else{
+        count = shard_vector_->size();
+      }
+      
+      Envoy::Upstream::HostConstVectorSharedPtr hosts = std::make_shared<std::vector<Upstream::HostConstSharedPtr>>();
+      for (auto const& shard : *shard_vector_) {
+        auto host = shard->primary();
+        if (host) {
+          hosts->emplace_back(std::move(host));
+        }
+      }
+      if (count == hosts->size()) {
+        return hosts;
+      } else {
+        return nullptr;
+      }
+    }
     // Pool selection not implemented.
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,

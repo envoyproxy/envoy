@@ -518,6 +518,7 @@ public:
 
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
+  HostConstVectorSharedPtr getallHosts(LoadBalancerContext* ) override {return nullptr;}
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
 protected:
@@ -774,6 +775,7 @@ public:
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
+  HostConstVectorSharedPtr getallHosts(LoadBalancerContext* ) override {return nullptr;}
 
 protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);

@@ -128,6 +128,14 @@ public:
    */
   virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
 
+    /**
+   * Ask the load balancer for the all host available for  LB algorithm.
+   * @param context supplies the load balancer context. Not all load balancers make use of all
+   *        context information. Load balancers should be written to assume that context information
+   *        is missing and use sensible defaults.
+   */
+  virtual HostConstVectorSharedPtr getallHosts(LoadBalancerContext* context) PURE;
+
   /**
    * Returns a best effort prediction of the next host to be picked, or nullptr if not predictable.
    * Advances with subsequent calls, so while the first call will return the next host to be picked,

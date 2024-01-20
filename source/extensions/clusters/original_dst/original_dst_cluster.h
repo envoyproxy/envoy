@@ -98,6 +98,8 @@ public:
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
     // Preconnecting is not implemented for OriginalDstCluster
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+    HostConstVectorSharedPtr getallHosts(LoadBalancerContext*)  override { return nullptr; }
+    
     // Pool selection not implemented for OriginalDstCluster
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,

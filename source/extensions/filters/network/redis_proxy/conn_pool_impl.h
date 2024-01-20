@@ -37,6 +37,7 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
 
+using VectorHostConstSharedPtr = std::shared_ptr<std::vector<Upstream::HostConstSharedPtr>>;
 // TODO(mattklein123): Circuit breaking
 // TODO(rshriram): Fault injection
 
@@ -84,6 +85,20 @@ public:
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::ClientCallbacks& callbacks);
 
+  /**
+   * Makes a redis request to an upstream host without a key (e.g., asking for cluster nodes).
+   * @param shard_index index of the shard of redis cluster.
+   * @param request supplies the Redis request to make.
+   * @param callbacks supplies the request completion callbacks.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be
+   * made for some reason.
+   */
+  Common::Redis::Client::PoolRequest*
+  makeRequestNoKey(int32_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+              Common::Redis::Client::Transaction& transaction);
+
+  int32_t getNumofRedisShards();
+  
   void init();
 
   // Allow the unit test to have access to private members.
@@ -158,6 +173,10 @@ private:
     Common::Redis::Client::PoolRequest*
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);
+    Common::Redis::Client::PoolRequest*
+    makeRequestNoKey(int32_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+              Common::Redis::Client::Transaction& transaction);
+    int32_t getNumofRedisShards();
 
     void onClusterAddOrUpdateNonVirtual(absl::string_view cluster_name,
                                         Upstream::ThreadLocalClusterCommand& get_cluster);
