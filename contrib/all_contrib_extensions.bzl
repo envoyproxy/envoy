@@ -32,5 +32,9 @@ FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
 ]
 
+FIPS_SKIP_CONTRIB_TARGETS = [
+    "envoy.compression.qatzip.compressor",
+]
+
 def envoy_all_contrib_extensions(denylist = []):
     return [v + "_envoy_extension" for k, v in CONTRIB_EXTENSIONS.items() if not k in denylist]
