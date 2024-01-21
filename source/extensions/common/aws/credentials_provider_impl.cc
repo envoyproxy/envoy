@@ -40,11 +40,6 @@ constexpr char SESSION_TOKEN[] = "SessionToken";
 constexpr char WEB_IDENTITY_RESPONSE_ELEMENT[] = "AssumeRoleWithWebIdentityResponse";
 constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult";
 
-constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
-constexpr char AWS_PROFILE[] = "AWS_PROFILE";
-constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "/.aws/credentials";
-constexpr char DEFAULT_AWS_PROFILE[] = "default";
-
 constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
 constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
 constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
@@ -189,19 +184,10 @@ bool CredentialsFileCredentialsProvider::needsRefresh() {
 void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
-  // Default path plus current home directory. Will fall back to / if HOME environment variable does
-  // not exist
+  auto credentials_file = Utility::getCredentialFilePath();
+  auto profile = Utility::getCredentialsProfileName();
 
-  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
-  const auto default_credentials_file_path =
-      absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
-
-  const auto credentials_file = Utility::getEnvironmentVariableOrDefault(
-      AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
-
-  const auto profile = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
-
-  ENVOY_LOG(debug, "Credentials file path = {}, profile = {}", credentials_file, profile);
+  ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credentials_file, profile);
 
   extractCredentials(credentials_file, profile);
 }
@@ -215,12 +201,17 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   // exist).
   last_updated_ = api_.timeSource().systemTime();
 
+  std::string access_key_id, secret_access_key, session_token;
+
   absl::flat_hash_map<std::string, std::string> elements = {
       {AWS_ACCESS_KEY_ID, ""}, {AWS_SECRET_ACCESS_KEY, ""}, {AWS_SESSION_TOKEN, ""}};
+  absl::flat_hash_map<std::string, std::string>::iterator it;
   Utility::resolveProfileElements(credentials_file, profile, elements);
-  auto access_key_id = elements.find(AWS_ACCESS_KEY_ID)->second;
-  auto secret_access_key = elements.find(AWS_SECRET_ACCESS_KEY)->second;
-  auto session_token = elements.find(AWS_SESSION_TOKEN)->second;
+  // if profile file fails to load, or these elements are not found in the profile, their values
+  // will remain blank when retrieving them from the hash map
+  access_key_id = elements.find(AWS_SECRET_ACCESS_KEY)->second;
+  secret_access_key = elements.find(AWS_SECRET_ACCESS_KEY)->second;
+  session_token = elements.find(AWS_SESSION_TOKEN)->second;
 
   ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
             profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,

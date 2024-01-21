@@ -31,9 +31,10 @@ private:
   const std::string region_;
 };
 
-class AWSProfileRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws> {
+class AWSCredentialsFileRegionProvider : public RegionProvider,
+                                         public Logger::Loggable<Logger::Id::aws> {
 public:
-  AWSProfileRegionProvider() = default;
+  AWSCredentialsFileRegionProvider() = default;
 
   absl::optional<std::string> getRegion() override;
 
@@ -41,9 +42,10 @@ private:
   const std::string region_;
 };
 
-class AWSConfigRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws> {
+class AWSConfigFileRegionProvider : public RegionProvider,
+                                    public Logger::Loggable<Logger::Id::aws> {
 public:
-  AWSConfigRegionProvider() = default;
+  AWSConfigFileRegionProvider() = default;
 
   absl::optional<std::string> getRegion() override;
 
@@ -57,8 +59,8 @@ public:
 
   virtual RegionProviderSharedPtr createEnvironmentRegionProvider() const PURE;
   virtual RegionProviderSharedPtr createEnvoyConfigRegionProvider() const PURE;
-  virtual RegionProviderSharedPtr createAWSProfileRegionProvider() const PURE;
-  virtual RegionProviderSharedPtr createAWSConfigRegionProvider() const PURE;
+  virtual RegionProviderSharedPtr createAWSCredentialsFileRegionProvider() const PURE;
+  virtual RegionProviderSharedPtr createAWSConfigFileRegionProvider() const PURE;
 };
 
 /**
@@ -87,11 +89,11 @@ public:
   RegionProviderSharedPtr createEnvironmentRegionProvider() const override {
     return std::make_shared<EnvironmentRegionProvider>();
   }
-  RegionProviderSharedPtr createAWSProfileRegionProvider() const override {
-    return std::make_shared<AWSProfileRegionProvider>();
+  RegionProviderSharedPtr createAWSCredentialsFileRegionProvider() const override {
+    return std::make_shared<AWSCredentialsFileRegionProvider>();
   }
-  RegionProviderSharedPtr createAWSConfigRegionProvider() const override {
-    return std::make_shared<AWSConfigRegionProvider>();
+  RegionProviderSharedPtr createAWSConfigFileRegionProvider() const override {
+    return std::make_shared<AWSConfigFileRegionProvider>();
   }
 
 protected:
@@ -100,8 +102,8 @@ protected:
 
 using EnvoyConfigRegionProviderPtr = std::shared_ptr<EnvoyConfigRegionProvider>;
 using EnvironmentRegionProviderPtr = std::shared_ptr<EnvironmentRegionProvider>;
-using AWSProfileRegionProviderPtr = std::shared_ptr<AWSProfileRegionProvider>;
-using AWSConfigRegionProviderPtr = std::shared_ptr<AWSConfigRegionProvider>;
+using AWSCredentialsFileRegionProviderPtr = std::shared_ptr<AWSCredentialsFileRegionProvider>;
+using AWSConfigFileRegionProviderPtr = std::shared_ptr<AWSConfigFileRegionProvider>;
 
 } // namespace Aws
 } // namespace Common

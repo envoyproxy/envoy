@@ -129,6 +129,11 @@ public:
   static bool resolveProfileElements(const std::string& credentials_file,
                                      const std::string& profile_name,
                                      absl::flat_hash_map<std::string, std::string>& elements);
+
+  static std::string getCredentialFilePath();
+  static std::string getConfigFilePath();
+  static std::string getConfigProfileName();
+  static std::string getCredentialsProfileName();
 };
 
 } // namespace Aws

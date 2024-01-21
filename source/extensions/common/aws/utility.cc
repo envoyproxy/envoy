@@ -28,6 +28,13 @@ constexpr absl::string_view S3_SERVICE_NAME = "s3";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
 constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
+constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
+constexpr char AWS_PROFILE[] = "AWS_PROFILE";
+constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "/.aws/credentials";
+constexpr char DEFAULT_AWS_PROFILE[] = "default";
+constexpr char AWS_CONFIG_FILE[] = "AWS_CONFIG_FILE";
+constexpr char DEFAULT_AWS_CONFIG_FILE[] = "/.aws/config";
+
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
                              const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
@@ -421,21 +428,58 @@ bool Utility::resolveProfileElements(const std::string& credentials_file,
 
       std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
       if (parts.size() == 2) {
-        ENVOY_LOG_MISC(debug, "line= {} ", line);
 
         const auto key = StringUtil::toUpper(StringUtil::trim(parts[0]));
         const auto val = StringUtil::trim(parts[1]);
-        ENVOY_LOG_MISC(debug, "key= {} ", key);
         auto found = elements.find(key);
         if (found != elements.end()) {
           found->second = val;
-          ENVOY_LOG_MISC(debug, "key {} value {}", found->first, found->second);
         }
       }
     }
   }
   return true;
 }
+
+std::string Utility::getCredentialFilePath() {
+
+  // Default credential file path plus current home directory. Will fall back to / if HOME
+  // environment variable does
+  // not exist
+
+  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto default_credentials_file_path =
+      absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+
+  return Utility::getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE,
+                                                  default_credentials_file_path);
+}
+
+std::string Utility::getConfigFilePath() {
+
+  // Default config file path plus current home directory. Will fall back to / if HOME environment
+  // variable does
+  // not exist
+
+  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto default_credentials_file_path = absl::StrCat(home, DEFAULT_AWS_CONFIG_FILE);
+
+  return Utility::getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
+}
+
+std::string Utility::getCredentialsProfileName() {
+  return Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+}
+
+std::string Utility::getConfigProfileName() {
+  auto profile_name = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  if (profile_name == DEFAULT_AWS_PROFILE) {
+    return profile_name;
+  } else {
+    return "profile " + profile_name;
+  }
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

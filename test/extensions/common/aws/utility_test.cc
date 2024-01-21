@@ -55,15 +55,12 @@ aws_secret_access_key = profile4_secret
 aws_session_token = profile4_token
 )";
 
-TEST(UtilityTest, testing) {
+TEST(UtilityTest, TestProfileResolver) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
-  absl::flat_hash_map<std::string, std::string> elements = {{"AWS_ACCESS_KEY_ID", "crap"},
+  absl::flat_hash_map<std::string, std::string> elements = {{"AWS_ACCESS_KEY_ID", "testoverwrite"},
                                                             {"AWS_SECRET_ACCESS_KEY", ""}};
-  auto it = elements.find("AWS_ACCESS_KEY_ID");
-  ENVOY_LOG_MISC(debug, "elements[AWS_ACCESS_KEY_ID] = {}", it->second);
-  auto it2 = elements.find("AWS_SECRET_ACCESS_KEY");
-  ENVOY_LOG_MISC(debug, "elements[AWS_SECRET_ACCESS_KEY] = {}", it2->second);
+  absl::flat_hash_map<std::string, std::string>::iterator it;
 
   auto temp = TestEnvironment::temporaryDirectory();
   std::filesystem::create_directory(temp + "/.aws");
@@ -72,12 +69,12 @@ TEST(UtilityTest, testing) {
   auto file_path = TestEnvironment::writeStringToFileForTest(
       credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
 
-  bool b = Utility::resolveProfileElements(file_path, "default", elements);
-  ENVOY_LOG_MISC(debug, "resolve returns {}", b);
-  auto it3 = elements.find("AWS_ACCESS_KEY_ID");
-  ENVOY_LOG_MISC(debug, "elements[AWS_ACCESS_KEY_ID] = {}", it3->second);
-  auto it4 = elements.find("AWS_SECRET_ACCESS_KEY");
-  ENVOY_LOG_MISC(debug, "elements[AWS_SECRET_ACCESS_KEY] = {}", it4->second);
+  Utility::resolveProfileElements(file_path, "default", elements);
+  it = elements.find("AWS_ACCESS_KEY_ID");
+  EXPECT_EQ(it->second, "default_access_key");
+  Utility::resolveProfileElements(file_path, "profile4", elements);
+  it = elements.find("AWS_ACCESS_KEY_ID");
+  EXPECT_EQ(it->second, "profile4_access_key");
 }
 
 // Headers must be in alphabetical order by virtue of std::map
