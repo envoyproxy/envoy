@@ -53,8 +53,8 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   auto& server_context = context.serverFactoryContext();
 
-auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-auto region = region_provider->getRegion().value_or("no-region");
+  auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+  auto region = region_provider->getRegion().value_or("no-region");
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           server_context.api(), makeOptRef(server_context), region,
@@ -92,8 +92,8 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     const AwsRequestSigningProtoPerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-      auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-auto region = region_provider->getRegion().value_or("no-region");
+  auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+  auto region = region_provider->getRegion().value_or("no-region");
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
@@ -116,8 +116,7 @@ auto region = region_provider->getRegion().value_or("no-region");
                            "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        per_route_config.aws_request_signing().service_name(),
-        region, credentials_provider,
+        per_route_config.aws_request_signing().service_name(), region, credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
   }
 

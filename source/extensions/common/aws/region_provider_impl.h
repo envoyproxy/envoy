@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "source/common/common/logger.h"
 #include "source/extensions/common/aws/region_provider.h"
 
@@ -14,7 +13,7 @@ namespace Aws {
  */
 class EnvironmentRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws> {
 public:
-  EnvironmentRegionProvider();
+  EnvironmentRegionProvider() = default;
 
   absl::optional<std::string> getRegion() override;
 };
@@ -22,9 +21,9 @@ public:
 /**
  * Return statically configured AWS region name
  */
-class EnvoyConfigRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws>  {
+class EnvoyConfigRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws> {
 public:
-  EnvoyConfigRegionProvider();
+  EnvoyConfigRegionProvider() = default;
 
   absl::optional<std::string> getRegion() override;
 
@@ -32,9 +31,9 @@ private:
   const std::string region_;
 };
 
-class AWSProfileRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws>  {
+class AWSProfileRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws> {
 public:
-  AWSProfileRegionProvider();
+  AWSProfileRegionProvider() = default;
 
   absl::optional<std::string> getRegion() override;
 
@@ -42,9 +41,9 @@ private:
   const std::string region_;
 };
 
-class AWSConfigRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws>  {
+class AWSConfigRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws> {
 public:
-  AWSConfigRegionProvider();
+  AWSConfigRegionProvider() = default;
 
   absl::optional<std::string> getRegion() override;
 
@@ -62,18 +61,17 @@ public:
   virtual RegionProviderSharedPtr createAWSConfigRegionProvider() const PURE;
 };
 
-
 /**
- * AWS region provider chain, supporting environment, envoy configuration, AWS config and AWS profile.
+ * AWS region provider chain, supporting environment, envoy configuration, AWS config and AWS
+ * profile.
  */
-class RegionProviderChain : public RegionProvider, public RegionProviderChainFactories,
-                                 public Logger::Loggable<Logger::Id::aws> {
+class RegionProviderChain : public RegionProvider,
+                            public RegionProviderChainFactories,
+                            public Logger::Loggable<Logger::Id::aws> {
 public:
-RegionProviderChain(
-      const RegionProviderChainFactories& factories);
+  RegionProviderChain(const RegionProviderChainFactories& factories);
 
-RegionProviderChain()
-      : RegionProviderChain(*this) {}
+  RegionProviderChain() : RegionProviderChain(*this) {}
 
   ~RegionProviderChain() override = default;
 

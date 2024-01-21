@@ -196,8 +196,8 @@ void CredentialsFileCredentialsProvider::refresh() {
   const auto default_credentials_file_path =
       absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
 
-  const auto credentials_file =
-      Utility::getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
+  const auto credentials_file = Utility::getEnvironmentVariableOrDefault(
+      AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
 
   const auto profile = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 
@@ -215,48 +215,12 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   // exist).
   last_updated_ = api_.timeSource().systemTime();
 
-  std::ifstream file(credentials_file);
-  if (!file) {
-    ENVOY_LOG(debug, "Error opening credentials file {}", credentials_file);
-    return;
-  }
-
-  std::string access_key_id, secret_access_key, session_token;
-  const auto profile_start = absl::StrFormat("[%s]", profile);
-
-  bool found_profile = false;
-  std::string line;
-  while (std::getline(file, line)) {
-    line = std::string(StringUtil::trim(line));
-    if (line.empty()) {
-      continue;
-    }
-
-    if (line == profile_start) {
-      found_profile = true;
-      continue;
-    }
-
-    if (found_profile) {
-      // Stop reading once we find the start of the next profile.
-      if (absl::StartsWith(line, "[")) {
-        break;
-      }
-
-      std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
-      if (parts.size() == 2) {
-        const auto key = StringUtil::toUpper(StringUtil::trim(parts[0]));
-        const auto val = StringUtil::trim(parts[1]);
-        if (key == AWS_ACCESS_KEY_ID) {
-          access_key_id = val;
-        } else if (key == AWS_SECRET_ACCESS_KEY) {
-          secret_access_key = val;
-        } else if (key == AWS_SESSION_TOKEN) {
-          session_token = val;
-        }
-      }
-    }
-  }
+  absl::flat_hash_map<std::string, std::string> elements = {
+      {AWS_ACCESS_KEY_ID, ""}, {AWS_SECRET_ACCESS_KEY, ""}, {AWS_SESSION_TOKEN, ""}};
+  Utility::resolveProfileElements(credentials_file, profile, elements);
+  auto access_key_id = elements.find(AWS_ACCESS_KEY_ID)->second;
+  auto secret_access_key = elements.find(AWS_SECRET_ACCESS_KEY)->second;
+  auto session_token = elements.find(AWS_SESSION_TOKEN)->second;
 
   ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
             profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,

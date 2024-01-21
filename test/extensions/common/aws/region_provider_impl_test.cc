@@ -1,9 +1,10 @@
+#include <memory>
+
 #include "source/extensions/common/aws/region_provider_impl.h"
 
 #include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {

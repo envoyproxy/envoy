@@ -1,16 +1,17 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::ElementsAre;
-using testing::InSequence;
+// using testing::InSequence;
 using testing::NiceMock;
 using testing::Pair;
-using testing::Ref;
+// using testing::Ref;
 using testing::Return;
 using testing::Throw;
 
@@ -24,6 +25,59 @@ MATCHER_P(WithName, expectedName, "") {
   *result_listener << "\nexpected { name: \"" << expectedName << "\"} but got {name: \""
                    << arg.name() << "\"}\n";
   return ExplainMatchResult(expectedName, arg.name(), result_listener);
+}
+
+const char CREDENTIALS_FILE_CONTENTS[] =
+    R"(
+[default]
+aws_access_key_id=default_access_key
+aws_secret_access_key=default_secret
+aws_session_token=default_token
+
+# This profile has leading spaces that should get trimmed.
+  [profile1]
+# The "=" in the value should not interfere with how this line is parsed.
+aws_access_key_id=profile1_acc=ess_key
+aws_secret_access_key=profile1_secret
+foo=bar
+aws_session_token=profile1_token
+
+[profile2]
+aws_access_key_id=profile2_access_key
+
+[profile3]
+aws_access_key_id=profile3_access_key
+aws_secret_access_key=
+
+[profile4]
+aws_access_key_id = profile4_access_key
+aws_secret_access_key = profile4_secret
+aws_session_token = profile4_token
+)";
+
+TEST(UtilityTest, testing) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  absl::flat_hash_map<std::string, std::string> elements = {{"AWS_ACCESS_KEY_ID", "crap"},
+                                                            {"AWS_SECRET_ACCESS_KEY", ""}};
+  auto it = elements.find("AWS_ACCESS_KEY_ID");
+  ENVOY_LOG_MISC(debug, "elements[AWS_ACCESS_KEY_ID] = {}", it->second);
+  auto it2 = elements.find("AWS_SECRET_ACCESS_KEY");
+  ENVOY_LOG_MISC(debug, "elements[AWS_SECRET_ACCESS_KEY] = {}", it2->second);
+
+  auto temp = TestEnvironment::temporaryDirectory();
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credential_file(temp + "/.aws/credentials");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
+
+  bool b = Utility::resolveProfileElements(file_path, "default", elements);
+  ENVOY_LOG_MISC(debug, "resolve returns {}", b);
+  auto it3 = elements.find("AWS_ACCESS_KEY_ID");
+  ENVOY_LOG_MISC(debug, "elements[AWS_ACCESS_KEY_ID] = {}", it3->second);
+  auto it4 = elements.find("AWS_SECRET_ACCESS_KEY");
+  ENVOY_LOG_MISC(debug, "elements[AWS_SECRET_ACCESS_KEY] = {}", it4->second);
 }
 
 // Headers must be in alphabetical order by virtue of std::map

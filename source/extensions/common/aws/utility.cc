@@ -387,6 +387,55 @@ std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable
   return (value != nullptr) && (value[0] != '\0') ? value : default_value;
 }
 
+// returns true if all elements could be resolved
+// returns false if at least one element could not be resolved
+
+bool Utility::resolveProfileElements(const std::string& credentials_file,
+                                     const std::string& profile_name,
+                                     absl::flat_hash_map<std::string, std::string>& elements) {
+  std::ifstream file(credentials_file);
+  if (!file.is_open()) {
+    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", credentials_file);
+    return false;
+  }
+  const auto profile_start = absl::StrFormat("[%s]", profile_name);
+
+  bool found_profile = false;
+  std::string line;
+  while (std::getline(file, line)) {
+    line = std::string(StringUtil::trim(line));
+    if (line.empty()) {
+      continue;
+    }
+
+    if (line == profile_start) {
+      found_profile = true;
+      continue;
+    }
+
+    if (found_profile) {
+      // Stop reading once we find the start of the next profile.
+      if (absl::StartsWith(line, "[")) {
+        break;
+      }
+
+      std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
+      if (parts.size() == 2) {
+        ENVOY_LOG_MISC(debug, "line= {} ", line);
+
+        const auto key = StringUtil::toUpper(StringUtil::trim(parts[0]));
+        const auto val = StringUtil::trim(parts[1]);
+        ENVOY_LOG_MISC(debug, "key= {} ", key);
+        auto found = elements.find(key);
+        if (found != elements.end()) {
+          found->second = val;
+          ENVOY_LOG_MISC(debug, "key {} value {}", found->first, found->second);
+        }
+      }
+    }
+  }
+  return true;
+}
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

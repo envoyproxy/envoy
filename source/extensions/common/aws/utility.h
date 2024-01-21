@@ -124,8 +124,11 @@ public:
                            absl::string_view uri);
 
   static std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
-                                                    const std::string& default_value);
+                                                     const std::string& default_value);
 
+  static bool resolveProfileElements(const std::string& credentials_file,
+                                     const std::string& profile_name,
+                                     absl::flat_hash_map<std::string, std::string>& elements);
 };
 
 } // namespace Aws
