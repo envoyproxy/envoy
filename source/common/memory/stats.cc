@@ -48,15 +48,20 @@ void Stats::dumpStatsToLog() {
 }
 
 void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine(Api::Api& api) {
-  ENVOY_LOG_MISC(debug, "Started tcmallocProcessBackgroundActionsThreadRoutine");
-  while (true) {
-    Thread::ReleasableLockGuard guard(mutex_);
-    if (terminating_) {
-      guard.release();
-      return;
-    }
-    memory_release_event_.wait(mutex_);
-    tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
+  ENVOY_LOG_MISC(debug, "Started {}", TCMALLOC_ROUTINE_THREAD_ID);
+  if (bytes_to_release_ > 0) {
+    tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(TCMALLOC_ROUTINE_THREAD_ID);
+    memory_release_timer_ = tcmalloc_routine_dispatcher_.createTimer([this]() -> void {
+      Thread::ReleasableLockGuard guard(mutex_);
+      if (terminating_) {
+        guard.release();
+        memory_release_timer_->disableTimer();
+        return;
+      }
+      tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
+      allocator_manager_stats_.released_by_timer_.inc();
+      memory_release_timer_->enableTimer(memory_release_interval_msec_);
+    });
   }
 }
 
@@ -119,24 +124,16 @@ void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine(Api::Api& a
   if (bytes_to_release_ > 0) {
     tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(TCMALLOC_ROUTINE_THREAD_ID);
     memory_release_timer_ = tcmalloc_routine_dispatcher_.createTimer([this]() -> void {
+      Thread::ReleasableLockGuard guard(mutex_);
+      if (terminating_) {
+        guard.release();
+        memory_release_timer_->disableTimer();
+        return;
+      }
+      MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
       allocator_manager_stats_.released_by_timer_.inc();
-        Thread::ReleasableLockGuard guard(mutex_);
-        if (terminating_) {
-          guard.release();
-          memory_release_timer_->disableTimer();
-          return;
-        }
       memory_release_timer_->enableTimer(memory_release_interval_msec_);
     });
-  while (true) {
-    Thread::ReleasableLockGuard guard(mutex_);
-    if (terminating_) {
-      guard.release();
-      return;
-    }
-    memory_release_event_.wait(mutex_);
-    MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
-  }
 }
 
 } // namespace Memory

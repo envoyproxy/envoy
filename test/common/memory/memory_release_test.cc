@@ -45,7 +45,7 @@ protected:
     const auto proto_config =
         TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
     allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
-        dispatcher_, Thread::threadFactoryForTest(), scope_, proto_config);
+        *api_, scope_, proto_config);
   }
 
   void step(const std::chrono::milliseconds& step) {
@@ -61,7 +61,7 @@ protected:
   std::unique_ptr<Memory::AllocatorManager> allocator_manager_;
 };
 
-TEST_F(MemoryReleaseTest, RelaseRateAboveZeroDefaultIntervalMemoryReleased) {
+TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   size_t initial_allocated_bytes = Stats::totalCurrentlyAllocated();
   auto a = std::make_unique<unsigned char[]>(MB);
   auto b = std::make_unique<unsigned char[]>(MB);
@@ -95,7 +95,7 @@ TEST_F(MemoryReleaseTest, RelaseRateAboveZeroDefaultIntervalMemoryReleased) {
 #endif
 }
 
-TEST_F(MemoryReleaseTest, RelaseRateZeroNoRelease) {
+TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
   auto a = std::make_unique<unsigned char[]>(MB);
   uint64_t before = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_NOT_CONTAINS(
@@ -109,7 +109,7 @@ TEST_F(MemoryReleaseTest, RelaseRateZeroNoRelease) {
   EXPECT_EQ(after, before);
 }
 
-TEST_F(MemoryReleaseTest, RelaseRateAboveZeroCustomIntervalMemoryReleased) {
+TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   size_t initial_allocated_bytes = Stats::totalCurrentlyAllocated();
   auto a = std::make_unique<uint32_t[]>(512 * MB);
   auto b = std::make_unique<uint32_t[]>(512 * MB);
