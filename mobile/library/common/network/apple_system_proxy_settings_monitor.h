@@ -35,7 +35,8 @@ public:
   void start();
 
 protected:
-  // Protected and virtual so they can be overridden by tests to provide mocked system proxy settings.
+  // Protected and virtual so they can be overridden by tests to provide mocked system proxy
+  // settings.
   virtual CFDictionaryRef getSystemProxySettings() const;
 
 private:

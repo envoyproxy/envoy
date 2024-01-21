@@ -4,17 +4,21 @@ namespace Envoy {
 namespace Network {
 
 AppleProxyResolver::AppleProxyResolver()
-    : proxy_settings_monitor_(std::make_unique<AppleSystemProxySettingsMonitor>(proxySettingsUpdater())),
+    : proxy_settings_monitor_(
+          std::make_unique<AppleSystemProxySettingsMonitor>(proxySettingsUpdater())),
       pac_proxy_resolver_(std::make_unique<ApplePACProxyResolver>()) {}
 
-std::function<void(absl::optional<Network::SystemProxySettings>)> AppleProxyResolver::proxySettingsUpdater() {
-  return std::function<void(absl::optional<Network::SystemProxySettings>)>([this](absl::optional<SystemProxySettings> proxy_settings) {
-            absl::MutexLock l(&mutex_);
-            proxy_settings_ = proxy_settings;
-          });
+std::function<void(absl::optional<Network::SystemProxySettings>)>
+AppleProxyResolver::proxySettingsUpdater() {
+  return std::function<void(absl::optional<Network::SystemProxySettings>)>(
+      [this](absl::optional<SystemProxySettings> proxy_settings) {
+        absl::MutexLock l(&mutex_);
+        proxy_settings_ = proxy_settings;
+      });
 }
 
-void AppleProxyResolver::setSettingsMonitorForTest(std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor) {
+void AppleProxyResolver::setSettingsMonitorForTest(
+    std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor) {
   proxy_settings_monitor_ = std::move(monitor);
 }
 

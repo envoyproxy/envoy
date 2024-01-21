@@ -40,14 +40,14 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     var responseBuffer = Data()
     engine.streamClient()
       .newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, endStream, _ in
+      .setOnResponseHeaders { responseHeaders, _, _ in
          XCTAssertEqual(200, responseHeaders.httpStatus)
          responseHeadersExpectation.fulfill()
       }
-      .setOnResponseData { data, endStream, _ in
+      .setOnResponseData { data, _, _ in
         responseBuffer.append(contentsOf: data)
       }
-      .setOnResponseTrailers { trailers, _ in
+      .setOnResponseTrailers { _, _ in
         responseTrailersExpectation.fulfill()
       }
       .start()
@@ -70,7 +70,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     let engineExpectation = self.expectation(description: "Run started engine")
     let responseHeadersExpectation = self.expectation(description: "Successful response headers received")
-    let responseTrailersExpectation = self.expectation(description: "Successful response trailers received")
+    let responseBodyExpectation = self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
       .addLogLevel(.trace)
@@ -92,26 +92,25 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     var responseBuffer = Data()
     engine.streamClient()
       .newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, endStream, _ in
+      .setOnResponseHeaders { responseHeaders, _, _ in
          XCTAssertEqual(200, responseHeaders.httpStatus)
          responseHeadersExpectation.fulfill()
       }
       .setOnResponseData { data, endStream, _ in
         responseBuffer.append(contentsOf: data)
+        if endStream {
+        responseBodyExpectation.fulfill()
+        }
       }
-      .setOnResponseTrailers { trailers, _ in
-        responseTrailersExpectation.fulfill()
+      .setOnResponseTrailers { _, _ in
       }
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
     XCTAssertEqual(XCTWaiter.wait(for: [responseHeadersExpectation], timeout: 10), .completed)
-    XCTAssertEqual(XCTWaiter.wait(for: [responseTrailersExpectation], timeout: 10), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [responseBodyExpectation], timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
-      print("AAB RESPONSE BODY:")
-      print(responseBody.utf8.count)
-      print(responseBody.utf8)
       XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
     }
 
