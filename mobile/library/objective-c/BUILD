@@ -61,7 +61,6 @@ envoy_objc_library(
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
         "//library/common/network:apple_proxy_resolution_lib",
-        "//library/objective-c/proxy:envoy_proxy_lib",
     ],
 )
 
@@ -72,7 +71,6 @@ envoy_objc_library(
     deps = [
         ":envoy_aliases_lib",
         "//library/common/types:c_types_lib",
-        "//library/objective-c/proxy:envoy_proxy_lib",
     ],
 )
 

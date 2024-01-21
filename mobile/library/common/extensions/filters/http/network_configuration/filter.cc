@@ -113,7 +113,6 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
                                          envoy_proxy_resolver* proxy_resolver) {
-
   const auto url_string = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
   const auto host_data = Data::Utility::copyToBridgeData(url_string);
 
@@ -154,8 +153,6 @@ Http::FilterHeadersStatus NetworkConfigurationFilter::continueWithProxySettings(
 
   ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request", proxy_settings->asString());
   // If there is a proxy with a raw address, set the information, and continue.
-  // TODO(Augustyniak): Remove this code path once Android's proxy resolution is migrated over to
-  // API registry.
   const auto proxy_address = proxy_settings->address();
   if (proxy_address != nullptr) {
     const auto host_value = decoder_callbacks_->streamInfo().getRequestHeaders()->getHostValue();

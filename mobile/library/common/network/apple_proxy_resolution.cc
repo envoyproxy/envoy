@@ -9,11 +9,6 @@
 namespace Envoy {
 namespace Network {
 
-typedef struct {
-  std::unique_ptr<Envoy::Network::AppleProxyResolver> resolver;
-  envoy_engine_t engine_handle;
-} envoy_proxy_resolver_context;
-
 envoy_data toManagedNativeString(std::string str) {
   size_t length = str.length();
   uint8_t* native_string = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * length));

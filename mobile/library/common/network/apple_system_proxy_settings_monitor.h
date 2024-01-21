@@ -1,5 +1,6 @@
 #pragma once
 
+#include <CFNetwork/CFNetwork.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <dispatch/dispatch.h>
 
@@ -26,12 +27,16 @@ public:
   AppleSystemProxySettingsMonitor(
       std::function<void(absl::optional<SystemProxySettings>)> proxySettingsDidUpdate)
       : proxySettingsDidUpdate_(proxySettingsDidUpdate){};
-  ~AppleSystemProxySettingsMonitor();
+  virtual ~AppleSystemProxySettingsMonitor();
 
   /**
    * Starts monitoring system proxy settings.
    */
   void start();
+
+protected:
+  // Protected and virtual so they can be overridden by tests to provide mocked system proxy settings.
+  virtual CFDictionaryRef getSystemProxySettings() const;
 
 private:
   absl::optional<SystemProxySettings> readSystemProxySettings() const;

@@ -4,14 +4,21 @@ namespace Envoy {
 namespace Network {
 
 AppleProxyResolver::AppleProxyResolver()
-    : proxy_settings_monitor_(AppleSystemProxySettingsMonitor(
-          [this](absl::optional<SystemProxySettings> proxy_settings) {
+    : proxy_settings_monitor_(std::make_unique<AppleSystemProxySettingsMonitor>(proxySettingsUpdater())),
+      pac_proxy_resolver_(std::make_unique<ApplePACProxyResolver>()) {}
+
+std::function<void(absl::optional<Network::SystemProxySettings>)> AppleProxyResolver::proxySettingsUpdater() {
+  return std::function<void(absl::optional<Network::SystemProxySettings>)>([this](absl::optional<SystemProxySettings> proxy_settings) {
             absl::MutexLock l(&mutex_);
             proxy_settings_ = proxy_settings;
-          })),
-      pac_proxy_resolver_(ApplePACProxyResolver()) {}
+          });
+}
 
-void AppleProxyResolver::start() { proxy_settings_monitor_.start(); }
+void AppleProxyResolver::setSettingsMonitorForTest(std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor) {
+  proxy_settings_monitor_ = std::move(monitor);
+}
+
+void AppleProxyResolver::start() { proxy_settings_monitor_->start(); }
 
 envoy_proxy_resolution_result
 AppleProxyResolver::resolveProxy(std::string target_url_string, std::vector<ProxySettings>& proxies,
@@ -32,7 +39,7 @@ AppleProxyResolver::resolveProxy(std::string target_url_string, std::vector<Prox
     }
   }
 
-  pac_proxy_resolver_.resolveProxies(
+  pac_proxy_resolver_->resolveProxies(
       proxy_settings.pacFileURL(), target_url_string,
       [completion](std::vector<ProxySettings> proxies) { completion(proxies); });
   return ENVOY_PROXY_RESOLUTION_RESULT_IN_PROGRESS;

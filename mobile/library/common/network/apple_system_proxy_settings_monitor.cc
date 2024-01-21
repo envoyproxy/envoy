@@ -51,9 +51,13 @@ AppleSystemProxySettingsMonitor::~AppleSystemProxySettingsMonitor() {
   }
 }
 
+CFDictionaryRef AppleSystemProxySettingsMonitor::getSystemProxySettings() const {
+  return CFNetworkCopySystemProxySettings();
+}
+
 absl::optional<SystemProxySettings>
 AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
-  CFDictionaryRef proxy_settings = CFNetworkCopySystemProxySettings();
+  CFDictionaryRef proxy_settings = getSystemProxySettings();
   if (proxy_settings == nullptr) {
     return absl::nullopt;
   }

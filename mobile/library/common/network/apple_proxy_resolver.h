@@ -4,9 +4,11 @@
 #include <CoreFoundation/CoreFoundation.h>
 
 #include <functional>
+#include <memory>
 
 #include "library/common/network/apple_pac_proxy_resolver.h"
 #include "library/common/network/apple_system_proxy_settings_monitor.h"
+#include "library/common/network/system_proxy_settings.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -18,6 +20,7 @@ namespace Network {
 class AppleProxyResolver {
 public:
   AppleProxyResolver();
+
   /**
    * Starts proxy resolver. It needs to be called prior to any proxy resolution attempt.
    */
@@ -36,9 +39,20 @@ public:
       std::string target_url_string, std::vector<ProxySettings>& proxies,
       std::function<void(std::vector<ProxySettings> proxies)> proxy_resolution_did_complete);
 
+  /*
+   * Supplies a function that updates this instance's proxy settings.
+   */
+  std::function<void(absl::optional<Network::SystemProxySettings>)> proxySettingsUpdater();
+
+  /**
+   * Resets the proxy settings monitor to the supplied monitor instance.
+   * For tests only.
+   */
+  void setSettingsMonitorForTest(std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor);
+
 private:
-  AppleSystemProxySettingsMonitor proxy_settings_monitor_;
-  ApplePACProxyResolver pac_proxy_resolver_;
+  std::unique_ptr<AppleSystemProxySettingsMonitor> proxy_settings_monitor_;
+  std::unique_ptr<ApplePACProxyResolver> pac_proxy_resolver_;
   absl::optional<SystemProxySettings> proxy_settings_;
   absl::Mutex mutex_;
 };

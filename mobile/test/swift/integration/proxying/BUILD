@@ -1,6 +1,9 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_swift_test")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 # TODO(jpsim): Fix remote execution for all the tests in this file.
 
@@ -16,6 +19,7 @@ envoy_mobile_swift_test(
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
+        "//test/objective-c:envoy_test_api",
         "//test/swift/integration:test_extensions",
     ],
 )
