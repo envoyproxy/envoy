@@ -17,8 +17,10 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     let port = EnvoyTestServer.getEnvoyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
-    let responseHeadersExpectation = self.expectation(description: "Successful response headers received")
-    let responseTrailersExpectation = self.expectation(description: "Successful response trailers received")
+    let responseHeadersExpectation =
+        self.expectation(description: "Successful response headers received")
+    let responseTrailersExpectation =
+        self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
       .addLogLevel(.trace)
@@ -69,8 +71,10 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     let port = EnvoyTestServer.getEnvoyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
-    let responseHeadersExpectation = self.expectation(description: "Successful response headers received")
-    let responseBodyExpectation = self.expectation(description: "Successful response trailers received")
+    let responseHeadersExpectation =
+        self.expectation(description: "Successful response headers received")
+    let responseBodyExpectation =
+        self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
       .addLogLevel(.trace)
