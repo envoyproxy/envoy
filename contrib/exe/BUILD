@@ -7,6 +7,7 @@ load(
 load(
     "//contrib:all_contrib_extensions.bzl",
     "ARM64_SKIP_CONTRIB_TARGETS",
+    "FIPS_SKIP_CONTRIB_TARGETS",
     "PPC_SKIP_CONTRIB_TARGETS",
     "envoy_all_contrib_extensions",
 )
@@ -20,11 +21,18 @@ alias(
     actual = ":envoy-static",
 )
 
+SELECTED_CONTRIB_EXTENSIONS = select({
+    "//bazel:linux_aarch64": envoy_all_contrib_extensions(ARM64_SKIP_CONTRIB_TARGETS),
+    "//bazel:linux_ppc": envoy_all_contrib_extensions(PPC_SKIP_CONTRIB_TARGETS),
+    "//bazel:boringssl_fips": envoy_all_contrib_extensions(FIPS_SKIP_CONTRIB_TARGETS),
+    "//conditions:default": envoy_all_contrib_extensions(),
+})
+
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
     visibility = ["//visibility:public"],
-    deps = ["//source/exe:envoy_main_entry_lib"] + envoy_all_contrib_extensions(),
+    deps = ["//source/exe:envoy_main_entry_lib"] + SELECTED_CONTRIB_EXTENSIONS,
 )
 
 envoy_cc_test(
@@ -41,9 +49,5 @@ envoy_cc_test(
     },
     deps = [
         "//test/config_test:example_configs_test_lib",
-    ] + select({
-        "//bazel:linux_aarch64": envoy_all_contrib_extensions(ARM64_SKIP_CONTRIB_TARGETS),
-        "//bazel:linux_ppc": envoy_all_contrib_extensions(PPC_SKIP_CONTRIB_TARGETS),
-        "//conditions:default": envoy_all_contrib_extensions(),
-    }),
+    ] + SELECTED_CONTRIB_EXTENSIONS,
 )
