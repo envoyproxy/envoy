@@ -44,14 +44,10 @@ protected:
                                                       bytes_to_release);
     const auto proto_config =
         TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
-    allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
-        *api_, scope_, proto_config);
+    allocator_manager_ = std::make_unique<Memory::AllocatorManager>(*api_, scope_, proto_config);
   }
 
-  void step(const std::chrono::milliseconds& step) {
-    time_system_.advanceTimeAndRun(std::chrono::milliseconds(step), dispatcher_,
-                                   Event::Dispatcher::RunType::NonBlock);
-  }
+  void step(const std::chrono::milliseconds& step) { time_system_.advanceTimeWait(step); }
 
   Envoy::Stats::TestUtil::TestStore stats_;
   Event::SimulatedTimeSystem time_system_;
@@ -71,21 +67,24 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   }
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
-      "info", "Configured tcmalloc with background release rate: 512 bytes per 1000 milliseconds",
-      initialiseAllocatorManager(512 /*bytes per second*/, 0));
-  EXPECT_EQ(512, AllocatorManagerPeer::bytesToRelease(*allocator_manager_));
+      "info",
+      "Configured tcmalloc with background release rate: 1048576 bytes per 1000 milliseconds",
+      initialiseAllocatorManager(MB /*bytes per second*/, 0));
+  EXPECT_EQ(MB, AllocatorManagerPeer::bytesToRelease(*allocator_manager_));
   EXPECT_EQ(std::chrono::milliseconds(1000),
             AllocatorManagerPeer::memoryReleaseInterval(*allocator_manager_));
   a.reset();
   // Release interval was configured to default value (1 second).
   step(std::chrono::milliseconds(1000));
-  EXPECT_EQ(1UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
+  TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 1UL,
+                                time_system_);
   auto released_bytes_before_next_run = Stats::totalPageHeapUnmapped();
   b.reset();
-  step(std::chrono::milliseconds(2000));
-  EXPECT_EQ(2UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
+  step(std::chrono::milliseconds(1000));
+  TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL,
+                                time_system_);
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
-  Stats::dumpStatsToLog();
+
 #if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
   EXPECT_LT(released_bytes_before_next_run, final_released_bytes);
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
@@ -129,9 +128,9 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   step(std::chrono::milliseconds(2000));
   b.reset();
   step(std::chrono::milliseconds(2000));
-  EXPECT_EQ(2UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
+  TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL,
+                                time_system_);
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
-  Stats::dumpStatsToLog();
 #if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
 #else

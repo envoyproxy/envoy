@@ -47,22 +47,8 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", tcmalloc::MallocExtension::GetStats());
 }
 
-void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine(Api::Api& api) {
-  ENVOY_LOG_MISC(debug, "Started {}", TCMALLOC_ROUTINE_THREAD_ID);
-  if (bytes_to_release_ > 0) {
-    tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(TCMALLOC_ROUTINE_THREAD_ID);
-    memory_release_timer_ = tcmalloc_routine_dispatcher_.createTimer([this]() -> void {
-      Thread::ReleasableLockGuard guard(mutex_);
-      if (terminating_) {
-        guard.release();
-        memory_release_timer_->disableTimer();
-        return;
-      }
-      tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
-      allocator_manager_stats_.released_by_timer_.inc();
-      memory_release_timer_->enableTimer(memory_release_interval_msec_);
-    });
-  }
+void AllocatorManager::tcmallocRelease() {
+  tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
 }
 
 } // namespace Memory
@@ -119,21 +105,8 @@ void Stats::dumpStatsToLog() {
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", buffer.get());
 }
 
-void AllocatorManager::tcmallocProcessBackgroundActionsThreadRoutine(Api::Api& api) {
-  ENVOY_LOG_MISC(debug, "Started {}", TCMALLOC_ROUTINE_THREAD_ID);
-  if (bytes_to_release_ > 0) {
-    tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(TCMALLOC_ROUTINE_THREAD_ID);
-    memory_release_timer_ = tcmalloc_routine_dispatcher_.createTimer([this]() -> void {
-      Thread::ReleasableLockGuard guard(mutex_);
-      if (terminating_) {
-        guard.release();
-        memory_release_timer_->disableTimer();
-        return;
-      }
-      MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
-      allocator_manager_stats_.released_by_timer_.inc();
-      memory_release_timer_->enableTimer(memory_release_interval_msec_);
-    });
+void AllocatorManager::tcmallocRelease() {
+  MallocExtension::instance()->ReleaseToSystem(bytes_to_release_);
 }
 
 } // namespace Memory
