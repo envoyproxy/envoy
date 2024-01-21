@@ -968,8 +968,8 @@ TEST_P(Http2FloodMitigationTest, KeepAliveTimerTriggersFloodProtection) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* keep_alive = hcm.mutable_http2_protocol_options()->mutable_connection_keepalive();
-        keep_alive->mutable_interval()->set_seconds(1 * TSAN_TIMEOUT_FACTOR);
-        keep_alive->mutable_timeout()->set_seconds(2 * TSAN_TIMEOUT_FACTOR);
+        keep_alive->mutable_interval()->set_seconds(1 * TIMEOUT_FACTOR);
+        keep_alive->mutable_timeout()->set_seconds(2 * TIMEOUT_FACTOR);
       });
 
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);

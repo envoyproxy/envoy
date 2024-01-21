@@ -401,6 +401,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
+  Envoy::Engine *_engine;
   EnvoyNetworkMonitor *_networkMonitor;
 }
 
@@ -436,9 +437,8 @@ static void ios_track_event(envoy_map map, const void *context) {
     native_event_tracker.context = CFBridgingRetain(objcEventTracker);
   }
 
-  _engineHandle = init_engine(native_callbacks, native_logger, native_event_tracker);
-
-  _networkMonitor = [[EnvoyNetworkMonitor alloc] initWithEngine:_engineHandle];
+  _engine = new Envoy::Engine(native_callbacks, native_logger, native_event_tracker);
+  _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
   if (enableProxying) {
     register_apple_proxy_resolver(_engineHandle);
@@ -540,7 +540,7 @@ static void ios_track_event(envoy_map map, const void *context) {
     options->setConfigProto(std::move(bootstrap));
     ENVOY_BUG(options->setLogLevel(logLevel.UTF8String).ok(), "invalid log level");
     options->setConcurrency(1);
-    return reinterpret_cast<Envoy::Engine *>(_engineHandle)->run(std::move(options));
+    return _engine->run(std::move(options));
   } @catch (NSException *exception) {
     [self logException:exception];
     return kEnvoyFailure;
@@ -554,7 +554,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   [self startObservingLifecycleNotifications];
 
   @try {
-    return (int)run_engine(_engineHandle, yaml.UTF8String, logLevel.UTF8String);
+    return _engine->run(yaml.UTF8String, logLevel.UTF8String);
   } @catch (NSException *exception) {
     [self logException:exception];
     return kEnvoyFailure;
@@ -589,7 +589,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (void)terminate {
-  terminate_engine(_engineHandle, /* release */ false);
+  _engine->terminate();
 }
 
 - (void)resetConnectivityState {
@@ -612,7 +612,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (void)terminateNotification:(NSNotification *)notification {
   NSLog(@"[Envoy %ld] terminating engine (%@)", _engineHandle, notification.name);
-  terminate_engine(_engineHandle, /* release */ false);
+  _engine->terminate();
 }
 
 - (void)logException:(NSException *)exception {

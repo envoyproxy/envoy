@@ -466,8 +466,8 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerDeniesSSLTest) {
   ASSERT_EQ(80877103, upstream_data.peekBEInt<uint32_t>(4));
   upstream_data.drain(upstream_data.length());
 
-  // Reply to Envoy with 'E' (SSL not allowed).
-  upstream_data.add("E");
+  // Reply to Envoy with 'N' (SSL not allowed).
+  upstream_data.add("N");
   ASSERT_TRUE(fake_upstream_connection_->write(upstream_data.toString()));
   config_factory_.proceed_sync_.Notify();
 

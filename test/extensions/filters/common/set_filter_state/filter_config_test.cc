@@ -77,6 +77,22 @@ TEST_F(ConfigTest, SetValue) {
   EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
 }
 
+TEST_F(ConfigTest, SetValueWithFactory) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "XXX"
+  )YAML"});
+  update();
+  EXPECT_FALSE(info_.filterState()->hasDataAtOrAboveLifeSpan(LifeSpan::Request));
+  const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("my_key");
+  ASSERT_NE(nullptr, foo);
+  EXPECT_EQ(foo->serializeAsString(), "XXX");
+  EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
+}
+
 TEST_F(ConfigTest, SetValueConnection) {
   initialize({R"YAML(
     object_key: foo

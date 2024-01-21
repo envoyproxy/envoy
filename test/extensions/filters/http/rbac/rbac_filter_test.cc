@@ -163,6 +163,88 @@ on_no_match:
         ProtobufMessage::getStrictValidationVisitor()));
   }
 
+  void setupMatcherWithCelInputs() {
+    envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+    constexpr absl::string_view matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+    - predicate:
+        single_predicate:
+          input:
+            name: envoy.matching.inputs.cel_data_input
+            typed_config:
+              "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+          custom_match:
+            name: envoy.matching.matchers.cel_matcher
+            typed_config:
+              "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+              expr_match:
+                parsed_expr:
+                  expr:
+                    id: 3
+                    call_expr:
+                      function: _==_
+                      args:
+                      - id: 2
+                        select_expr:
+                          operand:
+                            id: 1
+                            ident_expr:
+                              name: request
+                          field: path
+                      - id: 4
+                        const_expr:
+                          string_value: "/test-1234-deny"
+      on_match:
+        matcher:
+          matcher_tree:
+            input:
+              name: envoy.matching.inputs.source_ip
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+            custom_match:
+              name: envoy.matching.matchers.ip
+              typed_config:
+                "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+                range_matchers:
+                  - ranges:
+                      - address_prefix: 1.2.3.4
+                    on_match:
+                      action:
+                        name: envoy.filters.rbac.action
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                          name: deny-request
+                          action: DENY
+          on_no_match:
+            action:
+              name: action
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                name: allow-request
+                action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: no-match
+      action: ALLOW
+)EOF";
+
+    xds::type::matcher::v3::Matcher matcher;
+    TestUtility::loadFromYaml(std::string(matcher_yaml), matcher);
+    *config.mutable_matcher() = matcher;
+
+    *config.mutable_shadow_matcher() = matcher;
+    config.set_shadow_rules_stat_prefix("prefix_");
+
+    setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", *store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor()));
+  }
+
   void setupConfig(RoleBasedAccessControlFilterConfigSharedPtr config) {
     config_ = config;
     filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
@@ -175,13 +257,15 @@ on_no_match:
 
   RoleBasedAccessControlFilterTest() = default;
 
-  void setDestinationPort(uint16_t port) {
-    address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
+  void setDestinationAddressAndPort(std::string server_addr, uint16_t port) {
+    address_ = Envoy::Network::Utility::parseInternetAddress(server_addr, port, false);
     req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
 
     ON_CALL(connection_.stream_info_, downstreamAddressProvider())
         .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
   }
+
+  void setDestinationPort(uint16_t port) { setDestinationAddressAndPort("1.2.3.4", port); }
 
   void setRequestedServerName(std::string server_name) {
     requested_server_name_ = server_name;
@@ -349,6 +433,52 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherWithCelInputsRequestNoMatch) {
+  setupMatcherWithCelInputs();
+  setDestinationPort(80);
+
+  // The test request utilizing the path '/allow' is expected to be allowed by the RBAC filter as it
+  // doesn't match the CEL expression and hit the catch-all path which allows all the traffic.
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/allow"},
+      {":scheme", "http"},
+      {":authority", "sni.databricks.com"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ("test.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("test.rbac.denied", config_->stats().denied_.name());
+
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherWithCelInputsRequestDenied) {
+  setupMatcherWithCelInputs();
+  setDestinationPort(80);
+
+  // The test request utilizing the path '/test-1234-deny' is expected to be denied by the RBAC
+  // filter. This denial is based on the CEL expression that matches the request's path as
+  // '/test-1234-deny' and subsequently restricts all access based on the IP Address, in this
+  // instance pointing to 1.2.3.4.
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/test-1234-deny"},
+      {":scheme", "http"},
+      {":authority", "sni.databricks.com"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ("test.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("test.rbac.denied", config_->stats().denied_.name());
+
   checkAccessLogMetadata(LogResult::Undecided);
 }
 

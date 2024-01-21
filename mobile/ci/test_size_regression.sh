@@ -4,8 +4,11 @@ set -o pipefail
 
 # Checks the absolute size and the relative size increase of a file.
 
-MAX_SIZE=7300000 # 7.3MB
-MAX_PERC=2.0
+# As of Jan 11, 2024, the latest runs show that the test binary size is
+# 4273716 bytes:
+# https://github.com/envoyproxy/envoy/actions/runs/7497709450/job/20411963750
+MAX_SIZE=4500000 # 4.5MB
+MAX_PERC=1.5
 
 if [ "$(uname)" == "Darwin" ]
 then

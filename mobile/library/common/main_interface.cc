@@ -115,30 +115,6 @@ envoy_status_t register_platform_api(const char* name, void* api) {
   return ENVOY_SUCCESS;
 }
 
-envoy_engine_t init_engine(envoy_engine_callbacks callbacks, envoy_logger logger,
-                           envoy_event_tracker event_tracker) {
-  auto engine = new Envoy::Engine(callbacks, logger, event_tracker);
-  return reinterpret_cast<envoy_engine_t>(engine);
-}
-
-envoy_status_t run_engine(envoy_engine_t handle, const char* config, const char* log_level) {
-  if (auto engine = reinterpret_cast<Envoy::Engine*>(handle)) {
-    engine->run(config, log_level);
-    return ENVOY_SUCCESS;
-  }
-  return ENVOY_FAILURE;
-}
-
-envoy_status_t terminate_engine(envoy_engine_t handle, bool release) {
-  auto engine = reinterpret_cast<Envoy::Engine*>(handle);
-  envoy_status_t ret = engine->terminate();
-  if (release) {
-    // TODO(jpsim): Always delete engine to avoid leaking it
-    delete engine;
-  }
-  return ret;
-}
-
 envoy_status_t reset_connectivity_state(envoy_engine_t e) {
   return runOnEngineDispatcher(
       e, [](auto& engine) { engine.networkConnectivityManager().resetConnectivityState(); });

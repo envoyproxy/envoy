@@ -47,6 +47,8 @@ public:
                                   generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
+    InstallDecrypter(quic::ENCRYPTION_FORWARD_SECURE,
+                     std::make_unique<quic::test::TaggingDecrypter>());
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
@@ -64,10 +66,11 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({GetParam()}),
-        peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
-                                                        12345)),
+        peer_addr_(
+            Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(), 0)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         54321)),
+        peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
             quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
@@ -83,12 +86,15 @@ public:
             /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, {},
             *store_.rootScope(), transport_socket_options_, {}),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
-                                      POOL_GAUGE_PREFIX(store_, "http3."))}),
-        http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
-                         64 * 1024, 100) {
+                                      POOL_GAUGE_PREFIX(store_, "http3."))}) {
+    http3_options_.mutable_quic_protocol_options()
+        ->mutable_num_timeouts_to_trigger_port_migration()
+        ->set_value(1);
+    http_connection_ = std::make_unique<QuicHttpClientConnectionImpl>(
+        envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100);
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
-    EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
+    EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
 
     time_system_.advanceTimeWait(std::chrono::milliseconds(1));
     ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
@@ -98,6 +104,9 @@ public:
   void SetUp() override {
     envoy_quic_session_.Initialize();
     setQuicConfigWithDefaultValues(envoy_quic_session_.config());
+    quic::test::QuicConfigPeer::SetReceivedStatelessResetToken(
+        envoy_quic_session_.config(),
+        quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
     envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
     envoy_quic_session_.setConnectionStats(
@@ -112,12 +121,13 @@ public:
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
+    peer_socket_->close();
   }
 
   EnvoyQuicClientStream& sendGetRequest(Http::ResponseDecoder& response_decoder,
                                         Http::StreamCallbacks& stream_callbacks) {
     auto& stream =
-        dynamic_cast<EnvoyQuicClientStream&>(http_connection_.newStream(response_decoder));
+        dynamic_cast<EnvoyQuicClientStream&>(http_connection_->newStream(response_decoder));
     stream.getStream().addCallbacks(stream_callbacks);
 
     std::string host("www.abc.com");
@@ -136,8 +146,12 @@ protected:
   EnvoyQuicAlarmFactory alarm_factory_;
   quic::ParsedQuicVersionVector quic_version_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
+  // Initialized with port 0 and modified during peer_socket_ creation.
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
+  // Used in some tests to trigger a read event on the connection to test its full interaction with
+  // socket read utility functions.
+  Network::ConnectionSocketPtr peer_socket_;
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   TestEnvoyQuicClientConnection* quic_connection_;
@@ -156,13 +170,13 @@ protected:
   testing::StrictMock<Stats::MockGauge> write_current_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
-  QuicHttpClientConnectionImpl http_connection_;
+  std::unique_ptr<QuicHttpClientConnectionImpl> http_connection_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
-TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_.shutdownNotice(); }
+TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_->shutdownNotice(); }
 
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
@@ -410,6 +424,50 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnFlushWriteBuffer) {
       dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
   EXPECT_DEATH(verify_context.extraValidationContext().callbacks->flushWriteBuffer(),
                "unexpectedly reached");
+}
+
+// Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.
+TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
+  quic::QuicNewConnectionIdFrame frame;
+  frame.connection_id = quic::test::TestConnectionId(1234);
+  ASSERT_NE(frame.connection_id, quic_connection_->connection_id());
+  frame.stateless_reset_token = quic::QuicUtils::GenerateStatelessResetToken(frame.connection_id);
+  frame.retire_prior_to = 0u;
+  frame.sequence_number = 1u;
+  quic_connection_->OnNewConnectionIdFrame(frame);
+  quic_connection_->SetSelfAddress(envoyIpAddressToQuicSocketAddress(self_addr_->ip()));
+
+  // Trigger port migration.
+  quic_connection_->OnPathDegradingDetected();
+  EXPECT_TRUE(envoy_quic_session_.HasPendingPathValidation());
+  auto* path_validation_context =
+      dynamic_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(
+          quic_connection_->GetPathValidationContext());
+  Network::ConnectionSocket& probing_socket = path_validation_context->probingSocket();
+  const Network::Address::InstanceConstSharedPtr& new_self_address =
+      probing_socket.connectionInfoProvider().localAddress();
+  EXPECT_NE(new_self_address->asString(), self_addr_->asString());
+
+  // Send a STATELESS_RESET packet to the probing socket.
+  std::unique_ptr<quic::QuicEncryptedPacket> stateless_reset_packet =
+      quic::QuicFramer::BuildIetfStatelessResetPacket(
+          frame.connection_id, /*received_packet_length*/ 1200,
+          quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
+  Buffer::RawSlice slice;
+  slice.mem_ = const_cast<char*>(stateless_reset_packet->data());
+  slice.len_ = stateless_reset_packet->length();
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *new_self_address);
+
+  // Receiving the STATELESS_RESET on the probing socket shouldn't close the connection but should
+  // fail the probing.
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .Times(0);
+  while (envoy_quic_session_.HasPendingPathValidation()) {
+    // Running event loop to receive the STATELESS_RESET and following socket reads shouldn't cause
+    // crash.
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
 }
 
 } // namespace Quic
