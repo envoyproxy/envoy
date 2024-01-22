@@ -82,6 +82,11 @@ public:
     return ioHandle().congestionWindowInBytes();
   }
 
+  // ScopeTrackedObject
+  ScopedExecutionContext scoped_execution_context() const override {
+    return ScopedExecutionContext();
+  }
+
   void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ListenSocketImpl " << this << DUMP_MEMBER(transport_protocol_) << "\n";

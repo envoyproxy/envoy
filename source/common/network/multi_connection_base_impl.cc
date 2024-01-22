@@ -1,5 +1,6 @@
 #include "source/common/network/multi_connection_base_impl.h"
 
+#include <optional>
 #include <vector>
 
 namespace Envoy {

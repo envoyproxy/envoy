@@ -649,6 +649,10 @@ public:
   }
 
   // ScopeTrackedObject
+  ScopedExecutionContext scoped_execution_context() const override {
+    return ScopedExecutionContext();
+  }
+
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_) << "\n";

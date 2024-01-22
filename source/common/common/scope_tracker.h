@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/execution_context.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 
@@ -14,9 +15,12 @@ namespace Envoy {
 // when destroyed it pops the tracker's stack of tracked object, which should be the object it
 // registered.
 class ScopeTrackerScopeState {
-public:
-  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::ScopeTracker& tracker)
-      : registered_object_(object), tracker_(tracker) {
+ public:
+  ScopeTrackerScopeState(const ScopeTrackedObject* object,
+                         Event::ScopeTracker& tracker)
+      : registered_object_(object),
+        scoped_execution_context_(object->scoped_execution_context()),
+        tracker_(tracker) {
     tracker_.pushTrackedObject(registered_object_);
   }
 
@@ -30,8 +34,9 @@ public:
   // to be on the heap since it's tracking a stack of active operations.
   void* operator new(std::size_t) = delete;
 
-private:
+ private:
   const ScopeTrackedObject* registered_object_;
+  ScopedExecutionContext scoped_execution_context_;
   Event::ScopeTracker& tracker_;
 };
 

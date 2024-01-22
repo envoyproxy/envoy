@@ -2,6 +2,7 @@
 
 #include <ostream>
 
+#include "envoy/common/execution_context.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -17,6 +18,8 @@ namespace Envoy {
 class ScopeTrackedObject {
 public:
   virtual ~ScopeTrackedObject() = default;
+
+  virtual ScopedExecutionContext scoped_execution_context() const PURE;
 
   /**
    * Dump debug state of the object in question to the provided ostream.

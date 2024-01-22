@@ -156,6 +156,7 @@ public:
   }
 
   // ScopeTrackedObject
+  ScopedExecutionContext scoped_execution_context() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
@@ -263,6 +264,9 @@ protected:
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject
+    ScopedExecutionContext scoped_execution_context() const override {
+      return ScopedExecutionContext();
+    }
     void dumpState(std::ostream& os, int indent_level) const override;
 
     // This code assumes that details is a static string, so that we

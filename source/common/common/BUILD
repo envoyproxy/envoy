@@ -373,6 +373,7 @@ envoy_cc_library(
     name = "scope_tracker",
     hdrs = ["scope_tracker.h"],
     deps = [
+        "//envoy/common:execution_context",
         "//envoy/common:scope_tracker_interface",
         "//envoy/event:dispatcher_interface",
     ],
@@ -382,6 +383,7 @@ envoy_cc_library(
     name = "scope_tracked_object_stack",
     hdrs = ["scope_tracked_object_stack.h"],
     deps = [
+        "//envoy/common:execution_context",
         "//envoy/common:scope_tracker_interface",
     ],
 )

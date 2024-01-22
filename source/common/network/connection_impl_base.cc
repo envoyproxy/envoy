@@ -1,4 +1,5 @@
 #include "source/common/network/connection_impl_base.h"
+#include "source/common/network/common_connection_filter_states.h"
 
 namespace Envoy {
 namespace Network {
@@ -38,6 +39,12 @@ void ConnectionImplBase::setDelayedCloseTimeout(std::chrono::milliseconds timeou
   // Validate that this is only called prior to issuing a close() or closeSocket().
   ASSERT(delayed_close_timer_ == nullptr && state() == State::Open);
   delayed_close_timeout_ = timeout;
+}
+
+ScopedExecutionContext ConnectionImplBase::scoped_execution_context() const {
+  ExecutionContext* execution_context =
+      GetConnectionExecutionContextMutable(*this);
+  return ScopedExecutionContext(execution_context);
 }
 
 void ConnectionImplBase::initializeDelayedCloseTimer() {
