@@ -6,7 +6,7 @@ import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.uri_template.v3";
-option java_outer_classname = "UriTemplateMatcherProto";
+option java_outer_classname = "UriTemplateMatchProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/rbac/matchers/uri_template/v3;uri_templatev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
