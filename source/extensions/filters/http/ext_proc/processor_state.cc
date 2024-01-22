@@ -266,6 +266,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       Buffer::OwnedImpl chunk_data;
       auto chunk = dequeueStreamingChunk(chunk_data);
+      ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
       if (common_response.has_body_mutation()) {
         ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
         MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
@@ -288,6 +289,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       // Apply changes to the buffer that we sent to the server
       Buffer::OwnedImpl chunk_data;
       auto chunk = dequeueStreamingChunk(chunk_data);
+      ENVOY_BUG(chunk != nullptr, "Bad partial body callback state");
       if (common_response.has_header_mutation()) {
         if (headers_ != nullptr) {
           ENVOY_LOG(debug, "Applying header mutations to buffered body message");
