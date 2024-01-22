@@ -194,7 +194,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -270,12 +270,16 @@ message Permission {
     // Extension for configuring custom matchers for RBAC.
     // [#extension-category: envoy.rbac.matchers]
     core.v3.TypedExtensionConfig matcher = 12;
+
+    // Glob URL path matching.
+    // [#extension-category: envoy.rbac.matchers]
+    core.v3.TypedExtensionConfig glob_path = 13;
   }
 }
 
 // Principal defines an identity or a group of identities for a downstream
 // subject.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -357,6 +361,10 @@ message Principal {
 
     // Identifies the principal using a filter state object.
     type.matcher.v3.FilterStateMatcher filter_state = 12;
+
+    // Glob URL path matching.
+    // [#extension-category: envoy.rbac.matchers]
+    core.v3.TypedExtensionConfig glob_path = 13;
 
     // Negates matching the provided principal. For instance, if the value of
     // ``not_id`` would match, this principal would not match. Conversely, if the

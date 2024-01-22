@@ -38,6 +38,11 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
     return std::make_shared<const PathMatcher>(permission.url_path());
+  case envoy::config::rbac::v3::Permission::RuleCase::kGlobPath: {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.glob_path());
+    return factory.create(permission.glob_path(), validation_visitor);
+  }
   case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
     auto& factory =
         Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
@@ -79,6 +84,11 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const PathMatcher>(principal.url_path());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterState:
     return std::make_shared<const FilterStateMatcher>(principal.filter_state());
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kGlobPath: {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(principal.glob_path());
+    return factory.create(principal.glob_path(), validation_visitor);
+  }
   case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }
