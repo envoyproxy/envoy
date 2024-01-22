@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstddef>
+
 #include "envoy/common/pure.h"
 
 namespace Envoy {
 
 class ScopedExecutionContext;
 class ExecutionContext {
- public:
+public:
   ExecutionContext() = default;
   virtual ~ExecutionContext() = default;
 
@@ -17,7 +18,7 @@ class ExecutionContext {
   ExecutionContext(const ExecutionContext&) = delete;
   ExecutionContext(ExecutionContext&&) = delete;
 
- protected:
+protected:
   virtual void activate() PURE;
   virtual void deactivate() PURE;
 
@@ -25,7 +26,7 @@ class ExecutionContext {
 };
 
 class ScopedExecutionContext {
- public:
+public:
   ScopedExecutionContext() : ScopedExecutionContext(nullptr) {}
   ScopedExecutionContext(ExecutionContext* context) : context_(context) {
     if (context_ != nullptr) {
@@ -57,8 +58,8 @@ class ScopedExecutionContext {
 
   bool is_null() const { return context_ == nullptr; }
 
- private:
+private:
   ExecutionContext* context_;
 };
 
-}  // namespace Envoy
+} // namespace Envoy

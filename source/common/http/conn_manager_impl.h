@@ -44,8 +44,8 @@
 #include "source/common/http/user_agent.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
-#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/common_connection_filter_states.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -238,8 +238,7 @@ private:
     // ScopeTrackedObject
     ScopedExecutionContext scoped_execution_context() const override {
       ExecutionContext* execution_context =
-          GetConnectionExecutionContextMutable(
-              connection_manager_.read_callbacks_->connection());
+          GetConnectionExecutionContextMutable(connection_manager_.read_callbacks_->connection());
       return ScopedExecutionContext(execution_context);
     }
 

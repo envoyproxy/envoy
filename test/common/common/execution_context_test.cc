@@ -5,11 +5,11 @@
 namespace Envoy {
 
 class TestExecutionContext : public ExecutionContext {
- public:
+public:
   int activation_depth() const { return activation_depth_; }
   int activation_generations() const { return activation_generations_; }
 
- private:
+private:
   void activate() override {
     if (activation_depth_ == 0) {
       activation_generations_++;
@@ -39,7 +39,7 @@ TEST(ExecutionContextTest, NestedScopes) {
   TestExecutionContext context;
   EXPECT_EQ(context.activation_depth(), 0);
   EXPECT_EQ(context.activation_generations(), 0);
-  
+
   {
     ScopedExecutionContext scoped_context(&context);
     EXPECT_EQ(context.activation_depth(), 1);
@@ -88,4 +88,4 @@ TEST(ExecutionContextTest, ExtendScopeByMove) {
   EXPECT_TRUE(scoped_context1.is_null());
 }
 
-}  // namespace Envoy
+} // namespace Envoy

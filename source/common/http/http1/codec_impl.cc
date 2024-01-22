@@ -977,8 +977,7 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 }
 
 ScopedExecutionContext ConnectionImpl::scoped_execution_context() const {
-  ExecutionContext* execution_context =
-      GetConnectionExecutionContextMutable(connection_);
+  ExecutionContext* execution_context = GetConnectionExecutionContextMutable(connection_);
   return ScopedExecutionContext(execution_context);
 }
 

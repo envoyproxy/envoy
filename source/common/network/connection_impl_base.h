@@ -31,7 +31,7 @@ public:
 
   ScopedExecutionContext scoped_execution_context() const override;
 
- protected:
+protected:
   void initializeDelayedCloseTimer();
 
   bool inDelayedClose() const { return delayed_close_state_ != DelayedCloseState::None; }

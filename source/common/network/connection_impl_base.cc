@@ -1,4 +1,5 @@
 #include "source/common/network/connection_impl_base.h"
+
 #include "source/common/network/common_connection_filter_states.h"
 
 namespace Envoy {
@@ -42,8 +43,7 @@ void ConnectionImplBase::setDelayedCloseTimeout(std::chrono::milliseconds timeou
 }
 
 ScopedExecutionContext ConnectionImplBase::scoped_execution_context() const {
-  ExecutionContext* execution_context =
-      GetConnectionExecutionContextMutable(*this);
+  ExecutionContext* execution_context = GetConnectionExecutionContextMutable(*this);
   return ScopedExecutionContext(execution_context);
 }
 
