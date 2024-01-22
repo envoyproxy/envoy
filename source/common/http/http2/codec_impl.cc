@@ -1723,13 +1723,13 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
       std::move(status));
 }
 
-Http2VisitorInterface::OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id, absl::string_view name, absl::string_view value) {
+http2::adapter::Http2VisitorInterface::OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id, absl::string_view name_view, absl::string_view value_view) {
   // TODO PERF: Can reference count here to avoid copies.
   HeaderString name;
-  name.setCopy(name.data(), name.size());
+  name.setCopy(name_view.data(), name_view.size());
   HeaderString value;
-  value.setCopy(value.data(), value.size());
-  const int result = connection_->onHeader(frame, std::move(name),
+  value.setCopy(value_view.data(), value_view.size());
+  const int result = connection_->onHeader(stream_id, std::move(name),
                                           std::move(value));
   switch (result) {
     case 0:
@@ -1742,34 +1742,35 @@ Http2VisitorInterface::OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForS
 }
 
 bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id, Http2ErrorCode error_code) {
-  auto status = connection_->onStreamClose(stream_id, error_code);
+  auto status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
   return 0 == connection_->setAndCheckCodecCallbackStatus(
       std::move(status));
 }
 
-bool ConnectionImpl::Http2Visitor::a() { }
-bool ConnectionImpl::Http2Visitor::OnWindowUpdate() { }
+void ConnectionImpl::Http2Visitor::OnWindowUpdate(Http2StreamId stream_id, int window_increment) {
+  connection_->onWindowUpdate(stream_id, window_increment);
+}
 
-bool ConnectionImpl::Http2Visitor::OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
+int ConnectionImpl::Http2Visitor::OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
                         size_t length, uint8_t flags) {
-  return 0 == connection_->onBeforeFrameSend(stream_id, length, frame_type, flags);
+  return connection_->onBeforeFrameSend(stream_id, length, frame_type, flags);
 }
 
-bool ConnectionImpl::Http2Visitor::OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
+int ConnectionImpl::Http2Visitor::OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
                   uint8_t flags, uint32_t error_code) {
-  return 0 == connection_->onFrameSend(stream_id, length, frame_type, flags, error_code);
+  return connection_->onFrameSend(stream_id, length, frame_type, flags, error_code);
 }
 
-bool ConnectionImpl::Http2Visitor::OnInvalidFrame(Http2StreamId stream_id, http2::InvalidFrameError error) {
-  return 0 == connection_->onInvalidFrame(stream_id, http2::ToNghttp2ErrorCode(error));
+bool ConnectionImpl::Http2Visitor::OnInvalidFrame(Http2StreamId stream_id, InvalidFrameError error) {
+  return 0 == connection_->onInvalidFrame(stream_id, http2::adapter::ToNgHttp2ErrorCode(error));
 }
 
 bool ConnectionImpl::Http2Visitor::OnMetadataForStream(Http2StreamId stream_id, absl::string_view metadata) {
-  return 0 == connection->onMetadataReceived(stream_id, metadata.data(), metadata.size());
+  return 0 == connection_->onMetadataReceived(stream_id, reinterpret_cast<const uint8_t*>(metadata.data()), metadata.size());
 }
 
 bool ConnectionImpl::Http2Visitor::OnMetadataEndForStream(Http2StreamId stream_id) {
-  return 0 == connection->onMetadataFrameComplete(hd->stream_id, true);
+  return 0 == connection_->onMetadataFrameComplete(stream_id, true);
 }
 
 void ConnectionImpl::Http2Visitor::OnErrorDebug(absl::string_view message) {

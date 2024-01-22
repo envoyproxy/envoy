@@ -194,8 +194,8 @@ protected:
     void OnSettingsAck() override {}
     bool OnBeginHeadersForStream(Http2StreamId stream_id) override;
     OnHeaderResult OnHeaderForStream(Http2StreamId stream_id,
-                                     absl::string_view name,
-                                     absl::string_view value) override;
+                                     absl::string_view name_view,
+                                     absl::string_view value_view) override;
     bool OnEndHeadersForStream(Http2StreamId stream_id) override;
     bool OnDataPaddingLength(Http2StreamId stream_id,
                              size_t padding_length) override;
@@ -216,7 +216,7 @@ protected:
     bool OnGoAway(Http2StreamId last_accepted_stream_id,
                   Http2ErrorCode error_code,
                   absl::string_view opaque_data) override;
-    void OnWindowUpdate(Http2StreamId /*stream_id*/, int /*window_increment*/) override {}
+    void OnWindowUpdate(Http2StreamId stream_id, int window_increment) override;
     int OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
                           size_t length, uint8_t flags) override;
     int OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
@@ -752,6 +752,7 @@ private:
   Status onPing(uint64_t opaque_data, bool is_ack);
   Status onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, size_t padding);
   Status onGoAway(uint32_t error_code);
+  void onWindowUpdate(int32_t /*stream_id*/, int /*window_increment*/) {}
   Status onHeaders(int32_t stream_id, size_t length, uint8_t flags, int headers_category);
   Status onRstStream(int32_t stream_id, uint32_t error_code);
   Status onFrameReceived(const nghttp2_frame* frame);
