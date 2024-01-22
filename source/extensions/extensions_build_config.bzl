@@ -429,7 +429,7 @@ EXTENSIONS = {
     # RBAC URI template matcher
     #
 
-    "envoy.rbac.uri_template":         "//source/extensions/filters/common/rbac/uri_template:uri_template_lib",
+    "envoy.rbac.uri_template.uri_template_matcher":         "//source/extensions/filters/common/rbac/uri_template:uri_template_lib",
 
     #
     # DNS Resolver
