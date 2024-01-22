@@ -1,6 +1,14 @@
 #include "test_server.h"
 
 #include "source/common/common/random_generator.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/quic/server_codec_impl.h"
+#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/udp_packet_writer/default/config.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
@@ -77,6 +85,7 @@ void TestServer::startTestServer(TestServerType test_server_type) {
   if (test_server_type == TestServerType::HTTP_PROXY ||
       test_server_type == TestServerType::HTTPS_PROXY) {
     // Register the listeners required to run Envoy servers (as a proxy).
+    // These are all of the extensions registered when the ENVOY_MOBILE_LISTENER build flag is set.
     Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
     Server::forceRegisterConnectionHandlerFactoryImpl();
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
