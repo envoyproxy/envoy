@@ -79,9 +79,6 @@ build:mobile-test-android --define=static_extension_registration=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
-# Needed for running test Envoy servers as HTTP(S) proxies.
-build:mobile-test-ios --define=envoy_mobile_listener=enabled
-build:mobile-test-ios --define=static_extension_registration=enabled
 
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
