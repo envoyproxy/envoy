@@ -15,8 +15,8 @@ namespace Matchers {
 using namespace Filters::Common::RBAC;
 
 bool UriTemplateMatcher::matches(const Network::Connection&,
-                                 const Envoy::Http::RequestHeaderMap& headers,
-                                 const StreamInfo::StreamInfo&) const {
+                                  const Envoy::Http::RequestHeaderMap& headers,
+                                  const StreamInfo::StreamInfo&) const {
   return uri_template_matcher_.match(headers.getPathValue());
 }
 
