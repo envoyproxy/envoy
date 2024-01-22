@@ -73,6 +73,23 @@ TestServer::TestServer()
 
 void TestServer::startTestServer(TestServerType test_server_type) {
   ASSERT(!upstream_);
+
+  if (test_server_type == TestServerType::HTTP_PROXY ||
+      test_server_type == TestServerType::HTTPS_PROXY) {
+    // Register the listeners required to run Envoy servers (as a proxy).
+    Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
+    Server::forceRegisterConnectionHandlerFactoryImpl();
+    Server::forceRegisterDefaultListenerManagerFactoryImpl();
+    Server::FilterChain::forceRegisterFilterChainNameActionFactory();
+    Network::forceRegisterUdpDefaultWriterFactoryFactory();
+    Server::forceRegisterConnectionHandlerFactoryImpl();
+    Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+    Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
+    Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+    Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
+    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+  }
+
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock, false, false);
