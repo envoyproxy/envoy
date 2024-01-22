@@ -30,11 +30,6 @@ void* retrieveApi(std::string name, bool allow_absent) {
   return api;
 }
 
-void* retrieveApiSafe(std::string name) {
-  void* api = registry_[name];
-  return api;
-}
-
 } // namespace External
 } // namespace Api
 } // namespace Envoy

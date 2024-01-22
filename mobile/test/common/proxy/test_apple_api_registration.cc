@@ -12,7 +12,7 @@
 void register_test_apple_proxy_resolver(absl::string_view host, int port) {
   // Fetch the existing registered envoy_proxy_resolver API.
   const envoy_proxy_resolver* proxy_resolver = static_cast<envoy_proxy_resolver*>(
-      Envoy::Api::External::retrieveApiSafe("envoy_proxy_resolver"));
+      Envoy::Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
   // Create a new test AppleProxyResolver.
   auto test_resolver = std::make_unique<Envoy::Network::AppleProxyResolver>();
   // Create a TestAppleSystemProxySettingsMonitor and set the test resolver to use the

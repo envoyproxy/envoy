@@ -99,7 +99,7 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
   // TODO(Augustyniak): Update Android proxy resolution to use API extension registry. As of now,
   // it's only iOS that uses that code path.
   const auto proxy_resolver =
-      static_cast<envoy_proxy_resolver*>(Api::External::retrieveApiSafe("envoy_proxy_resolver"));
+      static_cast<envoy_proxy_resolver*>(Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
   if (proxy_resolver != nullptr) {
     return resolveProxy(request_headers, proxy_resolver);
   }
