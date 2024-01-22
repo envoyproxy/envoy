@@ -891,7 +891,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     return stream_info.upstreamInfo()->upstreamConnectionId().value_or(0);
                   });
-            }}},            
+            }}},
           {"UPSTREAM_CLUSTER",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
