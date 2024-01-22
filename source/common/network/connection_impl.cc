@@ -85,13 +85,9 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       transport_wants_read_(false) {
 
-#if defined(__linux__) || defined(__APPLE__)
   // Keep it as a bool flag to reduce the times calling runtime method..
   enable_rst_detect_send_ = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.detect_and_raise_rst_tcp_connection");
-#else
-  enable_rst_detect_send_ = false;
-#endif
 
   if (!connected) {
     connecting_ = true;
@@ -296,12 +292,14 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   if (enable_rst_detect_send_ && (detected_close_type_ == DetectedCloseType::RemoteReset ||
                                   detected_close_type_ == DetectedCloseType::LocalReset)) {
-    const bool ok = Network::Socket::applyOptions(
-        Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
-        envoy::config::core::v3::SocketOption::STATE_LISTENING);
-    if (!ok) {
-      ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on connection {}", id());
-    }
+    #if ENVOY_PLATFORM_ENABLE_SEND_RST
+      const bool ok = Network::Socket::applyOptions(
+          Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
+          envoy::config::core::v3::SocketOption::STATE_LISTENING);
+      if (!ok) {
+        ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on connection {}", id());
+      }
+    #endif
   }
 
   // It is safe to call close() since there is an IO handle check.
