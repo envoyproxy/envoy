@@ -8,8 +8,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/extensions/filters/common/rbac/glob/glob.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
+#include "source/extensions/filters/common/rbac/uri_template/uri_template.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -539,9 +539,9 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
 }
 
-TEST(GlobMatcherFactory, glob) {
+TEST(UriTemplateMatcherFactory, UriTemplateMatcherFactory) {
   const std::string yaml_string = R"EOF(
-      name: envoy.rbac.matchers.glob_matcher
+      name: envoy.rbac.uri_template.uri_template_matcher
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
@@ -554,7 +554,7 @@ TEST(GlobMatcherFactory, glob) {
       &Envoy::Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.rbac.matchers.glob_matcher");
+  EXPECT_EQ(factory->name(), "envoy.rbac.uri_template.uri_template_matcher");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);

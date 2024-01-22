@@ -1,4 +1,4 @@
-#include "glob.h"
+#include "uri_template.h"
 
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -14,13 +14,13 @@ namespace Matchers {
 
 using namespace Filters::Common::RBAC;
 
-bool GlobTemplateMatcher::matches(const Network::Connection&,
-                                  const Envoy::Http::RequestHeaderMap& headers,
-                                  const StreamInfo::StreamInfo&) const {
-  return glob_matcher_.match(headers.getPathValue());
+bool UriTemplateMatcher::matches(const Network::Connection&,
+                                 const Envoy::Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo&) const {
+  return uri_template_matcher_.match(headers.getPathValue());
 }
 
-REGISTER_FACTORY(GlobTemplateMatcherFactory, MatcherExtensionFactory);
+REGISTER_FACTORY(UriTemplateMatcherFactory, MatcherExtensionFactory);
 
 } // namespace Matchers
 } // namespace RBAC

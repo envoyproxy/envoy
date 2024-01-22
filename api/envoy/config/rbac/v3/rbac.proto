@@ -271,9 +271,9 @@ message Permission {
     // [#extension-category: envoy.rbac.matchers]
     core.v3.TypedExtensionConfig matcher = 12;
 
-    // Glob URL path matching.
-    // [#extension-category: envoy.rbac.matchers]
-    core.v3.TypedExtensionConfig glob_path = 13;
+    // URI template path matching.
+    // [#extension-category: envoy.rbac.uri_template]
+    core.v3.TypedExtensionConfig uri_template = 13;
   }
 }
 

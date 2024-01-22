@@ -1372,9 +1372,9 @@ envoy.rbac.matchers.upstream_ip_port:
   status: alpha
   type_urls:
   - envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
-envoy.rbac.matchers.glob_matcher:
+envoy.rbac.uri_template.uri_template_matcher:
   categories:
-  - envoy.rbac.matchers
+  - envoy.rbac.uri_template
   security_posture: unknown
   status: alpha
   type_urls:

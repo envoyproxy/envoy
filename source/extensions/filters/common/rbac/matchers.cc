@@ -38,10 +38,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
     return std::make_shared<const PathMatcher>(permission.url_path());
-  case envoy::config::rbac::v3::Permission::RuleCase::kGlobPath: {
+  case envoy::config::rbac::v3::Permission::RuleCase::kUriTemplate: {
     auto& factory =
-        Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.glob_path());
-    return factory.create(permission.glob_path(), validation_visitor);
+        Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.uri_template());
+    return factory.create(permission.uri_template(), validation_visitor);
   }
   case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
     auto& factory =

@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
-        "//source/extensions/filters/common/rbac/glob:glob_lib",
+        "//source/extensions/filters/common/rbac/uri_template:uri_template_lib",
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/match/uri_template:uri_template_match_lib",
         "//test/mocks/network:network_mocks",

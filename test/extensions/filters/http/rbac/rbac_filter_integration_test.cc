@@ -109,8 +109,8 @@ typed_config:
     policies:
       foo:
         permissions:
-          - glob_path:
-              name: envoy.rbac.matchers.glob_matcher
+          - uri_template:
+              name: envoy.rbac.uri_template.uri_template_matcher
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
                 path_template: "/test/deny/path"
