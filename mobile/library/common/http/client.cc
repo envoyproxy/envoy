@@ -248,6 +248,7 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
 }
 
 void Client::DirectStreamCallbacks::closeStream(bool end_stream) {
+  ENVOY_LOG(debug, "[S{}] close stream end stream {}\n", direct_stream_.stream_handle_, end_stream);
   remote_end_stream_received_ |= end_stream;
   if (end_stream) {
     // Latch stream intel on stream completion, as the stream info will go away.
@@ -260,6 +261,7 @@ void Client::DirectStreamCallbacks::closeStream(bool end_stream) {
   auto stream = client.getStream(direct_stream_.stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS);
   ASSERT(stream != nullptr);
   if (stream) {
+    ENVOY_LOG(debug, "[S{}] erased stream\n", direct_stream_.stream_handle_);
     client.closed_streams_.emplace(direct_stream_.stream_handle_, std::move(stream));
     size_t erased = client.streams_.erase(direct_stream_.stream_handle_);
     ASSERT(erased == 1, "closeStream should always remove one entry from the streams map");
@@ -303,7 +305,8 @@ void Client::DirectStreamCallbacks::onError() {
   if (explicit_flow_control_ && response_headers_forwarded_ && bytes_to_send_ == 0) {
     ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
-    if (!remote_end_stream_received_) {
+    if (direct_stream_.parent_.getStream(direct_stream_.stream_handle_,
+                                         ALLOW_ONLY_FOR_OPEN_STREAMS)) {
       closeStream(false);
     }
     return;
@@ -409,8 +412,11 @@ void Client::DirectStream::saveLatestStreamIntel() {
 }
 
 void Client::DirectStream::saveFinalStreamIntel() {
+  if (!parent_.getStream(stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS)) {
+    return;
+  }
   OptRef<RequestDecoder> request_decoder = requestDecoder();
-  if (!request_decoder || !parent_.getStream(stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS)) {
+  if (!request_decoder) {
     return;
   }
   StreamInfo::setFinalStreamIntel(request_decoder->streamInfo(), parent_.dispatcher_.timeSource(),
@@ -452,6 +458,21 @@ Client::DirectStream::DirectStream(envoy_stream_t stream_handle, Client& http_cl
     : stream_handle_(stream_handle), parent_(http_client) {}
 
 Client::DirectStream::~DirectStream() { ENVOY_LOG(debug, "[S{}] destroy stream", stream_handle_); }
+
+CodecEventCallbacks*
+Client::DirectStream::registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) {
+  // registerCodecEventCallbacks is called with nullptr when the underlying
+  // Envoy stream is going away. Make sure Envoy Mobile sees the stream as
+  // closed as well.
+  if (codec_callbacks == nullptr &&
+      parent_.getStream(stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS)) {
+    // Generally this only happens if Envoy closes the (virtual) downstream
+    // connection, otherwise Envoy would inform the codec to send a reset.
+    callbacks_->closeStream(false);
+  }
+  std::swap(codec_callbacks, codec_callbacks_);
+  return codec_callbacks;
+}
 
 // Correctly receiving resetStream() for errors in Http::Client relies on at least one filter
 // resetting the stream when handling a pending local response. By default, the LocalReplyFilter
@@ -663,6 +684,7 @@ void Client::cancelStream(envoy_stream_t stream) {
   if (direct_stream) {
     // Attempt to latch the latest stream info. This will be a no-op if the stream
     // is already complete.
+    ENVOY_LOG(debug, "[S{}] application cancelled stream", stream);
     direct_stream->saveFinalStreamIntel();
     bool stream_was_open =
         getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS) != nullptr;
@@ -670,7 +692,6 @@ void Client::cancelStream(envoy_stream_t stream) {
     direct_stream->notifyAdapter(DirectStream::AdapterSignal::Cancel);
     removeStream(direct_stream->stream_handle_);
 
-    ENVOY_LOG(debug, "[S{}] application cancelled stream", stream);
     direct_stream->callbacks_->onCancel();
 
     // Since https://github.com/envoyproxy/envoy/pull/13052, the connection manager expects that

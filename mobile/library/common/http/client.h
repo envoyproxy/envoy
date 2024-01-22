@@ -240,11 +240,7 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-    CodecEventCallbacks*
-    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
-      std::swap(codec_callbacks, codec_callbacks_);
-      return codec_callbacks;
-    }
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
 
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
