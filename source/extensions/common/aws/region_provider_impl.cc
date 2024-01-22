@@ -64,9 +64,22 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
   return it->second;
 }
 
+// Region provider chain. This allows retrieving region information from the following locations (in
+// order):
+// 1. The envoy configuration, in the region parameter
+// 2. The envoy environment, in AWS_REGION then AWS_DEFAULT_REGION
+// 3. In the credentials file $HOME/.aws/credentials (or location from
+//    AWS_SHARED_CREDENTIALS_FILE/AWS_DEFAULT_SHARED_CREDENTIALS_FILE), under profile section
+//    specified by AWS_PROFILE
+// 4. In the config file $HOME/.aws/config (or location from AWS_CONFIG_FILE), under profile section
+// specified by AWS_PROFILE
+//
+// Credentials and profile format can be found here:
+// https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+//
 RegionProviderChain::RegionProviderChain(const RegionProviderChainFactories& factories) {
-  add(factories.createEnvironmentRegionProvider());
   add(factories.createEnvoyConfigRegionProvider());
+  add(factories.createEnvironmentRegionProvider());
   add(factories.createAWSCredentialsFileRegionProvider());
   add(factories.createAWSConfigFileRegionProvider());
 }
