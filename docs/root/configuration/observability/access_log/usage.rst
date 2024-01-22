@@ -679,6 +679,11 @@ UDP
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
+.. _config_access_log_format_upstream_connection_id:
+
+%UPSTREAM_CONNECTION_ID%
+  An identifier for the upstream connection.
+
 .. _config_access_log_format_stream_id:
 
 %STREAM_ID%
