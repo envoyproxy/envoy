@@ -239,8 +239,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     bool use_downstream_protocol, bool use_http2,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(http1_settings, validation_visitor)),
-      http2_options_(validated_http2_options),
-      common_http_protocol_options_(common_options),
+      http2_options_(validated_http2_options), common_http_protocol_options_(common_options),
       upstream_http_protocol_options_(upstream_options),
       use_downstream_protocol_(use_downstream_protocol), use_http2_(use_http2) {
   ASSERT(Http2::Utility::initializeAndValidateOptions(validated_http2_options).status().ok());
