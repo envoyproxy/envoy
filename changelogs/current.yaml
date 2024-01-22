@@ -26,6 +26,6 @@ new_features:
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
 - area: mobile
   change: |
-    Support for proxies on iOS
+    Support for proxies through HTTP CONNECT on iOS.
 
 deprecated:
