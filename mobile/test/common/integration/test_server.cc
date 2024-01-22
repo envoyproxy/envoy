@@ -1,14 +1,8 @@
 #include "test_server.h"
 
+#include "external/envoy_build_config/test_extensions.h"
+
 #include "source/common/common/random_generator.h"
-#include "source/common/listener_manager/listener_manager_impl.h"
-#include "source/common/listener_manager/connection_handler_impl.h"
-#include "source/common/quic/server_codec_impl.h"
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
-#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
-#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
-#include "source/extensions/transport_sockets/raw_buffer/config.h"
-#include "source/extensions/udp_packet_writer/default/config.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
@@ -82,23 +76,6 @@ TestServer::TestServer()
 void TestServer::startTestServer(TestServerType test_server_type) {
   ASSERT(!upstream_);
 
-  if (test_server_type == TestServerType::HTTP_PROXY ||
-      test_server_type == TestServerType::HTTPS_PROXY) {
-    // Register the listeners required to run Envoy servers (as a proxy).
-    // These are all of the extensions registered when the ENVOY_MOBILE_LISTENER build flag is set.
-    Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
-    Server::forceRegisterConnectionHandlerFactoryImpl();
-    Server::forceRegisterDefaultListenerManagerFactoryImpl();
-    Server::FilterChain::forceRegisterFilterChainNameActionFactory();
-    Network::forceRegisterUdpDefaultWriterFactoryFactory();
-    Server::forceRegisterConnectionHandlerFactoryImpl();
-    Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
-    Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
-    Quic::forceRegisterQuicServerTransportSocketConfigFactory();
-    Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
-    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
-  }
-
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock, false, false);
@@ -120,6 +97,8 @@ void TestServer::startTestServer(TestServerType test_server_type) {
     factory = Network::Test::createRawBufferDownstreamSocketFactory();
     break;
   case TestServerType::HTTP_PROXY: {
+    // When running Envoy as a proxy, we need the listener modules, so force register them.
+    register_test_extensions_for_server();
     std::string config_path =
         TestEnvironment::writeStringToFileForTest("config.yaml", http_proxy_config);
     test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,
@@ -129,6 +108,8 @@ void TestServer::startTestServer(TestServerType test_server_type) {
     return;
   }
   case TestServerType::HTTPS_PROXY: {
+    // When running Envoy as a proxy, we need the listener modules, so force register them.
+    register_test_extensions_for_server();
     std::string config_path =
         TestEnvironment::writeStringToFileForTest("config.yaml", https_proxy_config);
     test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,

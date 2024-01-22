@@ -114,7 +114,11 @@ envoy_cc_library(
     # the time, while for iOS we have to force register the extensions, so test files must pull in
     # the TestExtensions module and call register_test_extensions().
     deps = [
+        "@envoy//source/common/listener_manager:connection_handler_lib",
+        "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/extensions/clusters/static:static_cluster_lib",
+        "@envoy//source/extensions/transport_sockets/raw_buffer:config",
+        "@envoy//source/extensions/udp_packet_writer/default:config",
         "@envoy//source/extensions/filters/http/buffer:config",
         "@envoy//source/extensions/load_balancing_policies/round_robin:config",
         "@envoy_mobile//test/common/http/filters/assertion:config",

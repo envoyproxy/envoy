@@ -1,6 +1,14 @@
+#include "source/common/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/filters/http/buffer/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
+#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/udp_packet_writer/default/config.h"
 
 #include "test/common/http/filters/assertion/config.h"
 #include "test/common/http/filters/route_cache_reset/config.h"
@@ -57,4 +65,18 @@ void register_test_extensions() {
     Envoy::loadFileDescriptors(descriptor);
   }
 #endif
+}
+
+void register_test_extensions_for_server() {
+  Envoy::Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
+  Envoy::Server::forceRegisterConnectionHandlerFactoryImpl();
+  Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
+  Envoy::Server::FilterChain::forceRegisterFilterChainNameActionFactory();
+  Envoy::Network::forceRegisterUdpDefaultWriterFactoryFactory();
+  Envoy::Server::forceRegisterConnectionHandlerFactoryImpl();
+  Envoy::Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
+  Envoy::Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
+  Envoy::Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+  Envoy::Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
+  Envoy::Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 }

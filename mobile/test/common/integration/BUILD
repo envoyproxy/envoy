@@ -172,16 +172,13 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        "@envoy//source/common/listener_manager:connection_handler_lib",
-        "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
-        "@envoy//source/extensions/transport_sockets/raw_buffer:config",
-        "@envoy//source/extensions/udp_packet_writer/default:config",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
+        "@envoy_build_config//:test_extensions_no_autoregister",
     ] + envoy_select_signal_trace(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",
