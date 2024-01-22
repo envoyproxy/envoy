@@ -1,7 +1,5 @@
 #include "test_server.h"
 
-#include "external/envoy_build_config/test_extensions.h"
-
 #include "source/common/common/random_generator.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -12,6 +10,8 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+
+#include "external/envoy_build_config/test_extensions.h"
 
 namespace Envoy {
 
