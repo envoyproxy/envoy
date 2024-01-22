@@ -54,7 +54,8 @@ public:
    * Creates a shared instance of a matcher based off the rules defined in the Principal config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Principal& principal);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Principal& principal,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -76,7 +77,8 @@ class AndMatcher : public Matcher {
 public:
   AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules,
              ProtobufMessage::ValidationVisitor& validation_visitor);
-  AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids);
+  AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids,
+             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -94,10 +96,13 @@ public:
   OrMatcher(const envoy::config::rbac::v3::Permission::Set& set,
             ProtobufMessage::ValidationVisitor& validation_visitor)
       : OrMatcher(set.rules(), validation_visitor) {}
-  OrMatcher(const envoy::config::rbac::v3::Principal::Set& set) : OrMatcher(set.ids()) {}
+  OrMatcher(const envoy::config::rbac::v3::Principal::Set& set,
+            ProtobufMessage::ValidationVisitor& validation_visitor)
+      : OrMatcher(set.ids(), validation_visitor) {}
   OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
             ProtobufMessage::ValidationVisitor& validation_visitor);
-  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids);
+  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids,
+            ProtobufMessage::ValidationVisitor& validation_visitor);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -111,8 +116,9 @@ public:
   NotMatcher(const envoy::config::rbac::v3::Permission& permission,
              ProtobufMessage::ValidationVisitor& validation_visitor)
       : matcher_(Matcher::create(permission, validation_visitor)) {}
-  NotMatcher(const envoy::config::rbac::v3::Principal& principal)
-      : matcher_(Matcher::create(principal)) {}
+  NotMatcher(const envoy::config::rbac::v3::Principal& principal,
+             ProtobufMessage::ValidationVisitor& validation_visitor)
+      : matcher_(Matcher::create(principal, validation_visitor)) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -211,8 +217,8 @@ class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor)
-      : permissions_(policy.permissions(), validation_visitor), principals_(policy.principals()),
-        condition_(policy.condition()) {
+      : permissions_(policy.permissions(), validation_visitor),
+        principals_(policy.principals(), validation_visitor), condition_(policy.condition()) {
     if (policy.has_condition()) {
       expr_ = Expr::createExpression(*builder, condition_);
     }
