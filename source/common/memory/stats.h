@@ -104,7 +104,7 @@ private:
 
   /**
    * Configures tcmalloc release rate from the page heap. If `bytes_to_release_`
-   * has been initialized to `0`, no heap memory will be release in background.
+   * has been initialized to `0`, no heap memory will be released in background.
    */
   void configureBackgroundMemoryRelease(Api::Api& api) {
     RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc have already been initialised");
