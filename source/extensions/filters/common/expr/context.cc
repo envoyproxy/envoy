@@ -73,13 +73,6 @@ absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
 
 } // namespace
 
-CelValue ResponseFlagsWrapper::operator[](int index) const {
-  ASSERT(index >= 0 && index < size());
-  return CelValue::CreateUint64(info_.responseFlags().at(index));
-}
-
-int ResponseFlagsWrapper::size() const { return info_.responseFlags().size(); }
-
 absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
@@ -171,7 +164,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Trailers) {
     return CelValue::CreateMap(&trailers_);
   } else if (value == Flags) {
-    return CelValue::CreateList(&flags_wrapper_);
+    return CelValue::CreateUint64(info_.legacyResponseFlags());
   } else if (value == GrpcStatus) {
     auto const& optional_status = Grpc::Common::getGrpcStatus(
         trailers_.value_ ? *trailers_.value_ : *Http::StaticEmptyHeaders::get().response_trailers,

@@ -44,14 +44,14 @@ public:
   };
 
   using ResponseFlagsVec = std::vector<FlagStrings>;
-  using ResponseFlagsMap = absl::flat_hash_map<std::string, uint16_t>;
+  using ResponseFlagsMap = absl::flat_hash_map<std::string, std::pair<uint16_t, std::string>>;
   static const ResponseFlagsVec& responseFlagsVec();
   static const ResponseFlagsMap& responseFlagsMap();
 
   using FlagStringsAndEnum = std::pair<const FlagStrings, ResponseFlag>;
 
   // When adding a new flag, it's required to update the access log docs and the string
-  // mapping below - ``ALL_RESPONSE_STRINGS_FLAGS``.
+  // mapping below - ``CORE_RESPONSE_FLAGS``.
   constexpr static absl::string_view NONE = "-";
   constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION = "DC";
   constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK = "LH";
@@ -117,7 +117,7 @@ public:
   constexpr static absl::string_view DNS_FAIL_LONG = "DnsResolutionFailed";
   constexpr static absl::string_view DROP_OVERLOAD_LONG = "DropOverload";
 
-  static constexpr std::array ALL_RESPONSE_STRINGS_FLAGS{
+  static constexpr std::array CORE_RESPONSE_FLAGS{
       FlagStringsAndEnum{{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_LONG},
                          ResponseFlag::FailedLocalHealthCheck},
       FlagStringsAndEnum{{NO_HEALTHY_UPSTREAM, NO_HEALTHY_UPSTREAM_LONG},
@@ -171,7 +171,6 @@ public:
 private:
   friend class CustomResponseFlag;
 
-  ResponseFlagUtils();
   static const std::string toString(const StreamInfo& stream_info, bool use_long_name);
 
   /**
@@ -184,8 +183,7 @@ private:
    */
   static uint16_t registerCustomFlag(absl::string_view flag, absl::string_view flag_long);
 
-  using CustomResponseFlagsMap = absl::flat_hash_map<std::string, std::pair<uint16_t, std::string>>;
-  static CustomResponseFlagsMap& customResponseFlags();
+  static ResponseFlagsMap& mutableResponseFlagsMap();
 };
 
 class TimingUtility {

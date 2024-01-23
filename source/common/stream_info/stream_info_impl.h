@@ -245,6 +245,16 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::Span<const uint16_t> responseFlags() const override { return response_flags_; }
 
+  uint64_t legacyResponseFlags() const override {
+    uint64_t legacy_flags = 0;
+    for (uint16_t flag : response_flags_) {
+      if (flag <= static_cast<uint16_t>(ResponseFlag::LastFlag)) {
+        legacy_flags |= (1UL << flag);
+      }
+    }
+    return legacy_flags;
+  }
+
   const std::string& getRouteName() const override {
     return route_ != nullptr ? route_->routeName() : EMPTY_STRING;
   }

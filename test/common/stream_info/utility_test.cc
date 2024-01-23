@@ -23,7 +23,7 @@ namespace {
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     NiceMock<MockStreamInfo> stream_info;
     ON_CALL(stream_info, hasResponseFlag(flag_enum)).WillByDefault(Return(true));
     EXPECT_EQ(flag_strings.short_string_, ResponseFlagUtils::toShortString(stream_info));
@@ -55,7 +55,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 
-  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     absl::optional<ResponseFlag> response_flag =
         ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
     EXPECT_TRUE(response_flag.has_value());

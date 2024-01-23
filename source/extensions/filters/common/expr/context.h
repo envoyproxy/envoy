@@ -168,27 +168,16 @@ protected:
   ProtobufWkt::Arena& arena_;
 };
 
-class ResponseFlagsWrapper : public google::api::expr::runtime::CelList {
-public:
-  ResponseFlagsWrapper(const StreamInfo::StreamInfo& info) : info_(info) {}
-  CelValue operator[](int index) const override;
-  int size() const override;
-
-private:
-  const StreamInfo::StreamInfo& info_;
-};
-
 class RequestWrapper : public BaseWrapper {
 public:
   RequestWrapper(Protobuf::Arena& arena, const ::Envoy::Http::RequestHeaderMap* headers,
                  const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), headers_(arena, headers), info_(info), flags_wrapper_(info_) {}
+      : BaseWrapper(arena), headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const HeadersWrapper<::Envoy::Http::RequestHeaderMap> headers_;
   const StreamInfo::StreamInfo& info_;
-  ResponseFlagsWrapper flags_wrapper_;
 };
 
 class ResponseWrapper : public BaseWrapper {
@@ -196,15 +185,13 @@ public:
   ResponseWrapper(Protobuf::Arena& arena, const ::Envoy::Http::ResponseHeaderMap* headers,
                   const ::Envoy::Http::ResponseTrailerMap* trailers,
                   const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info),
-        flags_wrapper_(info) {}
+      : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const HeadersWrapper<::Envoy::Http::ResponseHeaderMap> headers_;
   const HeadersWrapper<::Envoy::Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
-  ResponseFlagsWrapper flags_wrapper_;
 };
 
 class ConnectionWrapper : public BaseWrapper {

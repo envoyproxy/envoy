@@ -759,9 +759,15 @@ public:
   virtual bool hasAnyResponseFlag() const PURE;
 
   /**
-   * @return response flags encoded as an integer.
+   * @return all response flags that are set.
    */
   virtual absl::Span<const uint16_t> responseFlags() const PURE;
+
+  /**
+   * @return response flags encoded as an integer. Every bit of the integer is used to represent a
+   * flag. Only flags that are declared in the enum ResponseFlag type are supported.
+   */
+  virtual uint64_t legacyResponseFlags() const PURE;
 
   /**
    * @return whether the request is a health check request or not.

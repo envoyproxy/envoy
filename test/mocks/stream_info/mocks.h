@@ -107,6 +107,7 @@ public:
   MOCK_METHOD(bool, hasResponseFlag, (uint16_t), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));
   MOCK_METHOD(absl::Span<const uint16_t>, responseFlags, (), (const));
+  MOCK_METHOD(uint64_t, legacyResponseFlags, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));

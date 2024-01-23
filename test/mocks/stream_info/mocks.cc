@@ -150,6 +150,16 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, responseFlags()).WillByDefault(Invoke([this]() -> absl::Span<const uint16_t> {
     return response_flags_;
   }));
+  ON_CALL(*this, legacyResponseFlags()).WillByDefault(Invoke([this]() -> uint64_t {
+    uint64_t legacy_flags = 0;
+    for (uint16_t flag : response_flags_) {
+      if (flag <= static_cast<uint16_t>(ResponseFlag::LastFlag)) {
+        legacy_flags |= (1UL << flag);
+      }
+    }
+    return legacy_flags;
+  }));
+
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
