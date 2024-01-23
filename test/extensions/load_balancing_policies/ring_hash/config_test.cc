@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
 
 #include "source/extensions/load_balancing_policies/ring_hash/config.h"
 
@@ -69,6 +70,20 @@ TEST(RingHashConfigTest, Validate) {
         factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
                        context.api_.random_, context.time_system_),
         EnvoyException, "ring hash: minimum_ring_size (4) > maximum_ring_size (2)");
+  }
+
+  {
+    envoy::config::core::v3::TypedExtensionConfig config;
+    config.set_name("envoy.load_balancing_policies.ring_hash");
+    envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config_msg;
+    config_msg.mutable_minimum_ring_size()->set_value(0);
+
+    config.mutable_typed_config()->PackFrom(config_msg);
+
+    std::string err;
+    EXPECT_EQ(Validate(config_msg, &err), false);
+    EXPECT_EQ(err, "RingHashValidationError.MinimumRingSize: value must be "
+                   "inside range [1, 8388608]");
   }
 }
 

@@ -173,6 +173,9 @@ bug_fixes:
     setting. The OAuth spec does not dictate that an authorization server must respond with an expiry. Envoy currently
     fails any OAuth flow if the expiry is not set. This setting allows you to provide a default in this case to ensure
     the OAuth flow can succeed.
+- area: postgres proxy
+  change: |
+    Fix a race condition that may result from upstream servers refusing to switch to TLS.
 
 removed_config_or_runtime:
 - area: http
