@@ -186,7 +186,7 @@ void ActiveStream::sendLocalReply(Status status, absl::string_view data,
   // status message will be used as response code details.
   stream_info_.setResponseCodeDetails(status.message());
   // Set the response code to the stream info.
-  stream_info_.setResponseCode(response_stream_->status().code());
+  stream_info_.setResponseCode(static_cast<uint32_t>(response_stream_->status().code()));
 
   sendResponseStartToDownstream();
 }
