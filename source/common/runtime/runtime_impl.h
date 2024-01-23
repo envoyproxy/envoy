@@ -148,10 +148,10 @@ using AdminLayerPtr = std::unique_ptr<AdminLayer>;
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api);
+  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api, absl::Status& creation_status);
 
 private:
-  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
+  absl::Status walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
                      Api::Api& api);
 
   const std::string path_;

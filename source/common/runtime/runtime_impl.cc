@@ -415,30 +415,30 @@ void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>
 #endif
 }
 
-DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& api)
+DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& api, absl::Status& creation_status)
     : OverrideLayerImpl{name} {
-  walkDirectory(path, "", 1, api);
+  creation_status = walkDirectory(path, "", 1, api);
 }
 
-void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
+absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
                               Api::Api& api) {
   // Maximum recursion depth for walkDirectory().
   static constexpr uint32_t MaxWalkDepth = 16;
 
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
+    return absl::InvalidArgumentError(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid path: ", path));
+     return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
 
   Filesystem::Directory directory(path);
   Filesystem::DirectoryIteratorImpl it = directory.begin();
-  THROW_IF_NOT_OK_REF(it.status());
+  RETURN_IF_STATUS_NOT_OK(it);
   for (; it != directory.end(); ++it) {
-    THROW_IF_NOT_OK_REF(it.status());
+    RETURN_IF_STATUS_NOT_OK(it);
     Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
@@ -450,7 +450,8 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
     if (entry.type_ == Filesystem::FileType::Directory && entry.name_ != "." &&
         entry.name_ != "..") {
-      walkDirectory(full_path, full_prefix, depth + 1, api);
+      absl::Status status = walkDirectory(full_path, full_prefix, depth + 1, api);
+      RETURN_IF_NOT_OK(status);
     } else if (entry.type_ == Filesystem::FileType::Regular) {
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
@@ -461,7 +462,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       auto file_or_error = api.fileSystem().fileReadToEnd(full_path);
-      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      RETURN_IF_STATUS_NOT_OK(file_or_error);
       const std::string text_file{file_or_error.value()};
 
       const auto lines = StringUtil::splitToken(text_file, "\n");
@@ -488,7 +489,8 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 #endif
     }
   }
-  THROW_IF_NOT_OK_REF(it.status());
+  RETURN_IF_STATUS_NOT_OK(it);
+  return absl::OkStatus();
 }
 
 ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
@@ -752,18 +754,28 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
         absl::StrAppend(&path, "/", service_cluster_);
       }
       if (api_.fileSystem().directoryExists(path)) {
+        std::unique_ptr<DiskLayer> disk_layer;
+        std::string error;
         TRY_ASSERT_MAIN_THREAD {
-          layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
-          ++disk_layers;
+        absl::Status creation_status;
+        std::make_unique<DiskLayer>(layer.name(), path, creation_status);
+        if (!creation_status.ok()) {
+          disk_layer.release();
+        } else {
+          error = creation_status.message();
         }
         END_TRY
-        CATCH(EnvoyException & e, {
+        } CATCH(EnvoyException & e, { error = e.what()});
+        if (disk_layer) {
+          layers.emplace_back(std::move(disk_layer));
+          ++disk_layers;
+        } else {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());
-        });
+        }
       }
       break;
     }
