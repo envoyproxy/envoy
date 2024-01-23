@@ -1,0 +1,10 @@
+--- source/extensions/filters/http/local_ratelimit/local_ratelimit.h	2023-11-10 06:32:14.000000000 -0800
++++ source/extensions/filters/http/local_ratelimit/local_ratelimit.h	2024-01-23 13:11:48.000000000 -0800
+@@ -17,6 +17,7 @@
+ #include "third_party/envoy/src/source/common/http/header_map_impl.h"
+ #include "third_party/envoy/src/source/common/router/header_parser.h"
+ #include "third_party/envoy/src/source/common/runtime/runtime_protos.h"
++#include "third_party/envoy/src/source/common/singleton/const_singleton.h"
+ #include "third_party/envoy/src/source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+ #include "third_party/envoy/src/source/extensions/filters/common/ratelimit/ratelimit.h"
+ #include "third_party/envoy/src/source/extensions/filters/http/common/pass_through_filter.h"
