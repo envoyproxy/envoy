@@ -88,8 +88,7 @@ struct NullPathMatchCriterion : public Router::PathMatchCriterion {
 
 struct RouteEntryImpl : public Router::RouteEntry {
   RouteEntryImpl(
-      const std::string& cluster_name,
-      const absl::optional<std::chrono::milliseconds>& timeout,
+      const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
           hash_policy,
       const Router::RetryPolicy* retry_policy)

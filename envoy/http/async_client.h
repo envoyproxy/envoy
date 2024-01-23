@@ -280,8 +280,7 @@ public:
     // The retry policy can be set as either a proto or Router::RetryPolicy but
     // not both. If both formats of the options are set, the more recent call
     // will overwrite the older one.
-    StreamOptions& setRetryPolicy(
-        const envoy::config::route::v3::RetryPolicy& p) {
+    StreamOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       retry_policy = p;
       parsed_retry_policy = nullptr;
       return *this;

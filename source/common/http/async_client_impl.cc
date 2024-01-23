@@ -4,8 +4,8 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-
 #include "envoy/router/router.h"
+
 #include "source/common/grpc/common.h"
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
@@ -76,6 +76,19 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
   return active_streams_.front().get();
 }
 
+std::unique_ptr<const Router::RetryPolicy>
+createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& options) {
+  if (options.retry_policy.has_value()) {
+    Upstream::RetryExtensionFactoryContextImpl factory_context(parent.singleton_manager_);
+    return std::make_unique<Router::RetryPolicyImpl>(
+        options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), factory_context);
+  }
+  if (options.parsed_retry_policy == nullptr) {
+    return std::make_unique<Router::RetryPolicyImpl>();
+  }
+  return nullptr;
+}
+
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
@@ -83,24 +96,12 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
+      retry_policy_(createRetryPolicy(parent, options)),
+      route_(std::make_shared<NullRouteImpl>(
+          parent_.cluster_->name(), options.timeout, options.hash_policy,
+          retry_policy_ != nullptr ? retry_policy_.get() : options.parsed_retry_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
-  const Router::RetryPolicy* retry_policy = options.parsed_retry_policy;
-  if (options.retry_policy.has_value()) {
-    Upstream::RetryExtensionFactoryContextImpl factory_context(
-        parent_.singleton_manager_);
-    retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
-        options.retry_policy.value(),
-        ProtobufMessage::getNullValidationVisitor(), factory_context);
-    retry_policy = retry_policy_.get();
-  }
-  if (retry_policy == nullptr) {
-    retry_policy_ = std::make_unique<Router::RetryPolicyImpl>();
-    retry_policy = retry_policy_.get();
-  }
-  route_ = std::make_shared<NullRouteImpl>(
-      parent_.cluster_->name(), options.timeout,
-      options.hash_policy, retry_policy);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
