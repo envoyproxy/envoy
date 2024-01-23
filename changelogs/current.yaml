@@ -21,7 +21,9 @@ removed_config_or_runtime:
 new_features:
 - area: grpc reverse bridge
   change: |
-    Added support for ``%CONNECTION_ID%`` command operator for UDP session access log.
+    Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
+    to preserve HTTP 1.1 responses.  This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
 - area: healthcheck
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
