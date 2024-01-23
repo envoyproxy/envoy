@@ -40,8 +40,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const PathMatcher>(permission.url_path());
   case envoy::config::rbac::v3::Permission::RuleCase::kUriTemplate: {
     auto& factory =
-        Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.uri_template());
-    return factory.create(permission.uri_template(), validation_visitor);
+        Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(permission.uri_template());
+    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        permission.uri_template().typed_config(), validation_visitor, factory);
+    return std::make_shared<const UriTemplateMatcher>(factory.createPathMatcher(*config));
   }
   case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
     auto& factory =
@@ -265,6 +267,15 @@ bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::Request
     return false;
   }
   return path_matcher_.match(headers.getPathValue());
+}
+
+bool UriTemplateMatcher::matches(const Network::Connection&,
+                                 const Envoy::Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo&) const {
+  if (headers.Path() == nullptr) {
+    return false;
+  }
+  return uri_template_matcher_->match(headers.getPathValue());
 }
 
 } // namespace RBAC

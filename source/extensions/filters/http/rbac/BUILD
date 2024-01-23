@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
-        "//source/extensions/filters/common/rbac/uri_template:uri_template_lib",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )

@@ -272,7 +272,7 @@ message Permission {
     core.v3.TypedExtensionConfig matcher = 12;
 
     // URI template path matching.
-    // [#extension-category: envoy.rbac.uri_template]
+    // [#extension-category: envoy.path.match]
     core.v3.TypedExtensionConfig uri_template = 13;
   }
 }

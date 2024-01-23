@@ -9,7 +9,6 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
-#include "source/extensions/filters/common/rbac/uri_template/uri_template.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -541,25 +540,30 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
 
 TEST(UriTemplateMatcherFactory, UriTemplateMatcherFactory) {
   const std::string yaml_string = R"EOF(
-      name: envoy.rbac.uri_template.uri_template_matcher
+      name: envoy.path.match.uri_template.uri_template_matcher
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
 )EOF";
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/bar/lang/country");
 
   envoy::config::core::v3::TypedExtensionConfig config;
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.rbac.uri_template.uri_template_matcher");
+  EXPECT_EQ(factory->name(), "envoy.path.match.uri_template.uri_template_matcher");
+  EXPECT_EQ(factory->category(), "envoy.path.match");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
 
-  EXPECT_NE(nullptr, message);
+  const auto uri_template_matcher = UriTemplateMatcher(factory->createPathMatcher(*message));
+
+  checkMatcher(uri_template_matcher, true, Envoy::Network::MockConnection(), headers);
 }
 
 } // namespace

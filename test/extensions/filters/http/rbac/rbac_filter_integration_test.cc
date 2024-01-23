@@ -100,7 +100,7 @@ typed_config:
           - any: true
 )EOF";
 
-const std::string RBAC_CONFIG_PERMISSION_WITH_PATH_GLOB_MATCH = R"EOF(
+const std::string RBAC_CONFIG_PERMISSION_WITH_URI_PATH_TEMPLATE_MATCH = R"EOF(
 name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
@@ -110,7 +110,7 @@ typed_config:
       foo:
         permissions:
           - uri_template:
-              name: envoy.rbac.uri_template.uri_template_matcher
+              name: envoy.path.match.uri_template.uri_template_matcher
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
                 path_template: "/test/deny/path"
@@ -1059,8 +1059,8 @@ TEST_P(RBACIntegrationTest, PathIgnoreCaseMatcher) {
   }
 }
 
-TEST_P(RBACIntegrationTest, PermissionPathGlobMatch) {
-  config_helper_.prependFilter(RBAC_CONFIG_PERMISSION_WITH_PATH_GLOB_MATCH);
+TEST_P(RBACIntegrationTest, PermissionUriPathTemplateMatch) {
+  config_helper_.prependFilter(RBAC_CONFIG_PERMISSION_WITH_URI_PATH_TEMPLATE_MATCH);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
