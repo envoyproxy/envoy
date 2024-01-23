@@ -620,6 +620,7 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
     }
   });
 
+  EXPECT_CALL(scope, scoped_execution_context());
   Thread::LockGuard lock(mu_);
   while (!work_finished_) {
     cv_.wait(mu_);

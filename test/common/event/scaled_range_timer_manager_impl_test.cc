@@ -320,6 +320,10 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
     EXPECT_CALL(callback, Call).WillOnce([&] { EXPECT_EQ(dispatcher_.scope_, getScope()); });
   }
 
+  if (getScope() != nullptr) {
+    EXPECT_CALL(scope_, scoped_execution_context()).Times(2);
+  }
+
   timer->enableTimer(std::chrono::seconds(2), getScope());
   simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
 
@@ -344,6 +348,10 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ScheduleWithScalingFactorZero) {
   manager.setScaleFactor(UnitFloat(0));
 
   EXPECT_CALL(callback, Call).WillOnce([&] { EXPECT_EQ(dispatcher_.scope_, getScope()); });
+
+  if (getScope() != nullptr) {
+    EXPECT_CALL(scope_, scoped_execution_context());
+  }
 
   timer->enableTimer(std::chrono::seconds(1), getScope());
   simTime().advanceTimeAndRun(std::chrono::milliseconds(1), dispatcher_,
