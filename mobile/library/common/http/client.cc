@@ -425,6 +425,7 @@ void Client::DirectStream::saveFinalStreamIntel() {
 
 void Client::DirectStreamCallbacks::latchError() {
   if (error_.has_value()) {
+    return;  // Only latch error once.
   }
   envoy_error error{};
   error_ = error;
