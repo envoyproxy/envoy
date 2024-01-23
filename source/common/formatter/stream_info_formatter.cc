@@ -891,7 +891,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     uint64_t upstream_connection_id = 0;
                     if (stream_info.upstreamInfo().has_value()) {
-                      upstream_connection_id = stream_info.upstreamInfo()->upstreamConnectionId().value_or(0);
+                      upstream_connection_id =
+                          stream_info.upstreamInfo()->upstreamConnectionId().value_or(0);
                     }
                     return upstream_connection_id;
                   });
