@@ -129,6 +129,17 @@ TEST_F(XffTrustedCidrsRecurseTest, Recurse) {
   EXPECT_EQ("2.2.2.2", result.detected_remote_address->ip()->addressAsString());
 }
 
+TEST_F(XffTrustedCidrsRecurseTest, RecurseAllAddressesTrusted) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{
+      {"x-forwarded-for", "192.0.2.4,192.0.2.5, 198.51.100.1"}};
+
+  auto remote_address = std::make_shared<Network::Address::Ipv4Instance>("192.0.2.11");
+  Envoy::Http::OriginalIPDetectionParams params = {headers, remote_address};
+  auto result = xff_extension_->detect(params);
+  ASSERT_NE(result.detected_remote_address, nullptr);
+  EXPECT_EQ("192.0.2.4", result.detected_remote_address->ip()->addressAsString());
+}
+
 } // namespace Xff
 } // namespace OriginalIPDetection
 } // namespace Http

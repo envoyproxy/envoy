@@ -805,12 +805,14 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
   static constexpr absl::string_view separator(",");
 
   const auto xff_entries = StringUtil::splitToken(xff_string, separator, false, true);
+  Network::Address::InstanceConstSharedPtr last_valid_addr;
 
   for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {
     auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(*it));
     if (addr == nullptr) {
       continue;
     }
+    last_valid_addr = addr;
 
     bool trusted = false;
     for (const auto& cidr : trusted_cidrs) {
@@ -834,7 +836,9 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
     }
     return {addr, true};
   }
-  return {nullptr, false};
+  // If we reach this point all addresses in XFF were considered trusted, so return
+  // first IP in XFF (the last in the reverse-evaluated chain).
+  return {last_valid_addr, true};
 }
 
 Utility::GetLastAddressFromXffInfo
