@@ -40,8 +40,9 @@ protected:
 // ScopedExecutionContext is intened to be used in a simple c++ scope:
 //   {
 //     ExecutionContext context;
-//     // context.activate() called here. context.deactivate() called when scoped_execution_context
-//     destructs. ScopedExecutionContext scoped_execution_context(&context);
+//     // context.activate() called here.
+//     ScopedExecutionContext scoped_execution_context(&context);
+//     // context.deactivate() called when scoped_execution_context destructs.
 //   }
 //
 // Or, you can 'extend' its scope from a function to its caller via return-by-value:
