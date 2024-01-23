@@ -83,9 +83,6 @@ public:
 
   absl::optional<std::string> getRegion() override;
 
-  RegionProviderSharedPtr createEnvoyConfigRegionProvider() const override {
-    return std::make_shared<EnvoyConfigRegionProvider>();
-  }
   RegionProviderSharedPtr createEnvironmentRegionProvider() const override {
     return std::make_shared<EnvironmentRegionProvider>();
   }

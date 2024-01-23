@@ -394,15 +394,12 @@ std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable
   return (value != nullptr) && (value[0] != '\0') ? value : default_value;
 }
 
-// returns true if all elements could be resolved
-// returns false if at least one element could not be resolved
-
-bool Utility::resolveProfileElements(const std::string& credentials_file,
+bool Utility::resolveProfileElements(const std::string& profile_file,
                                      const std::string& profile_name,
                                      absl::flat_hash_map<std::string, std::string>& elements) {
-  std::ifstream file(credentials_file);
+  std::ifstream file(profile_file);
   if (!file.is_open()) {
-    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", credentials_file);
+    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", profile_file);
     return false;
   }
   const auto profile_start = absl::StrFormat("[%s]", profile_name);

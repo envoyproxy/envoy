@@ -74,6 +74,8 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
 
 .. include:: _include/aws_credentials.rst
 
+.. include:: _include/aws_regions.rst
+
 Statistics
 ----------
 

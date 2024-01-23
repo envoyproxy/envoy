@@ -53,8 +53,13 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
 
   auto& server_context = context.serverFactoryContext();
 
-  auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-  auto region = region_provider->getRegion().value();
+  std::string region;
+  region = config.region();
+
+  if (region.empty()) {
+    auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+    region = region_provider->getRegion().value();
+  }
   if (region.empty()) {
 
     throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
@@ -103,10 +108,16 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     const AwsRequestSigningProtoPerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-  auto region = region_provider->getRegion().value();
-  if (region.empty()) {
+  std::string region;
 
+  region = per_route_config.aws_request_signing().region();
+
+  if (region.empty()) {
+    auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+    region = region_provider->getRegion().value();
+  }
+
+  if (region.empty()) {
     throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
                          "profile/config files.");
   }
@@ -115,6 +126,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           context.api(), makeOptRef(context), region,
           Extensions::Common::Aws::Utility::fetchMetadata);
+
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
       per_route_config.aws_request_signing().match_excluded_headers().begin(),
       per_route_config.aws_request_signing().match_excluded_headers().end());

@@ -44,8 +44,20 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
-        auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-        auto region = region_provider->getRegion().value_or("no-region");
+
+        std::string region;
+        region = config.region();
+
+        if (region.empty()) {
+          auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+          region = region_provider->getRegion().value();
+        }
+        if (region.empty()) {
+
+          throw EnvoyException(
+              "Region string cannot be retrieved from configuration, environment or "
+              "profile/config files.");
+        }
 
         // TODO(suniltheta): Due to the reasons explained in
         // https://github.com/envoyproxy/envoy/issues/27586 this aws iam plugin is not able to
@@ -82,12 +94,6 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
   }
 
   return creds;
-}
-
-std::string AwsIamGrpcCredentialsFactory::getRegion(
-    const envoy::config::grpc_credential::v3::AwsIamConfig& ABSL_ATTRIBUTE_UNUSED config) {
-  auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-  return region_provider->getRegion().value_or("no-region");
 }
 
 grpc::Status

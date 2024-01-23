@@ -11,11 +11,6 @@ static const char AWS_REGION[] = "AWS_REGION";
 static const char AWS_DEFAULT_REGION[] = "AWS_DEFAULT_REGION";
 constexpr char REGION[] = "REGION";
 
-absl::optional<std::string> EnvoyConfigRegionProvider::getRegion() {
-  ENVOY_LOG_MISC(debug, "called EnvoyConfigRegionProvider::getRegion");
-  return "envoyconfig";
-}
-
 absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
   ENVOY_LOG_MISC(debug, "called EnvironmentRegionProvider::getRegion");
   std::string region;
@@ -78,7 +73,6 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
 // https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 //
 RegionProviderChain::RegionProviderChain(const RegionProviderChainFactories& factories) {
-  add(factories.createEnvoyConfigRegionProvider());
   add(factories.createEnvironmentRegionProvider());
   add(factories.createAWSCredentialsFileRegionProvider());
   add(factories.createAWSConfigFileRegionProvider());
@@ -88,7 +82,9 @@ absl::optional<std::string> RegionProviderChain::getRegion() {
   ENVOY_LOG_MISC(debug, "called RegionProviderChain::getRegion");
   for (auto& provider : providers_) {
     const auto region = provider->getRegion();
-    return region;
+    if (region.has_value()) {
+      return region;
+    }
   }
   return absl::nullopt;
 }
