@@ -1055,9 +1055,9 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
 
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
-  // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
+  // DATA frame is tracked in onFrameReceived().
   auto status = okStatus();
-  if (type != NGHTTP2_HEADERS && type != NGHTTP2_DATA) {
+  if (type != NGHTTP2_DATA) {
     status = trackInboundFrames(stream_id, length, type, flags, 0);
   }
 
@@ -1494,9 +1494,8 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
-int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
-                               HeaderString&& value) {
-  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
     // We have seen 1 or 2 crashes where we get a headers callback but there is no associated
     // stream data. I honestly am not sure how this can happen. However, from reading the nghttp2
@@ -1694,7 +1693,8 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame);
+        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame->hd.stream_id,
+                                                                              frame->headers.cat);
         return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
@@ -1708,8 +1708,8 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
         name.setCopy(reinterpret_cast<const char*>(raw_name), name_length);
         HeaderString value;
         value.setCopy(reinterpret_cast<const char*>(raw_value), value_length);
-        return static_cast<ConnectionImpl*>(user_data)->onHeader(frame, std::move(name),
-                                                                 std::move(value));
+        return static_cast<ConnectionImpl*>(user_data)->onHeader(frame->hd.stream_id,
+                                                                 std::move(name), std::move(value));
       });
 
   nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
@@ -2028,29 +2028,20 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
   return stream_ref;
 }
 
-Status ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
-  // The client code explicitly does not currently support push promise.
-  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
-  RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
-                     frame->headers.cat == NGHTTP2_HCAT_HEADERS,
-                 "");
-  RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
-                                     frame->hd.flags, frame->headers.padlen));
-  if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
-    StreamImpl* stream = getStream(frame->hd.stream_id);
+Status ClientConnectionImpl::onBeginHeaders(int32_t stream_id, int headers_category) {
+  RELEASE_ASSERT(
+      headers_category == NGHTTP2_HCAT_RESPONSE || headers_category == NGHTTP2_HCAT_HEADERS, "");
+  if (headers_category == NGHTTP2_HCAT_HEADERS) {
+    StreamImpl* stream = getStream(stream_id);
     stream->allocTrailers();
   }
 
   return okStatus();
 }
 
-int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& name,
-                                   HeaderString&& value) {
-  // The client code explicitly does not currently support push promise.
-  ASSERT(frame->hd.type == NGHTTP2_HEADERS);
-  ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
-  return saveHeader(frame, std::move(name), std::move(value));
+  return saveHeader(stream_id, std::move(name), std::move(value));
 }
 
 // TODO(yanavlasov): move to the base class once the runtime flag is removed.
@@ -2120,18 +2111,14 @@ ServerConnectionImpl::ServerConnectionImpl(
   allow_metadata_ = http2_options.allow_metadata();
 }
 
-Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
-  // For a server connection, we should never get push promise frames.
-  ASSERT(frame->hd.type == NGHTTP2_HEADERS);
+Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id, int headers_category) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
-  RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
-                                     frame->hd.flags, frame->headers.padlen));
 
-  if (frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
+  if (headers_category != NGHTTP2_HCAT_REQUEST) {
     stats_.trailers_.inc();
-    ASSERT(frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+    ASSERT(headers_category == NGHTTP2_HCAT_HEADERS);
 
-    StreamImpl* stream = getStream(frame->hd.stream_id);
+    StreamImpl* stream = getStream(stream_id);
     stream->allocTrailers();
     return okStatus();
   }
@@ -2141,20 +2128,16 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
     stream->runHighWatermarkCallbacks();
   }
   stream->setRequestDecoder(callbacks_.newStream(*stream));
-  stream->stream_id_ = frame->hd.stream_id;
+  stream->stream_id_ = stream_id;
   LinkedList::moveIntoList(std::move(stream), active_streams_);
-  adapter_->SetStreamUserData(frame->hd.stream_id, active_streams_.front().get());
+  adapter_->SetStreamUserData(stream_id, active_streams_.front().get());
   protocol_constraints_.incrementOpenedStreamCount();
   return okStatus();
 }
 
-int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& name,
-                                   HeaderString&& value) {
-  // For a server connection, we should never get push promise frames.
-  ASSERT(frame->hd.type == NGHTTP2_HEADERS);
-  ASSERT(frame->headers.cat == NGHTTP2_HCAT_REQUEST || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
-    StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
+    StreamImpl* stream = getStreamUnchecked(stream_id);
     if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
       // Check if there is already the :authority header
       const auto result = stream->headers().get(Http::Headers::get().Host);
@@ -2165,7 +2148,7 @@ int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
       // Otherwise use host value as :authority
     }
   }
-  return saveHeader(frame, std::move(name), std::move(value));
+  return saveHeader(stream_id, std::move(name), std::move(value));
 }
 
 Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint8_t type,

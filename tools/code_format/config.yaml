@@ -127,6 +127,7 @@ paths:
     - source/common/protobuf/visitor.cc
     - source/common/protobuf/utility.cc
     - source/common/protobuf/message_validator_impl.cc
+    - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/access_log/access_log_manager_impl.cc
     - source/common/secret/secret_manager_impl.cc
     - source/common/grpc/async_client_manager_impl.cc
@@ -143,7 +144,6 @@ paths:
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/router/router_ratelimit.cc
-    - source/common/router/vhds.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc

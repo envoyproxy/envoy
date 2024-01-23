@@ -567,7 +567,7 @@ protected:
   // Same as getStream, but without the ASSERT.
   const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
   StreamImpl* getStreamUnchecked(int32_t stream_id);
-  int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
+  int saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value);
 
   /**
    * Copies any frames pending internally by nghttp2 into outbound buffer.
@@ -687,7 +687,7 @@ private:
   friend class Http2CodecImplTestFixture;
 
   virtual ConnectionCallbacks& callbacks() PURE;
-  virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
+  virtual Status onBeginHeaders(int32_t stream_id, int headers_category) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   Status onPing(uint64_t opaque_data, bool is_ack);
@@ -700,7 +700,7 @@ private:
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                   uint32_t error_code);
   int onError(absl::string_view error);
-  virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
+  virtual int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
   // Pass through invoking with the actual stream.
   Status onStreamClose(int32_t stream_id, uint32_t error_code);
@@ -757,8 +757,8 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  Status onBeginHeaders(const nghttp2_frame* frame) override;
-  int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
+  Status onBeginHeaders(int32_t stream_id, int headers_category) override;
+  int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t) override;
   void dumpStreams(std::ostream& os, int indent_level) const override;
@@ -784,8 +784,8 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  Status onBeginHeaders(const nghttp2_frame* frame) override;
-  int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
+  Status onBeginHeaders(int32_t stream_id, int headers_category) override;
+  int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
