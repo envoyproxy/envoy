@@ -889,11 +889,10 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return std::make_unique<StreamInfoUInt64FormatterProvider>(
                   [](const StreamInfo::StreamInfo& stream_info) {
-                    unsigned long result = 0;
                     if (stream_info.upstreamInfo().has_value()) {
-                      result = stream_info.upstreamInfo()->upstreamConnectionId().value_or(0);
+                      return stream_info.upstreamInfo()->upstreamConnectionId().value_or(0);
                     }
-                    return result;
+                    return 0UL;
                   });
             }}},
           {"UPSTREAM_CLUSTER",
