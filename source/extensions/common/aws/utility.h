@@ -175,7 +175,7 @@ public:
    *
    * @return Name of the profile string.
    */
-  static std::string getCredentialsProfileName();
+  static std::string getCredentialProfileName();
 };
 
 } // namespace Aws

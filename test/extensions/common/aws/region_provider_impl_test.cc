@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <memory>
 
 #include "source/extensions/common/aws/region_provider_impl.h"
@@ -21,11 +22,6 @@ public:
   }
 
   EnvironmentRegionProvider provider_;
-};
-
-class EnvoyConfigRegionProviderTest : public testing::Test {
-public:
-  EnvoyConfigRegionProvider provider_;
 };
 
 class AWSCredentialsFileRegionProviderTest : public testing::Test {

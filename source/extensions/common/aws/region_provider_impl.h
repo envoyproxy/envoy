@@ -18,19 +18,6 @@ public:
   absl::optional<std::string> getRegion() override;
 };
 
-/**
- * Return statically configured AWS region name
- */
-class EnvoyConfigRegionProvider : public RegionProvider, public Logger::Loggable<Logger::Id::aws> {
-public:
-  EnvoyConfigRegionProvider() = default;
-
-  absl::optional<std::string> getRegion() override;
-
-private:
-  const std::string region_;
-};
-
 class AWSCredentialsFileRegionProvider : public RegionProvider,
                                          public Logger::Loggable<Logger::Id::aws> {
 public:
@@ -58,7 +45,6 @@ public:
   virtual ~RegionProviderChainFactories() = default;
 
   virtual RegionProviderSharedPtr createEnvironmentRegionProvider() const PURE;
-  virtual RegionProviderSharedPtr createEnvoyConfigRegionProvider() const PURE;
   virtual RegionProviderSharedPtr createAWSCredentialsFileRegionProvider() const PURE;
   virtual RegionProviderSharedPtr createAWSConfigFileRegionProvider() const PURE;
 };
@@ -97,7 +83,6 @@ protected:
   std::list<RegionProviderSharedPtr> providers_;
 };
 
-using EnvoyConfigRegionProviderPtr = std::shared_ptr<EnvoyConfigRegionProvider>;
 using EnvironmentRegionProviderPtr = std::shared_ptr<EnvironmentRegionProvider>;
 using AWSCredentialsFileRegionProviderPtr = std::shared_ptr<AWSCredentialsFileRegionProvider>;
 using AWSConfigFileRegionProviderPtr = std::shared_ptr<AWSConfigFileRegionProvider>;

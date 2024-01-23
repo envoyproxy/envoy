@@ -464,7 +464,7 @@ std::string Utility::getConfigFilePath() {
   return Utility::getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
 }
 
-std::string Utility::getCredentialsProfileName() {
+std::string Utility::getCredentialProfileName() {
   return Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 }
 

@@ -30,10 +30,12 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
   absl::flat_hash_map<std::string, std::string>::iterator it;
   // Search for the region in the credentials file
   ENVOY_LOG_MISC(debug, "config file path = {} profile name = {}", Utility::getCredentialFilePath(),
-                 Utility::getCredentialsProfileName());
+                 Utility::getCredentialProfileName());
 
-  Utility::resolveProfileElements(Utility::getCredentialFilePath(),
-                                  Utility::getCredentialsProfileName(), elements);
+  if (!Utility::resolveProfileElements(Utility::getCredentialFilePath(),
+                                       Utility::getCredentialProfileName(), elements)) {
+    return absl::nullopt;
+  }
   it = elements.find(REGION);
   if (it == elements.end()) {
     return absl::nullopt;
@@ -49,8 +51,11 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
   ENVOY_LOG_MISC(debug, "config file path = {} profile name = {}", Utility::getConfigFilePath(),
                  Utility::getConfigProfileName());
 
-  Utility::resolveProfileElements(Utility::getConfigFilePath(), Utility::getConfigProfileName(),
-                                  elements);
+  if (!Utility::resolveProfileElements(Utility::getConfigFilePath(),
+                                       Utility::getConfigProfileName(), elements)) {
+    return absl::nullopt;
+  }
+
   it = elements.find(REGION);
   if (it == elements.end()) {
     return absl::nullopt;
