@@ -14,6 +14,7 @@ envoy_cc_extension(
     hdrs = ["cel_input.h"],
     extra_visibility = [
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",

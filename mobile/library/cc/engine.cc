@@ -1,13 +1,14 @@
 #include "engine.h"
 
 #include "library/common/data/utility.h"
+#include "library/common/engine.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Platform {
 
-Engine::Engine(envoy_engine_t engine) : engine_(engine), terminated_(false) {}
+Engine::Engine(::Envoy::Engine* engine) : engine_(engine), terminated_(false) {}
 
 Engine::~Engine() {
   if (!terminated_) {
@@ -27,7 +28,7 @@ PulseClientSharedPtr Engine::pulseClient() { return std::make_shared<PulseClient
 
 std::string Engine::dumpStats() {
   envoy_data data;
-  if (dump_stats(engine_, &data) == ENVOY_FAILURE) {
+  if (dump_stats(reinterpret_cast<envoy_engine_t>(engine_), &data) == ENVOY_FAILURE) {
     return "";
   }
   const std::string to_return = Data::Utility::copyToString(data);
@@ -41,7 +42,7 @@ envoy_status_t Engine::terminate() {
     IS_ENVOY_BUG("attempted to double terminate engine");
     return ENVOY_FAILURE;
   }
-  envoy_status_t ret = terminate_engine(engine_, /* release */ false);
+  envoy_status_t ret = engine_->terminate();
   terminated_ = true;
   return ret;
 }

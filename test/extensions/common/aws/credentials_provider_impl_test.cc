@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <filesystem>
 #include <string>
 
 #include "source/extensions/common/aws/credentials_provider_impl.h"
@@ -158,11 +159,28 @@ public:
 
 TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
-
   const auto credentials = provider_.getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
+  TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+  auto temp = TestEnvironment::temporaryDirectory();
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credential_file(temp + "/.aws/credentials");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
+
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
+
+  const auto credentials = provider_.getCredentials();
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, ProfileDoesNotExist) {

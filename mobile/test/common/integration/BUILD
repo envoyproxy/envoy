@@ -19,7 +19,7 @@ envoy_cc_test(
         "sandboxNetwork": "standard",
     },
     repository = "@envoy",
-    shard_count = 4,
+    shard_count = 6,
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
@@ -172,6 +172,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",

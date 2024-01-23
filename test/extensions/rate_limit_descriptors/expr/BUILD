@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.rate_limit_descriptors.expr"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/common/router:router_ratelimit_lib",
