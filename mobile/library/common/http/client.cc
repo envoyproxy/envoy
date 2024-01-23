@@ -427,8 +427,7 @@ void Client::DirectStreamCallbacks::latchError() {
   if (error_.has_value()) {
     return;  // Only latch error once.
   }
-  envoy_error error{};
-  error_ = error;
+  error_ = envoy_error();
 
   OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
   if (!request_decoder) {
