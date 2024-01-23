@@ -221,6 +221,8 @@ protected:
     StreamImpl* base() { return this; }
     void resetStreamWorker(StreamResetReason reason);
     static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
+    virtual Status onBeginHeaders() PURE;
+    virtual void advanceHeadersState() PURE;
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
     virtual void submitHeaders(const HeaderMap& headers, bool end_stream) PURE;
@@ -318,6 +320,11 @@ protected:
         codec_callbacks_->onCodecEncodeComplete();
       }
     }
+    enum HeadersState {
+      HCAT_REQUEST,
+      HCAT_RESPONSE,
+      HCAT_HEADERS,
+    };
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
@@ -452,6 +459,8 @@ protected:
     }
     // StreamImpl
     void submitHeaders(const HeaderMap& headers, bool end_stream) override;
+    Status onBeginHeaders() override;
+    void advanceHeadersState() override;
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
     StreamDecoder& decoder() override { return response_decoder_; }
@@ -492,6 +501,7 @@ protected:
     ResponseDecoder& response_decoder_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
+    HeadersState next_headers_state_ = HCAT_RESPONSE;
   };
 
   using ClientStreamImplPtr = std::unique_ptr<ClientStreamImpl>;
@@ -508,6 +518,8 @@ protected:
     // StreamImpl
     void destroy() override;
     void submitHeaders(const HeaderMap& headers, bool end_stream) override;
+    Status onBeginHeaders() override;
+    void advanceHeadersState() override;
     // Enable deferred reset on downstream connections so outbound HTTP internal error replies are
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
@@ -554,6 +566,7 @@ protected:
 
   private:
     RequestDecoder* request_decoder_{};
+    HeadersState next_headers_state_ = HCAT_REQUEST;
   };
 
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
@@ -687,7 +700,7 @@ private:
   friend class Http2CodecImplTestFixture;
 
   virtual ConnectionCallbacks& callbacks() PURE;
-  virtual Status onBeginHeaders(int32_t stream_id, int headers_category) PURE;
+  virtual Status onBeginHeaders(int32_t stream_id) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   Status onPing(uint64_t opaque_data, bool is_ack);
@@ -757,7 +770,7 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  Status onBeginHeaders(int32_t stream_id, int headers_category) override;
+  Status onBeginHeaders(int32_t stream_id) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t) override;
@@ -784,7 +797,7 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  Status onBeginHeaders(int32_t stream_id, int headers_category) override;
+  Status onBeginHeaders(int32_t stream_id) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t padding_length) override;

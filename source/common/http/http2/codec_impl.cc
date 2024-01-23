@@ -675,11 +675,40 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, b
   ASSERT(stream_id_ > 0);
 }
 
+Status ConnectionImpl::ClientStreamImpl::onBeginHeaders() {
+  if (next_headers_state_ == HCAT_HEADERS) {
+    allocTrailers();
+  }
+
+  return okStatus();
+}
+
+void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
+  RELEASE_ASSERT(next_headers_state_ == HCAT_RESPONSE || next_headers_state_ == HCAT_HEADERS, "");
+  next_headers_state_ = HCAT_HEADERS;
+}
+
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
   parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers),
                                    end_stream ? nullptr
                                               : std::make_unique<StreamDataFrameSource>(*this));
+}
+
+Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
+  if (next_headers_state_ != HCAT_REQUEST) {
+    parent_.stats_.trailers_.inc();
+    ASSERT(next_headers_state_ == HCAT_HEADERS);
+
+    allocTrailers();
+  }
+
+  return okStatus();
+}
+
+void ConnectionImpl::ServerStreamImpl::advanceHeadersState() {
+  RELEASE_ASSERT(next_headers_state_ == HCAT_REQUEST || next_headers_state_ == HCAT_HEADERS, "");
+  next_headers_state_ = HCAT_HEADERS;
 }
 
 void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
@@ -1154,6 +1183,7 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
     ENVOY_BUG(false, "push not supported");
   }
 
+  stream->advanceHeadersState();
   return okStatus();
 }
 
@@ -1693,8 +1723,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame->hd.stream_id,
-                                                                              frame->headers.cat);
+        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame->hd.stream_id);
         return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
@@ -2028,15 +2057,9 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
   return stream_ref;
 }
 
-Status ClientConnectionImpl::onBeginHeaders(int32_t stream_id, int headers_category) {
-  RELEASE_ASSERT(
-      headers_category == NGHTTP2_HCAT_RESPONSE || headers_category == NGHTTP2_HCAT_HEADERS, "");
-  if (headers_category == NGHTTP2_HCAT_HEADERS) {
-    StreamImpl* stream = getStream(stream_id);
-    stream->allocTrailers();
-  }
-
-  return okStatus();
+Status ClientConnectionImpl::onBeginHeaders(int32_t stream_id) {
+  StreamImpl* stream = getStream(stream_id);
+  return stream->onBeginHeaders();
 }
 
 int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
@@ -2111,18 +2134,13 @@ ServerConnectionImpl::ServerConnectionImpl(
   allow_metadata_ = http2_options.allow_metadata();
 }
 
-Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id, int headers_category) {
+Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
-  if (headers_category != NGHTTP2_HCAT_REQUEST) {
-    stats_.trailers_.inc();
-    ASSERT(headers_category == NGHTTP2_HCAT_HEADERS);
-
-    StreamImpl* stream = getStream(stream_id);
-    stream->allocTrailers();
-    return okStatus();
+  StreamImpl* stream_ptr = getStream(stream_id);
+  if (stream_ptr != nullptr) {
+    return stream_ptr->onBeginHeaders();
   }
-
   ServerStreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
@@ -2132,7 +2150,7 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id, int headers_categ
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   adapter_->SetStreamUserData(stream_id, active_streams_.front().get());
   protocol_constraints_.incrementOpenedStreamCount();
-  return okStatus();
+  return stream->onBeginHeaders();
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
