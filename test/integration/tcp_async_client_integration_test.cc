@@ -111,6 +111,7 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
   tcp_client->close();
 }
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test if RST close can be detected from downstream and upstream is closed by RST.
 TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   enableHalfClose(true);
@@ -175,7 +176,6 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
   tcp_client->waitForDisconnect();
 }
 
-#if !defined(WIN32)
 // Test the behaviour when the connection is half closed and then the connection is reset by
 // the client. The behavior is different for windows, since RST support is literally supported for
 // unix like system, disabled the test for windows.
