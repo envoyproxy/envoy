@@ -2150,7 +2150,7 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   adapter_->SetStreamUserData(stream_id, active_streams_.front().get());
   protocol_constraints_.incrementOpenedStreamCount();
-  return stream->onBeginHeaders();
+  return active_streams_.front()->onBeginHeaders();
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
