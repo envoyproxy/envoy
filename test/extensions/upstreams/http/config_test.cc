@@ -252,7 +252,7 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithRuntimeEnabled) {
       ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
-  EXPECT_FALSE(proto_config->http1_protocol_options().allow_chunked_length());
+  EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
@@ -301,7 +301,7 @@ TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig
       ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
-  EXPECT_TRUE(proto_config->http1_protocol_options().allow_chunked_length());
+  EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
@@ -337,7 +337,7 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
       ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
-  EXPECT_TRUE(proto_config->http1_protocol_options().allow_chunked_length());
+  EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
@@ -373,7 +373,7 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
       ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
-  EXPECT_TRUE(proto_config->http1_protocol_options().allow_chunked_length());
+  EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
@@ -409,7 +409,7 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
       ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
-  EXPECT_FALSE(proto_config->http1_protocol_options().allow_chunked_length());
+  EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
