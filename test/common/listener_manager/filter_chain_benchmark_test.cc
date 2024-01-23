@@ -131,6 +131,9 @@ public:
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
   absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
   void dumpState(std::ostream&, int) const override {}
+  ScopedExecutionContext scoped_execution_context() const override {
+    return ScopedExecutionContext();
+  }
 
 private:
   Network::IoHandlePtr io_handle_;
