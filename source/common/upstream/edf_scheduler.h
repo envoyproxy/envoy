@@ -78,6 +78,9 @@ public:
   static EdfScheduler<C> createWithPicks(const std::vector<std::shared_ptr<C>>& entries,
                                          std::function<double(const C&)> calculate_weight,
                                          uint32_t picks) {
+    // Limiting the number of picks, as over 400M picks should be sufficient
+    // for most scenarios.
+    picks = picks % 429496729; // % UINT_MAX/10
     EDF_TRACE("Creating an EDF-scheduler with {} weights and {} pre-picks.", entries.size(), picks);
     // Assume no non-positive weights.
     ASSERT(std::none_of(entries.cbegin(), entries.cend(),
@@ -100,7 +103,7 @@ public:
     // this problem. This was added as a result of the following comment:
     // https://github.com/envoyproxy/envoy/pull/31592#issuecomment-1877663769.
     auto aug_calculate_weight = [&calculate_weight](const C& entry) -> double {
-      return calculate_weight(entry) + 1e-10;
+      return calculate_weight(entry) + 1e-13;
     };
 
     // Let weights {w_1, w_2, ..., w_N} be the per-entry weight where (w_i > 0),
@@ -120,8 +123,8 @@ public:
     std::transform(entries.cbegin(), entries.cend(), std::back_inserter(floor_picks),
                    [picks, weights_sum, &aug_calculate_weight](const std::shared_ptr<C>& entry) {
                      // Getting the lower-bound by casting to an integer.
-                     return static_cast<uint32_t>(aug_calculate_weight(*entry) / weights_sum *
-                                                  picks);
+                     return static_cast<uint32_t>(aug_calculate_weight(*entry) * picks /
+                                                  weights_sum);
                    });
 
     // Pre-compute the priority-queue entries to use an O(N) initialization c'tor.
@@ -134,8 +137,16 @@ public:
       // Add the entry with p'_i picks. As there were p'_i picks, the entry's
       // next deadline is (p'_i + 1) / w_i.
       const double weight = aug_calculate_weight(*entries[i]);
+      // While validating the algorithm there were a few cases where the math
+      // and floating-point arithmetic did not agree (specifically floor(A*B)
+      // was greater than A*B). The following if statement solves the problem by
+      // reducing floor-picks for the entry, which may result in more iterations
+      // in the code after the loop.
+      if ((floor_picks[i] > 0) && (floor_picks[i] / weight >= picks / weights_sum)) {
+        floor_picks[i]--;
+      }
       const double pick_time = floor_picks[i] / weight;
-      const double deadline = pick_time + 1.0 / weight;
+      const double deadline = (floor_picks[i] + 1) / weight;
       EDF_TRACE("Insertion {} in queue with emualted {} picks, deadline {} and weight {}.",
                 static_cast<const void*>(entries[i].get()), floor_picks[i], deadline, weight);
       scheduler_entries.emplace_back(EdfEntry{deadline, i, entries[i]});

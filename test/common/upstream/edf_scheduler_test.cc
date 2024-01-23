@@ -239,7 +239,7 @@ void firstPickTest(const std::vector<double> weights) {
   // To be able to converge to the expected weights, a decent number of iterations
   // should be used. If the number of weights is large, the number of iterations
   // should be larger than 10000.
-  constexpr uint64_t iterations = 1e6;
+  constexpr uint64_t iterations = 4e5;
   // The expected range of the weights is [0,100). If this is no longer the
   // case, this value may need to be updated.
   constexpr double tolerance_pct = 1.0;
@@ -283,6 +283,37 @@ TEST_F(EdfSchedulerTest, SchedulerWithRandomPicksFirstPickDistribution) {
   firstPickTest({50.0, 50.0});
   firstPickTest({1.0, 20.0, 79.0});
 }
+
+constexpr uint64_t BATCH_SIZE = 50;
+static std::vector<uint64_t> picksStarts() {
+  std::vector<uint64_t> start_idxs;
+  // Add the first range, as it starts at 1 (and not 0).
+  start_idxs.emplace_back(1);
+  // The weight delta between iterations is 0.001, so to cover the range
+  // from 0 to 100, the largest start_idx will be 100 / 0.001.
+  for (uint64_t i = 50; i < 100 * 1000; i += BATCH_SIZE) {
+    start_idxs.emplace_back(i);
+  }
+  return start_idxs;
+}
+
+class EdfSchedulerSpecialTest : public testing::TestWithParam<uint64_t> {};
+// Validates that after creating schedulers using the createWithPicks (with random picks)
+// and then performing a "first-pick", the distribution of the "first-picks" is
+// equal to the weights. Trying the case of 2 weights between 0 to 100, in steps
+// of 0.001. This test takes too long, and therefore it is disabled by default.
+// If the EDF scheduler is enable, it can be manually executed.
+TEST_P(EdfSchedulerSpecialTest, DISABLED_ExhustiveValidator) {
+  const uint64_t start_idx = GetParam();
+  for (uint64_t i = start_idx; i < start_idx + BATCH_SIZE; ++i) {
+    const double w1 = 0.001 * i;
+    ENVOY_LOG_MISC(trace, "Testing weights: w1={}, w2={}", w1, 100.0 - w1);
+    firstPickTest({w1, 100.0 - w1});
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(ExhustiveValidator, EdfSchedulerSpecialTest,
+                         testing::ValuesIn(picksStarts()));
 
 } // namespace Upstream
 } // namespace Envoy
