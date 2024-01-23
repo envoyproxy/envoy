@@ -160,7 +160,7 @@ public:
 
     ResponsePtr respond(Status status, absl::string_view, const Request&) override {
       auto response = std::make_unique<FakeResponse>();
-      response->status_ = {status.raw_code(), status.code() == absl::StatusCode::kOk};
+      response->status_ = {status.raw_code(), status.ok()};
       response->message_ = status.message();
       response->protocol_ = "fake_protocol_for_test";
       return response;
