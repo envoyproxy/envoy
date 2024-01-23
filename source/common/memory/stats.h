@@ -92,7 +92,7 @@ public:
 
 private:
   const uint64_t bytes_to_release_;
-  std::chrono::milliseconds memory_release_interval_msec_;
+  const std::chrono::milliseconds memory_release_interval_msec_;
   MemoryAllocatorManagerStats allocator_manager_stats_;
   Event::TimerPtr memory_release_timer_;
   Thread::ThreadPtr tcmalloc_thread_;
