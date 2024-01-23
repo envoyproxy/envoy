@@ -113,8 +113,8 @@ public:
                               std::unique_ptr<Cleanup>& resume_rds);
 
 private:
-  void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
-                            std::unique_ptr<Cleanup>& resume_rds) override;
+  absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
+                                    std::unique_ptr<Cleanup>& resume_rds) override;
   void afterProviderUpdate() override;
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
