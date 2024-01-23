@@ -44,35 +44,47 @@ import (
 
 var ErrDupRequestKey = errors.New("dup request key")
 
+var (
+	initOnce sync.Once
+	// each worker gets its own map which eliminates the need for a mutex
+	requests []map[*C.httpRequest]*httpRequest
+)
+
+func initializeRequestsMap(concurrency uint32) {
+	initOnce.Do(func() {
+		requests = make([]map[*C.httpRequest]*httpRequest, concurrency)
+		for i := uint32(0); i < concurrency; i++ {
+			requests[i] = map[*C.httpRequest]*httpRequest{}
+		}
+	})
+}
+
 var Requests = &requestMap{}
 
 type requestMap struct {
-	m sync.Map // *C.httpRequest -> *httpRequest
 }
 
 func (f *requestMap) StoreReq(key *C.httpRequest, req *httpRequest) error {
-	if _, loaded := f.m.LoadOrStore(key, req); loaded {
+	m := requests[key.worker_id]
+	if _, ok := m[key]; ok {
 		return ErrDupRequestKey
 	}
+	m[key] = req
 	return nil
 }
 
 func (f *requestMap) GetReq(key *C.httpRequest) *httpRequest {
-	if v, ok := f.m.Load(key); ok {
-		return v.(*httpRequest)
-	}
-	return nil
+	return requests[key.worker_id][key]
 }
 
 func (f *requestMap) DeleteReq(key *C.httpRequest) {
-	f.m.Delete(key)
+	delete(requests[key.worker_id], key)
 }
 
 func (f *requestMap) Clear() {
-	f.m.Range(func(key, _ interface{}) bool {
-		f.m.Delete(key)
-		return true
-	})
+	for idx := range requests {
+		requests[idx] = map[*C.httpRequest]*httpRequest{}
+	}
 }
 
 func requestFinalize(r *httpRequest) {

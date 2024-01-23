@@ -33,7 +33,10 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
       proto_config, dso_lib, fmt::format("{}golang.", stats_prefix), context);
   config->newGoPluginConfig();
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
-    auto filter = std::make_shared<Filter>(config, dso_lib);
+    const std::string worker_name = callbacks.dispatcher().name();
+    const uint32_t worker_id =
+        std::stoi(worker_name.substr(worker_name.find_first_of('_') + 1, worker_name.size()));
+    auto filter = std::make_shared<Filter>(config, dso_lib, worker_id);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };
