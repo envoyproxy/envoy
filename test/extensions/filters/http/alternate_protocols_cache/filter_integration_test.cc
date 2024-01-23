@@ -271,6 +271,7 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
 #endif
   // Start with the alt-svc header in the cache.
   write_alt_svc_to_file_ = true;
+  config_helper_.setConnectTimeout(std::chrono::seconds(1));
 
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;
