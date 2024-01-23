@@ -21,6 +21,8 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::RESPONSE_DATA_BLOCKS[] = "response_data_blocks";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
+const char AutonomousStream::RESET_AFTER_RESPONSE_HEADERS[] = "reset_after_response_headers";
+const char AutonomousStream::RESET_AFTER_RESPONSE_DATA[] = "reset_after_response_data";
 const char AutonomousStream::CLOSE_AFTER_RESPONSE[] = "close_after_response";
 const char AutonomousStream::NO_TRAILERS[] = "no_trailers";
 const char AutonomousStream::NO_END_STREAM[] = "no_end_stream";
@@ -87,6 +89,12 @@ void AutonomousStream::sendResponse() {
   }
 
   encodeHeaders(upstream_.responseHeaders(), headers_only_response);
+
+  if (!headers.get_(RESET_AFTER_RESPONSE_HEADERS).empty()) {
+    encodeResetStream();
+    return;
+  }
+
   if (!headers_only_response) {
     if (upstream_.responseBody().has_value()) {
       encodeData(*upstream_.responseBody(), !send_trailers);
@@ -94,6 +102,11 @@ void AutonomousStream::sendResponse() {
       for (int32_t i = 0; i < response_data_blocks; ++i) {
         encodeData(response_body_length,
                    i == (response_data_blocks - 1) && !send_trailers && end_stream);
+
+        if (!headers.get_(RESET_AFTER_RESPONSE_DATA).empty()) {
+          encodeResetStream();
+          return;
+        }
       }
     }
     if (send_trailers) {

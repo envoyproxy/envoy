@@ -2,7 +2,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
 #include "test/common/listener_manager/listener_manager_impl_test.h"

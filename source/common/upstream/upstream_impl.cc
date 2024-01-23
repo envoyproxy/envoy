@@ -227,10 +227,14 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
   std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses;
   if (bind_config.has_value()) {
     UpstreamLocalAddress upstream_local_address;
-    upstream_local_address.address_ =
-        bind_config->has_source_address()
-            ? ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address())
-            : nullptr;
+    upstream_local_address.address_ = nullptr;
+    if (bind_config->has_source_address()) {
+
+      auto address_or_error =
+          ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      upstream_local_address.address_ = address_or_error.value();
+    }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
 
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
@@ -242,8 +246,10 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
     for (const auto& extra_source_address : bind_config->extra_source_addresses()) {
       UpstreamLocalAddress extra_upstream_local_address;
-      extra_upstream_local_address.address_ =
+      auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      extra_upstream_local_address.address_ = address_or_error.value();
 
       extra_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -264,8 +270,10 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
     for (const auto& additional_source_address : bind_config->additional_source_addresses()) {
       UpstreamLocalAddress additional_upstream_local_address;
-      additional_upstream_local_address.address_ =
+      auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      additional_upstream_local_address.address_ = address_or_error.value();
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
@@ -815,6 +823,8 @@ HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   if (mutable_cross_priority_host_map_ != nullptr) {
     const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);
     ASSERT(mutable_cross_priority_host_map_ == nullptr);
+    ENVOY_LOG(debug, "cross_priority host map, moving mutable to const, len: {}",
+              const_cross_priority_host_map_->size());
   }
   return const_cross_priority_host_map_;
 }
@@ -831,14 +841,18 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   if (mutable_cross_priority_host_map_ == nullptr) {
     // Copy old read only host map to mutable host map.
     mutable_cross_priority_host_map_ = std::make_shared<HostMap>(*const_cross_priority_host_map_);
+    ENVOY_LOG(debug, "cross_priority host map, copying from const, len: {}",
+              const_cross_priority_host_map_->size());
   }
 
   for (const auto& host : hosts_removed) {
     mutable_cross_priority_host_map_->erase(addressToString(host->address()));
+    ENVOY_LOG(debug, "cross_priority host map, removing: {}", addressToString(host->address()));
   }
 
   for (const auto& host : hosts_added) {
     mutable_cross_priority_host_map_->insert({addressToString(host->address()), host});
+    ENVOY_LOG(debug, "cross_priority host map, adding: {}", addressToString(host->address()));
   }
 }
 
@@ -1741,7 +1755,11 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
 
 const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
-  TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
+  TRY_ASSERT_MAIN_THREAD {
+    auto address_or_error = Network::Address::resolveProtoAddress(address);
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    return address_or_error.value();
+  }
   END_TRY
   CATCH(EnvoyException & e, {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||
@@ -2409,7 +2427,9 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   Network::Address::InstanceConstSharedPtr health_check_address;
   const auto& port_value = health_check_config.port_value();
   if (health_check_config.has_address()) {
-    auto address = Network::Address::resolveProtoAddress(health_check_config.address());
+    auto address_or_error = Network::Address::resolveProtoAddress(health_check_config.address());
+    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    auto address = address_or_error.value();
     health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
   } else {

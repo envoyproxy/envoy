@@ -3,6 +3,10 @@ parameters:
   displayName: "CI target"
   type: string
   default: release
+- name: artifactName
+  displayName: "Artifact name"
+  type: string
+  default: ""
 - name: artifactSuffix
   displayName: "Suffix of artifact"
   type: string
@@ -339,6 +343,9 @@ steps:
 - task: PublishBuildArtifacts@1
   inputs:
     pathtoPublish: "$(Build.StagingDirectory)/envoy"
-    artifactName: ${{ parameters.ciTarget }}
+    ${{ if eq(parameters.artifactName, '') }}:
+      artifactName: ${{ parameters.ciTarget }}
+    ${{ if ne(parameters.artifactName, '') }}:
+      artifactName: ${{ parameters.artifactName }}
   timeoutInMinutes: 10
   condition: eq(${{ parameters.publishEnvoy }}, 'true')

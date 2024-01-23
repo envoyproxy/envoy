@@ -305,9 +305,10 @@ protected:
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
 
   // Test sending and receiving large request and response bodies with autonomous upstream.
-  void testGiantRequestAndResponse(
-      uint64_t request_size, uint64_t response_size, bool set_content_length_header,
-      std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
+  void testGiantRequestAndResponse(uint64_t request_size, uint64_t response_size,
+                                   bool set_content_length_header,
+                                   std::chrono::milliseconds timeout = 2 *
+                                                                       TestUtility::DefaultTimeout);
 
   struct BytesCountExpectation {
     BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
@@ -360,6 +361,7 @@ protected:
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   bool enable_quic_early_data_{true};
+  std::vector<absl::string_view> custom_alpns_;
   // Set this to true when sending malformed requests to avoid test client codec rejecting it.
   // This flag is only valid when UHV build flag is enabled.
   bool disable_client_header_validation_{false};

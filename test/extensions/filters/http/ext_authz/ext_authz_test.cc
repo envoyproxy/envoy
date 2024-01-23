@@ -2974,7 +2974,7 @@ TEST_P(HttpFilterTestParam, NoCluster) {
 
 // Check that config validation for per-route filter works as expected.
 TEST_F(HttpFilterTest, PerRouteCheckSettingsConfigCheck) {
-  // Set allow_partial_message to true and max_request_bytes to 10 on the per-route filter.
+  // Set allow_partial_message to true and max_request_bytes to 5 on the per-route filter.
   envoy::extensions::filters::http::ext_authz::v3::BufferSettings buffer_settings;
   buffer_settings.set_max_request_bytes(5);        // Set the max_request_bytes value
   buffer_settings.set_allow_partial_message(true); // Set the allow_partial_message value
@@ -3004,7 +3004,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
   failure_mode_allow: false
   )EOF");
 
-  // Set allow_partial_message to true and max_request_bytes to 10 on the per-route filter.
+  // Set allow_partial_message to true and max_request_bytes to 5 on the per-route filter.
   envoy::extensions::filters::http::ext_authz::v3::BufferSettings buffer_settings;
   buffer_settings.set_max_request_bytes(5);        // Set the max_request_bytes value
   buffer_settings.set_allow_partial_message(true); // Set the allow_partial_message value
@@ -3036,7 +3036,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
   data_.add(buffer1.toString());
 
   Buffer::OwnedImpl buffer2("bar");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer2, true));
   data_.add(buffer2.toString());
 
   Buffer::OwnedImpl buffer3("barfoo");
@@ -3066,7 +3066,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
 
   // Set allow_partial_message to true and max_request_bytes to 10 on the per-route filter.
   envoy::extensions::filters::http::ext_authz::v3::BufferSettings buffer_settings;
-  buffer_settings.set_max_request_bytes(5);        // Set the max_request_bytes value
+  buffer_settings.set_max_request_bytes(10);       // Set the max_request_bytes value
   buffer_settings.set_allow_partial_message(true); // Set the allow_partial_message value
   // Set the per-route filter config.
   envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings;

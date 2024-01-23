@@ -519,6 +519,7 @@ public:
   ABSL_MUST_USE_RESULT AssertionResult postWriteRawData(std::string data);
 
   Http::ServerHeaderValidatorPtr makeHeaderValidator();
+  Http::CodecType type() const { return type_; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -786,6 +787,8 @@ public:
 
   Event::DispatcherPtr& dispatcher() { return dispatcher_; }
   absl::Mutex& lock() { return lock_; }
+
+  void runOnDispatcherThread(std::function<void()> cb);
 
 protected:
   const FakeUpstreamConfig& config() const { return config_; }

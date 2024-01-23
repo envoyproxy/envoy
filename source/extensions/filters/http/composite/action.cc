@@ -28,6 +28,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
       throw EnvoyException(fmt::format("Failed to get factory context or server factory context."));
     }
+    std::string name = composite_action.dynamic_config().name();
     // Create a dynamic filter config provider and register it with the server factory context.
     auto config_discovery = composite_action.dynamic_config().config_discovery();
     Server::Configuration::FactoryContext& factory_context = context.factory_context_.value();
@@ -40,15 +41,15 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
         provider_manager->createDynamicFilterConfigProvider(
             config_discovery, composite_action.dynamic_config().name(), server_factory_context,
             factory_context, server_factory_context.clusterManager(), false, "http", nullptr);
-    return [provider = std::move(provider)]() -> Matcher::ActionPtr {
+    return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
       auto config_value = provider->config();
       if (config_value.has_value()) {
         auto factory_cb = config_value.value().get().factory_cb;
-        return std::make_unique<ExecuteFilterAction>(factory_cb);
+        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
       }
       // There is no dynamic config available. Apply missing config filter.
       auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
-      return std::make_unique<ExecuteFilterAction>(factory_cb);
+      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
     };
   }
 
@@ -78,9 +79,10 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
   if (callback == nullptr) {
     throw EnvoyException("Failed to get filter factory creation function");
   }
+  std::string name = composite_action.typed_config().name();
 
-  return [cb = std::move(callback)]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb);
+  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
+    return std::make_unique<ExecuteFilterAction>(cb, n);
   };
 }
 

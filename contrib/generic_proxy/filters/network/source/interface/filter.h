@@ -49,11 +49,6 @@ public:
   virtual const CodecFactory& downstreamCodec() PURE;
 
   /**
-   * Reset the underlying stream.
-   */
-  virtual void resetStream() PURE;
-
-  /**
    * @return const RouteEntry* cached route entry for current request.
    */
   virtual const RouteEntry* routeEntry() const PURE;
@@ -88,7 +83,20 @@ public:
 
 class DecoderFilterCallback : public virtual StreamFilterCallbacks {
 public:
-  virtual void sendLocalReply(Status status, ResponseUpdateFunction&& cb = nullptr) PURE;
+  /**
+   * Send local reply directly to the downstream for the current request. Note encoder filters
+   * will be skipped for the local reply for now.
+   * @param status supplies the protocol independent response status to the codec to create
+   * actual response frame or message. Note the actual response code may be different with code
+   * in the status. For example, if the status is Protocol::Status::Ok, the actual response code
+   * may be 200 for HTTP/1.1 or 20 for Dubbo.
+   * The status message will be used as response code details and could be logged.
+   * @param data supplies the additional data to the codec to create actual response frame or
+   * message. This could be anything and is optional.
+   * @param cb supplies the callback to update the response. This is optional and could be nullptr.
+   */
+  virtual void sendLocalReply(Status status, absl::string_view data = {},
+                              ResponseUpdateFunction cb = {}) PURE;
 
   virtual void continueDecoding() PURE;
 

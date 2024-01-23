@@ -215,6 +215,11 @@ void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (http_datagram_handler_) {
+    UnregisterHttp3DatagramVisitor();
+  }
+#endif
   Reset(envoyResetReasonToQuicRstError(reason));
 }
 
@@ -527,6 +532,7 @@ bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   http_datagram_handler_->setStreamDecoder(response_decoder_);
+  RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
 

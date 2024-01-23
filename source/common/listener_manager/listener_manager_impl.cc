@@ -27,7 +27,7 @@
 #include "absl/synchronization/blocking_counter.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
 #include "source/server/api_listener_impl.h"
@@ -468,7 +468,9 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
           name));
     }
     if (!api_listener_ && !added_via_api) {
-      api_listener_ = std::make_unique<HttpApiListener>(config, server_, config.name());
+      auto listener_or_error = HttpApiListener::create(config, server_, config.name());
+      THROW_IF_STATUS_NOT_OK(listener_or_error, throw);
+      api_listener_ = std::move(listener_or_error.value());
       return true;
     } else {
       ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "
