@@ -468,7 +468,7 @@ void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& met
   callbacks_.onCreateInitialMetadata(metadata);
 }
 
-// Only relevant to the xDS stream reachability.
+// Only relevant to determine whether the xDS stream is reachable.
 void GoogleAsyncRequestImpl::onServiceReachable() {}
 
 void GoogleAsyncRequestImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}

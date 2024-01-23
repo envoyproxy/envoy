@@ -168,7 +168,7 @@ TEST_F(GrpcStreamTest, ServiceReachableEstablishStream) {
 }
 
 // Tests that closure of the stream while establishing a stream with service-enabled, and
-// then restablishing it works.
+// then re-establishing it works.
 TEST_F(GrpcStreamTest, ServiceReachableCloseDuringEstablishStream) {
   setUpWithServiceReachableEnabled();
   InSequence s;
