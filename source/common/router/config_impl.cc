@@ -432,6 +432,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config)
     default_value_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   }
   trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
+  disable_shadow_host_suffix_append_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, disable_shadow_host_suffix_append, false);
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
