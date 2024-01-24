@@ -4,6 +4,7 @@ header:
   last-updated: '2024-01-24'
   last-reviewed: '2024-01-24'
   project-url: https://github.com/envoyproxy/envoy
+  changelog: https://www.envoyproxy.io/docs/envoy/latest/version_history/version_history#version-history
   license: https://github.com/envoyproxy/envoy/blob/main/LICENSE
 project-lifecycle:
   stage: active
