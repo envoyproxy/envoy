@@ -31,7 +31,6 @@ constexpr std::pair<absl::string_view, bool> quiche_reloadable_flag_overrides[]{
 constexpr std::pair<absl::string_view, std::variant<bool, uint32_t>>
     quiche_protocol_flag_overrides[]{OVERRIDDEN_PROTOCOL_FLAGS(QUICHE_PROTOCOL_FLAG_OVERRIDE)};
 #undef QUICHE_PROTOCOL_FLAG_OVERRIDE
-#undef STRINGIFY
 
 // Envoy uses different default values for some QUICHE flags. The following methods
 // ensure that the absl::Flag objects are created with the correct values for
