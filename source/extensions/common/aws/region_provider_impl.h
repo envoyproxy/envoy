@@ -57,14 +57,12 @@ class RegionProviderChain : public RegionProvider,
                             public RegionProviderChainFactories,
                             public Logger::Loggable<Logger::Id::aws> {
 public:
-  RegionProviderChain(const RegionProviderChainFactories& factories);
-
-  RegionProviderChain() : RegionProviderChain(*this) {}
+  RegionProviderChain();
 
   ~RegionProviderChain() override = default;
 
-  void add(const RegionProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
+  void add(const RegionProviderSharedPtr& region_provider) {
+    providers_.emplace_back(region_provider);
   }
 
   absl::optional<std::string> getRegion() override;

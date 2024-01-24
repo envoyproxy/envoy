@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -234,6 +235,61 @@ stat_prefix: foo_prefix
       {
         const auto route_config = factory.createRouteSpecificFilterConfig(
             proto_config, context, ProtobufMessage::getNullValidationVisitor());
+      },
+      EnvoyException);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4RegionInEnv) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  const std::string yaml = R"EOF(
+service_name: s3
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  TestEnvironment::setEnvVar("AWS_REGION", "ap-southeast-2", 1);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, InvalidConfigSigV4ARegionInEnv) {
+  const std::string yaml = R"EOF(
+service_name: s3
+signing_algorithm: AWS_SIGV4A
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  TestEnvironment::setEnvVar("AWS_REGION", "ap-southeast-2", 1);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  // Should fail as sigv4a requires region explicitly within config
+  EXPECT_THROW(
+      {
+        Http::FilterFactoryCb cb =
+            factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+        Http::MockFilterChainFactoryCallbacks filter_callbacks;
+        cb(filter_callbacks);
       },
       EnvoyException);
 }

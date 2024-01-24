@@ -2,7 +2,7 @@ Regions
 -------
 
 In a similar way to retrieving credentials, the region can be sourced from a number of locations. In order, these are the locations which are
-checked, which align with the AWS SDK:
+checked, which align with the AWS SDK behavior:
 
 1. The ``region`` parameter in the extension configuration. For the ``aws_request_signing`` filter, this is the
    :ref:`region <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` optional parameter.

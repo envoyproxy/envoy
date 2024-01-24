@@ -57,13 +57,15 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
   region = config.region();
 
   if (region.empty()) {
-    auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-    region = region_provider->getRegion().value();
-  }
-  if (region.empty()) {
+    ENVOY_LOG_MISC(debug, "creating region provider chain");
 
-    throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
-                         "profile/config files.");
+    auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+    absl::optional<std::string> regionopt = region_provider->getRegion();
+    if (!regionopt.has_value()) {
+      throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
+                           "profile/config files.");
+    }
+    region = regionopt.value();
   }
 
   auto credentials_provider =
@@ -113,13 +115,15 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   region = per_route_config.aws_request_signing().region();
 
   if (region.empty()) {
-    auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-    region = region_provider->getRegion().value();
-  }
+    ENVOY_LOG_MISC(debug, "creating region provider chain");
 
-  if (region.empty()) {
-    throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
-                         "profile/config files.");
+    auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+    absl::optional<std::string> regionopt = region_provider->getRegion();
+    if (!regionopt.has_value()) {
+      throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
+                           "profile/config files.");
+    }
+    region = regionopt.value();
   }
 
   auto credentials_provider =
