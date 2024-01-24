@@ -1902,11 +1902,11 @@ public:
 
     TestUtility::loadFromYaml(yaml_config, proto_policy);
     Upstream::RetryExtensionFactoryContextImpl factory_context(client_.singleton_manager_);
-    Router::RetryPolicyImpl retry_policy = Router::RetryPolicyImpl(
+    retry_policy_ = Router::RetryPolicyImpl(
         proto_policy, ProtobufMessage::getNullValidationVisitor(), factory_context);
 
     stream_ = std::make_unique<Http::AsyncStreamImpl>(
-        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
+        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy_));
   }
 
   const Router::RouteEntry& getRouteFromStream() { return *(stream_->route_->routeEntry()); }
