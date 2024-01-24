@@ -9,12 +9,13 @@ namespace Envoy {
 static constexpr absl::string_view kConnectionExecutionContextFilterStateName =
     "connection-execution-context";
 
-// ConnectionExecutionContextFilterState is an optional connection-level filter state goes by the
-// name kConnectionExecutionContextFilterStateName. It owns a ExecutionContext, whose
+// ConnectionExecutionContextFilterState is an optional connection-level filter state that goes by
+// the name kConnectionExecutionContextFilterStateName. It owns a ExecutionContext, whose
 // activate/deactivate methods will be called when a thread starts/finishes running code on behalf
 // of the corresponding connection.
 class ConnectionExecutionContextFilterState : public Envoy::StreamInfo::FilterState::Object {
 public:
+  // It is safe, although useless, to set execution_context to nullptr.
   explicit ConnectionExecutionContextFilterState(
       std::unique_ptr<ExecutionContext> execution_context)
       : execution_context_(std::move(execution_context)) {}
