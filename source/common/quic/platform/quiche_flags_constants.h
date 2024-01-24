@@ -33,3 +33,12 @@
                                                      but the actual bytes buffered should be bound \
                                                      by the negotiated upstream flow control       \
                                                      window. */
+
+namespace quiche {
+
+const std::string EnvoyQuicheReloadableFlagPrefix =
+    "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_";
+
+const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
+
+} // namespace quiche

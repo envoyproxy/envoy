@@ -11,7 +11,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/http/utility.h"
-#include "source/common/quic/platform/quiche_flags_constants.h"
 
 #include "absl/flags/flag.h"
 #include "absl/strings/ascii.h"
