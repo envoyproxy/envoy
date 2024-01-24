@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: decompression
+  change: |
+    Fixed a bug where Envoy will go into an endless loop when using the brotli decompressor. If the input stream has
+    redundant data, the decompressor will loop forever.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
