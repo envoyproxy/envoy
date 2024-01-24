@@ -1,0 +1,29 @@
+# Regression test for https://github.com/envoyproxy/envoy/issues/28413
+static_resources:
+  listeners:
+  - name: singleton_internal_encap
+    internal_listener: {}
+    filter_chains:
+    - filters:
+      - name: tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          cluster: singleton_internal_encap
+          stat_prefix: encap_tcp_proxy
+  clusters:
+  - name: singleton_internal_encap
+    connect_timeout: 3600s
+    type: STATIC
+    load_assignment:
+      cluster_name: "singleton_internal_encap"
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 0.0.0.0
+                port_value: 19001
+bootstrap_extensions:
+- name: envoy.bootstrap.internal_listener
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener"

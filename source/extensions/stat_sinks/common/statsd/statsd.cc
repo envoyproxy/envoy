@@ -194,8 +194,11 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
       cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
           Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
-  const auto cluster = Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name,
-                                                                 cluster_manager, local_info);
+  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("tcp statsd", local_info));
+  const auto cluster_or_error =
+      Config::Utility::checkCluster("tcp statsd", cluster_name, cluster_manager);
+  THROW_IF_STATUS_NOT_OK(cluster_or_error, throw);
+  const auto cluster = std::move(cluster_or_error.value());
   cluster_info_ = cluster->get().info();
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
