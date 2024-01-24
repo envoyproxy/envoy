@@ -52,13 +52,12 @@ TEST_F(EngineTest, EarlyExit) {
                                    &test_context /*context*/};
 
   engine_ = std::make_unique<TestEngine>(callbacks, level);
-  envoy_engine_t handle = engine_->handle();
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  start_stream(handle, 0, {}, false);
+  engine_->engine_->startStream(0, {}, false);
 
   engine_.reset();
 }

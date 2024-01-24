@@ -10,6 +10,10 @@
 
 namespace Envoy {
 
+static std::atomic<envoy_stream_t> current_stream_handle_{0};
+
+envoy_stream_t Engine::initStream() { return current_stream_handle_++; }
+
 Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
                envoy_event_tracker event_tracker)
     : callbacks_(callbacks), logger_(logger), event_tracker_(event_tracker),
@@ -191,12 +195,6 @@ envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats
 }
 
 Event::ProvisionalDispatcher& Engine::dispatcher() { return *dispatcher_; }
-
-Http::Client& Engine::httpClient() {
-  RELEASE_ASSERT(dispatcher_->isThreadSafe(),
-                 "httpClient must be accessed from dispatcher's context");
-  return *http_client_;
-}
 
 Network::ConnectivityManager& Engine::networkConnectivityManager() {
   RELEASE_ASSERT(dispatcher_->isThreadSafe(),

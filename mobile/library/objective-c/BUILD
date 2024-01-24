@@ -27,7 +27,7 @@ envoy_objc_library(
         "EnvoyHTTPFilterFactory.h",
         "EnvoyHTTPFilterFactory.m",
         "EnvoyHTTPStream.h",
-        "EnvoyHTTPStreamImpl.m",
+        "EnvoyHTTPStreamImpl.mm",
         "EnvoyLogger.h",
         "EnvoyLogger.m",
         "EnvoyNativeFilterConfig.h",
