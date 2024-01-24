@@ -715,20 +715,6 @@ public:
     initialize();
   }
 
-  // 40 prime numbers that are well above the largest number of hosts we'd expect.
-  // Taken from https://www.bigprimes.net/archive/prime/1000000.
-  constexpr static unsigned long LARGE_PRIME_CHOICES[] = {
-    15485863, 15485867, 15485917, 15485927, 15485933,
-    15485941, 15485959, 15485989, 15485993, 15486013,
-    15486041, 15486047, 15486059, 15486071, 15486101,
-    15486139, 15486157, 15486173, 15486181, 15486193,
-    15486209, 15486221, 15486227, 15486241, 15486257,
-    15486259, 15486277, 15486281, 15486283, 15486287,
-    15486347, 15486421, 15486433, 15486437, 15486451,
-    15486469, 15486481, 15486487, 15486491, 15486511
-  };
-  constexpr static unsigned long LARGE_PRIME_CHOICES_LEN = std::size(LARGE_PRIME_CHOICES);
-
 protected:
   void refresh(uint32_t priority) override {
     active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
@@ -754,8 +740,6 @@ private:
                                         const HostsSource& source) override;
   HostSharedPtr unweightedHostPickFullScan(const HostVector& hosts_to_use);
   HostSharedPtr unweightedHostPickNChoices(const HostVector& hosts_to_use);
-  HostSharedPtr pickLeastFromCandidateAndNewSample(HostSharedPtr candidate_host,
-                                                   HostSharedPtr sampled_host);
 
   const uint32_t choice_count_;
 
@@ -765,7 +749,7 @@ private:
   double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
-  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest_SelectionMethod selection_method_{};
+  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod selection_method_{};
 };
 
 /**

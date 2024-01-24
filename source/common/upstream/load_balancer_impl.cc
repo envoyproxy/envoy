@@ -1300,12 +1300,14 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   HostSharedPtr candidate_host = nullptr;
 
   switch (selection_method_) {
-    case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest_SelectionMethod_FULL_SCAN:
+    case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN:
       candidate_host = unweightedHostPickFullScan(hosts_to_use);
       break;
-    case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest_SelectionMethod_N_CHOICES:
-    default:
+    case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::N_CHOICES:
       candidate_host = unweightedHostPickNChoices(hosts_to_use);
+      break;
+    default:
+      IS_ENVOY_BUG("unknown selection method specified for least request load balancer");
   }
 
   return candidate_host;
@@ -1314,42 +1316,42 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 HostSharedPtr LeastRequestLoadBalancer::unweightedHostPickFullScan(const HostVector& hosts_to_use) {
   HostSharedPtr candidate_host = nullptr;
 
-  // "Randomly" scan the host array using a linear congruential generator with the following parameters:
-  // - The "modulus" is the number of hosts
-  // - The "multiplier" is 1
-  // - The "increment" is a non-zero value less than the modulus.
-  //   It is guaranteed non-zero because it is determined by:
-  //     random large prime number / modulus ... which never be 0
-  // - The "start value" is a random index in the host array
-  //
-  // With these parameters, the generator has a period equal to the modulus (number of hosts).
-  //
-  // The effect of this algorithm is to visit each index of the host array exactly once.
-  // The next index will always be +"increment" indices from the current index.
-  //
-  // This algorithm is not *very* random, but it is random *enough* for its purpose.
-  // Approaches with more randomness were not used because they are less performant for larger host arrays
-  // (e.g., requiring the allocation of an array the length of the host array).
+  uint32_t num_hosts_known_tied_for_least = 0;
 
+  const uint32_t num_hosts = hosts_to_use.size();
 
-  // Because the initial value of host_scan_index will always be the last index scanned,
-  // it must be a random index.
-  unsigned long host_scan_index = random_.random() % hosts_to_use.size();
-  unsigned long num_hosts = hosts_to_use.size();
+  for (uint32_t i = 0; i < num_hosts; ++i) {
+    const HostSharedPtr& sampled_host = hosts_to_use[i];
 
-  // Choose a random large prime greater than the host array length to ensure the "increment"
-  // can be any value between 0 and the array length that is coprime with the array length.
-  // By using a random large prime in each scan, the "increment" can differ between scans,
-  // and therefore the sequences of indices visited can differ between scans. This behavior is
-  // important to avoid selecting the exact same host every time if multiple hosts tie for
-  // least requests.
-  unsigned long large_prime = LARGE_PRIME_CHOICES[random_.random() % LARGE_PRIME_CHOICES_LEN];
+    if (candidate_host == nullptr) {
+      // Make a first choice to start the comparisons.
+      num_hosts_known_tied_for_least = 1;
+      candidate_host = sampled_host;
+      continue;
+    }
 
-  for (unsigned long i = 0; i < num_hosts; ++i) {
-    host_scan_index = (host_scan_index + large_prime) % num_hosts;
-    const HostSharedPtr& sampled_host = hosts_to_use[host_scan_index];
+    const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
+    const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
 
-    candidate_host = pickLeastFromCandidateAndNewSample(candidate_host, sampled_host);
+    if (sampled_active_rq < candidate_active_rq) {
+      // Reset the count of known tied hosts.
+      num_hosts_known_tied_for_least = 1;
+      candidate_host = sampled_host;
+    } else if (sampled_active_rq == candidate_active_rq) {
+      ++num_hosts_known_tied_for_least;
+
+      // Use reservoir sampling to select 1 unique sample from the total number of hosts N
+      // that will tie for least requests after processing the full hosts array.
+      //
+      // Upon each new tie encountered, replace candidate_host with sampled_host
+      // 1 / num_hosts_known_tied_for_least percent of the time.
+      // The end result is that each tied host has an equal 1 / N chance of being the
+      // candidate_host returned by this function.
+      uint32_t random_tied_host_index = random_.random() % num_hosts_known_tied_for_least;
+      if (random_tied_host_index == 0) {
+        candidate_host = sampled_host;
+      }
+    }
   }
 
   return candidate_host;
@@ -1362,25 +1364,21 @@ HostSharedPtr LeastRequestLoadBalancer::unweightedHostPickNChoices(const HostVec
     const int rand_idx = random_.random() % hosts_to_use.size();
     const HostSharedPtr& sampled_host = hosts_to_use[rand_idx];
 
-    candidate_host = pickLeastFromCandidateAndNewSample(candidate_host, sampled_host);
+    if (candidate_host == nullptr) {
+      // Make a first choice to start the comparisons.
+      candidate_host = sampled_host;
+      continue;
+    }
+
+    const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
+    const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
+
+    if (sampled_active_rq < candidate_active_rq) {
+      candidate_host = sampled_host;
+    }
   }
 
   return candidate_host;
-}
-
-HostSharedPtr LeastRequestLoadBalancer::pickLeastFromCandidateAndNewSample(HostSharedPtr candidate_host,
-                                                                           HostSharedPtr sampled_host) {
-  if (candidate_host == nullptr) {
-    // Make a first choice to start the comparisons.
-    return sampled_host;
-  }
-
-  const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
-  const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
-
-  return (sampled_active_rq < candidate_active_rq) ?
-    sampled_host :
-    candidate_host;
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {

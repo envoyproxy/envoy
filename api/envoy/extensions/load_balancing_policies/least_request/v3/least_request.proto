@@ -75,6 +75,7 @@ message LeastRequest {
   google.protobuf.BoolValue enable_full_scan = 5;
 
   // Method for selecting the host set from which to return the host with the fewest active requests.
+  //
   // Defaults to ``N_CHOICES``.
   SelectionMethod selection_method = 6 [(validate.rules).enum = {defined_only: true}];
 }

@@ -2883,7 +2883,7 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 TEST_P(LeastRequestLoadBalancerTest, DefaultSelectionMethod) {
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   EXPECT_EQ(lr_lb_config.selection_method(), 
-            envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest_SelectionMethod_N_CHOICES);
+            envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::N_CHOICES);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
@@ -2906,7 +2906,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
   lr_lb_config.mutable_choice_count()->set_value(2);
   // Enable full table scan on hosts.
   lr_lb_config.set_selection_method(
-    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest_SelectionMethod_FULL_SCAN);
+    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
@@ -2937,56 +2937,58 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
-  hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
-  hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
-  hostSet().healthy_hosts_[2]->stats().rq_active_.set(3);
-  hostSet().healthy_hosts_[3]->stats().rq_active_.set(3);
-  hostSet().healthy_hosts_[4]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[4]->stats().rq_active_.set(1);
 
   // Creating various load balancer objects with different choice configs.
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
   // Enable full table scan on hosts.
   lr_lb_config.set_selection_method(
-    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest_SelectionMethod_FULL_SCAN);
+    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
   LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
                               random_,       1,       lr_lb_config, simTime()};
 
-  // When multiple hosts have the least number of requests,
-  // full scan mode picks the first such host that it encountered in its pseudo-random scan order.
-  // The test expects here are hard-coded assuming there are 5 hosts and the available prime numbers
-  // used in the psuedo-random scan algorithm have not been modified. Check those assumptions.
-  EXPECT_EQ(LeastRequestLoadBalancer::LARGE_PRIME_CHOICES[0], 15485863);
-  EXPECT_EQ(LeastRequestLoadBalancer::LARGE_PRIME_CHOICES[1], 15485867);
-  EXPECT_EQ(hostSet().healthy_hosts_.size(), 5);
-
-  // large_prime_array_index is 0, which will select 15485863 from the large prime choices array.
-  // That causes the increment to be 15485863 % 5 = 3. Therefore, starting with
-  // index_before_first_increment (0) before the first increment, the sequence of indices scanned is:
-  //   [3, 1, 4, 2, 0]
-  // Therefore, healthy host 1 should be selected.
-  unsigned long index_before_first_increment = 0;
-  unsigned long large_prime_array_index = 0;
+  // Indices 2-4 are tied for least.
+  // Random numbers are generated whenever a tie is encountered, which will occur at:
+  // - Index 1 (tied with index 0)
+  // - Index 3 (tied with index 2) -> use 998 so that 998 % 2 ties == 0 to select index 3
+  // - Index 4 (tied with indices 2-3) -> use 4 so that 4 % 3 ties != 0 to keep index 3
   EXPECT_CALL(random_, random())
-    .WillOnce(Return(0)).
-    WillOnce(Return(index_before_first_increment)).
-    WillOnce(Return(large_prime_array_index));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb.chooseHost(nullptr));
+    .WillOnce(Return(0))
+    .WillOnce(Return(0))
+    .WillOnce(Return(998))
+    .WillOnce(Return(4));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
 
-  // large_prime_array_index is 1, which will select 15485867 from the large prime choices array.
-  // That causes the increment to be 15485867 % 5 = 2. Therefore, starting with
-  // index_before_first_increment (3) before the first increment, the sequence of indices scanned is:
-  //   [0, 2, 4, 1, 3]
-  // Therefore, healthy host 0 should be selected.
-  index_before_first_increment = 3;
-  large_prime_array_index = 1;
+  // Indices 2-4 are tied for least.
+  // Random numbers are generated whenever a tie is encountered, which will occur at:
+  // - Index 1 (tied with index 0)
+  // - Index 3 (tied with index 2) -> use 998 so that 998 % 2 ties == 0 to select index 3
+  // - Index 4 (tied with indices 2-3) -> use 6 so that 6 % 3 ties == 0 to select index 4
   EXPECT_CALL(random_, random())
-    .WillOnce(Return(0)).
-    WillOnce(Return(index_before_first_increment)).
-    WillOnce(Return(large_prime_array_index));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb.chooseHost(nullptr));
+    .WillOnce(Return(0))
+    .WillOnce(Return(0))
+    .WillOnce(Return(998))
+    .WillOnce(Return(6));
+  EXPECT_EQ(hostSet().healthy_hosts_[4], lb.chooseHost(nullptr));
+
+  // Indices 2-4 are tied for least.
+  // Random numbers are generated whenever a tie is encountered, which will occur at:
+  // - Index 1 (tied with index 0)
+  // - Index 3 (tied with index 2) -> use 999 so that 998 % 2 ties != 0 to keep index 2
+  // - Index 4 (tied with indices 2-3) -> use 4 so that 4 % 3 ties != 0 to keep index 2
+  EXPECT_CALL(random_, random())
+    .WillOnce(Return(0))
+    .WillOnce(Return(0))
+    .WillOnce(Return(999))
+    .WillOnce(Return(4));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
