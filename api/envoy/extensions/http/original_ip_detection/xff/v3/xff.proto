@@ -48,6 +48,9 @@ message XffConfig {
   // `CDN <https://en.wikipedia.org/wiki/Content_delivery_network>`_.
   //
   // If this field is configured, ``xff_num_trusted_hops`` is not used.
+  //
+  // Note: Use of this option is an ``n*m`` operation on every request, where ``n`` is
+  // the number of trusted CIDRs and ``m`` is the number of entries in the XFF header.
   XffTrustedCidrs xff_trusted_cidrs = 2;
 }
 
