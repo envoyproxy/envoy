@@ -6,6 +6,7 @@ This page lists all active maintainers and their areas of expertise. This can be
 routing PRs, questions, etc. to the right place.
 
 # Senior maintainers
+<!--- If you modify senior maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml  -->
 
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
@@ -33,6 +34,7 @@ routing PRs, questions, etc. to the right place.
   * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 
 # Maintainers
+<!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
 
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
