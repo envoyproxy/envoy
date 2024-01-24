@@ -1,7 +1,7 @@
 #include "source/extensions/filters/http/credential_injector/config.h"
 #include "source/extensions/filters/http/credential_injector/credential_injector_filter.h"
-#include "test/extensions/filters/http/credential_injector/mock_credential.pb.h"
 
+#include "test/extensions/filters/http/credential_injector/mock_credential.pb.h"
 #include "test/mocks/server/factory_context.h"
 
 #include "gtest/gtest.h"
