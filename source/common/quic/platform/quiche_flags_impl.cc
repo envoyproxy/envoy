@@ -5,9 +5,13 @@
 // porting layer for QUICHE.
 
 #include <set>
+#include <string>
+#include <variant>
+#include <vector>
 
 #include "source/common/common/assert.h"
 #include "source/common/http/utility.h"
+#include "source/common/quic/platform/quiche_flags_constants.h"
 
 #include "absl/flags/flag.h"
 #include "absl/strings/ascii.h"
@@ -17,6 +21,18 @@
 
 namespace {
 
+#define QUICHE_RELOADABLE_FLAG_OVERRIDE(flag_name, value)                                          \
+  {STRINGIFY(quic_reloadable_flag_##flag_name), value},
+constexpr std::pair<absl::string_view, bool> quiche_reloadable_flag_overrides[]{
+    OVERRIDDEN_RELOADABLE_FLAGS(QUICHE_RELOADABLE_FLAG_OVERRIDE)};
+#undef QUICHE_RELOADABLE_FLAG_OVERRIDE
+
+#define QUICHE_PROTOCOL_FLAG_OVERRIDE(flag_name, value) {STRINGIFY(flag_name), value},
+constexpr std::pair<absl::string_view, std::variant<bool, uint32_t>>
+    quiche_protocol_flag_overrides[]{OVERRIDDEN_PROTOCOL_FLAGS(QUICHE_PROTOCOL_FLAG_OVERRIDE)};
+#undef QUICHE_PROTOCOL_FLAG_OVERRIDE
+#undef STRINGIFY
+
 // Envoy uses different default values for some QUICHE flags. The following methods
 // ensure that the absl::Flag objects are created with the correct values for
 // these flags. This ensures that the absl::FlagSaver finds the correct values
@@ -25,35 +41,28 @@ namespace {
 template <typename T> constexpr T maybeOverride(absl::string_view /*name*/, T val) { return val; }
 
 template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val) {
-  if (name == "quic_reloadable_flag_quic_disable_version_draft_29") {
-    // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
-    // default.
-    return true;
+  for (const auto& [flag_name, new_value] : quiche_reloadable_flag_overrides) {
+    if (flag_name == name) {
+      return new_value;
+    }
   }
-  if (name == "quic_reloadable_flag_quic_default_to_bbr") {
-    // This flag enables BBR, otherwise QUIC will use Cubic which is less performant.
-    return true;
+  for (const auto& [flag_name, new_value_variant] : quiche_protocol_flag_overrides) {
+    if (flag_name == name) {
+      if (std::holds_alternative<bool>(new_value_variant)) {
+        return std::get<bool>(new_value_variant);
+      }
+    }
   }
-  if (name == "quic_header_size_limit_includes_overhead") {
-    // Do not include 32-byte per-entry overhead while counting header size.
-    return false;
-  }
-
   return val;
 }
 
 template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int32_t val) {
-  if (name == "quic_buffered_data_threshold") {
-    // Set send buffer twice of max flow control window to ensure that stream send
-    // buffer always takes all the data.
-    // The max amount of data buffered is the per-stream high watermark + the max
-    // flow control window of upstream. The per-stream high watermark should be
-    // smaller than max flow control window to make sure upper stream can be flow
-    // control blocked early enough not to send more than the threshold allows.
-    // TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible
-    // for now. 512MB is way to large, but the actual bytes buffered should be bound by the
-    // negotiated upstream flow control window.
-    return 2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE; // 512MB
+  for (const auto& [flag_name, new_value_variant] : quiche_protocol_flag_overrides) {
+    if (flag_name == name) {
+      if (std::holds_alternative<uint32_t>(new_value_variant)) {
+        return std::get<uint32_t>(new_value_variant);
+      }
+    }
   }
   return val;
 }

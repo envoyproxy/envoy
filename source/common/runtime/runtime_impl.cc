@@ -17,10 +17,10 @@
 #include "source/common/config/api_version.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/http/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -30,7 +30,6 @@
 #include "re2/re2.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
@@ -71,21 +70,6 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
   }
   markRuntimeInitialized();
 }
-
-#ifdef ENVOY_ENABLE_QUIC
-// Set Envoy-specific QUICHE flag defaults.
-bool setQuicheFlagDefaults() {
-  SetQuicReloadableFlag(quic_disable_version_draft_29, true);
-  SetQuicReloadableFlag(quic_default_to_bbr, true);
-  SetQuicFlag(quic_header_size_limit_includes_overhead, false);
-  SetQuicFlag(quic_buffered_data_threshold,
-              2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
-  return true;
-}
-
-// This will be dynamically initialized before the first line in main().
-bool unused_flag_init = setQuicheFlagDefaults();
-#endif
 
 } // namespace
 
@@ -672,8 +656,8 @@ absl::Status RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
   if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
     return absl::InvalidArgumentError(
-        fmt::format("Unexpected RTDS resource length, number of added recources "
-                    "{}, number of removed recources {}",
+        fmt::format("Unexpected RTDS resource length, number of added resources "
+                    "{}, number of removed resources {}",
                     added_resources_num, removed_resources_num));
   }
   return absl::OkStatus();
