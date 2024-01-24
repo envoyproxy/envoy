@@ -664,6 +664,27 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
   }
 }
 
+TEST_P(RBACIntegrationTest, PermissionUriPathTemplateMatch) {
+  config_helper_.prependFilter(RBAC_CONFIG_PERMISSION_WITH_URI_PATH_TEMPLATE_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test/deny/path"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
 TEST_P(RBACIntegrationTest, LogConnectionAllow) {
   config_helper_.prependFilter(RBAC_CONFIG_WITH_LOG_ACTION);
   initialize();
@@ -1057,27 +1078,6 @@ TEST_P(RBACIntegrationTest, PathIgnoreCaseMatcher) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
-}
-
-TEST_P(RBACIntegrationTest, PermissionUriPathTemplateMatch) {
-  config_helper_.prependFilter(RBAC_CONFIG_PERMISSION_WITH_URI_PATH_TEMPLATE_MATCH);
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "POST"},
-          {":path", "/test/deny/path"},
-          {":scheme", "http"},
-          {":authority", "sni.lyft.com"},
-          {"x-forwarded-for", "10.0.0.1"},
-      },
-      1024);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, MatcherLogConnectionAllow) {
