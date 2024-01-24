@@ -9,7 +9,8 @@
 #include "library/common/network/apple_pac_proxy_resolver.h"
 #include "library/common/network/apple_system_proxy_settings_monitor.h"
 #include "library/common/network/system_proxy_settings.h"
-#include "library/common/types/c_types.h"
+#include "library/common/network/proxy_resolver_interface.h"
+#include "library/common/network/proxy_types.h"
 
 namespace Envoy {
 namespace Network {
@@ -17,27 +18,19 @@ namespace Network {
 /**
  * Resolves proxies on Apple platforms.
  */
-class AppleProxyResolver {
+class AppleProxyResolver : public ProxyResolver {
 public:
   AppleProxyResolver();
+  virtual ~AppleProxyResolver() = default;
 
   /**
    * Starts proxy resolver. It needs to be called prior to any proxy resolution attempt.
    */
   void start();
 
-  /**
-   * Resolves proxy for a given url. Depending on the type current system proxy settings the method
-   * may return results in synchronous or asynchronous way.
-   * @param proxies Result proxies for when the proxy resolution is performed synchronously.
-   * @param proxy_resolution_did_complete A function that's called with result proxies as its
-   * arguments for when the proxy resolution is performed asynchronously.
-   * @return Whether there is a proxy or no and whether proxy resolution was performed synchronously
-   * or whether it's still running.
-   */
-  envoy_proxy_resolution_result resolveProxy(
-      std::string target_url_string, std::vector<ProxySettings>& proxies,
-      std::function<void(std::vector<ProxySettings> proxies)> proxy_resolution_did_complete);
+  virtual ProxyResolutionResult resolveProxy(
+      const std::string& target_url_string, std::vector<ProxySettings>& proxies,
+      std::function<void(std::vector<ProxySettings>& proxies)> proxy_resolution_did_complete) override;
 
   /*
    * Supplies a function that updates this instance's proxy settings.

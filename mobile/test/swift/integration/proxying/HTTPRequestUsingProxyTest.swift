@@ -59,8 +59,6 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [responseTrailersExpectation], timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
-      print("AAB response body")
-      print(responseBody.utf8.count)
       XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
     }
 
@@ -117,8 +115,6 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [responseBodyExpectation], timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
-      print("AAB response body")
-      print(responseBody.utf8.count)
       XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
     }
 

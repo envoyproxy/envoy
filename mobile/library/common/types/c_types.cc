@@ -74,9 +74,3 @@ const envoy_headers envoy_noheaders = {0, NULL};
 const envoy_stats_tags envoy_stats_notags = {0, NULL};
 
 const char* envoy_event_tracker_api_name = "event_tracker_api";
-
-void envoy_proxy_settings_list_release(envoy_proxy_settings_list list) {
-  if (list.proxy_settings != NULL) {
-    free(list.proxy_settings);
-  }
-}

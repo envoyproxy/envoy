@@ -98,6 +98,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "proxy_resolver_interface_lib",
+    hdrs = ["proxy_resolver_interface.h"],
+    repository = "@envoy",
+    deps = [
+        ":proxy_settings_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "proxy_types_lib",
+    hdrs = ["proxy_types.h"],
+    repository = "@envoy",
+    deps = [
+        ":proxy_resolver_interface_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "apple_proxy_resolution_lib",
     srcs = select({
         "@envoy//bazel:apple": [
@@ -121,8 +139,11 @@ envoy_cc_library(
     repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
+            ":proxy_resolver_interface_lib",
             ":proxy_settings_lib",
+            ":proxy_types_lib",
             "//library/common:envoy_main_interface_lib_no_stamp",
+            "//library/common/api:external_api_lib",
             "//library/common/apple:utility_lib",
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
             "//library/common/types:c_types_lib",

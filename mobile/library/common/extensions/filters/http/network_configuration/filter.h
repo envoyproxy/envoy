@@ -7,7 +7,9 @@
 
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/network/connectivity_manager.h"
+#include "library/common/network/proxy_resolver_interface.h"
 #include "library/common/network/proxy_settings.h"
+#include "library/common/network/proxy_types.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/types/c_types.h"
 
@@ -52,7 +54,7 @@ private:
   bool
   onAddressResolved(const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info);
   Http::FilterHeadersStatus resolveProxy(Http::RequestHeaderMap& request_headers,
-                                         envoy_proxy_resolver* resolver);
+                                         Network::ProxyResolverApi* resolver);
   Http::FilterHeadersStatus
   continueWithProxySettings(Network::ProxySettingsConstSharedPtr proxy_settings);
 
@@ -64,6 +66,8 @@ private:
   bool enable_drain_post_dns_refresh_;
   bool enable_interface_binding_;
   Event::SchedulableCallbackPtr continue_decoding_callback_;
+  // The lifetime of proxy settings must be attached to the lifetime of the filter.
+  std::vector<Network::ProxySettings> proxy_settings_;
 };
 
 } // namespace NetworkConfiguration

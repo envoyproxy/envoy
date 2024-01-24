@@ -69,24 +69,6 @@ void NetworkConfigurationFilter::onProxyResolutionComplete(
   }
 }
 
-void proxyResolutionCompleted(envoy_proxy_settings_list proxy_settings_list, const void* context) {
-  const auto wrapped_filter =
-      const_cast<std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>*>(
-          static_cast<const std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>*>(context));
-
-  // Release proxy settings list no matter whether filter still exists or not.
-  const auto proxy_settings = Network::ProxySettings::create(proxy_settings_list);
-  envoy_proxy_settings_list_release(proxy_settings_list);
-
-  const auto filter = wrapped_filter->get()->lock();
-  if (filter) {
-    filter->onProxyResolutionComplete(proxy_settings);
-  }
-
-  wrapped_filter->get()->reset();
-  delete wrapped_filter;
-}
-
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
@@ -96,15 +78,13 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(Augustyniak): Update Android proxy resolution to use API extension registry. As of now,
-  // it's only iOS that uses that code path.
-  const auto proxy_resolver =
-      static_cast<envoy_proxy_resolver*>(Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
+  auto* proxy_resolver =
+      static_cast<Network::ProxyResolverApi*>(Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
   if (proxy_resolver != nullptr) {
     return resolveProxy(request_headers, proxy_resolver);
   }
 
-  // TODO(Augustyniak): Migrate Android so that it uses API registry instead of calling
+  // TODO(abeyad): Migrate Android so that it uses API registry instead of calling
   // getProxySettings().
   const auto proxy_settings = connectivity_manager_->getProxySettings();
   return continueWithProxySettings(proxy_settings);
@@ -112,33 +92,30 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
-                                         envoy_proxy_resolver* proxy_resolver) {
-  const auto url_string = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
-  const auto host_data = Data::Utility::copyToBridgeData(url_string);
+                                         Network::ProxyResolverApi* proxy_resolver) {
+  ASSERT(proxy_resolver != nullptr, "proxy_resolver must not be null.");
 
-  envoy_proxy_resolver_proxy_resolution_result_handler* result_handler =
-      static_cast<envoy_proxy_resolver_proxy_resolution_result_handler*>(
-          safe_malloc(sizeof(envoy_proxy_resolver_proxy_resolution_result_handler)));
+  const std::string target_url = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
 
-  auto weak_self = weak_from_this();
-  auto wrapper =
-      new std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>(new std::weak_ptr(weak_self));
-  result_handler->context = static_cast<const void*>(wrapper);
-  result_handler->proxy_resolution_completed = proxyResolutionCompleted;
+  std::weak_ptr<NetworkConfigurationFilter> weak_self = weak_from_this();
+  Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
+      target_url, proxy_settings_, [&weak_self](std::vector<Network::ProxySettings>& proxies) {
+        if (auto caller_ptr = weak_self.lock()) {
+        caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, &proxies]() {
+            if (auto filter_ptr = weak_self.lock()) {
+              filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));
+            }
+          });
+        }
+      });
 
-  envoy_proxy_settings_list proxy_settings_list;
-
-  const auto proxy_resolution_result = proxy_resolver->resolve(
-      host_data, &proxy_settings_list, result_handler, proxy_resolver->context);
   switch (proxy_resolution_result) {
-  case ENVOY_PROXY_RESOLUTION_RESULT_NO_PROXY_CONFIGURED:
+  case Network::ProxyResolutionResult::NO_PROXY_CONFIGURED:
     return Http::FilterHeadersStatus::Continue;
-  case ENVOY_PROXY_RESOLUTION_RESULT_COMPLETED: {
-    const auto proxy_settings = Network::ProxySettings::create(proxy_settings_list);
-    envoy_proxy_settings_list_release(proxy_settings_list);
-    return continueWithProxySettings(proxy_settings);
+  case Network::ProxyResolutionResult::RESULT_COMPLETED: {
+    return continueWithProxySettings(Network::ProxySettings::create(proxy_settings_));
   }
-  case ENVOY_PROXY_RESOLUTION_RESULT_IN_PROGRESS:
+  case Network::ProxyResolutionResult::RESULT_IN_PROGRESS:
     // `onProxyResolutionComplete` method will be called once the proxy resolution completes
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
@@ -151,7 +128,7 @@ Http::FilterHeadersStatus NetworkConfigurationFilter::continueWithProxySettings(
     return Http::FilterHeadersStatus::Continue;
   }
 
-  ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request", proxy_settings->asString());
+  ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request proxy_settings={}", proxy_settings->asString());
   // If there is a proxy with a raw address, set the information, and continue.
   const auto proxy_address = proxy_settings->address();
   if (proxy_address != nullptr) {

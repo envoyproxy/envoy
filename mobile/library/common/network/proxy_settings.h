@@ -52,18 +52,17 @@ struct ProxySettings {
   // Whether proxy settings represent a direct proxy, meaning no proxy.
   bool isDirect() const { return hostname_ == "" && port_ == 0; }
 
-  static const ProxySettingsConstSharedPtr create(envoy_proxy_settings_list proxy_settings_list) {
-    if (proxy_settings_list.length < 1) {
+  static const ProxySettingsConstSharedPtr create(const std::vector<ProxySettings>& proxy_settings_list) {
+    if (proxy_settings_list.empty()) {
       return nullptr;
     }
 
-    const auto proxy_settings = proxy_settings_list.proxy_settings[0];
-    if (proxy_settings.type == ENVOY_PROXY_TYPE_DIRECT) {
+    const auto proxy_settings = proxy_settings_list[0];
+    if (proxy_settings.isDirect()) {
       return nullptr;
     }
 
-    const auto hostname = Envoy::Data::Utility::copyToString(proxy_settings.host_data);
-    return std::make_shared<ProxySettings>(hostname, proxy_settings.port);
+    return std::make_shared<ProxySettings>(proxy_settings.hostname(), proxy_settings.port());
   }
 
   /**

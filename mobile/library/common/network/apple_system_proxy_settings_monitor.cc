@@ -36,7 +36,7 @@ void AppleSystemProxySettingsMonitor::start() {
     const auto new_proxy_settings = readSystemProxySettings();
     if (new_proxy_settings != proxy_settings) {
       proxy_settings = new_proxy_settings;
-      proxySettingsDidUpdate_(readSystemProxySettings());
+      proxySettingsDidUpdate_(new_proxy_settings);
     }
   });
   dispatch_resume(source_);

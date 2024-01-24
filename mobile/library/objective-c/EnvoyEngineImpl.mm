@@ -441,7 +441,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
   if (enableProxying) {
-    register_apple_proxy_resolver(_engineHandle);
+    register_apple_proxy_resolver();
   }
 
   if (networkMonitoringMode == 1) {
