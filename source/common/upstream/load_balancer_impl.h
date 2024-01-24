@@ -749,7 +749,8 @@ private:
   double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
-  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod selection_method_{};
+  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
+      selection_method_{};
 };
 
 /**

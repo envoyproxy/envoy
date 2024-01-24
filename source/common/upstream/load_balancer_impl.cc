@@ -1300,13 +1300,13 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   HostSharedPtr candidate_host = nullptr;
 
   switch (selection_method_) {
-    case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN:
-      candidate_host = unweightedHostPickFullScan(hosts_to_use);
-      break;
-    case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::N_CHOICES:
-      candidate_host = unweightedHostPickNChoices(hosts_to_use);
-      break;
-    default:
+  case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN:
+    candidate_host = unweightedHostPickFullScan(hosts_to_use);
+    break;
+  case envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::N_CHOICES:
+    candidate_host = unweightedHostPickNChoices(hosts_to_use);
+    break;
+  default:
       IS_ENVOY_BUG("unknown selection method specified for least request load balancer");
   }
 

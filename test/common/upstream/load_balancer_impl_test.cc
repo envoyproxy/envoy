@@ -2882,7 +2882,7 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 
 TEST_P(LeastRequestLoadBalancerTest, DefaultSelectionMethod) {
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
-  EXPECT_EQ(lr_lb_config.selection_method(), 
+  EXPECT_EQ(lr_lb_config.selection_method(),
             envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::N_CHOICES);
 }
 
@@ -2906,7 +2906,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
   lr_lb_config.mutable_choice_count()->set_value(2);
   // Enable full table scan on hosts.
   lr_lb_config.set_selection_method(
-    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
@@ -2948,7 +2948,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
   lr_lb_config.mutable_choice_count()->set_value(2);
   // Enable full table scan on hosts.
   lr_lb_config.set_selection_method(
-    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
   LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
@@ -2960,10 +2960,10 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
   // - Index 3 (tied with index 2) -> use 998 so that 998 % 2 ties == 0 to select index 3
   // - Index 4 (tied with indices 2-3) -> use 4 so that 4 % 3 ties != 0 to keep index 3
   EXPECT_CALL(random_, random())
-    .WillOnce(Return(0))
-    .WillOnce(Return(0))
-    .WillOnce(Return(998))
-    .WillOnce(Return(4));
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(998))
+      .WillOnce(Return(4));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
 
   // Indices 2-4 are tied for least.
@@ -2972,10 +2972,10 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
   // - Index 3 (tied with index 2) -> use 998 so that 998 % 2 ties == 0 to select index 3
   // - Index 4 (tied with indices 2-3) -> use 6 so that 6 % 3 ties == 0 to select index 4
   EXPECT_CALL(random_, random())
-    .WillOnce(Return(0))
-    .WillOnce(Return(0))
-    .WillOnce(Return(998))
-    .WillOnce(Return(6));
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(998))
+      .WillOnce(Return(6));
   EXPECT_EQ(hostSet().healthy_hosts_[4], lb.chooseHost(nullptr));
 
   // Indices 2-4 are tied for least.
@@ -2984,10 +2984,10 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
   // - Index 3 (tied with index 2) -> use 999 so that 998 % 2 ties != 0 to keep index 2
   // - Index 4 (tied with indices 2-3) -> use 4 so that 4 % 3 ties != 0 to keep index 2
   EXPECT_CALL(random_, random())
-    .WillOnce(Return(0))
-    .WillOnce(Return(0))
-    .WillOnce(Return(999))
-    .WillOnce(Return(4));
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(999))
+      .WillOnce(Return(4));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb.chooseHost(nullptr));
 }
 
