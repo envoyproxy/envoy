@@ -73,9 +73,10 @@ build:mobile-dbg-ios --config=mobile-dbg-common
 build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
-# TODO(jpsim): Explicitly register test extensions for Android tests
-# https://github.com/envoyproxy/envoy/issues/24977
-build:test-android --define=static_extension_registration=enabled
+build:mobile-test-android --define=static_extension_registration=disabled
+
+# Default flags for iOS tests.
+build:mobile-test-ios --config=ios
 
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
@@ -252,7 +253,7 @@ build:mobile-remote-ci --config=remote-ci
 
 build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
-test:mobile-remote-ci-android --config=test-android
+test:mobile-remote-ci-android --config=mobile-test-android
 test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --define=signal_trace=disabled
 
@@ -294,7 +295,7 @@ build:mobile-remote-ci-macos-kotlin --define=envoy_yaml=disabled
 build:mobile-remote-ci-macos-kotlin --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=
 
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-swift --config=ios
+build:mobile-remote-ci-macos-swift --config=mobile-test-ios
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --define=signal_trace=disabled
 build:mobile-remote-ci-macos-swift --define=envoy_mobile_request_compression=disabled
@@ -311,7 +312,7 @@ test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 test:mobile-remote-ci-core --define=envoy_yaml=disabled
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-ios --config=ios
+build:mobile-remote-ci-macos-ios --config=mobile-test-ios
 
 build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
 build:mobile-remote-ci-macos-ios-admin --define=admin_functionality=enabled

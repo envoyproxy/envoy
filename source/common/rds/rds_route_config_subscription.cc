@@ -85,7 +85,7 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     stats_.config_reload_.inc();
     stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
 
-    beforeProviderUpdate(noop_init_manager, resume_rds);
+    THROW_IF_NOT_OK(beforeProviderUpdate(noop_init_manager, resume_rds));
 
     ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
               config_update_info_->configHash());

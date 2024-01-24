@@ -17,6 +17,25 @@ envoy_proto_library(
     srcs = ["config.proto"],
 )
 
+envoy_cc_test(
+    name = "listener_impl_test",
+    srcs = ["listener_impl_test.cc"],
+    data = [
+        "internal_listener.yaml",
+        "internal_listener_missing_bootstrap.yaml",
+    ],
+    deps = [
+        "//source/extensions/bootstrap/internal_listener:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+        "//source/server/config_validation:server_lib",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/server:options_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "listener_manager_impl_test_lib",
     hdrs = ["listener_manager_impl_test.h"],

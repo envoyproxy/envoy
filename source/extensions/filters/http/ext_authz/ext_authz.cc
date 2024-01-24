@@ -152,16 +152,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
                    Http::Utility::isH2UpgradeRequest(headers));
 
+  max_request_bytes_ = config_->maxRequestBytes();
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *decoder_callbacks_);
 
     allow_partial_message_ = check_settings.has_with_request_body()
                                  ? check_settings.with_request_body().allow_partial_message()
                                  : config_->allowPartialMessage();
-    max_request_bytes_ = check_settings.has_with_request_body()
-                             ? check_settings.with_request_body().max_request_bytes()
-                             : config_->maxRequestBytes();
-
+    if (check_settings.has_with_request_body()) {
+      max_request_bytes_ = check_settings.with_request_body().max_request_bytes();
+    }
     if (!allow_partial_message_) {
       decoder_callbacks_->setDecoderBufferLimit(max_request_bytes_);
     }

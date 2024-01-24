@@ -19,6 +19,23 @@
 namespace Envoy {
 namespace Router {
 
+absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
+    RouteConfigUpdatePtr& config_update_info,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    Rds::RouteConfigProvider* route_config_provider) {
+  const auto& config_source = config_update_info->protobufConfigurationCast()
+                                  .vhds()
+                                  .config_source()
+                                  .api_config_source()
+                                  .api_type();
+  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+    return absl::InvalidArgumentError("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+  }
+
+  return std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
+      config_update_info, factory_context, stat_prefix, route_config_provider));
+}
+
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
 VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    Server::Configuration::ServerFactoryContext& factory_context,
@@ -37,14 +54,6 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                          {config_update_info_->protobufConfigurationCast().name()});
                    }),
       route_config_provider_(route_config_provider) {
-  const auto& config_source = config_update_info_->protobufConfigurationCast()
-                                  .vhds()
-                                  .config_source()
-                                  .api_config_source()
-                                  .api_type();
-  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    throwEnvoyExceptionOrPanic("vhds: only 'DELTA_GRPC' is supported as an api_type.");
-  }
   const auto resource_name = getResourceName();
   Envoy::Config::SubscriptionOptions options;
   options.use_namespace_matching_ = true;

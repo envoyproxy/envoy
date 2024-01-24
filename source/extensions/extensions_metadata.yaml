@@ -1021,7 +1021,7 @@ envoy.resource_monitors.downstream_connections:
   categories:
   - envoy.resource_monitors
   security_posture: data_plane_agnostic
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
 envoy.resource_monitors.fixed_heap:

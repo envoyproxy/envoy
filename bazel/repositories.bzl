@@ -18,6 +18,7 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
     "envoy.filters.http.rate_limit_quota",
+    "envoy.filters.http.ext_proc",
     "envoy.formatter.cel",
     "envoy.matching.inputs.cel_data_input",
     "envoy.matching.matchers.cel_matcher",
@@ -1479,5 +1480,5 @@ def _com_github_maxmind_libmaxminddb():
     )
     native.bind(
         name = "maxmind",
-        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux_darwin",
     )
