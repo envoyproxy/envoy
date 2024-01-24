@@ -8,23 +8,16 @@
 namespace Envoy {
 namespace Network {
 
-class PACProxyResolutionCompletionCallback {
-public:
-  PACProxyResolutionCompletionCallback(std::function<void(std::vector<ProxySettings>)> callback)
-      : callback_(callback){};
-  std::function<void(std::vector<ProxySettings>)> callback_;
-};
-
-static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies,
-                                                 CFErrorRef cf_error) {
-  auto completion_callback = static_cast<PACProxyResolutionCompletionCallback*>(ptr);
-  auto completion = completion_callback->callback_;
-  delete completion_callback;
-
+void ApplePacProxyResolver::proxyAutoConfigurationResultCallback(void*, CFArrayRef cf_proxies, CFErrorRef cf_error) {
+  // Note: we don't need the void* context because it typically contains the callback pointer,
+  // whose ownership we'd be responsible for. However, we have stored the callback as a member
+  // of ApplePacProxyResolver, so we don't need to worry about its lifetime (since it's tied to the
+  // lifetime of this instance).  For that reason, we don't need the first argument to this
+  // function.
   if (cf_error != nullptr || cf_proxies == nullptr) {
     // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
     // system (URLSession) is doing.
-    completion({});
+    proxy_resolution_completed_callback_({});
     return;
   }
 
@@ -52,33 +45,32 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
     }
   }
 
-  completion(proxies);
+  proxy_resolution_completed_callback_(proxies);
 }
 
-void ApplePACProxyResolver::resolveProxies(
+void ApplePacProxyResolver::resolveProxies(
     absl::string_view target_url_string, absl::string_view proxy_autoconfiguration_file_url_string,
-    std::function<void(std::vector<ProxySettings>)> didResolveProxy) {
+    std::function<void(std::vector<ProxySettings>&)> proxy_resolution_did_complete) {
+  proxy_resolution_completed_callback_ = proxy_resolution_did_complete;
   CFURLRef cf_target_url = createCFURL(target_url_string);
   CFURLRef cf_proxy_autoconfiguration_file_url =
       createCFURL(proxy_autoconfiguration_file_url_string);
 
-  auto callbackWrapper =
-      static_cast<void*>(new class PACProxyResolutionCompletionCallback(didResolveProxy));
-  CFStreamClientContext context = {0, callbackWrapper, nullptr, nullptr, nullptr};
+  CFStreamClientContext context = {0, &proxy_resolution_completed_callback_, nullptr, nullptr, nullptr};
   // Even though neither the name of the method nor Apple's documentation mentions that, manual
   // testing shows that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched
   // PAC file and does not fetch it on every proxy resolution request.
-  CFRunLoopSourceRef runLoopSource =
+  CFRunLoopSourceRef run_loop_source =
       CFNetworkExecuteProxyAutoConfigurationURL(cf_proxy_autoconfiguration_file_url, cf_target_url,
-                                                proxyAutoConfigurationResultCallback, &context);
+                                                ApplePACProxyResolver::proxyAutoConfigurationResultCallback, &context);
 
-  CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, kCFRunLoopDefaultMode);
+  CFRunLoopAddSource(CFRunLoopGetMain(), run_loop_source, kCFRunLoopDefaultMode);
 
   CFRelease(cf_target_url);
   CFRelease(cf_proxy_autoconfiguration_file_url);
 }
 
-CFURLRef ApplePACProxyResolver::createCFURL(absl::string_view url_string) {
+CFURLRef ApplePacProxyResolver::createCFURL(absl::string_view url_string) {
   auto cf_url_string =
       CFStringCreateWithCString(kCFAllocatorDefault, url_string.begin(), kCFStringEncodingUTF8);
   auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, NULL);

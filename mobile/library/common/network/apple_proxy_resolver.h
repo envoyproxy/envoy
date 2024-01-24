@@ -46,7 +46,7 @@ public:
 
 private:
   std::unique_ptr<AppleSystemProxySettingsMonitor> proxy_settings_monitor_;
-  std::unique_ptr<ApplePACProxyResolver> pac_proxy_resolver_;
+  std::unique_ptr<ApplePacProxyResolver> pac_proxy_resolver_;
   absl::optional<SystemProxySettings> proxy_settings_;
   absl::Mutex mutex_;
 };

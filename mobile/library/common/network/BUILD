@@ -142,7 +142,6 @@ envoy_cc_library(
             ":proxy_resolver_interface_lib",
             ":proxy_settings_lib",
             ":proxy_types_lib",
-            "//library/common:envoy_main_interface_lib_no_stamp",
             "//library/common/api:external_api_lib",
             "//library/common/apple:utility_lib",
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",

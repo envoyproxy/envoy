@@ -6,7 +6,7 @@ namespace Network {
 AppleProxyResolver::AppleProxyResolver()
     : proxy_settings_monitor_(
           std::make_unique<AppleSystemProxySettingsMonitor>(proxySettingsUpdater())),
-      pac_proxy_resolver_(std::make_unique<ApplePACProxyResolver>()) {}
+      pac_proxy_resolver_(std::make_unique<ApplePacProxyResolver>()) {}
 
 std::function<void(absl::optional<Network::SystemProxySettings>)>
 AppleProxyResolver::proxySettingsUpdater() {
