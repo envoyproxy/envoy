@@ -987,8 +987,8 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
 
   EXPECT_CALL(rtds_init_callback_, Call());
   EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate({}, "").message(),
-            "Unexpected RTDS resource length, number of added recources 0, number of removed "
-            "recources 0");
+            "Unexpected RTDS resource length, number of added resources 0, number of removed "
+            "resources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -1005,8 +1005,8 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
 
   EXPECT_CALL(rtds_init_callback_, Call());
   EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, "").message(),
-            "Unexpected RTDS resource length, number of added recources 2, number of removed "
-            "recources 0");
+            "Unexpected RTDS resource length, number of added resources 2, number of removed "
+            "resources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
