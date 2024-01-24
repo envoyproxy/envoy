@@ -916,13 +916,13 @@ static envoy_data jvm_get_string(const void* context) {
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initStream(
     JNIEnv* /*env*/, jclass, jlong engine_handle) {
 
-  return init_stream(static_cast<envoy_engine_t>(engine_handle));
+  auto engine = reinterpret_cast<Envoy::Engine*>(engine_handle);
+  return engine->initStream();
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject j_context,
     jboolean explicit_flow_control) {
-
   // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref.
   jobject retained_context = env->NewGlobalRef(j_context);
   envoy_http_callbacks native_callbacks = {jvm_on_response_headers,
@@ -934,9 +934,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
                                            jvm_on_cancel,
                                            jvm_on_send_window_available,
                                            retained_context};
-  envoy_status_t result = start_stream(static_cast<envoy_engine_t>(engine_handle),
-                                       static_cast<envoy_stream_t>(stream_handle), native_callbacks,
-                                       explicit_flow_control);
+  auto engine = reinterpret_cast<Envoy::Engine*>(engine_handle);
+  envoy_status_t result = engine->startStream(static_cast<envoy_stream_t>(stream_handle),
+                                              native_callbacks, explicit_flow_control);
   if (result != ENVOY_SUCCESS) {
     env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
   }
@@ -1041,8 +1041,8 @@ Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callReleaseCa
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_readData(
     JNIEnv* /*env*/, jclass, jlong engine_handle, jlong stream_handle, jlong byte_count) {
-  return read_data(static_cast<envoy_engine_t>(engine_handle),
-                   static_cast<envoy_stream_t>(stream_handle), byte_count);
+  return reinterpret_cast<Envoy::Engine*>(engine_handle)
+      ->readData(static_cast<envoy_stream_t>(stream_handle), byte_count);
 }
 
 // The Java counterpart guarantees to invoke this method with a non-null direct ByteBuffer where the
@@ -1054,9 +1054,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   if (end_stream) {
     jni_log("[Envoy]", "jvm_send_data_end_stream");
   }
-  return send_data(static_cast<envoy_engine_t>(engine_handle),
-                   static_cast<envoy_stream_t>(stream_handle),
-                   Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, data, length), end_stream);
+  return reinterpret_cast<Envoy::Engine*>(engine_handle)
+      ->sendData(static_cast<envoy_stream_t>(stream_handle),
+                 Envoy::JNI::javaByteBufferToEnvoyData(jni_helper, data, length), end_stream);
 }
 
 // The Java counterpart guarantees to invoke this method with a non-null jbyteArray where the
@@ -1073,33 +1073,34 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, 
   if (end_stream) {
     jni_log("[Envoy]", "jvm_send_data_end_stream");
   }
-  return send_data(static_cast<envoy_engine_t>(engine_handle),
-                   static_cast<envoy_stream_t>(stream_handle),
-                   Envoy::JNI::javaByteArrayToEnvoyData(jni_helper, data, length), end_stream);
+  return reinterpret_cast<Envoy::Engine*>(engine_handle)
+      ->sendData(static_cast<envoy_stream_t>(stream_handle),
+                 Envoy::JNI::javaByteArrayToEnvoyData(jni_helper, data, length), end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray headers,
     jboolean end_stream) {
   Envoy::JNI::JniHelper jni_helper(env);
-  return send_headers(
-      static_cast<envoy_engine_t>(engine_handle), static_cast<envoy_stream_t>(stream_handle),
-      Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, headers), end_stream);
+  return reinterpret_cast<Envoy::Engine*>(engine_handle)
+      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle),
+                    Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, headers),
+                    end_stream);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendTrailers(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray trailers) {
   Envoy::JNI::JniHelper jni_helper(env);
   jni_log("[Envoy]", "jvm_send_trailers");
-  return send_trailers(static_cast<envoy_engine_t>(engine_handle),
-                       static_cast<envoy_stream_t>(stream_handle),
-                       Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, trailers));
+  return reinterpret_cast<Envoy::Engine*>(engine_handle)
+      ->sendTrailers(static_cast<envoy_stream_t>(stream_handle),
+                     Envoy::JNI::javaArrayOfObjectArrayToEnvoyHeaders(jni_helper, trailers));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetStream(
     JNIEnv* /*env*/, jclass, jlong engine_handle, jlong stream_handle) {
-  return reset_stream(static_cast<envoy_engine_t>(engine_handle),
-                      static_cast<envoy_stream_t>(stream_handle));
+  return reinterpret_cast<Envoy::Engine*>(engine_handle)
+      ->cancelStream(static_cast<envoy_stream_t>(stream_handle));
 }
 
 // EnvoyStringAccessor
