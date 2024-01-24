@@ -962,7 +962,11 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerKeyValueStore(JNIEnv* e
   api->remove = jvm_kv_store_remove;
   api->context = retained_context;
 
-  Envoy::Api::External::registerApi(env->GetStringUTFChars(name, nullptr), api);
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr native_java_string =
+      jni_helper.getStringUtfChars(name, nullptr);
+  std::string api_name(native_java_string.get());
+  Envoy::Api::External::registerApi(api_name, api);
   return ENVOY_SUCCESS;
 }
 
@@ -997,7 +1001,11 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
   api->static_context = retained_context;
   api->instance_context = nullptr;
 
-  Envoy::Api::External::registerApi(env->GetStringUTFChars(filter_name, nullptr), api);
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr native_java_string =
+      jni_helper.getStringUtfChars(filter_name, nullptr);
+  std::string api_name(native_java_string.get());
+  Envoy::Api::External::registerApi(api_name, api);
   return ENVOY_SUCCESS;
 }
 
@@ -1119,8 +1127,11 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   string_accessor->get_string = jvm_get_string;
   string_accessor->context = retained_context;
 
-  Envoy::Api::External::registerApi(env->GetStringUTFChars(accessor_name, nullptr),
-                                    string_accessor);
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr native_java_string =
+      jni_helper.getStringUtfChars(accessor_name, nullptr);
+  std::string api_name(native_java_string.get());
+  Envoy::Api::External::registerApi(api_name, string_accessor);
   return ENVOY_SUCCESS;
 }
 
