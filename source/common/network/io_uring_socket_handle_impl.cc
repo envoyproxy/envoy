@@ -125,7 +125,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*
                                                          const Address::Ip*,
                                                          const Address::Instance&) {
   ENVOY_LOG(trace, "sendmsg, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
-  PANIC("IoUringSocketHandleImpl::sendmsg not implement");
+  PANIC("IoUringSocketHandleImpl::sendmsg not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmsg(Buffer::RawSlice*, const uint64_t,
@@ -164,12 +164,12 @@ Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstShared
 
 Api::SysCallIntResult IoUringSocketHandleImpl::listen(int) {
   ENVOY_LOG(trace, "listen, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
-  PANIC("IoUringSocketHandleImpl::listen not implement");
+  PANIC("IoUringSocketHandleImpl::listen not implemented");
 }
 
 IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
   ENVOY_LOG(trace, "accept, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
-  PANIC("IoUringSocketHandleImpl::accept not implement");
+  PANIC("IoUringSocketHandleImpl::accept not implemented");
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -342,7 +342,7 @@ absl::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkWriteResul
     // EAGAIN indicates an injected write event to trigger IO handle write. Submit the new write to
     // the io_uring.
     if (write_param->result_ < 0 && write_param->result_ != -EAGAIN) {
-      return Api::IoCallUint64Result{0, IoSocketError::create(write_param->result_)};
+      return Api::IoCallUint64Result{0, IoSocketError::create(-write_param->result_)};
     }
   }
   return absl::nullopt;
