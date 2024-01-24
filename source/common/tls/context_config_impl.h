@@ -117,8 +117,7 @@ private:
   std::vector<TlsCertificateConfigProviderWithName> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
   std::vector<Envoy::Common::CallbackHandlePtr> tc_update_callback_handles_;
-  CertificateValidationContextConfigProviderWithName
-      certificate_validation_context_provider_;
+  CertificateValidationContextConfigProviderWithName certificate_validation_context_provider_;
   // Handle for certificate validation context dynamic secret callback.
   Envoy::Common::CallbackHandlePtr cvc_update_callback_handle_;
   Envoy::Common::CallbackHandlePtr cvc_validation_callback_handle_;
