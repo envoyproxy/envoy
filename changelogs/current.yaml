@@ -20,6 +20,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
+- area: overload manager
+  change: |
+    removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
 
 new_features:
 - area: grpc reverse bridge
