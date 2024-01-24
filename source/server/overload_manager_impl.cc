@@ -420,7 +420,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     ENVOY_LOG(debug, "Adding overload action {}", name);
 
     // Validate that this is a well known overload action.
-    auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
+    const auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
     if (std::find(well_known_actions.begin(), well_known_actions.end(), name) ==
         well_known_actions.end()) {
       throw EnvoyException(absl::StrCat("Unknown Overload Manager Action ", name));
