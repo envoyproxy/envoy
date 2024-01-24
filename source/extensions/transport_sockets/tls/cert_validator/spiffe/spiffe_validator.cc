@@ -454,8 +454,7 @@ void SPIFFEValidator::refreshCertStatsWithExpirationTime() {
       if (result.second) {
         result.first->second = std::make_unique<CertStats>(generateCertStats(scope_, cert_name));
       }
-      result.first->second->expiration_unix_time_.set(
-          expiration_unix_time.value());
+      result.first->second->expiration_unix_time_.set(expiration_unix_time.value());
     }
     idx++;
   }

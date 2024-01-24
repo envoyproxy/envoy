@@ -16,11 +16,6 @@ namespace Ssl {
 
 using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v3::CertificateDetails>;
 
-struct CertificateNameExpiration {
-  std::string name;
-  std::chrono::duration<uint64_t> expiration;
-};
-
 /**
  * SSL Context is used as a template for SSL connection configuration.
  */

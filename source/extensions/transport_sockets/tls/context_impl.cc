@@ -611,8 +611,7 @@ void ContextImpl::updateCertStats() {
   for (auto& ctx : tls_contexts_) {
     auto expiration_unix_time = Utility::getExpirationUnixTime(ctx.cert_chain_.get());
     if (expiration_unix_time.has_value()) {
-      ctx.setExpirationOnCertStats(
-          std::chrono::duration<uint64_t>(expiration_unix_time.value()));
+      ctx.setExpirationOnCertStats(std::chrono::duration<uint64_t>(expiration_unix_time.value()));
     }
   }
 }
