@@ -365,6 +365,7 @@ envoy_cc_test_binary(
     external_deps = [
         "abseil_symbolize",
     ],
+    linkstatic = False,
     deps = [
         "//source/exe:main_common_lib",
         "//source/exe:platform_impl_lib",
