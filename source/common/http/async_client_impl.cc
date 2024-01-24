@@ -14,6 +14,9 @@
 
 namespace Envoy {
 namespace Http {
+
+const absl::string_view AsyncClientImpl::ResponseBufferLimit = "http.async_response_buffer_limit";
+
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
@@ -25,7 +28,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
       config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
               runtime, random, std::move(shadow_writer), true, false, false, false, false, false,
               {}, dispatcher.timeSource(), http_context, router_context),
-      dispatcher_(dispatcher) {}
+      dispatcher_(dispatcher), runtime_(runtime) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -77,7 +80,8 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
-    : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
+    : parent_(parent), discard_response_body_(options.discard_response_body),
+      stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
@@ -261,7 +265,9 @@ void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
 AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                AsyncClient::Callbacks& callbacks,
                                                const AsyncClient::RequestOptions& options)
-    : AsyncStreamImpl(parent, *this, options), callbacks_(callbacks) {
+    : AsyncStreamImpl(parent, *this, options), callbacks_(callbacks),
+      response_buffer_limit_(parent.runtime_.snapshot().getInteger(
+          AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse)) {
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =
         options.child_span_name_.empty()
@@ -312,7 +318,22 @@ void AsyncRequestSharedImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
-void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) { response_->body().move(data); }
+void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) {
+  if (discard_response_body_) {
+    data.drain(data.length());
+    return;
+  }
+
+  if (response_->body().length() + data.length() > response_buffer_limit_) {
+    ENVOY_LOG_EVERY_POW_2(warn, "the buffer size limit for async client response body "
+                                "has been exceeded, draining data");
+    data.drain(data.length());
+    response_buffer_overlimit_ = true;
+    reset();
+  } else {
+    response_->body().move(data);
+  }
+}
 
 void AsyncRequestSharedImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
@@ -333,8 +354,12 @@ void AsyncRequestSharedImpl::onReset() {
                                                    Tracing::EgressConfig::get());
 
   if (!cancelled_) {
-    // In this case we don't have a valid response so we do need to raise a failure.
-    callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
+    if (response_buffer_overlimit_) {
+      callbacks_.onFailure(*this, AsyncClient::FailureReason::ExceedResponseBufferLimit);
+    } else {
+      // In this case we don't have a valid response so we do need to raise a failure.
+      callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
+    }
   }
 }
 
