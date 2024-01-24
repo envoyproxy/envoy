@@ -285,11 +285,10 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&, Event::Fil
   }
 
   switch (io_uring_socket_type_) {
-  case IoUringSocketType::Server: {
+  case IoUringSocketType::Server:
     io_uring_socket_ = io_uring_worker_factory_.getIoUringWorker()->addServerSocket(
         fd_, std::move(cb), events & Event::FileReadyType::Closed);
     break;
-  }
   case IoUringSocketType::Client:
     io_uring_socket_ = io_uring_worker_factory_.getIoUringWorker()->addClientSocket(
         fd_, std::move(cb), events & Event::FileReadyType::Closed);

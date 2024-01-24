@@ -280,8 +280,8 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ] + select({
         "//bazel:linux": [
-            "//source/common/io:io_uring_worker_factory_impl_lib",
             "//source/common/io:io_uring_impl_lib",
+            "//source/common/io:io_uring_worker_factory_impl_lib",
             "//source/common/io:io_uring_worker_lib",
         ],
         "//conditions:default": [],

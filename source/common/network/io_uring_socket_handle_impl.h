@@ -69,7 +69,6 @@ protected:
     case IoUringSocketType::Server:
       return "server";
     }
-    PANIC("unexpected");
   }
 
   Io::IoUringWorkerFactory& io_uring_worker_factory_;
