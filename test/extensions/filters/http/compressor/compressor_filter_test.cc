@@ -421,10 +421,10 @@ TEST_F(CompressorFilterTest, ContentEncodingAlreadyEncoded) {
 
 // Content-Range: upstream response is range content.
 TEST_F(CompressorFilterTest, ContentRangeHeaderExists) {
-  doRequestNoCompression({{":method", "get"}, {"range" : "bytes=0-255"}});
+  doRequestNoCompression({{":method", "get"}, {"range", "bytes=0-255"}});
   Http::TestResponseHeaderMapImpl response_headers{
       {":method", "get"}, {"content-length", "256"}, {"content-range", "bytes 0-255/1024"}};
-  doResponseNoCompression(headers);
+  doResponseNoCompression(response_headers);
 }
 
 // No compression when upstream response is empty.
