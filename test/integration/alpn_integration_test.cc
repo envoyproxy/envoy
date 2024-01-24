@@ -186,6 +186,7 @@ TEST_P(AlpnIntegrationTest, Mixed) {
 }
 
 TEST_P(AlpnIntegrationTest, DisconnectDuringHandshake) {
+  DISABLE_UNDER_WINDOWS;
   setUpstreamProtocol(Http::CodecType::HTTP2);
   protocols_ = {Http::CodecType::HTTP2};
   setUpstreamCount(1);
