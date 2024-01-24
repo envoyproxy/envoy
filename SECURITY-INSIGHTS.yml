@@ -40,7 +40,7 @@ dependencies:
 distribution-points:
   - https://github.com/envoyproxy/envoy
 documentation:
-  - https://www.envoyproxy.io/
+  - https://www.envoyproxy.io/docs
 security-contacts:
   - type: email
     value: envoy-security@googlegroups.com
