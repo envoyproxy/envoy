@@ -238,6 +238,7 @@ def envoy_cc_test_binary(
             "@envoy//test/test_common:test_version_linkstamp",
         ],
         stamp = stamp,
+        linkstatic = False,
         **kargs
     )
 
