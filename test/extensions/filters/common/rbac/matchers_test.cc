@@ -538,7 +538,7 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
 }
 
-TEST(UriTemplateMatcherFactory, UriTemplateMatcherFactory) {
+TEST(UriTemplateMatcher, UriTemplateMatcherFactory) {
   const std::string yaml_string = R"EOF(
       name: envoy.path.match.uri_template.uri_template_matcher
       typed_config:
@@ -565,6 +565,20 @@ TEST(UriTemplateMatcherFactory, UriTemplateMatcherFactory) {
 
   checkMatcher(uri_template_matcher, true, Envoy::Network::MockConnection(), headers);
 }
+
+TEST(UriTemplateMatcher, NoPathInHeader) {
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig uri_template_match_config;
+  const std::string path_template = "/{foo}";
+  uri_template_match_config.set_path_template(path_template);
+  Router::PathMatcherSharedPtr matcher = std::make_shared<Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher>(uri_template_match_config);
+  
+  headers.setPath("/foo");
+  checkMatcher(UriTemplateMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.removePath();
+  checkMatcher(UriTemplateMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
 
 } // namespace
 } // namespace RBAC
