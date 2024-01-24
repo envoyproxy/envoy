@@ -676,7 +676,7 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, b
 }
 
 Status ConnectionImpl::ClientStreamImpl::onBeginHeaders() {
-  if (next_headers_state_ == HCAT_HEADERS) {
+  if (headers_state_ == HCAT_HEADERS) {
     allocTrailers();
   }
 
@@ -684,8 +684,8 @@ Status ConnectionImpl::ClientStreamImpl::onBeginHeaders() {
 }
 
 void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
-  RELEASE_ASSERT(next_headers_state_ == HCAT_RESPONSE || next_headers_state_ == HCAT_HEADERS, "");
-  next_headers_state_ = HCAT_HEADERS;
+  RELEASE_ASSERT(headers_state_ == HCAT_RESPONSE || headers_state_ == HCAT_HEADERS, "");
+  headers_state_ = HCAT_HEADERS;
 }
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
@@ -696,9 +696,9 @@ void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, b
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
-  if (next_headers_state_ != HCAT_REQUEST) {
+  if (headers_state_ != HCAT_REQUEST) {
     parent_.stats_.trailers_.inc();
-    ASSERT(next_headers_state_ == HCAT_HEADERS);
+    ASSERT(headers_state_ == HCAT_HEADERS);
 
     allocTrailers();
   }
@@ -707,8 +707,8 @@ Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
 }
 
 void ConnectionImpl::ServerStreamImpl::advanceHeadersState() {
-  RELEASE_ASSERT(next_headers_state_ == HCAT_REQUEST || next_headers_state_ == HCAT_HEADERS, "");
-  next_headers_state_ = HCAT_HEADERS;
+  RELEASE_ASSERT(headers_state_ == HCAT_REQUEST || headers_state_ == HCAT_HEADERS, "");
+  headers_state_ = HCAT_HEADERS;
 }
 
 void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
@@ -1140,8 +1140,7 @@ Status ConnectionImpl::onGoAway(uint32_t error_code) {
   return okStatus();
 }
 
-Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags,
-                                 int headers_category) {
+Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags) {
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
     return okStatus();
@@ -1156,14 +1155,15 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
     stream->headers().addViaMove(std::move(key), std::move(stream->cookies_));
   }
 
-  switch (headers_category) {
-  case NGHTTP2_HCAT_RESPONSE:
-  case NGHTTP2_HCAT_REQUEST: {
+  StreamImpl::HeadersState headers_state = stream->headersState();
+  switch (headers_state) {
+  case StreamImpl::HCAT_RESPONSE:
+  case StreamImpl::HCAT_REQUEST: {
     stream->decodeHeaders();
     break;
   }
 
-  case NGHTTP2_HCAT_HEADERS: {
+  case StreamImpl::HCAT_HEADERS: {
     // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
     // if local is not complete.
     if (!stream->deferred_reset_) {
@@ -1239,7 +1239,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return okStatus();
   }
   if (frame->hd.type == NGHTTP2_HEADERS) {
-    return onHeaders(frame->hd.stream_id, frame->hd.length, frame->hd.flags, frame->headers.cat);
+    return onHeaders(frame->hd.stream_id, frame->hd.length, frame->hd.flags);
   }
   if (frame->hd.type == NGHTTP2_RST_STREAM) {
     return onRstStream(frame->hd.stream_id, frame->rst_stream.error_code);
