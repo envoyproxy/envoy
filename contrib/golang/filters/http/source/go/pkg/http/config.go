@@ -73,7 +73,7 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
 
-	initializeRequestsMap(uint32(c.concurrency))
+	Requests.initialize(uint32(c.concurrency))
 
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
 
