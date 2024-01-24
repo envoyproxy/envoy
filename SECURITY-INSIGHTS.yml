@@ -7,7 +7,7 @@ header:
   changelog: https://www.envoyproxy.io/docs/envoy/latest/version_history/version_history#version-history
   license: https://github.com/envoyproxy/envoy/blob/main/LICENSE
 project-lifecycle:
-  stage: active
+  status: active
   bug-fixes-only: false
   core-maintainers:  # from https://github.com/envoyproxy/envoy/blob/main/OWNERS.md
 # Senior maintainers
