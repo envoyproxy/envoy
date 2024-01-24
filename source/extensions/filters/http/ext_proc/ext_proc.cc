@@ -315,7 +315,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
     if (config_->expressionManager().hasRequestExpr()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(
-          &config_->expressionManager().localInfo(), decoding_state_.callbacks().streamInfo(),
+          &config_->expressionManager().localInfo(), decoding_state_.callbacks()->streamInfo(),
           &headers, nullptr, nullptr);
       proto = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
     }
@@ -603,7 +603,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
     if (config_->expressionManager().hasResponseExpr()) {
       auto activation_ptr = Filters::Common::Expr::createActivation(
-          &config_->expressionManager().localInfo(), encoding_state_.callbacks().streamInfo(),
+          &config_->expressionManager().localInfo(), encoding_state_.callbacks()->streamInfo(),
           nullptr, &headers, nullptr);
       proto = config_->expressionManager().evaluateResponseAttributes(*activation_ptr);
     }
