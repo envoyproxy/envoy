@@ -121,7 +121,7 @@ absl::string_view getCertificateExtensionValue(X509& cert, absl::string_view ext
  * @param cert the certificate
  * @return the seconds since unix epoch of the expiration time of this certificate.
  */
-absl::optional<uint64_t> getSecondsSinceEpoch(const X509* cert);
+absl::optional<uint64_t> getExpirationUnixTime(const X509* cert);
 
 /**
  * Returns the days until this certificate is valid.

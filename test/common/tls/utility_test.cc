@@ -143,7 +143,7 @@ TEST(UtilityTest, TestSecondsSinceEpochOfExpiratioWithExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1724226690, Utility::getSecondsSinceEpoch(cert.get()).value());
+  EXPECT_EQ(1724226690, Utility::getExpirationUnixTime(cert.get()).value());
 }
 
 TEST(UtilityTest, TestSecondsSinceEpochOfWithNotExpiredCert) {
@@ -153,12 +153,12 @@ TEST(UtilityTest, TestSecondsSinceEpochOfWithNotExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1724226690, Utility::getSecondsSinceEpoch(cert.get()).value());
+  EXPECT_EQ(1724226690, Utility::getExpirationUnixTime(cert.get()).value());
 }
 
 TEST(UtilityTest, TestSecondsSinceEpochOfWithNullCert) {
   Event::SimulatedTimeSystem time_source;
-  EXPECT_EQ(absl::nullopt, Utility::getSecondsSinceEpoch(nullptr));
+  EXPECT_EQ(absl::nullopt, Utility::getExpirationUnixTime(nullptr));
 }
 
 TEST(UtilityTest, TestDaysUntilExpiration) {

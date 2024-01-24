@@ -446,16 +446,16 @@ void SPIFFEValidator::refreshCertStatsWithExpirationTime() {
   // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
   int idx = 0;
   for (auto& cert : ca_certs_) {
-    const absl::optional<uint32_t> seconds_since_epoch_of_expiration =
-        Utility::getSecondsSinceEpoch(cert.get());
-    if (seconds_since_epoch_of_expiration.has_value()) {
+    const absl::optional<uint32_t> expiration_unix_time =
+        Utility::getExpirationUnixTime(cert.get());
+    if (expiration_unix_time.has_value()) {
       std::string cert_name = absl::StrCat(cert_name_, idx);
       auto result = cert_stats_map_.insert({cert_name, nullptr});
       if (result.second) {
         result.first->second = std::make_unique<CertStats>(generateCertStats(scope_, cert_name));
       }
-      result.first->second->seconds_since_epoch_of_expiration_.set(
-          seconds_since_epoch_of_expiration.value());
+      result.first->second->expiration_unix_time_.set(
+          expiration_unix_time.value());
     }
     idx++;
   }

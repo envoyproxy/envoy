@@ -209,7 +209,7 @@ TEST_P(StatsIntegrationTest, WithExpiringCert) {
   auto actual_cert_expire_time_since_epoch =
       test_server_
           ->gauge(
-              "listener.0.0.0.0_0.ssl.certificate.server_cert.seconds_since_epoch_of_expiration")
+              "listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time")
           ->value();
   EXPECT_EQ(actual_cert_expire_time_since_epoch, absl::ToUnixSeconds(cert_expiry));
 }
@@ -256,7 +256,7 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
   EXPECT_EQ(
       test_server_
           ->gauge(
-              "listener.0.0.0.0_0.ssl.certificate.server_cert.seconds_since_epoch_of_expiration")
+              "listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time")
           ->value(),
       1621998942);
 }

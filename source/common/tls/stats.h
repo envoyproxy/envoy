@@ -32,7 +32,7 @@ struct SslStats {
 
 SslStats generateSslStats(Stats::Scope& store);
 
-#define ALL_CERT_STATS(GAUGE) GAUGE(seconds_since_epoch_of_expiration, NeverImport)
+#define ALL_CERT_STATS(GAUGE) GAUGE(expiration_unix_time, NeverImport)
 
 struct CertStats {
   ALL_CERT_STATS(GENERATE_GAUGE_STRUCT)

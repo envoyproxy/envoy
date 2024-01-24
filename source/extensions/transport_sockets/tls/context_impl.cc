@@ -609,10 +609,10 @@ void ContextImpl::updateCertStats() {
 
   // Update TLS certs' expiration time.
   for (auto& ctx : tls_contexts_) {
-    auto seconds_since_epoch_of_expiration = Utility::getSecondsSinceEpoch(ctx.cert_chain_.get());
-    if (seconds_since_epoch_of_expiration.has_value()) {
+    auto expiration_unix_time = Utility::getExpirationUnixTime(ctx.cert_chain_.get());
+    if (expiration_unix_time.has_value()) {
       ctx.setExpirationOnCertStats(
-          std::chrono::duration<uint64_t>(seconds_since_epoch_of_expiration.value()));
+          std::chrono::duration<uint64_t>(expiration_unix_time.value()));
     }
   }
 }
@@ -1542,7 +1542,7 @@ void TlsContext::createCertStats(Stats::Scope& scope, std::string cert_name) {
 }
 
 void TlsContext::setExpirationOnCertStats(std::chrono::duration<uint64_t> duration) {
-  cert_stats_->seconds_since_epoch_of_expiration_.set(duration.count());
+  cert_stats_->expiration_unix_time_.set(duration.count());
 }
 
 } // namespace Tls

@@ -433,7 +433,7 @@ absl::optional<uint64_t> Utility::getSecondsUntilExpiration(const X509* cert,
   }
   return 0.L;
 
-absl::optional<uint64_t> Utility::getSecondsSinceEpoch(const X509* cert) {
+absl::optional<uint64_t> Utility::getExpirationUnixTime(const X509* cert) {
   if (cert == nullptr) {
     return absl::nullopt;
   }
