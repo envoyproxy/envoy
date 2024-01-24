@@ -2,7 +2,6 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/engine.h"
-#include "library/common/main_interface.h"
 
 namespace Envoy {
 
@@ -74,19 +73,19 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
                                    [](void*) -> void {} /*on_exit*/, &test_context /*context*/};
 
   engine_ = std::make_unique<TestEngine>(callbacks, level);
-  envoy_engine_t handle = engine_->handle();
+  engine_->handle();
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification getClusterManagerInvoked;
   envoy_data stats_data;
   // Running engine functions should work because the engine is running
-  EXPECT_EQ(ENVOY_SUCCESS, dump_stats(handle, &stats_data));
+  EXPECT_EQ(ENVOY_SUCCESS, engine_->engine_->dumpStats(&stats_data));
   release_envoy_data(stats_data);
 
   engine_->terminate();
 
   // Now that the engine has been shut down, we no longer expect scheduling to work.
-  EXPECT_EQ(ENVOY_FAILURE, dump_stats(handle, &stats_data));
+  EXPECT_EQ(ENVOY_FAILURE, engine_->engine_->dumpStats(&stats_data));
 
   engine_.reset();
 }

@@ -16,7 +16,6 @@
 #include "library/common/jni/jni_utility.h"
 #include "library/common/jni/types/exception.h"
 #include "library/common/jni/types/java_virtual_machine.h"
-#include "library/common/main_interface.h"
 #include "library/common/types/managed_envoy_headers.h"
 
 using Envoy::Platform::EngineBuilder;
@@ -167,22 +166,23 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
     JNIEnv* env,
     jclass, // class
-    jlong engine, jstring elements, jobjectArray tags, jint count) {
+    jlong engine_handle, jstring elements, jobjectArray tags, jint count) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr native_elements = jni_helper.getStringUtfChars(elements, nullptr);
-  jint result = record_counter_inc(
-      engine, native_elements.get(),
-      Envoy::JNI::javaArrayOfObjectArrayToEnvoyStatsTags(jni_helper, tags), count);
-  return result;
+  return reinterpret_cast<Envoy::Engine*>(engine_handle)
+      ->recordCounterInc(native_elements.get(),
+                         Envoy::JNI::javaArrayOfObjectArrayToEnvoyStatsTags(jni_helper, tags),
+                         count);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
                                                            jclass, // class
-                                                           jlong engine) {
+                                                           jlong engine_handle) {
   jni_log("[Envoy]", "dumpStats");
+  auto engine = reinterpret_cast<Envoy::Engine*>(engine_handle);
   envoy_data data;
-  jint result = dump_stats(engine, &data);
+  jint result = engine->dumpStats(&data);
   if (result != ENVOY_SUCCESS) {
     return env->NewStringUTF("");
   }
@@ -962,8 +962,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerKeyValueStore(JNIEnv* e
   api->remove = jvm_kv_store_remove;
   api->context = retained_context;
 
-  envoy_status_t result = register_platform_api(env->GetStringUTFChars(name, nullptr), api);
-  return result;
+  Envoy::Api::External::registerApi(env->GetStringUTFChars(name, nullptr), api);
+  return ENVOY_SUCCESS;
 }
 
 // EnvoyHTTPFilter
@@ -997,8 +997,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
   api->static_context = retained_context;
   api->instance_context = nullptr;
 
-  envoy_status_t result = register_platform_api(env->GetStringUTFChars(filter_name, nullptr), api);
-  return result;
+  Envoy::Api::External::registerApi(env->GetStringUTFChars(filter_name, nullptr), api);
+  return ENVOY_SUCCESS;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -1119,9 +1119,9 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   string_accessor->get_string = jvm_get_string;
   string_accessor->context = retained_context;
 
-  envoy_status_t result =
-      register_platform_api(env->GetStringUTFChars(accessor_name, nullptr), string_accessor);
-  return result;
+  Envoy::Api::External::registerApi(env->GetStringUTFChars(accessor_name, nullptr),
+                                    string_accessor);
+  return ENVOY_SUCCESS;
 }
 
 // Takes a jstring from Java, converts it to a C++ string, calls the supplied
@@ -1370,7 +1370,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetConnectivityState(JNIEnv* 
                                                                         jclass, // class
                                                                         jlong engine) {
   jni_log("[Envoy]", "resetConnectivityState");
-  return reset_connectivity_state(engine);
+  return reinterpret_cast<Envoy::Engine*>(engine)->resetConnectivityState();
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -1378,8 +1378,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*e
                                                                      jclass, // class
                                                                      jlong engine, jint network) {
   jni_log("[Envoy]", "setting preferred network");
-  return set_preferred_network(static_cast<envoy_engine_t>(engine),
-                               static_cast<envoy_network_t>(network));
+  return reinterpret_cast<Envoy::Engine*>(engine)->setPreferredNetwork(
+      static_cast<envoy_network_t>(network));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(
@@ -1392,7 +1392,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   const uint16_t native_port = static_cast<uint16_t>(port);
 
   envoy_status_t result =
-      set_proxy_settings(static_cast<envoy_engine_t>(engine), native_host, native_port);
+      reinterpret_cast<Envoy::Engine*>(engine)->setProxySettings(native_host, native_port);
 
   env->ReleaseStringUTFChars(host, native_host);
   return result;
