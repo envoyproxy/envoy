@@ -13,7 +13,8 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: postgres proxy
   change: |
-    Fix a race condition that may result from upstream servers refusing to switch to TLS/SSL. This fix first appeared in ``v1.29.0`` release.
+    Fix a race condition that may result from upstream servers refusing to switch to TLS/SSL.
+    This fix first appeared in ``v1.29.0`` release.
 
 new_features:
 
