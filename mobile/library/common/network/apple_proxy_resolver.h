@@ -8,9 +8,9 @@
 
 #include "library/common/network/apple_pac_proxy_resolver.h"
 #include "library/common/network/apple_system_proxy_settings_monitor.h"
-#include "library/common/network/system_proxy_settings.h"
 #include "library/common/network/proxy_resolver_interface.h"
 #include "library/common/network/proxy_types.h"
+#include "library/common/network/system_proxy_settings.h"
 
 namespace Envoy {
 namespace Network {
@@ -28,9 +28,10 @@ public:
    */
   void start();
 
-  virtual ProxyResolutionResult resolveProxy(
-      const std::string& target_url_string, std::vector<ProxySettings>& proxies,
-      std::function<void(std::vector<ProxySettings>& proxies)> proxy_resolution_did_complete) override;
+  virtual ProxyResolutionResult
+  resolveProxy(const std::string& target_url_string, std::vector<ProxySettings>& proxies,
+               std::function<void(std::vector<ProxySettings>& proxies)>
+                   proxy_resolution_did_complete) override;
 
   /*
    * Supplies a function that updates this instance's proxy settings.

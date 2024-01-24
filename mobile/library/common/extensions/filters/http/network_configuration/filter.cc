@@ -78,8 +78,8 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
     return Http::FilterHeadersStatus::Continue;
   }
 
-  auto* proxy_resolver =
-      static_cast<Network::ProxyResolverApi*>(Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
+  auto* proxy_resolver = static_cast<Network::ProxyResolverApi*>(
+      Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
   if (proxy_resolver != nullptr) {
     return resolveProxy(request_headers, proxy_resolver);
   }
@@ -101,7 +101,7 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
   Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
       target_url, proxy_settings_, [&weak_self](std::vector<Network::ProxySettings>& proxies) {
         if (auto caller_ptr = weak_self.lock()) {
-        caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, &proxies]() {
+          caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, &proxies]() {
             if (auto filter_ptr = weak_self.lock()) {
               filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));
             }
@@ -128,7 +128,8 @@ Http::FilterHeadersStatus NetworkConfigurationFilter::continueWithProxySettings(
     return Http::FilterHeadersStatus::Continue;
   }
 
-  ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request proxy_settings={}", proxy_settings->asString());
+  ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request proxy_settings={}",
+            proxy_settings->asString());
   // If there is a proxy with a raw address, set the information, and continue.
   const auto proxy_address = proxy_settings->address();
   if (proxy_address != nullptr) {

@@ -52,7 +52,8 @@ struct ProxySettings {
   // Whether proxy settings represent a direct proxy, meaning no proxy.
   bool isDirect() const { return hostname_ == "" && port_ == 0; }
 
-  static const ProxySettingsConstSharedPtr create(const std::vector<ProxySettings>& proxy_settings_list) {
+  static const ProxySettingsConstSharedPtr
+  create(const std::vector<ProxySettings>& proxy_settings_list) {
     if (proxy_settings_list.empty()) {
       return nullptr;
     }

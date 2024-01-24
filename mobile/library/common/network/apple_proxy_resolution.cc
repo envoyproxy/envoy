@@ -6,6 +6,8 @@
 #include "library/common/network/apple_proxy_resolver.h"
 #include "library/common/network/proxy_types.h"
 
+// NOLINT(namespace-envoy)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

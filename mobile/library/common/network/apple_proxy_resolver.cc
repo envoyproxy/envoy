@@ -25,7 +25,8 @@ void AppleProxyResolver::setSettingsMonitorForTest(
 void AppleProxyResolver::start() { proxy_settings_monitor_->start(); }
 
 ProxyResolutionResult
-AppleProxyResolver::resolveProxy(const std::string& target_url_string, std::vector<ProxySettings>& proxies,
+AppleProxyResolver::resolveProxy(const std::string& target_url_string,
+                                 std::vector<ProxySettings>& proxies,
                                  std::function<void(std::vector<ProxySettings>&)> completion) {
   absl::MutexLock l(&mutex_);
   if (!proxy_settings_.has_value()) {
