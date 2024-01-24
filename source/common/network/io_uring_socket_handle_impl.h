@@ -62,7 +62,7 @@ public:
   Api::SysCallIntResult shutdown(int how) override;
 
 protected:
-  std::string ioUringSocketTypeStr() {
+  std::string ioUringSocketTypeStr() const {
     switch (io_uring_socket_type_) {
     case IoUringSocketType::Client:
       return "client";
@@ -75,6 +75,8 @@ protected:
   IoUringSocketType io_uring_socket_type_;
   OptRef<Io::IoUringSocket> io_uring_socket_{absl::nullopt};
 
+  absl::optional<Api::IoCallUint64Result> checkReadResult() const;
+  absl::optional<Api::IoCallUint64Result> checkWriteResult() const;
   Api::IoCallUint64Result copyOut(uint64_t max_length, Buffer::RawSlice* slices,
                                   uint64_t num_slice);
 };

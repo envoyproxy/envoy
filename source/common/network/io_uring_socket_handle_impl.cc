@@ -79,41 +79,14 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                                       absl::optional<uint64_t> max_length_opt) {
-  ASSERT(io_uring_socket_.has_value());
   ENVOY_LOG(trace, "read, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
+  auto read_result = checkReadResult();
+  if (read_result.has_value()) {
+    return std::move(*read_result);
+  }
+
   const OptRef<Io::ReadParam>& read_param = io_uring_socket_->getReadParam();
-  // A absl::nullopt read param means that there is no io_uring request which has been done.
-  if (read_param == absl::nullopt) {
-    if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::RemoteClosed) {
-      return {0, IoSocketError::getIoSocketEagainError()};
-    } else {
-      ENVOY_LOG(trace, "read, fd = {}, type = {}, remote close", fd_, ioUringSocketTypeStr());
-      return Api::ioCallUint64ResultNoError();
-    }
-  }
-
-  if (read_param->result_ == 0) {
-    ENVOY_LOG(trace, "read remote close, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
-    return Api::ioCallUint64ResultNoError();
-  }
-
-  if (read_param->result_ < 0) {
-    ASSERT(read_param->buf_.length() == 0);
-    ENVOY_LOG(trace, "read error = {}, fd = {}, type = {}", -read_param->result_, fd_,
-              ioUringSocketTypeStr());
-    if (read_param->result_ == -EAGAIN) {
-      return {0, IoSocketError::getIoSocketEagainError()};
-    }
-    return {0, IoSocketError::create(-read_param->result_)};
-  }
-
-  // The buffer has been read in the previous call, return EAGAIN to tell the caller to wait for the
-  // next read event.
-  if (read_param->buf_.length() == 0) {
-    return {0, IoSocketError::getIoSocketEagainError()};
-  }
-
   uint64_t max_read_length =
       std::min(max_length_opt.value_or(UINT64_MAX), read_param->buf_.length());
   buffer.move(read_param->buf_, max_read_length);
@@ -125,13 +98,9 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
   ASSERT(io_uring_socket_.has_value());
   ENVOY_LOG(trace, "writev, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  const OptRef<Io::WriteParam>& write_param = io_uring_socket_->getWriteParam();
-  if (write_param != absl::nullopt) {
-    // EAGAIN indicates an injected write event to trigger IO handle write. Submit the new write to
-    // the io_uring.
-    if (write_param->result_ < 0 && write_param->result_ != -EAGAIN) {
-      return {0, IoSocketError::create(write_param->result_)};
-    }
+  auto write_result = checkWriteResult();
+  if (write_result.has_value()) {
+    return std::move(*write_result);
   }
 
   uint64_t ret = io_uring_socket_->write(slices, num_slice);
@@ -142,13 +111,9 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   ASSERT(io_uring_socket_.has_value());
   ENVOY_LOG(trace, "write {}, fd = {}, type = {}", buffer.length(), fd_, ioUringSocketTypeStr());
 
-  const OptRef<Io::WriteParam>& write_param = io_uring_socket_->getWriteParam();
-  if (write_param != absl::nullopt) {
-    // EAGAIN indicates an injected write event to trigger IO handle write. Submit the new write to
-    // the io_uring.
-    if (write_param->result_ < 0 && write_param->result_ != -EAGAIN) {
-      return {0, IoSocketError::create(write_param->result_)};
-    }
+  auto write_result = checkWriteResult();
+  if (write_result.has_value()) {
+    return std::move(*write_result);
   }
 
   uint64_t buffer_size = buffer.length();
@@ -334,15 +299,14 @@ Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
   return Api::SysCallIntResult{0, 0};
 }
 
-Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,
-                                                         Buffer::RawSlice* slices,
-                                                         uint64_t num_slice) {
+absl::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkReadResult() const {
   ASSERT(io_uring_socket_.has_value());
+
   const OptRef<Io::ReadParam>& read_param = io_uring_socket_->getReadParam();
   // A absl::nullopt read param means that there is no io_uring request which has been done.
   if (read_param == absl::nullopt) {
     if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::RemoteClosed) {
-      return {0, IoSocketError::getIoSocketEagainError()};
+      return Api::IoCallUint64Result{0, IoSocketError::getIoSocketEagainError()};
     } else {
       ENVOY_LOG(trace, "read, fd = {}, type = {}, remote close", fd_, ioUringSocketTypeStr());
       return Api::ioCallUint64ResultNoError();
@@ -359,17 +323,40 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,
     ENVOY_LOG(trace, "read error = {}, fd = {}, type = {}", -read_param->result_, fd_,
               ioUringSocketTypeStr());
     if (read_param->result_ == -EAGAIN) {
-      return {0, IoSocketError::getIoSocketEagainError()};
+      return Api::IoCallUint64Result{0, IoSocketError::getIoSocketEagainError()};
     }
-    return {0, IoSocketError::create(-read_param->result_)};
+    return Api::IoCallUint64Result{0, IoSocketError::create(-read_param->result_)};
   }
 
-  // The buffer has been read in the previous call, return EAGAIN to tell the caller to wait for the
-  // next read event.
+  // The buffer has been read in the previous call, return EAGAIN to tell the caller to wait for
+  // the next read event.
   if (read_param->buf_.length() == 0) {
-    return {0, IoSocketError::getIoSocketEagainError()};
+    return Api::IoCallUint64Result{0, IoSocketError::getIoSocketEagainError()};
+  }
+  return absl::nullopt;
+}
+
+absl::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkWriteResult() const {
+  const OptRef<Io::WriteParam>& write_param = io_uring_socket_->getWriteParam();
+  if (write_param != absl::nullopt) {
+    // EAGAIN indicates an injected write event to trigger IO handle write. Submit the new write to
+    // the io_uring.
+    if (write_param->result_ < 0 && write_param->result_ != -EAGAIN) {
+      return Api::IoCallUint64Result{0, IoSocketError::create(write_param->result_)};
+    }
+  }
+  return absl::nullopt;
+}
+
+Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,
+                                                         Buffer::RawSlice* slices,
+                                                         uint64_t num_slice) {
+  auto read_result = checkReadResult();
+  if (read_result.has_value()) {
+    return std::move(*read_result);
   }
 
+  const OptRef<Io::ReadParam>& read_param = io_uring_socket_->getReadParam();
   const uint64_t max_read_length = std::min(max_length, static_cast<uint64_t>(read_param->result_));
   uint64_t num_bytes_to_read = read_param->buf_.copyOutToSlices(max_read_length, slices, num_slice);
   return {num_bytes_to_read, IoSocketError::none()};
