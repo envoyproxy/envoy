@@ -1140,12 +1140,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme")) {
-      headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
-    } else {
-      headers.setScheme(absolute_url.scheme());
-    }
+    headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
     if (!Utility::schemeIsValid(headers.getSchemeValue())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
       return codecProtocolError("http/1.1 protocol error: invalid scheme");

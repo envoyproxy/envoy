@@ -679,6 +679,15 @@ UDP
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
+.. _config_access_log_format_upstream_connection_id:
+
+%UPSTREAM_CONNECTION_ID%
+  An identifier for the upstream connection. It can be used to
+  cross-reference TCP access logs across multiple log sinks, or to
+  cross-reference timer-based reports for the same connection. The identifier
+  is unique with high likelihood within an execution, but can duplicate across
+  multiple instances or between restarts.
+
 .. _config_access_log_format_stream_id:
 
 %STREAM_ID%
