@@ -161,7 +161,6 @@ paths:
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
     - source/server/ssl_context_manager.cc
-    - source/server/configuration_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
