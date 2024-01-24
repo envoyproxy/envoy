@@ -55,9 +55,10 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
   // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
   // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
   // the main thread if necessary.
-  auto client = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
+  auto client_or_error = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
                     ->createUncachedRawAsyncClient();
-  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, local_info_,
+  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client_or_error->value()), config, dispatcher, local_info_,
                                                 scope_);
 }
 

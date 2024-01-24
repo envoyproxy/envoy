@@ -111,10 +111,9 @@ public:
    * @param scope stats scope.
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
    * configured.
-   * @return AsyncClientFactoryPtr factory for grpc_service.
-   * @throws EnvoyException when grpc_service validation fails.
+   * @return AsyncClientFactoryPtr factory for grpc_service or an error status.
    */
-  virtual AsyncClientFactoryPtr
+  virtual absl::StatusOr<AsyncClientFactoryPtr>
   factoryForGrpcService(const envoy::config::core::v3::GrpcService& grpc_service,
                         Stats::Scope& scope, bool skip_cluster_check) PURE;
 };

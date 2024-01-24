@@ -33,7 +33,7 @@ public:
   GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot,
                                Stats::Scope& scope,
                                const envoy::config::core::v3::GrpcService& config, Api::Api& api,
-                               const StatNames& stat_names);
+                               const StatNames& stat_names, absl::Status& creation_status);
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
 
 private:
@@ -59,7 +59,7 @@ public:
   getOrCreateRawAsyncClientWithHashKey(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                                        Stats::Scope& scope, bool skip_cluster_check) override;
 
-  AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
+  absl::StatusOr<AsyncClientFactoryPtr> factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
                                               bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {

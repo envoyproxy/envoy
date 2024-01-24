@@ -111,7 +111,7 @@ public:
   MockAsyncClientManager();
   ~MockAsyncClientManager() override;
 
-  MOCK_METHOD(AsyncClientFactoryPtr, factoryForGrpcService,
+  MOCK_METHOD(absl::StatusOr<AsyncClientFactoryPtr>, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
                bool skip_cluster_check));
 
