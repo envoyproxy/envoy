@@ -1321,6 +1321,32 @@ TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
   EXPECT_EQ("204", response_->headers().Status()->value().getStringView());
 }
 
+// Test exceeding the async client buffer limit.
+TEST_P(ExtAuthzHttpIntegrationTest, ErrorReponseWithDefultBufferLimit) {
+  initializeConfig(false, /*failure_mode_allow=*/false);
+  config_helper_.addRuntimeOverride("http.async_response_buffer_limit", "1024");
+
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"baz", "baz"},
+      {"bat", "bar"},
+      {"x-append-bat", "append-foo"},
+      {"x-append-bat", "append-bar"},
+      {"x-envoy-auth-headers-to-remove", "remove-me"},
+  };
+  ext_authz_request_->encodeHeaders(response_headers, false);
+  ext_authz_request_->encodeData(2048, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  // A forbidden response since the onFailure is called due to the async client buffer limit.
+  EXPECT_EQ("403", response_->headers().Status()->value().getStringView());
+}
+
 // (uses new config for allowed_headers).
 TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
   config_helper_.addConfigModifier(
