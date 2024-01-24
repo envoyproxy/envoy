@@ -963,8 +963,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerKeyValueStore(JNIEnv* e
   api->context = retained_context;
 
   Envoy::JNI::JniHelper jni_helper(env);
-  Envoy::JNI::StringUtfUniquePtr native_java_string =
-      jni_helper.getStringUtfChars(name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr native_java_string = jni_helper.getStringUtfChars(name, nullptr);
   std::string api_name(native_java_string.get());
   Envoy::Api::External::registerApi(api_name, api);
   return ENVOY_SUCCESS;
