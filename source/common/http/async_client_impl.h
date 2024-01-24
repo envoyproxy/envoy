@@ -51,6 +51,8 @@ namespace {
 // Limit the size of buffer for data used for retries.
 // This is currently fixed to 64KB.
 constexpr uint64_t kBufferLimitForRetry = 1 << 16;
+// Response buffer limit 32MB.
+constexpr uint64_t kBufferLimitForResponse = 32 * 1024 * 1024;
 } // namespace
 
 class AsyncStreamImpl;
@@ -72,6 +74,7 @@ public:
   OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
                                const AsyncClient::RequestOptions& options) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  static const absl::string_view ResponseBufferLimit;
 
 private:
   template <typename T> T* internalStartRequest(T* async_request);
@@ -80,6 +83,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
   Singleton::Manager& singleton_manager_;
+  Runtime::Loader& runtime_;
 
   friend class AsyncStreamImpl;
   friend class AsyncRequestSharedImpl;
@@ -92,7 +96,7 @@ private:
 class AsyncStreamImpl : public virtual AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
                         public Event::DeferredDeletable,
-                        Logger::Loggable<Logger::Id::http>,
+                        public Logger::Loggable<Logger::Id::http>,
                         public LinkedObject<AsyncStreamImpl>,
                         public ScopeTrackedObject {
 public:
@@ -151,6 +155,7 @@ protected:
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
   absl::optional<std::reference_wrapper<DecoderFilterWatermarkCallbacks>> watermark_callbacks_;
+  const bool discard_response_body_;
 
 private:
   struct NullHedgePolicy : public Router::HedgePolicy {
@@ -531,6 +536,8 @@ protected:
   Tracing::SpanPtr child_span_;
   std::unique_ptr<ResponseMessageImpl> response_;
   bool cancelled_{};
+  bool response_buffer_overlimit_{};
+  const uint64_t response_buffer_limit_;
 };
 
 class AsyncOngoingRequestImpl final : public AsyncClient::OngoingRequest,
