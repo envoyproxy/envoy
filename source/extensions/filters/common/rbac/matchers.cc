@@ -272,9 +272,6 @@ bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::Request
 bool UriTemplateMatcher::matches(const Network::Connection&,
                                  const Envoy::Http::RequestHeaderMap& headers,
                                  const StreamInfo::StreamInfo&) const {
-  if (headers.Path() == nullptr) {
-    return false;
-  }
   return uri_template_matcher_->match(headers.getPathValue());
 }
 
