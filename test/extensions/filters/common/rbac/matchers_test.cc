@@ -568,17 +568,19 @@ TEST(UriTemplateMatcher, UriTemplateMatcherFactory) {
 
 TEST(UriTemplateMatcher, NoPathInHeader) {
   Envoy::Http::TestRequestHeaderMapImpl headers;
-  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig uri_template_match_config;
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig
+      uri_template_match_config;
   const std::string path_template = "/{foo}";
   uri_template_match_config.set_path_template(path_template);
-  Router::PathMatcherSharedPtr matcher = std::make_shared<Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher>(uri_template_match_config);
-  
+  Router::PathMatcherSharedPtr matcher =
+      std::make_shared<Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher>(
+          uri_template_match_config);
+
   headers.setPath("/foo");
   checkMatcher(UriTemplateMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
   headers.removePath();
   checkMatcher(UriTemplateMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
 }
-
 
 } // namespace
 } // namespace RBAC
