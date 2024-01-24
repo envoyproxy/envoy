@@ -422,7 +422,9 @@ public:
       return validation_result_;
     }
     // verify that parser iterated over entire message and nothing is left.
-    validation_result_ = left == 0 ? Message::ValidationOK : Message::ValidationFailed;
+    if (left != 0) {
+      validation_result_ = Message::ValidationFailed;
+    }
     return validation_result_;
   }
   std::string toString() const override { return Sequence<Types...>::toString(); }
