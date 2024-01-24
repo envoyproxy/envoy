@@ -914,6 +914,8 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
 TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
   explicit_flow_control_ = true;
   autonomous_upstream_ = false;
+  // TODO(32024) remove trace logging.
+  builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
   ConditionalInitializer headers_callback;
 
@@ -954,7 +956,6 @@ TEST_P(ClientIntegrationTest, Proxying) {
   if (getCodecType() != Http::CodecType::HTTP1) {
     return;
   }
-  builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
 
   set_proxy_settings(rawEngine(), fake_upstreams_[0]->localAddress()->asString().c_str(),
