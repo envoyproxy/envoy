@@ -3116,7 +3116,7 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
   EXPECT_EQ(1, config_->stats().rejected_header_mutations_.value());
 }
 
-TEST_F(HttpFilterTest, MetadataOptionsOverrideOverwrite) {
+TEST_F(HttpFilterTest, MetadataOptionsOverride) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -3142,10 +3142,11 @@ TEST_F(HttpFilterTest, MetadataOptionsOverrideOverwrite) {
   const std::string override_yaml = R"EOF(
   overrides:
     metadata_options:
-      namespaces_merge_behavior: overwrite
       forwarding_namespaces:
         untyped:
         - untyped_ns_2
+        typed:
+        - typed_ns_2
       receiving_namespaces:
         untyped:
         - untyped_receiving_ns_2
@@ -3172,144 +3173,13 @@ TEST_F(HttpFilterTest, MetadataOptionsOverrideOverwrite) {
   EXPECT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_2");
 
   ASSERT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces().size(), 1);
-  EXPECT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces()[0], "typed_ns_1");
+  EXPECT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces()[0], "typed_ns_2");
 
   ASSERT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces().size(), 1);
   EXPECT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces()[0],
             "untyped_receiving_ns_2");
   ASSERT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces().size(), 1);
   EXPECT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces()[0],
-            "untyped_receiving_ns_2");
-
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-
-  filter_->onDestroy();
-}
-
-TEST_F(HttpFilterTest, MetadataOptionsOverrideOverwriteWithEmpty) {
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  metadata_options:
-    forwarding_namespaces:
-      untyped:
-      - untyped_ns_1
-      typed:
-      - typed_ns_1
-    receiving_namespaces:
-      untyped:
-      - untyped_receiving_ns_1
-  )EOF");
-  ExtProcPerRoute override_cfg;
-  const std::string override_yaml = R"EOF(
-  overrides:
-    metadata_options:
-      namespaces_merge_behavior: overwrite_with_empty
-      forwarding_namespaces:
-        untyped:
-        - untyped_ns_2
-  )EOF";
-  TestUtility::loadFromYaml(override_yaml, override_cfg);
-
-  FilterConfigPerRoute route_config(override_cfg);
-
-  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
-      .WillOnce(
-          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            cb(route_config);
-          }));
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-  response_headers_.addCopy(LowerCaseString("content-length"), "3");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
-
-  ASSERT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces().size(), 1);
-  EXPECT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_2");
-  ASSERT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces().size(), 1);
-  EXPECT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_2");
-
-  ASSERT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces().size(), 0);
-  ASSERT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces().size(), 0);
-
-  ASSERT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces().size(), 0);
-  ASSERT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces().size(), 0);
-
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-
-  filter_->onDestroy();
-}
-
-TEST_F(HttpFilterTest, MetadataOptionsOverrideMerge) {
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  metadata_options:
-    forwarding_namespaces:
-      untyped:
-      - untyped_ns_1
-      typed:
-      - typed_ns_1
-    receiving_namespaces:
-      untyped:
-      - untyped_receiving_ns_1
-  )EOF");
-  ExtProcPerRoute override_cfg;
-  const std::string override_yaml = R"EOF(
-  overrides:
-    metadata_options:
-      namespaces_merge_behavior: merge
-      forwarding_namespaces:
-        untyped:
-        - untyped_ns_2
-        typed:
-        - typed_ns_2
-      receiving_namespaces:
-        untyped:
-        - untyped_receiving_ns_2
-  )EOF";
-  TestUtility::loadFromYaml(override_yaml, override_cfg);
-
-  FilterConfigPerRoute route_config(override_cfg);
-
-  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
-      .WillOnce(
-          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            cb(route_config);
-          }));
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-  response_headers_.addCopy(LowerCaseString("content-length"), "3");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
-
-  ASSERT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces().size(), 2);
-  EXPECT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_1");
-  EXPECT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces()[1], "untyped_ns_2");
-  ASSERT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces().size(), 2);
-  EXPECT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_1");
-  EXPECT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces()[1], "untyped_ns_2");
-
-  ASSERT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces().size(), 2);
-  EXPECT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces()[0], "typed_ns_1");
-  EXPECT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces()[1], "typed_ns_2");
-  ASSERT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces().size(), 2);
-  EXPECT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces()[0], "typed_ns_1");
-  EXPECT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces()[1], "typed_ns_2");
-
-  ASSERT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces().size(), 2);
-  EXPECT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces()[0],
-            "untyped_receiving_ns_1");
-  EXPECT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces()[1],
-            "untyped_receiving_ns_2");
-  ASSERT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces().size(), 2);
-  EXPECT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces()[0],
-            "untyped_receiving_ns_1");
-  EXPECT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces()[1],
             "untyped_receiving_ns_2");
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));

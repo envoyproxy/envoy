@@ -120,8 +120,6 @@ protected:
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 
       // Add set_metadata filter to inject dynamic metadata used for testing
-      // TODO(jbohanon) If/when https://github.com/envoyproxy/envoy/pull/31244 merges
-      // we should use this to test typed metadata as well
       if (config_option.add_metadata) {
         envoy::config::listener::v3::Filter set_metadata_filter;
         std::string set_metadata_filter_name = "envoy.filters.http.set_metadata";
