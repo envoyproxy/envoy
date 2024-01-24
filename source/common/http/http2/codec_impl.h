@@ -185,10 +185,10 @@ protected:
     explicit Http2Visitor(ConnectionImpl* connection);
 
     int64_t OnReadyToSend(absl::string_view serialized) override;
-    void OnConnectionError(ConnectionError error) override;
+    void OnConnectionError(ConnectionError /*error*/) override { /* not implemented */ }
     bool OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
                        uint8_t flags) override;
-    void OnSettingsStart() override;
+    void OnSettingsStart() override {}
     void OnSetting(Http2Setting setting) override;
     void OnSettingsEnd() override;
     void OnSettingsAck() override {}
