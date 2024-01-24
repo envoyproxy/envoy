@@ -86,7 +86,6 @@ envoy_cc_library(
         "headers_builder.h",
         "key_value_store.h",
         "log_level.h",
-        "pulse_client.h",
         "request_headers.h",
         "request_headers_builder.h",
         "request_method.h",
