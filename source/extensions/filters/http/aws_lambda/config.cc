@@ -79,7 +79,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
   }
   return std::make_shared<const FilterSettings>(
       FilterSettings{*arn, getInvocationMode(proto_config.invoke_config()),
-                     proto_config.invoke_config().payload_passthrough(), proto_config.invoke_config().host_rewrite()});
+                     proto_config.invoke_config().payload_passthrough(),
+                     proto_config.invoke_config().host_rewrite()});
 }
 
 /*

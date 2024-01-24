@@ -80,13 +80,15 @@ enum class InvocationMode { Synchronous, Asynchronous };
 
 class FilterSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FilterSettings(const Arn& arn, InvocationMode mode, bool payload_passthrough, const std::string & host_rewrite)
-      : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough), host_rewrite_(host_rewrite) {}
+  FilterSettings(const Arn& arn, InvocationMode mode, bool payload_passthrough,
+                 const std::string& host_rewrite)
+      : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough),
+        host_rewrite_(host_rewrite) {}
 
   const Arn& arn() const& { return arn_; }
   bool payloadPassthrough() const { return payload_passthrough_; }
   InvocationMode invocationMode() const { return invocation_mode_; }
-  const std::string& hostRewrite() const {return host_rewrite_; }
+  const std::string& hostRewrite() const { return host_rewrite_; }
 
 private:
   Arn arn_;

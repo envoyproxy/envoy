@@ -141,7 +141,8 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectRegionForSigning) {
   const absl::string_view override_region = "us-west-1";
   const auto per_route_arn =
       parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
-  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/, ""};
+  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/,
+                                ""};
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&route_settings));
 
@@ -216,7 +217,8 @@ TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
   const absl::string_view override_region = "us-west-1";
   const auto per_route_arn =
       parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
-  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/, ""};
+  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/,
+                                ""};
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&route_settings));
 

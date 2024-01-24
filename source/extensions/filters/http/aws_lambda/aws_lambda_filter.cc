@@ -42,7 +42,7 @@ constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
 void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>& arn,
-                      InvocationMode mode, const std::string & host_rewrite) {
+                      InvocationMode mode, const std::string& host_rewrite) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
   if (mode == InvocationMode::Synchronous) {
