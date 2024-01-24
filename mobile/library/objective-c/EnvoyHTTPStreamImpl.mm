@@ -3,6 +3,7 @@
 
 #import "library/common/main_interface.h"
 #import "library/common/types/c_types.h"
+#import "library/common/engine.h"
 
 #import <stdatomic.h>
 
@@ -138,11 +139,11 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
   EnvoyHTTPCallbacks *_platformCallbacks;
   envoy_http_callbacks _nativeCallbacks;
   envoy_stream_t _streamHandle;
-  envoy_engine_t _engineHandle;
+  Envoy::Engine *_engine;
 }
 
 - (instancetype)initWithHandle:(envoy_stream_t)handle
-                        engine:(envoy_engine_t)engineHandle
+                        engine:(intptr_t)engine
                      callbacks:(EnvoyHTTPCallbacks *)callbacks
            explicitFlowControl:(BOOL)explicitFlowControl {
   self = [super init];
@@ -168,17 +169,13 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
       context};
   _nativeCallbacks = native_callbacks;
 
-  _engineHandle = engineHandle;
+  _engine = reinterpret_cast<Envoy::Engine *>(engine);
 
   // We need create the native-held strong ref on this stream before we call start_stream because
   // start_stream could result in a reset that would release the native ref.
   _strongSelf = self;
-  envoy_status_t result =
-      start_stream(engineHandle, _streamHandle, native_callbacks, explicitFlowControl);
-  if (result != ENVOY_SUCCESS) {
-    _strongSelf = nil;
-    return nil;
-  }
+  _streamHandle = _engine->initStream();
+  _engine->startStream(_streamHandle, native_callbacks, explicitFlowControl);
 
   return self;
 }
@@ -190,23 +187,24 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)sendHeaders:(EnvoyHeaders *)headers close:(BOOL)close {
-  send_headers(_engineHandle, _streamHandle, toNativeHeaders(headers), close);
+  _engine->sendHeaders(_streamHandle, toNativeHeaders(headers), close);
 }
 
 - (void)sendData:(NSData *)data close:(BOOL)close {
-  send_data(_engineHandle, _streamHandle, toNativeData(data), close);
+  _engine->sendData(_streamHandle, toNativeData(data), close);
 }
 
 - (void)readData:(size_t)byteCount {
-  read_data(_engineHandle, _streamHandle, byteCount);
+  _engine->readData(_streamHandle, byteCount);
 }
 
 - (void)sendTrailers:(EnvoyHeaders *)trailers {
-  send_trailers(_engineHandle, _streamHandle, toNativeHeaders(trailers));
+  _engine->sendTrailers(_streamHandle, toNativeHeaders(trailers));
 }
 
 - (int)cancel {
-  return reset_stream(_engineHandle, _streamHandle);
+  _engine->cancelStream(_streamHandle);
+  return ENVOY_SUCCESS;
 }
 
 - (void)cleanUp {

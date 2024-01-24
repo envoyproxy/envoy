@@ -63,8 +63,9 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
       thread_local_slot_(
           ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
   const bool allow_added_via_api = true;
-  Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster, cluster_manager,
-                                allow_added_via_api);
+  THROW_IF_STATUS_NOT_OK(Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster,
+                                                       cluster_manager, allow_added_via_api),
+                         throw);
 
   thread_local_slot_->set([&logger = ENVOY_LOGGER(), collector_cluster, collector_reference_host,
                            config, &tracer_stats = tracer_stats_, &cluster_manager,
