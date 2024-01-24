@@ -143,8 +143,9 @@ private:
   public:
     DirectStreamCallbacks(DirectStream& direct_stream, envoy_http_callbacks bridge_callbacks,
                           Client& http_client);
+    virtual ~DirectStreamCallbacks();
 
-    void closeStream();
+    void closeStream(bool end_stream = true);
     void onComplete();
     void onCancel();
     void onError();
@@ -185,18 +186,20 @@ private:
     //
     // Bytes will only be sent up once, even if the bytes available are fewer
     // than bytes_to_send.
-    void resumeData(int32_t bytes_to_send);
+    void resumeData(size_t bytes_to_send);
 
     void setFinalStreamIntel(StreamInfo::StreamInfo& stream_info);
+
+    void latchError();
 
   private:
     bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
 
     void sendDataToBridge(Buffer::Instance& data, bool end_stream);
     void sendTrailersToBridge(const ResponseTrailerMap& trailers);
+    void sendErrorToBridge();
     envoy_stream_intel streamIntel();
     envoy_final_stream_intel& finalStreamIntel();
-    envoy_error streamError();
 
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;
@@ -217,7 +220,7 @@ private:
     bool remote_end_stream_received_{};
     // Set true when the end stream has been forwarded to the bridge.
     bool remote_end_stream_forwarded_{};
-    uint32_t bytes_to_send_{};
+    size_t bytes_to_send_{};
   };
 
   using DirectStreamCallbacksPtr = std::unique_ptr<DirectStreamCallbacks>;
@@ -237,11 +240,7 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-    CodecEventCallbacks*
-    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
-      std::swap(codec_callbacks, codec_callbacks_);
-      return codec_callbacks;
-    }
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
 
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
@@ -305,6 +304,7 @@ private:
       if (!request_decoder_) {
         return {};
       }
+      ENVOY_BUG(request_decoder_->get(), "attempting to access deleted decoder");
       return request_decoder_->get();
     }
 

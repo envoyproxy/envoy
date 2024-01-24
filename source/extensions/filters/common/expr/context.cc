@@ -303,6 +303,7 @@ public:
   // Default stubs.
   int size() const override { return 0; }
   bool empty() const override { return true; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return &WrapperFields::get().Empty;
   }
@@ -385,6 +386,16 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
     const absl::string_view filter_chain_name =
         filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
     return CelValue::CreateStringView(filter_chain_name);
+  } else if (value == ListenerMetadata) {
+    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &arena_);
+    }
+  } else if (value == ListenerDirection) {
+    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelValue::CreateInt64(listener_info->direction());
+    }
   } else if (value == Node) {
     if (local_info_) {
       return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);

@@ -3,7 +3,10 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
+
+#if defined(USE_CEL)
 #include "source/extensions/filters/common/expr/cel_state.h"
+#endif // USE_CEL
 
 #include "test/mocks/stream_info/mocks.h"
 
@@ -13,8 +16,11 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 namespace {
 
+#if defined(USE_CEL)
 using Filters::Common::Expr::CelStatePrototype;
 using Filters::Common::Expr::CelStateType;
+#endif // USE_CEL
+
 using testing::_;
 using testing::Return;
 
@@ -58,6 +64,7 @@ TEST(UtilityResponseFlagsToAccessLogResponseFlagsTest, All) {
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
+#if defined(USE_CEL)
 // key is present only in downstream streamInfo's filter state
 TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -156,6 +163,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
+#endif // USE_CEL
 
 } // namespace
 } // namespace GrpcCommon

@@ -46,7 +46,8 @@ message RingHash {
   // provided host) the better the request distribution will reflect the desired weights. Defaults
   // to 1024 entries, and limited to 8M entries. See also
   // :ref:`maximum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.maximum_ring_size>`.
-  google.protobuf.UInt64Value minimum_ring_size = 2 [(validate.rules).uint64 = {lte: 8388608}];
+  google.protobuf.UInt64Value minimum_ring_size = 2
+      [(validate.rules).uint64 = {lte: 8388608 gte: 1}];
 
   // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
   // to further constrain resource use. See also

@@ -10,10 +10,11 @@ namespace Server {
 
 class AdminFactoryContext final : public FactoryContextImplBase {
 public:
-  AdminFactoryContext(Envoy::Server::Instance& server)
+  AdminFactoryContext(Envoy::Server::Instance& server,
+                      const Network::ListenerInfoConstSharedPtr& listener_info)
       : FactoryContextImplBase(server, server.messageValidationContext().staticValidationVisitor(),
                                server.stats().createScope(""),
-                               server.stats().createScope("listener.admin.")) {}
+                               server.stats().createScope("listener.admin."), listener_info) {}
 
   Init::Manager& initManager() override {
     // Reuse the server init manager to avoid creating a new one for this special listener.

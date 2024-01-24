@@ -21,6 +21,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -121,8 +122,11 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_ =
-        std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(), "");
+    config_ = std::make_shared<FilterConfig>(
+        proto_config, 200ms, 10000, *stats_store_.rootScope(), "",
+        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+        local_info_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -561,6 +565,7 @@ protected:
   std::vector<Event::MockTimer*> timers_;
   TestScopedRuntime scoped_runtime_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -2899,11 +2904,11 @@ TEST(OverrideTest, OverrideProcessingMode) {
       ProcessingMode::BUFFERED);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_FALSE(route1.disabled());
-  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::DEFAULT);
-  EXPECT_EQ(route1.processingMode()->request_body_mode(), ProcessingMode::STREAMED);
-  EXPECT_EQ(route1.processingMode()->response_body_mode(), ProcessingMode::BUFFERED);
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_FALSE(merged_route.disabled());
+  EXPECT_EQ(merged_route.processingMode()->request_header_mode(), ProcessingMode::DEFAULT);
+  EXPECT_EQ(merged_route.processingMode()->request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(merged_route.processingMode()->response_body_mode(), ProcessingMode::BUFFERED);
 }
 
 // When merging two configurations, if the first processing mode is set, and
@@ -2916,9 +2921,9 @@ TEST(OverrideTest, DisableOverridesFirstMode) {
   cfg2.set_disabled(true);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_TRUE(route1.disabled());
-  EXPECT_FALSE(route1.processingMode());
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_TRUE(merged_route.disabled());
+  EXPECT_FALSE(merged_route.processingMode());
 }
 
 // When merging two configurations, if the first override is disabled, and
@@ -2931,9 +2936,9 @@ TEST(OverrideTest, ModeOverridesFirstDisable) {
       ProcessingMode::SKIP);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_FALSE(route1.disabled());
-  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::SKIP);
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_FALSE(merged_route.disabled());
+  EXPECT_EQ(merged_route.processingMode()->request_header_mode(), ProcessingMode::SKIP);
 }
 
 // When merging two configurations, if both are disabled, then it's still
@@ -2945,9 +2950,9 @@ TEST(OverrideTest, DisabledThingsAreDisabled) {
   cfg2.set_disabled(true);
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  EXPECT_TRUE(route1.disabled());
-  EXPECT_FALSE(route1.processingMode());
+  FilterConfigPerRoute merged_route(route1, route2);
+  EXPECT_TRUE(merged_route.disabled());
+  EXPECT_FALSE(merged_route.processingMode());
 }
 
 // When merging two configurations, second grpc_service overrides the first.
@@ -2960,9 +2965,9 @@ TEST(OverrideTest, GrpcServiceOverride) {
       "cluster_2");
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  ASSERT_TRUE(route1.grpcService().has_value());
-  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
+  FilterConfigPerRoute merged_route(route1, route2);
+  ASSERT_TRUE(merged_route.grpcService().has_value());
+  EXPECT_THAT(*merged_route.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
 }
 
 // When merging two configurations, unset grpc_service is equivalent to no override.
@@ -2974,9 +2979,9 @@ TEST(OverrideTest, GrpcServiceNonOverride) {
   // Leave cfg2.grpc_service unset.
   FilterConfigPerRoute route1(cfg1);
   FilterConfigPerRoute route2(cfg2);
-  route1.merge(route2);
-  ASSERT_TRUE(route1.grpcService().has_value());
-  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
+  FilterConfigPerRoute merged_route(route1, route2);
+  ASSERT_TRUE(merged_route.grpcService().has_value());
+  EXPECT_THAT(*merged_route.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
 // Verify that attempts to change headers that are not allowed to be changed

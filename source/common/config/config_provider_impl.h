@@ -211,7 +211,7 @@ protected:
         manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
         time_source_(factory_context.timeSource()),
         last_updated_(factory_context.timeSource().systemTime()) {
-    Envoy::Config::Utility::checkLocalInfo(name, factory_context.localInfo());
+    THROW_IF_NOT_OK(Envoy::Config::Utility::checkLocalInfo(name, factory_context.localInfo()));
     local_init_manager_.add(local_init_target_);
   }
 

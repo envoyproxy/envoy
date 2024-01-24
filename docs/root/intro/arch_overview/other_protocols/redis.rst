@@ -238,6 +238,7 @@ For details on each command's usage see the official
   DECRBY, String
   GET, String
   GETBIT, String
+  GETDEL, String
   GETRANGE, String
   GETSET, String
   INCR, String

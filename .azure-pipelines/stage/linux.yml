@@ -63,6 +63,7 @@ jobs:
     name: target
   - template: ../ci.yml
     parameters:
+      artifactName: release
       managedAgent: ${{ parameters.managedAgent }}
       ciTarget: $(target.value)
       cacheName: "release"

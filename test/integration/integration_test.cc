@@ -1558,23 +1558,6 @@ TEST_P(IntegrationTest, AbsolutePathWithMixedScheme) {
   EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
-TEST_P(IntegrationTest, AbsolutePathWithMixedSchemeLegacy) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme", "false");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.handle_uppercase_scheme", "false");
-
-  // Mixed scheme requests will be rejected
-  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
-  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
-  config_helper_.addVirtualHost(host);
-  initialize();
-  std::string response;
-  sendRawHttpAndWaitForResponse(
-      lookupPort("http"), "GET hTtp://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
-      &response, true);
-  EXPECT_THAT(response, StartsWith("HTTP/1.1 400"));
-}
-
 TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
   // Add a restrictive default match, to avoid the request hitting the * / catchall.
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");

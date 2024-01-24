@@ -617,6 +617,9 @@ public:
   OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
     return StreamInfoImpl::downstreamAddressProvider().filterChainInfo();
   }
+  OptRef<const Network::ListenerInfo> listenerInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().listenerInfo();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
@@ -777,6 +780,9 @@ public:
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
+
+  void resetStream(StreamResetReason reason, absl::string_view transport_failure_reason);
+
   /**
    * Executes a prepared, but not yet propagated, local reply.
    * Prepared local replies can occur in the decoder filter chain iteration.

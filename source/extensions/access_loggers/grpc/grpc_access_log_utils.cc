@@ -8,6 +8,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/custom_tag_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -203,6 +204,9 @@ void Utility::extractCommonAccessLogProperties(
     }
 
     peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
+    peer_properties->set_issuer(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->issuerPeerCertificate()));
+
     tls_properties->set_tls_session_id(
         MessageUtil::sanitizeUtf8String(downstream_ssl_connection->sessionId()));
     tls_properties->set_tls_version(
@@ -310,7 +314,8 @@ void Utility::extractCommonAccessLogProperties(
     }
   }
 
-  Tracing::CustomTagContext ctx{&request_header, stream_info};
+  Tracing::ReadOnlyHttpTraceContext trace_context(request_header);
+  Tracing::CustomTagContext ctx{trace_context, stream_info};
   for (const auto& custom_tag : config.custom_tags()) {
     const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
     tag_applier->applyLog(common_access_log, ctx);

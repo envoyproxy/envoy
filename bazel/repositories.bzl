@@ -14,6 +14,24 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
+    # Extensions that require CEL.
+    "envoy.access_loggers.extension_filters.cel",
+    "envoy.rate_limit_descriptors.expr",
+    "envoy.filters.http.rate_limit_quota",
+    "envoy.filters.http.ext_proc",
+    "envoy.formatter.cel",
+    "envoy.matching.inputs.cel_data_input",
+    "envoy.matching.matchers.cel_matcher",
+    # Wasm and RBAC extensions have a link dependency on CEL.
+    "envoy.access_loggers.wasm",
+    "envoy.bootstrap.wasm",
+    "envoy.filters.http.wasm",
+    "envoy.filters.network.wasm",
+    "envoy.stat_sinks.wasm",
+    # RBAC extensions have a link dependency on CEL.
+    "envoy.filters.http.rbac",
+    "envoy.filters.network.rbac",
+    "envoy.rbac.matchers.upstream_ip_port",
 ]
 
 NO_HTTP3_SKIP_TARGETS = [
@@ -1462,5 +1480,5 @@ def _com_github_maxmind_libmaxminddb():
     )
     native.bind(
         name = "maxmind",
-        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux_darwin",
     )

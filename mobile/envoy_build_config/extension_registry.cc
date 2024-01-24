@@ -9,7 +9,6 @@
 #include "source/common/upstream/default_local_address_selector_factory.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
-#include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
@@ -34,8 +33,8 @@
 #include "source/extensions/upstreams/http/generic/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #endif
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -46,7 +45,7 @@
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
 #include "extension_registry_platform_additions.h"
@@ -204,9 +203,6 @@ void ExtensionRegistry::registerFactories() {
 #endif
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
 #endif
-
-  // TODO(alyssawilk) figure out why these are needed.
-  Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
 
 #ifdef ENVOY_MOBILE_XDS
   // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile

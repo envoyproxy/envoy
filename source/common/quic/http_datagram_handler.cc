@@ -12,11 +12,7 @@
 namespace Envoy {
 namespace Quic {
 
-HttpDatagramHandler::HttpDatagramHandler(quic::QuicSpdyStream& stream) : stream_(stream) {
-  stream_.RegisterHttp3DatagramVisitor(this);
-}
-
-HttpDatagramHandler::~HttpDatagramHandler() { stream_.UnregisterHttp3DatagramVisitor(); }
+HttpDatagramHandler::HttpDatagramHandler(quic::QuicSpdyStream& stream) : stream_(stream) {}
 
 void HttpDatagramHandler::decodeCapsule(const quiche::Capsule& capsule) {
   quiche::QuicheBuffer serialized_capsule = SerializeCapsule(capsule, &capsule_buffer_allocator_);
