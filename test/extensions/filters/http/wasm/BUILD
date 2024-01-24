@@ -37,7 +37,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     shard_count = 50,
-    tags = ["cpu:4"],
+    tags = [
+        "cpu:4",
+        "skip_on_windows",
+    ],
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/wasm:wasm_filter_lib",
@@ -59,6 +62,7 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     shard_count = 16,
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",

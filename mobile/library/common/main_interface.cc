@@ -23,54 +23,6 @@ envoy_status_t runOnEngineDispatcher(envoy_engine_t handle,
 }
 } // namespace
 
-static std::atomic<envoy_stream_t> current_stream_handle_{0};
-
-envoy_stream_t init_stream(envoy_engine_t) { return current_stream_handle_++; }
-
-envoy_status_t start_stream(envoy_engine_t engine, envoy_stream_t stream,
-                            envoy_http_callbacks callbacks, bool explicit_flow_control) {
-  return runOnEngineDispatcher(
-      engine, [stream, callbacks, explicit_flow_control](auto& engine) -> void {
-        engine.httpClient().startStream(stream, callbacks, explicit_flow_control);
-      });
-}
-
-envoy_status_t send_headers(envoy_engine_t engine, envoy_stream_t stream, envoy_headers headers,
-                            bool end_stream) {
-  return runOnEngineDispatcher(engine, ([stream, headers, end_stream](auto& engine) -> void {
-                                 engine.httpClient().sendHeaders(stream, headers, end_stream);
-                               }));
-}
-
-envoy_status_t read_data(envoy_engine_t engine, envoy_stream_t stream, size_t bytes_to_read) {
-  return runOnEngineDispatcher(engine, [stream, bytes_to_read](auto& engine) -> void {
-    engine.httpClient().readData(stream, bytes_to_read);
-  });
-}
-
-envoy_status_t send_data(envoy_engine_t engine, envoy_stream_t stream, envoy_data data,
-                         bool end_stream) {
-  return runOnEngineDispatcher(engine, [stream, data, end_stream](auto& engine) -> void {
-    engine.httpClient().sendData(stream, data, end_stream);
-  });
-}
-
-// TODO: implement.
-envoy_status_t send_metadata(envoy_engine_t, envoy_stream_t, envoy_headers) {
-  return ENVOY_FAILURE;
-}
-
-envoy_status_t send_trailers(envoy_engine_t engine, envoy_stream_t stream, envoy_headers trailers) {
-  return runOnEngineDispatcher(engine, [stream, trailers](auto& engine) -> void {
-    engine.httpClient().sendTrailers(stream, trailers);
-  });
-}
-
-envoy_status_t reset_stream(envoy_engine_t engine, envoy_stream_t stream) {
-  return runOnEngineDispatcher(
-      engine, [stream](auto& engine) -> void { engine.httpClient().cancelStream(stream); });
-}
-
 envoy_status_t set_preferred_network(envoy_engine_t engine, envoy_network_t network) {
   envoy_netconf_t configuration_key =
       Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);

@@ -140,6 +140,14 @@ public:
         upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
         upstream_resp_exception_local_(stat_name_set_->add("thrift.upstream_resp_exception_local")),
+        upstream_resp_exception_local_overflow_(
+            stat_name_set_->add("thrift.upstream_resp_exception_local.overflow")),
+        upstream_resp_exception_local_local_connection_failure_(
+            stat_name_set_->add("thrift.upstream_resp_exception_local.local_connection_failure")),
+        upstream_resp_exception_local_remote_connection_failure_(
+            stat_name_set_->add("thrift.upstream_resp_exception_local.remote_connection_failure")),
+        upstream_resp_exception_local_timeout_(
+            stat_name_set_->add("thrift.upstream_resp_exception_local.timeout")),
         upstream_resp_exception_remote_(
             stat_name_set_->add("thrift.upstream_resp_exception_remote")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
@@ -249,9 +257,30 @@ public:
    * upstream.
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
    */
-  void incResponseLocalException(const Upstream::ClusterInfo& cluster) const {
+  void incResponseLocalException(
+      const Upstream::ClusterInfo& cluster,
+      absl::optional<ConnectionPool::PoolFailureReason> reason = absl::nullopt) const {
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_);
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_);
+
+    if (reason.has_value()) {
+      switch (reason.value()) {
+      case ConnectionPool::PoolFailureReason::Overflow:
+        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_overflow_);
+        break;
+      case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+        incClusterScopeCounter(cluster, nullptr,
+                               upstream_resp_exception_local_local_connection_failure_);
+        break;
+      case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+        incClusterScopeCounter(cluster, nullptr,
+                               upstream_resp_exception_local_remote_connection_failure_);
+        break;
+      case ConnectionPool::PoolFailureReason::Timeout:
+        incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_timeout_);
+        break;
+      }
+    }
   }
 
   /**
@@ -366,6 +395,10 @@ private:
   const Stats::StatName upstream_resp_reply_error_;
   const Stats::StatName upstream_resp_exception_;
   const Stats::StatName upstream_resp_exception_local_;
+  const Stats::StatName upstream_resp_exception_local_overflow_;
+  const Stats::StatName upstream_resp_exception_local_local_connection_failure_;
+  const Stats::StatName upstream_resp_exception_local_remote_connection_failure_;
+  const Stats::StatName upstream_resp_exception_local_timeout_;
   const Stats::StatName upstream_resp_exception_remote_;
   const Stats::StatName upstream_resp_invalid_type_;
   const Stats::StatName upstream_resp_decoding_error_;
