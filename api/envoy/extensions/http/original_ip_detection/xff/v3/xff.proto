@@ -63,5 +63,9 @@ message XffTrustedCidrs {
   // HTTP header to find the first (from the right) non-trusted IP address. If all addresses
   // are trusted, the last (from the right) IP address is returned.
   // Otherwise the last address in ``x-forwarded-for`` is used.
+  //
+  // Whether or not to recurse depends on whether you trust the downstream proxy to have
+  // validated all addresses in the list.
+  // If you do not fully trust the downstream proxy you may not wish to recurse.
   google.protobuf.BoolValue recurse = 2;
 }
