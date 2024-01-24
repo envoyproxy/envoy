@@ -78,6 +78,7 @@ public:
       std::unique_ptr<
           envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
           message) override;
+  void onServiceReachable() override {}
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
@@ -152,6 +153,7 @@ private:
             message) override {
       parent_.onReceiveMessage(std::move(message));
     }
+    void onServiceReachable() override { parent_.onServiceReachable(); }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
       return parent_.onReceiveInitialMetadata(std::move(metadata));
     }
