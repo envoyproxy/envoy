@@ -56,7 +56,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
       xds_resources_delegate_(grpc_mux_content.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_content.eds_resources_cache_)),
       target_xds_authority_(grpc_mux_content.target_xds_authority_) {
-  Config::Utility::checkLocalInfo("ads", grpc_mux_content.local_info_);
+  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", grpc_mux_content.local_info_));
   AllMuxes::get().insert(this);
 }
 

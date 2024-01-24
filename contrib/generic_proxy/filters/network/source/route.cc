@@ -17,26 +17,45 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
+RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilterConfig(
+    const std::string& name, const ProtobufWkt::Any& typed_config,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator) {
+
+  auto* factory = Config::Utility::getFactoryByType<NamedFilterConfigFactory>(typed_config);
+  if (factory == nullptr) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_extension_lookup_by_name")) {
+      factory = Config::Utility::getFactoryByName<NamedFilterConfigFactory>(name);
+    }
+  }
+
+  if (factory == nullptr) {
+    ExceptionUtil::throwEnvoyException(
+        fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'", name,
+                    Config::Utility::getFactoryType(typed_config)));
+  }
+
+  ProtobufTypes::MessagePtr message = factory->createEmptyRouteConfigProto();
+  if (message == nullptr) {
+    return nullptr;
+  }
+
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *message);
+  return factory->createRouteSpecificFilterConfig(*message, factory_context, validator);
+}
+
 RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
                                Envoy::Server::Configuration::ServerFactoryContext& context)
     : name_(route_action.name()), cluster_name_(route_action.cluster()),
       metadata_(route_action.metadata()), typed_metadata_(metadata_) {
 
   for (const auto& proto_filter_config : route_action.per_filter_config()) {
-    auto& factory = Config::Utility::getAndCheckFactoryByName<NamedFilterConfigFactory>(
-        proto_filter_config.first);
-
-    ProtobufTypes::MessagePtr message = factory.createEmptyRouteConfigProto();
-    if (message == nullptr) {
-      continue;
+    auto route_config =
+        createRouteSpecificFilterConfig(proto_filter_config.first, proto_filter_config.second,
+                                        context, context.messageValidationVisitor());
+    if (route_config != nullptr) {
+      per_filter_configs_.emplace(proto_filter_config.first, std::move(route_config));
     }
-
-    Envoy::Config::Utility::translateOpaqueConfig(proto_filter_config.second,
-                                                  context.messageValidationVisitor(), *message);
-
-    auto route_config = factory.createRouteSpecificFilterConfig(*message, context,
-                                                                context.messageValidationVisitor());
-    per_filter_configs_.emplace(proto_filter_config.first, std::move(route_config));
   }
 }
 

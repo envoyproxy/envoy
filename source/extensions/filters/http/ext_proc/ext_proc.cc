@@ -221,7 +221,8 @@ void Filter::onDestroy() {
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                      ProtobufWkt::Struct* proto) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -239,6 +240,9 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
+  if (proto != nullptr) {
+    (*headers_req->mutable_attributes())[FilterName] = *proto;
+  }
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -257,7 +261,17 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
-    status = onHeaders(decoding_state_, headers, end_stream);
+    ProtobufWkt::Struct proto;
+
+    if (config_->expressionManager().hasRequestExpr()) {
+      auto activation_ptr = Filters::Common::Expr::createActivation(
+          &config_->expressionManager().localInfo(), decoding_state_.streamInfo(), &headers,
+          nullptr, nullptr);
+      proto = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
+    }
+
+    status = onHeaders(decoding_state_, headers, end_stream,
+                       config_->expressionManager().hasRequestExpr() ? &proto : nullptr);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
@@ -535,7 +549,17 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
-    status = onHeaders(encoding_state_, headers, end_stream);
+    ProtobufWkt::Struct proto;
+
+    if (config_->expressionManager().hasResponseExpr()) {
+      auto activation_ptr = Filters::Common::Expr::createActivation(
+          &config_->expressionManager().localInfo(), encoding_state_.streamInfo(), nullptr,
+          &headers, nullptr);
+      proto = config_->expressionManager().evaluateResponseAttributes(*activation_ptr);
+    }
+
+    status = onHeaders(encoding_state_, headers, end_stream,
+                       config_->expressionManager().hasResponseExpr() ? &proto : nullptr);
     ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");

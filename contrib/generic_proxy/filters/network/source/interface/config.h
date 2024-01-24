@@ -51,6 +51,16 @@ public:
   virtual absl::Status validateCodec(const TypedExtensionConfig& /*config*/) {
     return absl::OkStatus();
   }
+
+  std::set<std::string> configTypes() override {
+    auto config_types = TypedFactory::configTypes();
+
+    if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
+      config_types.insert(createReflectableMessage(*message)->GetDescriptor()->full_name());
+    }
+
+    return config_types;
+  }
 };
 
 } // namespace GenericProxy
