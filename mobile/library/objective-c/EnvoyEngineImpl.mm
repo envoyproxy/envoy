@@ -556,8 +556,8 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
                             explicitFlowControl:(BOOL)explicitFlowControl {
-  return [[EnvoyHTTPStreamImpl alloc] initWithHandle:init_stream(_engineHandle)
-                                              engine:_engineHandle
+  return [[EnvoyHTTPStreamImpl alloc] initWithHandle:_engine->initStream()
+                                              engine:reinterpret_cast<envoy_engine_t>(_engine)
                                            callbacks:callbacks
                                  explicitFlowControl:explicitFlowControl];
 }
