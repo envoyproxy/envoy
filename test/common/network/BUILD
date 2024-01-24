@@ -433,6 +433,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "io_uring_socket_handle_impl_test",
+    srcs = select({
+        "//bazel:linux": ["io_uring_socket_handle_impl_test.cc"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/io:io_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "win32_socket_handle_impl_test",
     srcs = ["win32_socket_handle_impl_test.cc"],
     deps = [

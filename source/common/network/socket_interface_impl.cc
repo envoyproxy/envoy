@@ -10,15 +10,39 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
 
+#ifdef __linux__
+#include "source/common/network/io_uring_socket_handle_impl.h"
+#endif
+
 namespace Envoy {
 namespace Network {
 
-IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                            absl::optional<int> domain) {
+namespace {
+bool hasIoUringWorkerFactory(Io::IoUringWorkerFactory* io_uring_worker_factory) {
+  return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
+         io_uring_worker_factory->getIoUringWorker() != absl::nullopt;
+}
+} // namespace
+
+IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
+    int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    [[maybe_unused]] Io::IoUringWorkerFactory* io_uring_worker_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
+#ifdef __linux__
+  // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has
+  // been registered in the TLS, initialized. There are cases that test may create threads before
+  // IoUringWorkerFactory has been added to the TLS and got initialized.
+  if (hasIoUringWorkerFactory(io_uring_worker_factory)) {
+    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_worker_factory, socket_fd,
+                                                     socket_v6only, domain);
+  } else {
+    return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+  }
+#else
   return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+#endif
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
