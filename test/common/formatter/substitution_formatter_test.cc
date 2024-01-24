@@ -796,7 +796,14 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(id)));
   }
-
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CONNECTION_ID");
+    uint64_t id = 1234;
+    stream_info.upstreamInfo()->setUpstreamConnectionId(id);
+    EXPECT_EQ("1234", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::numberValue(id)));
+  }
   {
     StreamInfoFormatter upstream_format("STREAM_ID");
 
