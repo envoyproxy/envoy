@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/credential_injector/config.h"
 #include "source/extensions/filters/http/credential_injector/credential_injector_filter.h"
+#include "test/extensions/filters/http/credential_injector/mock_credential.pb.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -9,6 +10,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CredentialInjector {
+
+using testing::NiceMock;
+
+const ::test::mock_credential::Unregistered _mock_credential_dummy;
 
 TEST(Factory, UnregisteredExtension) {
   const std::string yaml_string = R"EOF(
