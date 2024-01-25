@@ -8,7 +8,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
-#include "absl/base/attributes.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 
@@ -38,7 +37,6 @@ using Http::ResponseTrailerMap;
 
 constexpr absl::string_view ErrorPrefix = "ext_proc_error";
 constexpr int DefaultImmediateStatus = 200;
-ABSL_ATTRIBUTE_UNUSED constexpr absl::string_view FilterName = "envoy.filters.http.ext_proc";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
