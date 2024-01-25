@@ -8,20 +8,33 @@
 namespace Envoy {
 namespace Network {
 
-void ApplePacProxyResolver::proxyAutoConfigurationResultCallback(void*, CFArrayRef cf_proxies, CFErrorRef cf_error) {
-  // Note: we don't need the void* context because it typically contains the callback pointer,
-  // whose ownership we'd be responsible for. However, we have stored the callback as a member
-  // of ApplePacProxyResolver, so we don't need to worry about its lifetime (since it's tied to the
-  // lifetime of this instance).  For that reason, we don't need the first argument to this
-  // function.
+namespace {
+
+struct PacResultCallbackWrapper {
+  PacResultCallbackWrapper(
+      const std::function<void(std::vector<ProxySettings>&)>& proxy_resolution_did_complete)
+      : pac_resolution_callback(proxy_resolution_did_complete) {}
+
+  std::function<void(std::vector<ProxySettings>&)> pac_resolution_callback;
+};
+
+// Called when the PAC URL resolution has executed and the result is available.
+static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies,
+                                                 CFErrorRef cf_error) {
+  // `ptr` contains the unowned pointer to the PacResultCallbackWrapper. We extract it from the
+  // void* and wrap it in a unique_ptr so the memory gets reclaimed at the end of the function when
+  // `callback_wrapper` goes out of scope.
+  std::unique_ptr<PacResultCallbackWrapper> callback_wrapper(
+      static_cast<PacResultCallbackWrapper*>(ptr));
+
+  std::vector<ProxySettings> proxies;
   if (cf_error != nullptr || cf_proxies == nullptr) {
     // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
     // system (URLSession) is doing.
-    proxy_resolution_completed_callback_({});
+    callback_wrapper->pac_resolution_callback(proxies);
     return;
   }
 
-  std::vector<ProxySettings> proxies;
   for (int i = 0; i < CFArrayGetCount(cf_proxies); i++) {
     CFDictionaryRef cf_dictionary =
         static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(cf_proxies, i));
@@ -45,24 +58,27 @@ void ApplePacProxyResolver::proxyAutoConfigurationResultCallback(void*, CFArrayR
     }
   }
 
-  proxy_resolution_completed_callback_(proxies);
+  callback_wrapper->pac_resolution_callback(proxies);
 }
+
+} // namespace
 
 void ApplePacProxyResolver::resolveProxies(
     absl::string_view target_url_string, absl::string_view proxy_autoconfiguration_file_url_string,
     std::function<void(std::vector<ProxySettings>&)> proxy_resolution_did_complete) {
-  proxy_resolution_completed_callback_ = proxy_resolution_did_complete;
   CFURLRef cf_target_url = createCFURL(target_url_string);
   CFURLRef cf_proxy_autoconfiguration_file_url =
       createCFURL(proxy_autoconfiguration_file_url_string);
 
-  CFStreamClientContext context = {0, &proxy_resolution_completed_callback_, nullptr, nullptr, nullptr};
+  std::unique_ptr<PacResultCallbackWrapper> callback_wrapper =
+      std::make_unique<PacResultCallbackWrapper>(proxy_resolution_did_complete);
+  CFStreamClientContext context = {0, callback_wrapper.release(), nullptr, nullptr, nullptr};
   // Even though neither the name of the method nor Apple's documentation mentions that, manual
   // testing shows that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched
   // PAC file and does not fetch it on every proxy resolution request.
   CFRunLoopSourceRef run_loop_source =
       CFNetworkExecuteProxyAutoConfigurationURL(cf_proxy_autoconfiguration_file_url, cf_target_url,
-                                                ApplePACProxyResolver::proxyAutoConfigurationResultCallback, &context);
+                                                proxyAutoConfigurationResultCallback, &context);
 
   CFRunLoopAddSource(CFRunLoopGetMain(), run_loop_source, kCFRunLoopDefaultMode);
 

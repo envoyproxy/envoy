@@ -92,7 +92,6 @@ envoy_cc_library(
     hdrs = ["proxy_settings.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/data:utility_lib",
         "@envoy//source/common/network:utility_lib",
     ],
 )

@@ -2,8 +2,6 @@
 
 #include "source/common/network/utility.h"
 
-#include "library/common/data/utility.h"
-
 namespace Envoy {
 namespace Network {
 

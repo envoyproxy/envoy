@@ -1,8 +1,8 @@
 #pragma once
 
+#include <memory>
+
 #include "library/common/network/proxy_resolver_interface.h"
-#include "library/common/network/proxy_types.h"
-#include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Network {

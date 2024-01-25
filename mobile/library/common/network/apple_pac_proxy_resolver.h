@@ -3,6 +3,7 @@
 #include <CFNetwork/CFNetwork.h>
 
 #include <functional>
+#include <vector>
 
 #include "absl/strings/string_view.h"
 #include "library/common/network/proxy_settings.h"
@@ -30,13 +31,8 @@ public:
                  std::function<void(std::vector<ProxySettings>&)> proxy_resolution_did_complete);
 
 private:
-  // Called when the PAC URL resolution has executed and the result is available.
-  void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFErrorRef cf_error);
   // Creates a CFURLRef from a C++ string URL.
   CFURLRef createCFURL(absl::string_view url_string);
-
-  // The callback to invoke when PAC URL resolution is completed.
-  std::function<void(std::vector<ProxySettings>&)> proxy_resolution_completed_callback_;
 };
 
 } // namespace Network
