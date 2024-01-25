@@ -29,11 +29,23 @@ Other credential types can be supported as extensions.
 
 Here is an example configuration with Generic credential, which injects an HTTP Basic Auth credential into the proxied requests.
 
-.. literalinclude:: _include/credential-injector-filter.yaml
-    :language: yaml
-    :lines: 28-41
-    :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-filter.yaml>`
+.. code-block:: yaml
 
+  http_filters:
+  - name: envoy.filters.http.credential_injector
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+      allow_request_without_credential: true
+      overwrite: true
+      credential:
+        name: envoy.injected_credentials.generic
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.injected_credentials.generic.v3.Generic
+          credential:
+            name: credential
+            sds_config:
+              path_config_source:
+                path: /home/ubuntu/credential.yaml
 
 credential.yaml for Basic Auth:
 
