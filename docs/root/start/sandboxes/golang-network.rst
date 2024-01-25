@@ -14,13 +14,13 @@ In this example, we show how the `Golang <https://go.dev/>`_ network filter can 
 
 The example Go plugin adds a :literal:`hello, \ ` prefix to the requests received from its TCP connections. These modified requests are then proxied to an echo service that is retrieved from the configuration file.
 
-.. code-block:: yaml
-   :emphasize-lines: 4
-
-   plugin_config:
-      "@type": type.googleapis.com/xds.type.v3.TypedStruct
-      value:
-         echo_server_addr: echo_service
+.. literalinclude:: _include/golang-network/envoy.yaml
+   :language: yaml
+   :lines: 16-23
+   :linenos:
+   :lineno-start: 16
+   :emphasize-lines: 3-6
+   :caption: :download:`envoy.yaml <_include/golang-network/envoy.yaml>`
 
 
 Step 1: Compile the go plugin library

@@ -62,22 +62,13 @@ to set a :ref:`cluster member<envoy_v3_api_msg_config.endpoint.v3.Endpoint>`'s a
 :ref:`address<envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.address>` and
 :ref:`port<envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.port_value>` is:
 
-.. code-block:: yaml
-
-  load_assignment:
-    endpoints:
-    - lb_endpoints:
-      - endpoint:
-          health_check_config:
-            port_value: 8080
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 80
-          address:
-            socket_address:
-              address: localhost
-              port_value: 80
+.. literalinclude:: /_configs/upstream/health-checking.yaml
+    :language: yaml
+    :lines: 17-32
+    :emphasize-lines: 3-16
+    :linenos:
+    :lineno-start: 17
+    :caption: :download:`health-checking.yaml </_configs/upstream/health-checking.yaml>`
 
 .. _arch_overview_health_check_logging:
 
@@ -192,5 +183,3 @@ Degraded health
 When using the HTTP health checker, an upstream host can return ``x-envoy-degraded`` to inform the
 health checker that the host is degraded. See :ref:`here <arch_overview_load_balancing_degraded>` for
 how this affects load balancing.
-
-
