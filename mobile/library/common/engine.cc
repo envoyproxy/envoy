@@ -32,7 +32,7 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-envoy_status_t Engine::run(const std::string config, const std::string log_level) {
+envoy_status_t Engine::run(const std::string& config, const std::string& log_level) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
@@ -40,7 +40,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   auto options = std::make_unique<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level.c_str()).ok(), "invalid log level");
+    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
   }
   options->setConcurrency(1);
   return run(std::move(options));
