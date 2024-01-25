@@ -7,6 +7,7 @@ import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -73,7 +74,8 @@ message LeastRequest {
 
   // [#not-implemented-hide:]
   // Unused. Replaced by the `selection_method` enum for better extensibility.
-  google.protobuf.BoolValue enable_full_scan = 5 [deprecated = true];
+  google.protobuf.BoolValue enable_full_scan = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Method for selecting the host set from which to return the host with the fewest active requests.
   //

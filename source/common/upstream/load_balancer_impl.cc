@@ -1307,7 +1307,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
     candidate_host = unweightedHostPickNChoices(hosts_to_use);
     break;
   default:
-      IS_ENVOY_BUG("unknown selection method specified for least request load balancer");
+    IS_ENVOY_BUG("unknown selection method specified for least request load balancer");
   }
 
   return candidate_host;

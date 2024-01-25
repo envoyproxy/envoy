@@ -5,7 +5,6 @@
 #include <string>
 #include <tuple>
 #include <utility>
-#include <random>
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
