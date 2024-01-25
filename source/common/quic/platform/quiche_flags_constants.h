@@ -36,9 +36,9 @@
 
 namespace quiche {
 
-const std::string EnvoyQuicheReloadableFlagPrefix =
+inline constexpr absl::string_view EnvoyQuicheReloadableFlagPrefix =
     "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_";
 
-const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
+inline constexpr absl::string_view EnvoyFeaturePrefix = "envoy.reloadable_features.";
 
 } // namespace quiche

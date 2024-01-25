@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
-#include "source/common/http/utility.h"
 
 #include "absl/flags/flag.h"
 #include "absl/strings/ascii.h"
