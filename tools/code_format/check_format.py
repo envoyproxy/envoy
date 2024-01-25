@@ -393,8 +393,11 @@ class FormatChecker:
         return file_path in self.config.paths["raw_try"]["include"]
 
     def deny_listed_for_exceptions(self, file_path):
-        # Returns true when it is a non test header file or the file_path is in DENYLIST or
-        # it is under tools/testdata subdirectory.
+      # Returns if this file is deny listed for exceptions.
+      # Header files are strongly discouraged from throwing exceptions, both for
+      # core and exception code. Source files are also discouraged but
+      # extensions source files are currently exempt from checks as many factory creation
+      # calls do not yet support StatusOr.
         return ((
             file_path.endswith('.h') and file_path.startswith("./source/")
             and not file_path.startswith("./source/extensions/")
