@@ -99,14 +99,14 @@ message ProcessingRequest {
     // must send back a TrailerResponse message or close the stream.
     //
     // This message is only sent if the trailers processing mode is set to ``SEND`` and
-    // original downstream request has trailer.
+    // the original downstream request has trailer.
     HttpTrailers request_trailers = 6;
 
     // The HTTP trailers for the response path. Unless ``async_mode`` is ``true``, the server
     // must send back a TrailerResponse message or close the stream.
     //
     // This message is only sent if the trailers processing mode is set to ``SEND`` and
-    // original upstream response has trailer.
+    // the original upstream response has trailer.
     HttpTrailers response_trailers = 7;
   }
 }
