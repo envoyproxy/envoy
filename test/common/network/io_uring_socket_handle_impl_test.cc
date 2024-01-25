@@ -31,7 +31,7 @@ TEST(IoUringSocketHandleImpl, CreateClientSocket) {
   Io::MockIoUringWorkerFactory factory;
   Event::MockDispatcher dispatcher;
   IoUringSocketHandleTestImpl impl(factory, false);
-  EXPECT_EQ(IoUringSocketType::Client, impl.ioUringSocketType());
+  EXPECT_EQ(IoUringSocketType::Unknown, impl.ioUringSocketType());
   EXPECT_CALL(worker, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket));
   EXPECT_CALL(factory, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker)));
@@ -49,7 +49,7 @@ TEST(IoUringSocketHandleImpl, ReadError) {
   Io::MockIoUringWorkerFactory factory;
   Event::MockDispatcher dispatcher;
   IoUringSocketHandleTestImpl impl(factory, false);
-  EXPECT_EQ(IoUringSocketType::Client, impl.ioUringSocketType());
+  EXPECT_EQ(IoUringSocketType::Unknown, impl.ioUringSocketType());
   EXPECT_CALL(worker, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket));
   EXPECT_CALL(factory, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker)));
@@ -81,7 +81,7 @@ TEST(IoUringSocketHandleImpl, WriteError) {
   Io::MockIoUringWorkerFactory factory;
   Event::MockDispatcher dispatcher;
   IoUringSocketHandleTestImpl impl(factory, false);
-  EXPECT_EQ(IoUringSocketType::Client, impl.ioUringSocketType());
+  EXPECT_EQ(IoUringSocketType::Unknown, impl.ioUringSocketType());
   EXPECT_CALL(worker, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket));
   EXPECT_CALL(factory, getIoUringWorker())
       .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker)));
@@ -93,6 +93,31 @@ TEST(IoUringSocketHandleImpl, WriteError) {
   auto write_param_ref = OptRef<Io::WriteParam>(write_param);
   EXPECT_CALL(socket, getWriteParam()).WillOnce(testing::ReturnRef(write_param_ref));
   auto ret = impl.write(write_buffer);
+  EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::BadFd);
+}
+
+TEST(IoUringSocketHandleImpl, WritevError) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  Io::MockIoUringSocket socket;
+  Io::MockIoUringWorker worker;
+  Io::MockIoUringWorkerFactory factory;
+  Event::MockDispatcher dispatcher;
+  IoUringSocketHandleTestImpl impl(factory, false);
+  EXPECT_EQ(IoUringSocketType::Unknown, impl.ioUringSocketType());
+  EXPECT_CALL(worker, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket));
+  EXPECT_CALL(factory, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker)));
+  impl.initializeFileEvent(
+      dispatcher, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  Buffer::OwnedImpl write_buffer;
+  Io::WriteParam write_param{-EBADF};
+  auto write_param_ref = OptRef<Io::WriteParam>(write_param);
+  EXPECT_CALL(socket, getWriteParam()).WillOnce(testing::ReturnRef(write_param_ref));
+  auto slice = write_buffer.frontSlice();
+  auto ret = impl.writev(&slice, 1);
   EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::BadFd);
 }
 

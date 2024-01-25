@@ -18,6 +18,8 @@ using IoUringSocketHandleImplOptRef =
     absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
 
 enum class IoUringSocketType {
+  Unknown,
+  Accept,
   Server,
   Client,
 };
@@ -64,6 +66,10 @@ public:
 protected:
   std::string ioUringSocketTypeStr() const {
     switch (io_uring_socket_type_) {
+    case IoUringSocketType::Unknown:
+      return "unknown";
+    case IoUringSocketType::Accept:
+      return "accept";
     case IoUringSocketType::Client:
       return "client";
     case IoUringSocketType::Server:
@@ -74,6 +80,8 @@ protected:
   Io::IoUringWorkerFactory& io_uring_worker_factory_;
   IoUringSocketType io_uring_socket_type_;
   OptRef<Io::IoUringSocket> io_uring_socket_{absl::nullopt};
+
+  Event::FileEventPtr file_event_{nullptr};
 
   absl::optional<Api::IoCallUint64Result> checkReadResult() const;
   absl::optional<Api::IoCallUint64Result> checkWriteResult() const;

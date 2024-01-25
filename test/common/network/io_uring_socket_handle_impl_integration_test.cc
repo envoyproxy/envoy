@@ -56,6 +56,26 @@ public:
     }
   }
 
+  void createAcceptConnection() {
+    // Create an io_uring handle with accept socket.
+    fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
+    EXPECT_GE(fd_, 0);
+    io_uring_socket_handle_ = std::make_unique<IoUringSocketHandleImpl>(
+        *io_uring_worker_factory_, fd_, false, absl::nullopt, false);
+
+    // Listen within the io_uring handle.
+    auto local_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
+    io_uring_socket_handle_->bind(local_addr);
+    io_uring_socket_handle_->listen(1);
+
+    // Create an socket handle.
+    os_fd_t fd = Api::OsSysCallsSingleton::get()
+                     .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
+                     .return_value_;
+    EXPECT_GE(fd, 0);
+    io_socket_handle_ = std::make_unique<IoSocketHandleImpl>(fd);
+  }
+
   void createServerConnection() {
     // Create an io_uring handle with server socket.
     fd_ = Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, IPPROTO_TCP).return_value_;
@@ -145,6 +165,71 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, CancelAndClose) {
       *dispatcher_, [](uint32_t) {}, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_uring_socket_handle_->close();
 
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(errno, EBADF);
+}
+
+TEST_F(IoUringSocketHandleImplIntegrationTest, Accept) {
+  initialize();
+  createAcceptConnection();
+
+  bool accepted = false;
+  io_uring_socket_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        auto handle = io_uring_socket_handle_->accept(&addr, &addrlen);
+        EXPECT_NE(handle, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Connect from the socket handle.
+  io_socket_handle_->connect(io_uring_socket_handle_->localAddress());
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  // Close safely.
+  io_socket_handle_->close();
+  io_uring_socket_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(errno, EBADF);
+}
+
+TEST_F(IoUringSocketHandleImplIntegrationTest, AcceptError) {
+  initialize();
+  createAcceptConnection();
+
+  bool accepted = false;
+  io_uring_socket_handle_->initializeFileEvent(
+      *dispatcher_,
+      [this, &accepted](uint32_t) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(addr);
+        auto handle = io_uring_socket_handle_->accept(&addr, &addrlen);
+        EXPECT_EQ(handle, nullptr);
+        accepted = true;
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+
+  // Accept nothing.
+  io_uring_socket_handle_->enableFileEvents(Event::FileReadyType::Read);
+  io_uring_socket_handle_->activateFileEvents(Event::FileReadyType::Read);
+  while (!accepted) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_TRUE(accepted);
+
+  // Close safely.
+  io_socket_handle_->close();
+  io_uring_socket_handle_->close();
   while (fcntl(fd_, F_GETFD, 0) >= 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -693,6 +778,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, RemoteCloseWithCloseEventDisabled
         }
       },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  io_uring_socket_handle_->enableFileEvents(Event::FileReadyType::Read);
 
   // Write from the peer handle.
   io_socket_handle_->write(write_buffer);
