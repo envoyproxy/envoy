@@ -34,18 +34,19 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
   }
 
   const auto proxy_settings = proxy_settings_.value();
-  if (!proxy_settings.isPACEnabled()) {
+  if (!proxy_settings.isPacEnabled()) {
     auto settings = ProxySettings(proxy_settings.hostname(), proxy_settings.port());
     if (settings.isDirect()) {
       return ProxyResolutionResult::NO_PROXY_CONFIGURED;
     } else {
+      // TODO(abeyad): handle updates coming from the AppleSystemProxySettingsMonitor.
       proxies.push_back(settings);
       return ProxyResolutionResult::RESULT_COMPLETED;
     }
   }
 
   pac_proxy_resolver_->resolveProxies(
-      proxy_settings.pacFileURL(), target_url_string,
+      proxy_settings.pacFileUrl(), target_url_string,
       [completion](std::vector<ProxySettings> proxies) { completion(proxies); });
   return ProxyResolutionResult::RESULT_IN_PROGRESS;
 }

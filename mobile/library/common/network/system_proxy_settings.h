@@ -16,8 +16,7 @@ public:
    * @param hostname A domain name or an IP address.
    * @param port     A valid internet port from within [0-65535] range.
    */
-  SystemProxySettings(const std::string& hostname, int port)
-      : hostname_(std::move(hostname)), port_(port){};
+  SystemProxySettings(const std::string& hostname, int port) : hostname_(hostname), port_(port){};
 
   /**
    * Creates proxy settings using provided URL to a Proxy Auto-Configuration (PAC) file.
@@ -27,12 +26,12 @@ public:
 
   std::string hostname() const { return hostname_; }
   int port() const { return port_; }
-  std::string pacFileURL() const { return pac_file_url_; }
+  std::string pacFileUrl() const { return pac_file_url_; }
 
-  bool isPACEnabled() const { return pac_file_url_ != ""; }
+  bool isPacEnabled() const { return pac_file_url_ != ""; }
 
   bool operator==(SystemProxySettings const& rhs) const {
-    return hostname() == rhs.hostname() && port() == rhs.port() && pacFileURL() == rhs.pacFileURL();
+    return hostname() == rhs.hostname() && port() == rhs.port() && pacFileUrl() == rhs.pacFileUrl();
   }
 
   bool operator!=(SystemProxySettings const& rhs) const { return !(*this == rhs); }

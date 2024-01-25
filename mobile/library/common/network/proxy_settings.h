@@ -5,15 +5,19 @@
 namespace Envoy {
 namespace Network {
 
-struct ProxySettings;
+class ProxySettings;
 using ProxySettingsConstSharedPtr = std::shared_ptr<const ProxySettings>;
 
 /**
  * Proxy settings coming from platform specific APIs, i.e. ConnectivityManager in
  * the case of Android platform.
  *
+ * ProxySettings represents already-resolved proxy settings. For example, if the proxy
+ * settings are obtained from a PAC URL, then this object represents the resolved proxy
+ * settings after reading and parsing the PAC URL.
  */
-struct ProxySettings {
+class ProxySettings {
+public:
   /**
    * @brief Construct a new Proxy Settings object.
    *
