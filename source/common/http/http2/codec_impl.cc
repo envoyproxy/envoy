@@ -676,7 +676,7 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, b
 }
 
 Status ConnectionImpl::ClientStreamImpl::onBeginHeaders() {
-  if (headers_state_ == HCAT_HEADERS) {
+  if (headers_state_ == HeadersState::Headers) {
     allocTrailers();
   }
 
@@ -684,8 +684,8 @@ Status ConnectionImpl::ClientStreamImpl::onBeginHeaders() {
 }
 
 void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
-  RELEASE_ASSERT(headers_state_ == HCAT_RESPONSE || headers_state_ == HCAT_HEADERS, "");
-  headers_state_ = HCAT_HEADERS;
+  RELEASE_ASSERT(headers_state_ == HeadersState::Response || headers_state_ == HeadersState::Headers, "");
+  headers_state_ = HeadersState::Headers;
 }
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
@@ -696,9 +696,9 @@ void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, b
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
-  if (headers_state_ != HCAT_REQUEST) {
+  if (headers_state_ != HeadersState::Request) {
     parent_.stats_.trailers_.inc();
-    ASSERT(headers_state_ == HCAT_HEADERS);
+    ASSERT(headers_state_ == HeadersState::Headers);
 
     allocTrailers();
   }
@@ -707,8 +707,8 @@ Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
 }
 
 void ConnectionImpl::ServerStreamImpl::advanceHeadersState() {
-  RELEASE_ASSERT(headers_state_ == HCAT_REQUEST || headers_state_ == HCAT_HEADERS, "");
-  headers_state_ = HCAT_HEADERS;
+  RELEASE_ASSERT(headers_state_ == HeadersState::Request || headers_state_ == HeadersState::Headers, "");
+  headers_state_ = HeadersState::Headers;
 }
 
 void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
@@ -1157,13 +1157,13 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
 
   StreamImpl::HeadersState headers_state = stream->headersState();
   switch (headers_state) {
-  case StreamImpl::HCAT_RESPONSE:
-  case StreamImpl::HCAT_REQUEST: {
+  case StreamImpl::HeadersState::Response:
+  case StreamImpl::HeadersState::Request: {
     stream->decodeHeaders();
     break;
   }
 
-  case StreamImpl::HCAT_HEADERS: {
+  case StreamImpl::HeadersState::Headers: {
     // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
     // if local is not complete.
     if (!stream->deferred_reset_) {
