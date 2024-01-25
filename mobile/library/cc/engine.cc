@@ -24,8 +24,6 @@ StreamClientSharedPtr Engine::streamClient() {
   return std::make_shared<StreamClient>(shared_from_this());
 }
 
-PulseClientSharedPtr Engine::pulseClient() { return std::make_shared<PulseClient>(); }
-
 std::string Engine::dumpStats() {
   envoy_data data;
   if (dump_stats(reinterpret_cast<envoy_engine_t>(engine_), &data) == ENVOY_FAILURE) {

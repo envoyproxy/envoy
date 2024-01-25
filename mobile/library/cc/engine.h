@@ -4,7 +4,6 @@
 
 #include "library/common/types/c_types.h"
 #include "log_level.h"
-#include "pulse_client.h"
 #include "stream_client.h"
 
 namespace Envoy {
@@ -22,7 +21,6 @@ public:
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
-  PulseClientSharedPtr pulseClient();
 
   envoy_status_t terminate();
 
@@ -38,7 +36,6 @@ private:
 
   Envoy::Engine* engine_;
   StreamClientSharedPtr stream_client_;
-  PulseClientSharedPtr pulse_client_;
   bool terminated_;
 };
 
