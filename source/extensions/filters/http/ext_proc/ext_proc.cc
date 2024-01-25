@@ -14,6 +14,11 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
+namespace {
+
+const std::string ErrorPrefix = "ext_proc_error";
+const int DefaultImmediateStatus = 200;
+const std::string FilterName = "envoy.filters.http.ext_proc";
 
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
@@ -33,9 +38,67 @@ using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
-static const std::string ErrorPrefix = "ext_proc_error";
-static const int DefaultImmediateStatus = 200;
-static const std::string FilterName = "envoy.filters.http.ext_proc";
+absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
+  if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
+    return config.overrides().processing_mode();
+  }
+  return absl::nullopt;
+}
+absl::optional<envoy::config::core::v3::GrpcService>
+initGrpcService(const ExtProcPerRoute& config) {
+  if (config.has_overrides() && config.overrides().has_grpc_service()) {
+    return config.overrides().grpc_service();
+  }
+  return absl::nullopt;
+}
+
+absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                                                   const FilterConfigPerRoute& more_specific) {
+  if (more_specific.disabled()) {
+    return absl::nullopt;
+  }
+  return more_specific.processingMode().has_value() ? more_specific.processingMode()
+                                                    : less_specific.processingMode();
+}
+// replace all entries with the same name or append one.
+void mergeHeaderValue(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
+                      const envoy::config::core::v3::HeaderValue& header) {
+  size_t count = 0;
+  for (auto& dest : metadata) {
+    if (dest.key() == header.key()) {
+      dest.CopyFrom(header);
+      count++;
+    }
+  }
+  if (!count) {
+    metadata.emplace_back(header);
+  }
+}
+std::vector<envoy::config::core::v3::HeaderValue>
+mergeMetadata(const FilterConfigPerRoute& less_specific,
+              const FilterConfigPerRoute& more_specific) {
+  std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.metadata());
+
+  for (const auto& header : more_specific.metadata()) {
+    mergeHeaderValue(metadata, header);
+  }
+
+  return metadata;
+}
+// replace all entries with the same name or append one.
+void mergeHeaderValue(Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
+                      const envoy::config::core::v3::HeaderValue& header) {
+  bool count = false;
+  for (auto& dest : metadata) {
+    if (dest.key() == header.key()) {
+      dest.CopyFrom(header);
+      count = true;
+    }
+  }
+  if (!count) {
+    metadata.Add()->CopyFrom(header);
+  }
+}
 
 // Changes to headers are normally tested against the MutationRules supplied
 // with configuration. When writing an immediate response message, however,
@@ -57,6 +120,19 @@ public:
 private:
   std::unique_ptr<Checker> rule_checker_;
 };
+
+const ImmediateMutationChecker& immediateResponseChecker() {
+  CONSTRUCT_ON_FIRST_USE(ImmediateMutationChecker);
+}
+
+ProcessingMode allDisabledMode() {
+  ProcessingMode pm;
+  pm.set_request_header_mode(ProcessingMode::SKIP);
+  pm.set_response_header_mode(ProcessingMode::SKIP);
+  return pm;
+}
+
+} // namespace
 
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
@@ -115,72 +191,10 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-absl::optional<ProcessingMode>
-FilterConfigPerRoute::initProcessingMode(const ExtProcPerRoute& config) {
-  if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
-    return config.overrides().processing_mode();
-  }
-  return absl::nullopt;
-}
-absl::optional<envoy::config::core::v3::GrpcService>
-FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
-  if (config.has_overrides() && config.overrides().has_grpc_service()) {
-    return config.overrides().grpc_service();
-  }
-  return absl::nullopt;
-}
-namespace {
-std::vector<envoy::config::core::v3::HeaderValue> initMetadata(const ExtProcPerRoute& config) {
-  std::vector<envoy::config::core::v3::HeaderValue> metadata;
-  for (const auto& header : config.overrides().metadata()) {
-    metadata.emplace_back(header);
-  }
-  return metadata;
-}
-} // namespace
-
-absl::optional<ProcessingMode>
-FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_specific,
-                                          const FilterConfigPerRoute& more_specific) {
-  if (more_specific.disabled()) {
-    return absl::nullopt;
-  }
-  return more_specific.processingMode().has_value() ? more_specific.processingMode()
-                                                    : less_specific.processingMode();
-}
-
-namespace {
-// replace all entries with the same name or append one.
-void mergeHeaderValue(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
-                      const envoy::config::core::v3::HeaderValue& header) {
-  size_t count = 0;
-  for (auto& dest : metadata) {
-    if (dest.key() == header.key()) {
-      dest.CopyFrom(header);
-      count++;
-    }
-  }
-  if (!count) {
-    metadata.emplace_back(header);
-  }
-}
-
-std::vector<envoy::config::core::v3::HeaderValue>
-mergeMetadata(const FilterConfigPerRoute& less_specific,
-              const FilterConfigPerRoute& more_specific) {
-  std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.metadata());
-
-  for (const auto& header : more_specific.metadata()) {
-    mergeHeaderValue(metadata, header);
-  }
-
-  return metadata;
-}
-} // namespace
-
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
-      grpc_service_(initGrpcService(config)), metadata_(initMetadata(config)) {}
+      grpc_service_(initGrpcService(config)),
+      metadata_(config.overrides().metadata().begin(), config.overrides().metadata().end()) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
@@ -857,10 +871,6 @@ void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
   encoding_state_.onFinishProcessorCall(call_status);
 }
 
-static const ImmediateMutationChecker& immediateResponseChecker() {
-  CONSTRUCT_ON_FIRST_USE(ImmediateMutationChecker);
-}
-
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
   if (!MutationUtils::isValidHttpStatus(status_code)) {
@@ -897,30 +907,6 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
                                      mutate_headers, grpc_status, details);
 }
-
-static ProcessingMode allDisabledMode() {
-  ProcessingMode pm;
-  pm.set_request_header_mode(ProcessingMode::SKIP);
-  pm.set_response_header_mode(ProcessingMode::SKIP);
-  return pm;
-}
-
-namespace {
-// replace all entries with the same name or append one.
-void mergeHeaderValue(Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
-                      const envoy::config::core::v3::HeaderValue& header) {
-  size_t count = 0;
-  for (auto& dest : metadata) {
-    if (dest.key() == header.key()) {
-      dest.CopyFrom(header);
-      count++;
-    }
-  }
-  if (!count) {
-    metadata.Add()->CopyFrom(header);
-  }
-}
-} // namespace
 
 void Filter::mergePerRouteConfig() {
   if (route_config_merged_) {

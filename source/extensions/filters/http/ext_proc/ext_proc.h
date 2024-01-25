@@ -227,16 +227,6 @@ public:
   const std::vector<envoy::config::core::v3::HeaderValue>& metadata() const { return metadata_; }
 
 private:
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::config::core::v3::GrpcService>
-  initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  mergeProcessingMode(const FilterConfigPerRoute& less_specific,
-                      const FilterConfigPerRoute& more_specific);
-
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
