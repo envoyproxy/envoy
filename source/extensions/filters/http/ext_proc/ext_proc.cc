@@ -8,17 +8,15 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
+#include "absl/base/attributes.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
-
-const std::string ErrorPrefix = "ext_proc_error";
-const int DefaultImmediateStatus = 200;
-const std::string FilterName = "envoy.filters.http.ext_proc";
 
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
@@ -38,12 +36,17 @@ using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
+constexpr absl::string_view ErrorPrefix = "ext_proc_error";
+constexpr int DefaultImmediateStatus = 200;
+ABSL_ATTRIBUTE_UNUSED constexpr absl::string_view FilterName = "envoy.filters.http.ext_proc";
+
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
     return config.overrides().processing_mode();
   }
   return absl::nullopt;
 }
+
 absl::optional<envoy::config::core::v3::GrpcService>
 initGrpcService(const ExtProcPerRoute& config) {
   if (config.has_overrides() && config.overrides().has_grpc_service()) {
@@ -60,34 +63,38 @@ absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& l
   return more_specific.processingMode().has_value() ? more_specific.processingMode()
                                                     : less_specific.processingMode();
 }
-// replace all entries with the same name or append one.
-void mergeHeaderValue(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
-                      const envoy::config::core::v3::HeaderValue& header) {
-  size_t count = 0;
+
+// Replaces all entries with the same name or append one.
+void mergeHeaderValues(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
+                       const envoy::config::core::v3::HeaderValue& header) {
+  bool count = false;
   for (auto& dest : metadata) {
     if (dest.key() == header.key()) {
       dest.CopyFrom(header);
-      count++;
+      count = true;
     }
   }
   if (!count) {
     metadata.emplace_back(header);
   }
 }
+
 std::vector<envoy::config::core::v3::HeaderValue>
 mergeMetadata(const FilterConfigPerRoute& less_specific,
               const FilterConfigPerRoute& more_specific) {
   std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.metadata());
 
   for (const auto& header : more_specific.metadata()) {
-    mergeHeaderValue(metadata, header);
+    mergeHeaderValues(metadata, header);
   }
 
   return metadata;
 }
-// replace all entries with the same name or append one.
-void mergeHeaderValue(Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
-                      const envoy::config::core::v3::HeaderValue& header) {
+
+// Replaces all entries with the same name or append one.
+void mergeHeaderValuesField(
+    Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
+    const envoy::config::core::v3::HeaderValue& header) {
   bool count = false;
   for (auto& dest : metadata) {
     if (dest.key() == header.key()) {
@@ -960,7 +967,7 @@ void Filter::mergePerRouteConfig() {
     auto ptr = config.mutable_initial_metadata();
     for (const auto& header : merged_config->metadata()) {
       ENVOY_LOG(trace, "Setting metadata {} = {}", header.key(), header.value());
-      mergeHeaderValue(*ptr, header);
+      mergeHeaderValuesField(*ptr, header);
     }
     config_with_hash_key_.setConfig(config);
   }
