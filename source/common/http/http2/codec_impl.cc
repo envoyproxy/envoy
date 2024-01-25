@@ -1116,10 +1116,10 @@ Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
   return okStatus();
 }
 
-Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t flags,
                                    size_t padding) {
   ENVOY_CONN_LOG(trace, "recv frame type=DATA stream_id={}", connection_, stream_id);
-  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, type, flags, padding));
+  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, NGHTTP2_DATA, flags, padding));
 
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
@@ -1193,6 +1193,13 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   return okStatus();
 }
 
+void ConnectionImpl::onEndStream(int32_t stream_id) {
+  StreamImpl* stream = getStreamUnchecked(stream_id);
+  if (stream) {
+    stream->remote_end_stream_ = true;
+  }
+}
+
 Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
   ENVOY_CONN_LOG(trace, "recv frame type=RST_STREAM stream_id={}", connection_, stream_id);
   StreamImpl* stream = getStreamUnchecked(stream_id);
@@ -1225,7 +1232,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return onPing(data, frame->ping.hd.flags & NGHTTP2_FLAG_ACK);
   }
   if (frame->hd.type == NGHTTP2_DATA) {
-    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags,
+    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.flags,
                        frame->data.padlen);
   }
   if (frame->hd.type == NGHTTP2_GOAWAY) {
@@ -1743,8 +1750,8 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
       std::move(status));
 }
 
-bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id, absl::string_view data) {
-  return 0 == connection_->onData(stream_id, reinterpret_cast<const uint8_t*>(data.data()), data.size());
+void ConnectionImpl::Http2Visitor::OnSettingsEnd() {
+  connection_->onSettings(settings_);
 }
 
 bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
@@ -1769,6 +1776,19 @@ http2::adapter::Http2VisitorInterface::OnHeaderResult ConnectionImpl::Http2Visit
     default:
       return HEADER_CONNECTION_ERROR;
   }
+}
+
+bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id, absl::string_view data) {
+  return 0 == connection_->onData(stream_id, reinterpret_cast<const uint8_t*>(data.data()), data.size());
+}
+
+bool ConnectionImpl::Http2Visitor::OnEndStream(Http2StreamId stream_id) {
+  connection_->onEndStream(stream_id);
+  return true;
+}
+
+void ConnectionImpl::Http2Visitor::OnRstStream(Http2StreamId stream_id, Http2ErrorCode error_code) {
+  (void)connection_->onRstStream(stream_id, static_cast<uint32_t>(error_code));
 }
 
 bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id, Http2ErrorCode error_code) {
