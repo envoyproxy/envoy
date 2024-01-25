@@ -30,7 +30,6 @@
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
-#include "library/common/main_interface.h"
 
 namespace Envoy {
 namespace Platform {
@@ -838,7 +837,7 @@ EngineSharedPtr EngineBuilder::build() {
     if (!Api::External::retrieveApi(name, true)) {
       auto* api = new envoy_kv_store();
       *api = store->asEnvoyKeyValueStore();
-      register_platform_api(name.c_str(), api);
+      Envoy::Api::External::registerApi(name.c_str(), api);
     }
   }
 
@@ -847,7 +846,7 @@ EngineSharedPtr EngineBuilder::build() {
     if (!Api::External::retrieveApi(name, true)) {
       auto* api = new envoy_string_accessor();
       *api = StringAccessor::asEnvoyStringAccessor(accessor);
-      register_platform_api(name.c_str(), api);
+      Envoy::Api::External::registerApi(name.c_str(), api);
     }
   }
 

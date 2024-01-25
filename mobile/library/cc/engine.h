@@ -23,6 +23,7 @@ public:
   StreamClientSharedPtr streamClient();
 
   envoy_status_t terminate();
+  Envoy::Engine* engine() { return engine_; }
 
 private:
   Engine(::Envoy::Engine* engine);

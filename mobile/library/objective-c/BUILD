@@ -33,7 +33,7 @@ envoy_objc_library(
         "EnvoyNativeFilterConfig.h",
         "EnvoyNativeFilterConfig.m",
         "EnvoyNetworkMonitor.h",
-        "EnvoyNetworkMonitor.m",
+        "EnvoyNetworkMonitor.mm",
         "EnvoyStringAccessor.h",
         "EnvoyStringAccessor.m",
     ],
