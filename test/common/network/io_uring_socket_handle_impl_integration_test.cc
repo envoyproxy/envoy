@@ -68,7 +68,7 @@ public:
     io_uring_socket_handle_->bind(local_addr);
     io_uring_socket_handle_->listen(1);
 
-    // Create an socket handle.
+    // Create a socket handle.
     os_fd_t fd = Api::OsSysCallsSingleton::get()
                      .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP)
                      .return_value_;
@@ -369,6 +369,24 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, ReadContinuity) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(read_buffer.toString(), data.substr(5) + data2);
+
+  // Close safely.
+  io_socket_handle_->close();
+  io_uring_socket_handle_->close();
+  while (fcntl(fd_, F_GETFD, 0) >= 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_F(IoUringSocketHandleImplIntegrationTest, ReadActively) {
+  initialize();
+  createClientConnection();
+
+  Buffer::OwnedImpl read_buffer;
+
+  // Read actively.
+  auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+  EXPECT_EQ(ret.wouldBlock(), true);
 
   // Close safely.
   io_socket_handle_->close();

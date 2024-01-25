@@ -128,19 +128,19 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*
                                                          const Address::Ip*,
                                                          const Address::Instance&) {
   ENVOY_LOG(trace, "sendmsg, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
-  PANIC("IoUringSocketHandleImpl::sendmsg not implemented");
+  return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmsg(Buffer::RawSlice*, const uint64_t,
                                                          uint32_t, RecvMsgOutput&) {
   ENVOY_LOG(trace, "recvmsg, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
-  PANIC("IoUringSocketHandleImpl::recvmsg not implemented");
+  return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmmsg(RawSliceArrays&, uint32_t,
                                                           RecvMsgOutput&) {
   ENVOY_LOG(trace, "recvmmsg, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
-  PANIC("IoUringSocketHandleImpl::recvmmsg not implemented");
+  return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
