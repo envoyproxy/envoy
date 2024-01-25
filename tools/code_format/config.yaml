@@ -120,6 +120,7 @@ paths:
     - source/common/stats/tag_extractor_impl.cc
     - source/common/stats/tag_producer_impl.cc
     - source/common/http/http2/codec_impl.cc
+    - source/common/http/utility.cc
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/http/match_delegate/config.cc
