@@ -236,7 +236,7 @@ ResponseFlagFilter::ResponseFlagFilter(
 bool ResponseFlagFilter::evaluate(const Formatter::HttpFormatterContext&,
                                   const StreamInfo::StreamInfo& info) const {
   if (!configured_flags_.empty()) {
-    for (uint16_t flag : info.responseFlags()) {
+    for (const uint16_t flag : info.responseFlags()) {
       if (flag >= configured_flags_.size()) {
         // Any valid flag should be less than the size of the configured flags vector
         // because the vector is allocated with the size of the response flags map.

@@ -25,7 +25,8 @@ using envoy::extensions::filters::network::http_connection_manager::v3::HttpConn
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     NiceMock<MockStreamInfo> stream_info;
-    ON_CALL(stream_info, hasResponseFlag(flag_enum)).WillByDefault(Return(true));
+    stream_info.response_flags_.clear();
+    stream_info.response_flags_.push_back(flag_enum);
     EXPECT_EQ(flag_strings.short_string_, ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ(flag_strings.long_string_, ResponseFlagUtils::toString(stream_info));
   }
@@ -33,7 +34,6 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   // No flag is set.
   {
     NiceMock<MockStreamInfo> stream_info;
-    ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(false));
     EXPECT_EQ("-", ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ("-", ResponseFlagUtils::toString(stream_info));
   }
@@ -42,10 +42,11 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   // These are not real use cases, but are used to cover multiple response flags case.
   {
     NiceMock<MockStreamInfo> stream_info;
-    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
-    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
-    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
-        .WillByDefault(Return(true));
+    stream_info.response_flags_.clear();
+    stream_info.response_flags_.push_back(ResponseFlag::UpstreamRequestTimeout);
+    stream_info.response_flags_.push_back(ResponseFlag::DelayInjected);
+    stream_info.response_flags_.push_back(ResponseFlag::FaultInjected);
+
     EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ("UpstreamRequestTimeout,DelayInjected,FaultInjected",
               ResponseFlagUtils::toString(stream_info));
@@ -56,7 +57,7 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 
   for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-    absl::optional<ResponseFlag> response_flag =
+    absl::optional<uint16_t> response_flag =
         ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
     EXPECT_TRUE(response_flag.has_value());
     EXPECT_EQ(flag_enum, response_flag.value());
@@ -90,8 +91,7 @@ protected:
   void SetUp() override {
     proxy_status_config_.set_remove_details(false);
 
-    ON_CALL(stream_info_, hasAnyResponseFlag()).WillByDefault(Return(true));
-    ON_CALL(stream_info_, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
+    stream_info_.response_flags_.push_back(ResponseFlag::DelayInjected);
   }
 
   HttpConnectionManager::ProxyStatusConfig proxy_status_config_;

@@ -62,9 +62,10 @@ uint16_t ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag,
   RELEASE_ASSERT(!mutable_flags.contains(custom_flag),
                  fmt::format("Flag: {}/{} already registered", custom_flag, custom_flag_long));
 
-  const uint16_t next_flag =
-      static_cast<uint16_t>(ResponseFlag::LastFlag) + 1 + mutable_flags.size();
-  mutable_flags.emplace(custom_flag, std::make_pair(next_flag, std::string(custom_flag_long)));
+  const uint16_t next_flag = (ResponseFlag::LastFlag + 1) /*Index of first custom flag.*/
+                             + mutable_flags.size();      /*Exist size of custom flags.*/
+
+  mutable_flags.emplace(custom_flag, FlagLongString{next_flag, std::string(custom_flag_long)});
 
   return next_flag;
 }
