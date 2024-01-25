@@ -31,13 +31,12 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
   return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
           timeout_ms](Network::FilterManager& filter_manager) -> void {
     auto factory_or_error = context.serverFactoryContext()
-                                    .clusterManager()
-                                    .grpcAsyncClientManager()
-                                    .factoryForGrpcService(grpc_service, context.scope(), true);
-    THROW_IF_STATUS_NOT_OK(factory_or_error);
-
+                                .clusterManager()
+                                .grpcAsyncClientManager()
+                                .factoryForGrpcService(grpc_service, context.scope(), true);
+    THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-        factory_or_error->value()->createUncachedRawAsyncClient(),
+        factory_or_error.value()->createUncachedRawAsyncClient(),
         std::chrono::milliseconds(timeout_ms));
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         std::make_shared<Filter>(ext_authz_config, std::move(client))});

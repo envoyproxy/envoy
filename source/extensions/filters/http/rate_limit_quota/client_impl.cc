@@ -7,6 +7,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+Grpc::RawAsyncClientSharedPtr
+getOrThrow(absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error) {
+  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  return client_or_error.value();
+}
+
+RateLimitClientImpl::RateLimitClientImpl(
+    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+    Server::Configuration::FactoryContext& context, absl::string_view domain_name,
+    RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
+    : domain_name_(domain_name),
+      aync_client_(getOrThrow(
+          context.serverFactoryContext()
+              .clusterManager()
+              .grpcAsyncClientManager()
+              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true))),
+      rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
+      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
+
 RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_t> bucket_id) {
   RateLimitQuotaUsageReports report;
   // Build the report from quota bucket cache.
