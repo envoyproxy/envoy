@@ -35,7 +35,7 @@ public:
    * @param config, the Envoy bootstrap configuration to use.
    * @param log_level, the log level.
    */
-  envoy_status_t run(std::string config, std::string log_level);
+  envoy_status_t run(const std::string& config, const std::string& log_level);
   envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
 
   /**
@@ -82,11 +82,11 @@ public:
     return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
   }
 
-  /**
-   * Accessor for the network configuraator. Must be called from the dispatcher's context.
-   * @return Network::ConnectivityManager&, the network connectivity_manager.
-   */
-  Network::ConnectivityManager& networkConnectivityManager();
+  // These functions are wrappers around networkConnectivityManager functions, which hand off
+  // to networkConnectivityManager after doing a dispatcher post (thread context switch)
+  envoy_status_t setProxySettings(const char* host, const uint16_t port);
+  envoy_status_t resetConnectivityState();
+  envoy_status_t setPreferredNetwork(envoy_network_t network);
 
   /**
    * Increment a counter with a given string of elements and by the given count.
@@ -94,14 +94,17 @@ public:
    * @param tags, custom tags of the reporting stat.
    * @param count, amount to add to the counter.
    */
-  envoy_status_t recordCounterInc(const std::string& elements, envoy_stats_tags tags,
+  envoy_status_t recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
                                   uint64_t count);
 
   /**
-   * Dump Envoy stats into the returned buffer
-   * @returns a buffer with referenced stats dumped in Envoy's standard text format.
+   * Dump Envoy stats into the provided envoy_data
+   * @params envoy_data which will be filed with referenced stats dumped in Envoy's standard text
+   * format.
+   * @return failure status if the engine is no longer running.
+   * This can be called from any thread, but will block on engine-thread processing.
    */
-  Buffer::OwnedImpl dumpStats();
+  envoy_status_t dumpStats(envoy_data* out);
 
   /**
    * Get cluster manager from the Engine.

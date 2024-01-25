@@ -27,7 +27,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
-  Config::Utility::checkLocalInfo(type_url, local_info_);
+  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo(type_url, local_info_));
   SubscriptionStats stats = Utility::generateStats(scope);
 
   std::string subscription_type = "";
@@ -50,19 +50,20 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
-    Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
+    THROW_IF_NOT_OK(Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_));
     subscription_type = "envoy.config_subscription.filesystem";
     break;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource: {
-    Utility::checkFilesystemSubscriptionBackingPath(config.path_config_source().path(), api_);
+    THROW_IF_NOT_OK(
+        Utility::checkFilesystemSubscriptionBackingPath(config.path_config_source().path(), api_));
     subscription_type = "envoy.config_subscription.filesystem";
     break;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
-                                                            api_config_source);
+    THROW_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                                            api_config_source));
     THROW_IF_NOT_OK(Utility::checkTransportVersion(api_config_source));
     switch (api_config_source.api_type()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
@@ -147,7 +148,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   switch (collection_locator.scheme()) {
   case xds::core::v3::ResourceLocator::FILE: {
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
-    Utility::checkFilesystemSubscriptionBackingPath(path, api_);
+    THROW_IF_NOT_OK(Utility::checkFilesystemSubscriptionBackingPath(path, api_));
     factory_config.set_path(path);
     return createFromFactoryOrThrow(data, "envoy.config_subscription.filesystem_collection");
   }
@@ -161,8 +162,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
       const envoy::config::core::v3::ApiConfigSource& api_config_source =
           config.api_config_source();
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
-                                                              api_config_source);
+      THROW_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                                              api_config_source));
       // All Envoy collections currently are xDS resource graph roots and require node context
       // parameters.
       options.add_xdstp_node_context_params_ = true;

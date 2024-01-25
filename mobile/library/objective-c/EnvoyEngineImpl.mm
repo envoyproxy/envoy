@@ -5,7 +5,6 @@
 
 #include "library/common/api/c_types.h"
 
-#import "library/common/main_interface.h"
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
 #import "library/cc/engine_builder.h"
@@ -473,7 +472,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   api->static_context = CFBridgingRetain(filterFactory);
   api->instance_context = NULL;
 
-  register_platform_api(filterFactory.filterName.UTF8String, api);
+  Envoy::Api::External::registerApi(filterFactory.filterName.UTF8String, api);
   return kEnvoySuccess;
 }
 
@@ -485,7 +484,8 @@ static void ios_track_event(envoy_map map, const void *context) {
   accessorStruct->get_string = ios_get_string;
   accessorStruct->context = CFBridgingRetain(accessor);
 
-  return register_platform_api(name.UTF8String, accessorStruct);
+  Envoy::Api::External::registerApi(name.UTF8String, accessorStruct);
+  return ENVOY_SUCCESS;
 }
 
 - (int)registerKeyValueStore:(NSString *)name keyValueStore:(id<EnvoyKeyValueStore>)keyValueStore {
@@ -495,7 +495,8 @@ static void ios_track_event(envoy_map map, const void *context) {
   api->remove = ios_kv_store_remove;
   api->context = CFBridgingRetain(keyValueStore);
 
-  return register_platform_api(name.UTF8String, api);
+  Envoy::Api::External::registerApi(name.UTF8String, api);
+  return ENVOY_SUCCESS;
 }
 
 - (void)performRegistrationsForConfig:(EnvoyConfiguration *)config {
@@ -564,12 +565,12 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count {
   // TODO: update to use real tag array when the API layer change is ready.
-  return record_counter_inc(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), count);
+  return _engine->recordCounterInc(elements.UTF8String, toNativeStatsTags(tags), count);
 }
 
 - (NSString *)dumpStats {
   envoy_data data;
-  envoy_status_t status = dump_stats(_engineHandle, &data);
+  envoy_status_t status = _engine->dumpStats(&data);
   if (status != ENVOY_SUCCESS) {
     return @"";
   }
@@ -586,7 +587,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (void)resetConnectivityState {
-  reset_connectivity_state(_engineHandle);
+  _engine->resetConnectivityState();
 }
 
 #pragma mark - Private

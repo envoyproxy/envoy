@@ -4,6 +4,7 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/synchronization/notification.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/stats/utility.h"
@@ -31,7 +32,7 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-envoy_status_t Engine::run(const std::string config, const std::string log_level) {
+envoy_status_t Engine::run(const std::string& config, const std::string& log_level) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
@@ -39,7 +40,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   auto options = std::make_unique<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level.c_str()).ok(), "invalid log level");
+    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
   }
   options->setConcurrency(1);
   return run(std::move(options));
@@ -182,25 +183,37 @@ envoy_status_t Engine::terminate() {
 
 Engine::~Engine() { terminate(); }
 
-envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats_tags tags,
+envoy_status_t Engine::setProxySettings(const char* hostname, const uint16_t port) {
+  return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
+    connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
+  });
+}
+
+envoy_status_t Engine::resetConnectivityState() {
+  return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
+}
+
+envoy_status_t Engine::setPreferredNetwork(envoy_network_t network) {
+  return dispatcher_->post([&, network]() -> void {
+    envoy_netconf_t configuration_key =
+        Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+    connectivity_manager_->refreshDns(configuration_key, true);
+  });
+}
+
+envoy_status_t Engine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
                                         uint64_t count) {
-  ENVOY_LOG(trace, "[pulse.{}] recordCounterInc", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(name)}, tags_vctr)
-      .add(count);
-  return ENVOY_SUCCESS;
+  return dispatcher_->post(
+      [&, name = Stats::Utility::sanitizeStatsName(elements), tags, count]() -> void {
+        ENVOY_LOG(trace, "[pulse.{}] recordCounterInc", name);
+        Stats::StatNameTagVector tags_vctr =
+            Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
+        Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(name)}, tags_vctr)
+            .add(count);
+      });
 }
 
 Event::ProvisionalDispatcher& Engine::dispatcher() { return *dispatcher_; }
-
-Network::ConnectivityManager& Engine::networkConnectivityManager() {
-  RELEASE_ASSERT(dispatcher_->isThreadSafe(),
-                 "networkConnectivityManager must be accessed from dispatcher's context");
-  return *connectivity_manager_;
-}
 
 void statsAsText(const std::map<std::string, uint64_t>& all_stats,
                  const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
@@ -241,12 +254,23 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
   statsAsText(all_stats, histograms, response);
 }
 
-Envoy::Buffer::OwnedImpl Engine::dumpStats() {
-  ASSERT(dispatcher_->isThreadSafe(), "dumpStats must be called from the dispatcher's context");
+envoy_status_t Engine::dumpStats(envoy_data* out) {
+  // If the engine isn't running, fail.
+  if (!main_thread_.joinable()) {
+    return ENVOY_FAILURE;
+  }
 
-  Envoy::Buffer::OwnedImpl instance;
-  handlerStats(server_->stats(), instance);
-  return instance;
+  absl::Notification stats_received;
+  if (dispatcher_->post([&]() -> void {
+        Envoy::Buffer::OwnedImpl instance;
+        handlerStats(server_->stats(), instance);
+        *out = Envoy::Data::Utility::toBridgeData(instance, 1024 * 1024 * 100);
+        stats_received.Notify();
+      }) == ENVOY_SUCCESS) {
+    stats_received.WaitForNotification();
+    return ENVOY_SUCCESS;
+  }
+  return ENVOY_FAILURE;
 }
 
 Upstream::ClusterManager& Engine::getClusterManager() {

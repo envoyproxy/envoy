@@ -1,7 +1,6 @@
 #import "library/objective-c/EnvoyEngine.h"
 #import "library/objective-c/EnvoyBridgeUtility.h"
 
-#import "library/common/main_interface.h"
 #import "library/common/types/c_types.h"
 #import "library/common/engine.h"
 
