@@ -39,12 +39,16 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
     if (settings.isDirect()) {
       return ProxyResolutionResult::NO_PROXY_CONFIGURED;
     } else {
-      // TODO(abeyad): handle updates coming from the AppleSystemProxySettingsMonitor.
       proxies.push_back(settings);
       return ProxyResolutionResult::RESULT_COMPLETED;
     }
   }
 
+  // TODO(abeyad): As stated in ApplePacProxyResolver's comments,
+  // CFNetworkExecuteProxyAutoConfigurationURL caches PAC file resolution, so it's not fetched on
+  // every request. However, it would be good to not depend on Apple's undocumented behavior and
+  // implement a caching layer with TTLs for PAC file URL resolution within AppleProxyResolver
+  // itself.
   pac_proxy_resolver_->resolveProxies(
       proxy_settings.pacFileUrl(), target_url_string,
       [completion](std::vector<ProxySettings> proxies) { completion(proxies); });

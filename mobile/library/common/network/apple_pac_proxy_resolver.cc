@@ -52,7 +52,6 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
       std::string hostname = Apple::toString(cf_host);
       int port = Apple::toInt(cf_port);
       proxies.push_back(ProxySettings(std::move(hostname), port));
-
     } else if (is_direct_proxy) {
       proxies.push_back(ProxySettings::direct());
     }
