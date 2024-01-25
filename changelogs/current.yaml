@@ -43,8 +43,8 @@ new_features:
     identifier.
 - area: rbac
   change: |
-    Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing 
-    :ref:`UriTemplateMatchConfig<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>` 
+    Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
+    :ref:`UriTemplateMatchConfig<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>`
     to allow use of glob patterns for URI path matching in RBAC.
 
 deprecated:
