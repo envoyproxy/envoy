@@ -23,7 +23,7 @@ bool FilterConfig::injectCredential(Http::RequestHeaderMap& headers) {
   // increase the counter and continue processing the request.
   if (absl::IsAlreadyExists(status)) {
     ASSERT(!overwrite_); // overwrite should be false if AlreadyExists is returned
-    ENVOY_LOG(debug, "Credential already exists in the header");
+    ENVOY_LOG(trace, "Credential already exists in the header");
     stats_.already_exists_.inc();
     // continue processing the request if credential already exists in the header
     return true;
