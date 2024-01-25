@@ -23,8 +23,10 @@ new_features:
   change: |
     Added
     :ref:`metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.metadata>`
-    config API to allow extending inherited metadata from ``ExternalProcessor``
-    :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`
+    config API to allow extending inherited metadata from
+    :ref:`ExternalProcessor.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`
+    and
+    :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
     with the new or updated values.
 - area: grpc reverse bridge
   change: |
