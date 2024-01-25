@@ -209,7 +209,7 @@ protected:
     enum class HeadersState {
       Request,
       Response,
-      Headers,  // Signifies additional headers after the initial request/response set.
+      Headers, // Signifies additional headers after the initial request/response set.
     };
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
