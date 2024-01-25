@@ -22,6 +22,9 @@ namespace {
 
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
+REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
+REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
+
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     NiceMock<MockStreamInfo> stream_info;
@@ -29,6 +32,51 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     stream_info.response_flags_.push_back(flag_enum);
     EXPECT_EQ(flag_strings.short_string_, ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ(flag_strings.long_string_, ResponseFlagUtils::toString(stream_info));
+  }
+
+  // Custom flag.
+  {
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec().size(),
+              ResponseFlagUtils::responseFlagsMap().size());
+
+    // There are two custom flags are registered.
+    EXPECT_EQ(ResponseFlagUtils::CORE_RESPONSE_FLAGS.size() + 2,
+              ResponseFlagUtils::responseFlagsMap().size());
+
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF), ResponseFlag::LastFlag + 1);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2), ResponseFlag::LastFlag + 2);
+
+    // Verify the custom flags are registered correctly.
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF), ResponseFlagUtils::responseFlagsMap().at("CF").flag_);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2), ResponseFlagUtils::responseFlagsMap().at("CF2").flag_);
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF)].short_string_, "CF");
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF)].long_string_,
+              "CustomFlag");
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2)].short_string_,
+              "CF2");
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2)].long_string_,
+              "CustomFlag2");
+
+    // Verify the custom flag could work as expected.
+
+    NiceMock<MockStreamInfo> stream_info;
+    stream_info.response_flags_.clear();
+
+    stream_info.setResponseFlag(CUSTOM_RESPONSE_FLAG(CF));
+    EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+    EXPECT_TRUE(stream_info.hasResponseFlag(CUSTOM_RESPONSE_FLAG(CF)));
+
+    EXPECT_EQ("CF", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("CustomFlag", ResponseFlagUtils::toString(stream_info));
+
+    stream_info.response_flags_.push_back(CUSTOM_RESPONSE_FLAG(CF2));
+
+    EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+    EXPECT_TRUE(stream_info.hasResponseFlag(CUSTOM_RESPONSE_FLAG(CF)));
+    EXPECT_TRUE(stream_info.hasResponseFlag(CUSTOM_RESPONSE_FLAG(CF2)));
+
+    EXPECT_EQ("CF,CF2", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("CustomFlag,CustomFlag2", ResponseFlagUtils::toString(stream_info));
   }
 
   // No flag is set.

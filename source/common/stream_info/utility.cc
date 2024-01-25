@@ -47,11 +47,16 @@ ResponseFlagUtils::ResponseFlagsMap& ResponseFlagUtils::mutableResponseFlagsMap(
     ResponseFlagsMap map;
     // Initialize the map with the all core flags first to ensure no custom flags
     // conflict with them.
-    map.reserve(ResponseFlagUtils::CORE_RESPONSE_FLAGS.size());
-    for (const auto& flag : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
+    RELEASE_ASSERT(CORE_RESPONSE_FLAGS.size() == ResponseFlag::LastFlag + 1,
+                   "Not all inlined flags are contained by CORE_RESPONSE_FLAGS.");
+
+    map.reserve(CORE_RESPONSE_FLAGS.size());
+    for (const auto& flag : CORE_RESPONSE_FLAGS) {
       map.emplace(flag.first.short_string_,
                   FlagLongString{flag.second, std::string(flag.first.long_string_)});
     }
+    RELEASE_ASSERT(map.size() == CORE_RESPONSE_FLAGS.size(),
+                   "Duplicate flags in CORE_RESPONSE_FLAGS");
     return map;
   }());
 }
@@ -62,8 +67,7 @@ uint16_t ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag,
   RELEASE_ASSERT(!mutable_flags.contains(custom_flag),
                  fmt::format("Flag: {}/{} already registered", custom_flag, custom_flag_long));
 
-  const uint16_t next_flag = (ResponseFlag::LastFlag + 1) /*Index of first custom flag.*/
-                             + mutable_flags.size();      /*Exist size of custom flags.*/
+  const uint16_t next_flag = mutable_flags.size();
 
   mutable_flags.emplace(custom_flag, FlagLongString{next_flag, std::string(custom_flag_long)});
 
@@ -74,9 +78,6 @@ const ResponseFlagUtils::ResponseFlagsVec& ResponseFlagUtils::responseFlagsVec()
   CONSTRUCT_ON_FIRST_USE(ResponseFlagsVec, []() {
     static_assert(ResponseFlag::LastFlag == 27,
                   "A flag has been added. Add the new flag to CORE_RESPONSE_FLAGS.");
-    RELEASE_ASSERT(CORE_RESPONSE_FLAGS.size() == ResponseFlag::LastFlag + 1,
-                   "Not all inlined flags are contained by CORE_RESPONSE_FLAGS.");
-
     ResponseFlagsVec res;
 
     uint16_t max_flag = ResponseFlag::LastFlag;
@@ -87,6 +88,9 @@ const ResponseFlagUtils::ResponseFlagsVec& ResponseFlagUtils::responseFlagsVec()
     }
 
     res.resize(max_flag + 1);
+
+    std::cout << max_flag << std::endl;
+
     for (const auto& flag : responseFlagsMap()) {
       res[flag.second.flag_] = {absl::string_view(flag.first),
                                 absl::string_view(flag.second.long_string_)};

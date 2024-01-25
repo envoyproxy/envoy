@@ -23,15 +23,15 @@ private:
 
 // Register a custom response flag by specifying the flag and the long name of the flag.
 // This macro should never be used in header files.
-#define REGISTER_CUSTOM_RESPONSE_FLAG(flag, flag_long)                                             \
+#define REGISTER_CUSTOM_RESPONSE_FLAG(short, long)                                                 \
   static CustomResponseFlag /* NOLINT(fuchsia-statically-constructed-objects) */                   \
-      registered##flag{flag, flag_long};
+      registered_##short{#short, #long};
 
 // Get the registered flag value. This macro should only be used when calling the
 // 'setResponseFlag' method in the StreamInfo class.
 // **Never use this macro to initialize another static variable.**
 // This macro should never be used in header files.
-#define CUSTOM_RESPONSE_FLAG(flag) registered##flag.flag()
+#define CUSTOM_RESPONSE_FLAG(short) registered_##short.flag()
 
 /**
  * Util class for ResponseFlags.

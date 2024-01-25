@@ -233,7 +233,7 @@ struct StreamInfoImpl : public StreamInfo {
   uint64_t bytesSent() const override { return bytes_sent_; }
 
   void setResponseFlag(uint16_t flag) override {
-    ASSERT(flag < ResponseFlagUtils::ResponseFlagsVec().size());
+    ASSERT(flag < ResponseFlagUtils::responseFlagsVec().size());
     if (!hasResponseFlag(flag)) {
       response_flags_.push_back(flag);
     }
