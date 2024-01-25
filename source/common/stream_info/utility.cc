@@ -45,10 +45,12 @@ const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, boo
 ResponseFlagUtils::ResponseFlagsMap& ResponseFlagUtils::mutableResponseFlagsMap() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(ResponseFlagsMap, []() {
     ResponseFlagsMap map;
-    // Initialize the map with the core flags first.
+    // Initialize the map with the all core flags first to ensure no custom flags
+    // conflict with them.
     map.reserve(ResponseFlagUtils::CORE_RESPONSE_FLAGS.size());
-    for (const auto& [flag_strings, flag] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-      map.emplace(flag_strings.short_string_, flag);
+    for (const auto& flag : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
+      map.emplace(flag.first.short_string_,
+                  FlagLongString{flag.second, std::string(flag.first.long_string_)});
     }
     return map;
   }());
@@ -77,15 +79,16 @@ const ResponseFlagUtils::ResponseFlagsVec& ResponseFlagUtils::responseFlagsVec()
     ResponseFlagsVec res;
 
     uint16_t max_flag = ResponseFlag::LastFlag;
-    for (const auto& [short_flag, flag_and_long] : responseFlagsMap()) {
-      if (flag_and_long.first > max_flag) {
-        max_flag = flag_and_long.first;
+    for (const auto& flag : responseFlagsMap()) {
+      if (flag.second.flag_ > max_flag) {
+        max_flag = flag.second.flag_;
       }
     }
 
     res.resize(max_flag + 1);
-    for (const auto& [short_flag, flag_and_long] : responseFlagsMap()) {
-      res[flag_and_long.first] = {short_flag, flag_and_long.second};
+    for (const auto& flag : responseFlagsMap()) {
+      res[flag.second.flag_] = {absl::string_view(flag.first),
+                                absl::string_view(flag.second.long_string_)};
     }
 
     return res;
@@ -96,11 +99,9 @@ const ResponseFlagUtils::ResponseFlagsMap& ResponseFlagUtils::responseFlagsMap()
 }
 
 absl::optional<uint16_t> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
-  const auto& flag_map = responseFlagsMap();
-
-  const auto& it = flag_map.find(flag);
-  if (it != flag_map.end()) {
-    return absl::make_optional<uint16_t>(it->second.first);
+  const auto iter = responseFlagsMap().find(flag);
+  if (iter != responseFlagsMap().end()) {
+    return absl::make_optional<uint16_t>(iter->second.flag_);
   }
   return absl::nullopt;
 }

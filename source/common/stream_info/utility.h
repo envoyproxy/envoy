@@ -7,6 +7,8 @@
 #include "envoy/http/codes.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "absl/container/node_hash_map.h"
+
 namespace Envoy {
 namespace StreamInfo {
 
@@ -25,7 +27,9 @@ private:
   static CustomResponseFlag /* NOLINT(fuchsia-statically-constructed-objects) */                   \
       registered##flag{flag, flag_long};
 
-// Get the registered flag value.
+// Get the registered flag value. This macro should only be used when calling the
+// 'setResponseFlag' method in the StreamInfo class.
+// **Never use this macro to initialize another static variable.**
 // This macro should never be used in header files.
 #define CUSTOM_RESPONSE_FLAG(flag) registered##flag.flag()
 
@@ -43,8 +47,16 @@ public:
     absl::string_view long_string_; // PascalCase string
   };
 
+  struct FlagLongString {
+    uint16_t flag_{};
+    std::string long_string_; // PascalCase string
+  };
+
   using ResponseFlagsVec = std::vector<FlagStrings>;
-  using ResponseFlagsMap = absl::flat_hash_map<std::string, std::pair<uint16_t, std::string>>;
+  // Node hash map is used to avoid the key/value pair pointer change of the string_view when the
+  // map is resized. And the performance is not a concern here because the map is only used when
+  // loading the config.
+  using ResponseFlagsMap = absl::node_hash_map<std::string, FlagLongString>;
   static const ResponseFlagsVec& responseFlagsVec();
   static const ResponseFlagsMap& responseFlagsMap();
 

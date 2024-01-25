@@ -21,6 +21,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -232,6 +233,7 @@ struct StreamInfoImpl : public StreamInfo {
   uint64_t bytesSent() const override { return bytes_sent_; }
 
   void setResponseFlag(uint16_t flag) override {
+    ASSERT(flag < ResponseFlagUtils::ResponseFlagsVec().size());
     if (!hasResponseFlag(flag)) {
       response_flags_.push_back(flag);
     }
