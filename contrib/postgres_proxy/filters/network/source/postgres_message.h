@@ -325,9 +325,9 @@ public:
                                      uint64_t& pos, uint64_t& left) {
     uint64_t orig_pos = pos;
     uint64_t orig_left = left;
-    // Check if one byte can be read.
+    // Check if one byte of code can be read.
     while (left >= sizeof(Byte1)) {
-      // Read 1 byte code and Exit when terminating zero is found.
+      // Read 1 byte code and exit when terminating zero is found.
       Byte1 code;
       code = data.peekBEInt<char>(pos);
       // Advance the position by 1 byte (code).
