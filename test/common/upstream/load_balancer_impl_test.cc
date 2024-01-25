@@ -5,12 +5,14 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <random>
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -2904,7 +2906,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
   // Creating various load balancer objects with different choice configs.
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
-  // Enable full table scan on hosts.
+  // Enable FULL_SCAN on hosts.
   lr_lb_config.set_selection_method(
       envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
@@ -2951,44 +2953,39 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
       envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
+  auto random = Random::RandomGeneratorImpl();
+
   LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
-                              random_,       1,       lr_lb_config, simTime()};
+                              random,        1,       lr_lb_config, simTime()};
 
-  // Indices 2-4 are tied for least.
-  // Random numbers are generated whenever a tie is encountered, which will occur at:
-  // - Index 1 (tied with index 0)
-  // - Index 3 (tied with index 2) -> use 998 so that 998 % 2 ties == 0 to select index 3
-  // - Index 4 (tied with indices 2-3) -> use 4 so that 4 % 3 ties != 0 to keep index 3
-  EXPECT_CALL(random_, random())
-      .WillOnce(Return(0))
-      .WillOnce(Return(0))
-      .WillOnce(Return(998))
-      .WillOnce(Return(4));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
+  // Make 1 million selections. Then, check that the selection probability is
+  // approximately equal among the 3 hosts tied for least requests.
+  // Accept a +/-0.5% deviation from the expected selection probability (33.3..%).
+  size_t num_selections = 1000000;
+  size_t expected_approx_selections_per_tied_host = num_selections / 3;
+  size_t abs_error = 5000;
 
-  // Indices 2-4 are tied for least.
-  // Random numbers are generated whenever a tie is encountered, which will occur at:
-  // - Index 1 (tied with index 0)
-  // - Index 3 (tied with index 2) -> use 998 so that 998 % 2 ties == 0 to select index 3
-  // - Index 4 (tied with indices 2-3) -> use 6 so that 6 % 3 ties == 0 to select index 4
-  EXPECT_CALL(random_, random())
-      .WillOnce(Return(0))
-      .WillOnce(Return(0))
-      .WillOnce(Return(998))
-      .WillOnce(Return(6));
-  EXPECT_EQ(hostSet().healthy_hosts_[4], lb.chooseHost(nullptr));
+  size_t host_2_counts = 0;
+  size_t host_3_counts = 0;
+  size_t host_4_counts = 0;
 
-  // Indices 2-4 are tied for least.
-  // Random numbers are generated whenever a tie is encountered, which will occur at:
-  // - Index 1 (tied with index 0)
-  // - Index 3 (tied with index 2) -> use 999 so that 998 % 2 ties != 0 to keep index 2
-  // - Index 4 (tied with indices 2-3) -> use 4 so that 4 % 3 ties != 0 to keep index 2
-  EXPECT_CALL(random_, random())
-      .WillOnce(Return(0))
-      .WillOnce(Return(0))
-      .WillOnce(Return(999))
-      .WillOnce(Return(4));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb.chooseHost(nullptr));
+  for (size_t i = 0; i < num_selections; ++i) {
+    auto selected_host = lb.chooseHost(nullptr);
+
+    if (selected_host == hostSet().healthy_hosts_[2]) {
+      ++host_2_counts;
+    } else if (selected_host == hostSet().healthy_hosts_[3]) {
+      ++host_3_counts;
+    } else if (selected_host == hostSet().healthy_hosts_[4]) {
+      ++host_4_counts;
+    } else {
+      FAIL() << "Must only select hosts with least requests";
+    }
+  }
+
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_2_counts, abs_error);
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_3_counts, abs_error);
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_4_counts, abs_error);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {

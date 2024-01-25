@@ -73,7 +73,7 @@ message LeastRequest {
 
   // [#not-implemented-hide:]
   // Unused. Replaced by the `selection_method` enum for better extensibility.
-  google.protobuf.BoolValue enable_full_scan = 5;
+  google.protobuf.BoolValue enable_full_scan = 5 [deprecated = true];
 
   // Method for selecting the host set from which to return the host with the fewest active requests.
   //

@@ -1316,11 +1316,11 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 HostSharedPtr LeastRequestLoadBalancer::unweightedHostPickFullScan(const HostVector& hosts_to_use) {
   HostSharedPtr candidate_host = nullptr;
 
-  uint32_t num_hosts_known_tied_for_least = 0;
+  size_t num_hosts_known_tied_for_least = 0;
 
-  const uint32_t num_hosts = hosts_to_use.size();
+  const size_t num_hosts = hosts_to_use.size();
 
-  for (uint32_t i = 0; i < num_hosts; ++i) {
+  for (size_t i = 0; i < num_hosts; ++i) {
     const HostSharedPtr& sampled_host = hosts_to_use[i];
 
     if (candidate_host == nullptr) {
@@ -1344,10 +1344,10 @@ HostSharedPtr LeastRequestLoadBalancer::unweightedHostPickFullScan(const HostVec
       // that will tie for least requests after processing the full hosts array.
       //
       // Upon each new tie encountered, replace candidate_host with sampled_host
-      // 1 / num_hosts_known_tied_for_least percent of the time.
+      // with probability (1 / num_hosts_known_tied_for_least percent).
       // The end result is that each tied host has an equal 1 / N chance of being the
       // candidate_host returned by this function.
-      uint32_t random_tied_host_index = random_.random() % num_hosts_known_tied_for_least;
+      const size_t random_tied_host_index = random_.random() % num_hosts_known_tied_for_least;
       if (random_tied_host_index == 0) {
         candidate_host = sampled_host;
       }
