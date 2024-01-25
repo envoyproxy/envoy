@@ -91,7 +91,7 @@ message ProcessingRequest {
     // a BodyResponse message, an ImmediateResponse message, or close the stream.
     HttpBody request_body = 4;
 
-    // A chunk of the HTTP request body. Unless ``async_mode`` is ``true``, the server must send back
+    // A chunk of the HTTP response body. Unless ``async_mode`` is ``true``, the server must send back
     // a BodyResponse message or close the stream.
     HttpBody response_body = 5;
 
