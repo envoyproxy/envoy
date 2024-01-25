@@ -37,7 +37,6 @@ private:
 
   Envoy::Engine* engine_;
   StreamClientSharedPtr stream_client_;
-  bool terminated_;
 };
 
 using EngineSharedPtr = std::shared_ptr<Engine>;

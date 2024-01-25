@@ -146,6 +146,10 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
 }
 
 envoy_status_t Engine::terminate() {
+  if (terminated_) {
+    IS_ENVOY_BUG("attempted to double terminate engine");
+    return ENVOY_FAILURE;
+  }
   // If main_thread_ has finished (or hasn't started), there's nothing more to do.
   if (!main_thread_.joinable()) {
     return ENVOY_FAILURE;
@@ -177,11 +181,17 @@ envoy_status_t Engine::terminate() {
   if (std::this_thread::get_id() != main_thread_.get_id()) {
     main_thread_.join();
   }
-
+  terminated_ = true;
   return ENVOY_SUCCESS;
 }
 
-Engine::~Engine() { terminate(); }
+bool Engine::isTerminated() const { return terminated_; }
+
+Engine::~Engine() {
+  if (!terminated_) {
+    terminate();
+  }
+}
 
 envoy_status_t Engine::setProxySettings(const char* hostname, const uint16_t port) {
   return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
@@ -271,6 +281,17 @@ envoy_status_t Engine::dumpStats(envoy_data* out) {
     return ENVOY_SUCCESS;
   }
   return ENVOY_FAILURE;
+}
+
+std::string Engine::dumpStats() {
+  envoy_data data;
+  if (dumpStats(&data) == ENVOY_FAILURE) {
+    return "";
+  }
+  const std::string to_return = Data::Utility::copyToString(data);
+  release_envoy_data(data);
+
+  return to_return;
 }
 
 Upstream::ClusterManager& Engine::getClusterManager() {
