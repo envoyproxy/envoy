@@ -77,7 +77,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
         self.expectation(description: "Successful response trailers received")
 
     let engine = EngineBuilder()
-      .addLogLevel(.trace)
+      .addLogLevel(.debug)
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
