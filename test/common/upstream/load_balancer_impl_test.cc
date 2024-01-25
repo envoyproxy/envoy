@@ -2903,31 +2903,17 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
   hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[4]->stats().rq_active_.set(5);
 
-  // Creating various load balancer objects with different choice configs.
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
-  lr_lb_config.mutable_choice_count()->set_value(2);
+
   // Enable FULL_SCAN on hosts.
   lr_lb_config.set_selection_method(
       envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
-  common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(3);
-  LeastRequestLoadBalancer lb_3{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(4);
-  LeastRequestLoadBalancer lb_4{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(6);
-  LeastRequestLoadBalancer lb_6{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
+                              random_,       1,       lr_lb_config, simTime()};
 
-  // With full scan we will always choose the host with least number of active requests.
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_4.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_6.chooseHost(nullptr));
+  // With FULL_SCAN we will always choose the host with least number of active requests.
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
@@ -2945,13 +2931,11 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
   hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[4]->stats().rq_active_.set(1);
 
-  // Creating various load balancer objects with different choice configs.
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
-  lr_lb_config.mutable_choice_count()->set_value(2);
-  // Enable full table scan on hosts.
+
+  // Enable FULL_SCAN on hosts.
   lr_lb_config.set_selection_method(
       envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
-  common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
   auto random = Random::RandomGeneratorImpl();
 
