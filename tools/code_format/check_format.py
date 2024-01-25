@@ -395,9 +395,14 @@ class FormatChecker:
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
         # it is under tools/testdata subdirectory.
-        return (file_path.endswith('.h') and file_path.startswith("./source/") and not file_path.startswith("./source/extensions/")and not file_path in self.config.paths["exception"]["include"]) \
-            or (file_path.endswith('.cc') and file_path.startswith("./source/") and not file_path.startswith("./source/extensions/") and not file_path in self.config.paths["exception"]["include"]) \
-            or self.is_in_subdir(file_path, 'tools/testdata')
+        return ((
+            file_path.endswith('.h') and file_path.startswith("./source/")
+            and not file_path.startswith("./source/extensions/")
+            and not file_path in self.config.paths["exception"]["include"]) or (
+                file_path.endswith('.cc') and file_path.startswith("./source/")
+                and not file_path.startswith("./source/extensions/")
+                and not file_path in self.config.paths["exception"]["include"])
+                or self.is_in_subdir(file_path, 'tools/testdata'))
 
     def allow_listed_for_build_urls(self, file_path):
         return file_path in self.config.paths["build_urls"]["include"]
@@ -794,10 +799,10 @@ class FormatChecker:
             return False
 
         if self.deny_listed_for_exceptions(file_path):
-            if (has_non_comment_throw(line) or "THROW" in line or "throwExceptionOrPanic" in line):
+            if has_non_comment_throw(line) or "THROW" in line or "throwExceptionOrPanic" in line:
                 report_error(
                     "Don't introduce throws into exception-free files, use error "
-                    + "statuses instead.")
+                    "statuses instead.")
 
     def check_build_line(self, line, file_path, report_error):
         if "@bazel_tools" in line and not (self.is_starlark_file(file_path)
