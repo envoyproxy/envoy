@@ -77,6 +77,12 @@ message ClusterLoadAssignment {
     //
     // Envoy supports only one element and will NACK if more than one element is present.
     // Other xDS-capable data planes will not necessarily have this limitation.
+    //
+    // In Envoy, this **drop_overloads** config can be overridden by a runtime key
+    // "config.drop_overload_support". This runtime key can be set to any integer
+    // number between 0 and 100. 0 means 0%. 100 means 100%.
+    // In case an EDS update with **drop_overloads** setting, if this runtime key is
+    // enabled, then the smaller value between this two will be the actual drop_ratio.
     repeated DropOverload drop_overloads = 2;
 
     // Priority levels and localities are considered overprovisioned with this

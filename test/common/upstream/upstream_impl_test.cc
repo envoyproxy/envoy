@@ -167,7 +167,36 @@ std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
 }
 
 class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
-                           public UpstreamImplTestBase {};
+                           public UpstreamImplTestBase {
+public:
+  void dropOverloadRuntimeTest(uint64_t numerator, float drop_ratio) {
+    auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+    ReadyWatcher initialized;
+    const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                             R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 50
+              denominator: HUNDRED
+    )EOF";
+
+    EXPECT_CALL(runtime_.snapshot_, getInteger(_, _)).WillRepeatedly(Return(numerator));
+    envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
+    StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
+    EXPECT_EQ(drop_ratio, cluster.dropOverload().value());
+  }
+};
 
 INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
                          testing::ValuesIn(generateStrictDnsParams()));
@@ -320,6 +349,10 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
       StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
       "Cluster drop_overloads config has 2 categories. Envoy only support one.");
 }
+
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideSmall) { dropOverloadRuntimeTest(10, 0.1); }
+
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideLarge) { dropOverloadRuntimeTest(80, 0.5); }
 
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
 protected:

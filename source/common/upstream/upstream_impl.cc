@@ -381,6 +381,9 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
 const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
     "config.do_not_validate_alpn_support";
 
+// Overriding drop_overload ratio settings from EDS.
+const absl::string_view ClusterImplBase::DropOverloadRuntimeKey = "config.drop_overload_support";
+
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
 // stat name into every host that receives a copy of that metric. This can be improved by putting
 // a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
@@ -1698,7 +1701,14 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
         "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
         drop_percentage.denominator()));
   }
-  drop_overload_ = UnitFloat(float(drop_percentage.numerator()) / (denominator));
+
+  // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.
+  // If it is enabled, choose the smaller one between it and the EDS config.
+  float drop_ratio = float(drop_percentage.numerator()) / (denominator);
+  uint64_t drop_ratio_runtime =
+      runtime_.snapshot().getInteger(ClusterImplBase::DropOverloadRuntimeKey, 100);
+  drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(100));
+  drop_overload_ = UnitFloat(drop_ratio);
   return absl::OkStatus();
 }
 
