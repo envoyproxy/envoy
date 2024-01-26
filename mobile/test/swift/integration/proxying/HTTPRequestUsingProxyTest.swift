@@ -121,4 +121,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     engine.terminate()
     EnvoyTestServer.shutdownTestServer()
   }
+
+  // TODO(abeyad): Add test for PAC file URL.
+  // TODO(abeyad): Add test for proxy system settings updated.
 }
