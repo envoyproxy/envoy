@@ -728,8 +728,8 @@ private:
 
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   void addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
-                                    uint32_t padding_length) PURE;
+  Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                            uint32_t padding_length);
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
   bool slowContainsStreamId(int32_t stream_id) const;
@@ -775,8 +775,6 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(int32_t stream_id) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
-  Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
-                            uint32_t) override;
   void dumpStreams(std::ostream& os, int indent_level) const override;
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
@@ -802,8 +800,6 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(int32_t stream_id) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
-  Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
-                            uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
   StreamResetReason getMessagingErrorResetReason() const override {
     return StreamResetReason::LocalReset;
