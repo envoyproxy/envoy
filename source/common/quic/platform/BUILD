@@ -40,6 +40,7 @@ envoy_package()
 envoy_cc_library(
     name = "quiche_flags_constants",
     hdrs = ["quiche_flags_constants.h"],
+    deps = ["//source/common/http:utility_lib"],
 )
 
 envoy_quiche_platform_impl_cc_library(

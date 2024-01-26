@@ -29,7 +29,7 @@
    * flow control window to make sure upper stream can be flow control blocked early enough not to \
    * send more than the threshold allows.                                                          \
    * TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible  \
-   * for now. 512MB is way too large, but the actual bytes buffered should be bound by the                                                                   \
+   * for now. 512MB is way too large, but the actual bytes buffered should be bound by the         \
    * negotiated upstream flow control window. */                                                   \
   KEY_VALUE_PAIR(quic_buffered_data_threshold,                                                     \
                  2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE)
