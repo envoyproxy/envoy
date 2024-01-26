@@ -14,36 +14,25 @@
 #include "source/common/http/utility.h"
 
 #define OVERRIDDEN_RELOADABLE_FLAGS(KEY_VALUE_PAIR)                                                \
-  KEY_VALUE_PAIR(quic_disable_version_draft_29,                                                    \
-                 true) /* Envoy only supports RFC-v1 in the long term, so disable IETF draft 29    \
-                          implementation by default. */                                            \
-  KEY_VALUE_PAIR(                                                                                  \
-      quic_default_to_bbr,                                                                         \
-      true) /* This flag enables BBR, otherwise QUIC will use Cubic which is less performant */
+  /* Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by       \
+   * default. */                                                                                   \
+  KEY_VALUE_PAIR(quic_disable_version_draft_29, true)                                              \
+  /* This flag enables BBR, otherwise QUIC will use Cubic which is less performant */              \
+  KEY_VALUE_PAIR(quic_default_to_bbr, true)
 
 #define OVERRIDDEN_PROTOCOL_FLAGS(KEY_VALUE_PAIR)                                                  \
-  KEY_VALUE_PAIR(                                                                                  \
-      quic_header_size_limit_includes_overhead,                                                    \
-      false) /* Do not include 32-byte per-entry overhead while counting header size. */           \
-  KEY_VALUE_PAIR(                                                                                  \
-      quic_buffered_data_threshold,                                                                \
-      2 * ::Envoy::Http2::Utility::OptionsLimits::                                                 \
-              DEFAULT_INITIAL_STREAM_WINDOW_SIZE) /* Set send buffer twice of max flow control     \
-                                                     window to ensure that stream send buffer      \
-                                                     always takes all the data. The max amount of  \
-                                                     data buffered is the per-stream high          \
-                                                     watermark + the max flow control window of    \
-                                                     upstream. The per-stream high watermark       \
-                                                     should be smaller than max flow control       \
-                                                     window to make sure upper stream can be flow  \
-                                                     control blocked early enough not to send more \
-                                                     than the threshold allows.                    \
-                                                     TODO(#8826) Ideally we should use the         \
-                                                     negotiated value from upstream which is not   \
-                                                     accessible for now. 512MB is way too large,   \
-                                                     but the actual bytes buffered should be bound \
-                                                     by the negotiated upstream flow control       \
-                                                     window. */
+  /* Do not include 32-byte per-entry overhead while counting header size. */                      \
+  KEY_VALUE_PAIR(quic_header_size_limit_includes_overhead, false)                                  \
+  /* Set send buffer twice of max flow control window to ensure that stream send buffer always     \
+   * takes all the data. The max amount of data buffered is the per-stream high watermark + the    \
+   * max flow control window of upstream. The per-stream high watermark should be smaller than max \
+   * flow control window to make sure upper stream can be flow control blocked early enough not to \
+   * send more than the threshold allows.                                                          \
+   * TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible  \
+   * for now. 512MB is way too large, but the actual bytes buffered should be bound by the                                                                   \
+   * negotiated upstream flow control window. */                                                   \
+  KEY_VALUE_PAIR(quic_buffered_data_threshold,                                                     \
+                 2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE)
 
 namespace quiche {
 
