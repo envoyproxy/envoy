@@ -215,18 +215,20 @@ bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
-    const envoy::config::accesslog::v3::ResponseFlagFilter& config) {
+    const envoy::config::accesslog::v3::ResponseFlagFilter& config)
+    : has_configured_flags_(!config.flags().empty()) {
+
   // Preallocate the vector to avoid frequent heap allocations. 64 should be enough for most use
   // cases.
-  configured_flags_.resize(StreamInfo::ResponseFlagUtils::responseFlagsMap().size(), false);
+  configured_flags_.resize(StreamInfo::ResponseFlagUtils::ResponseFlagsVec().size(), false);
   for (int i = 0; i < config.flags_size(); i++) {
     absl::optional<uint16_t> response_flag =
         StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
     // The config has been validated. Therefore, every flag in the config will have a mapping.
     ASSERT(response_flag.has_value());
 
-    // The vector is allocated with the size of the response flags map. Therefore, the index
-    // should be valid.
+    // The vector is allocated with the size of the response flags vec. Therefore, the index
+    // should always be valid.
     ASSERT(response_flag.value() < configured_flags_.size());
 
     configured_flags_[response_flag.value()] = true;
@@ -235,7 +237,7 @@ ResponseFlagFilter::ResponseFlagFilter(
 
 bool ResponseFlagFilter::evaluate(const Formatter::HttpFormatterContext&,
                                   const StreamInfo::StreamInfo& info) const {
-  if (!configured_flags_.empty()) {
+  if (has_configured_flags_) {
     for (const uint16_t flag : info.responseFlags()) {
       if (flag >= configured_flags_.size()) {
         // Any valid flag should be less than the size of the configured flags vector
