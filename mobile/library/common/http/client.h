@@ -151,10 +151,6 @@ private:
     void onError();
     void onSendWindowAvailable();
 
-    // Remove the stream and clear up state if possible, else set up deferred
-    // removal path.
-    void removeStream();
-
     // ResponseEncoder
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -187,8 +183,6 @@ private:
     // Bytes will only be sent up once, even if the bytes available are fewer
     // than bytes_to_send.
     void resumeData(size_t bytes_to_send);
-
-    void setFinalStreamIntel(StreamInfo::StreamInfo& stream_info);
 
     void latchError();
 

@@ -583,7 +583,9 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  absl::Status creation_status;
+  Configuration::InitialImpl initial_config(bootstrap_, creation_status);
+  THROW_IF_NOT_OK(creation_status);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -738,7 +740,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
-  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
