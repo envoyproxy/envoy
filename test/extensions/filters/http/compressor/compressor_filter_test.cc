@@ -420,23 +420,24 @@ TEST_F(CompressorFilterTest, ContentEncodingAlreadyEncoded) {
 }
 
 // No compression when upstream response status code is 206 Partial Content.
-TEST_F(CompressorFilterTest, PartialContentResponse) {
-  // single part
-  {
-    doRequestNoCompression({{":method", "get"}, {"range", "bytes=0-255"}});
-    Http::TestResponseHeaderMapImpl response_headers{
-        {"content-length", "256"}, {"content-range", "bytes 0-255/1024"}, {":status", "206"}};
-    doResponseNoCompression(response_headers);
-  }
-  // multi parts
-  {
-    doRequestNoCompression({{":method", "get"}, {"range", "bytes=500-999, 7000-7999"}});
-    Http::TestResponseHeaderMapImpl response_headers{
-        {"content-length", "1741"},
-        {"content-type", "multipart/byteranges; boundary=THIS_STRING_SEPARATES"},
-        {":status", "206"}};
-    doResponseNoCompression(response_headers);
-  }
+// single part
+TEST_F(CompressorFilterTest, PartialContentSinglePartResponse) {
+
+  doRequestNoCompression({{":method", "get"}, {"range", "bytes=0-255"}});
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-length", "256"}, {"content-range", "bytes 0-255/1024"}, {":status", "206"}};
+  doResponseNoCompression(response_headers);
+}
+
+// No compression when upstream response status code is 206 Partial Content.
+// multi parts
+TEST_F(CompressorFilterTest, PartialContentMultiPartsResponse) {
+  doRequestNoCompression({{":method", "get"}, {"range", "bytes=500-999, 7000-7999"}});
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-length", "1741"},
+      {"content-type", "multipart/byteranges; boundary=THIS_STRING_SEPARATES"},
+      {":status", "206"}};
+  doResponseNoCompression(response_headers);
 }
 
 // No compression when upstream response is empty.
