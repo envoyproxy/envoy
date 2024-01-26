@@ -28,10 +28,23 @@ message LeastRequest {
   // Available methods for selecting the host set from which to return the host with the
   // fewest active requests.
   enum SelectionMethod {
-    // Return host with fewest requests from a set of ``choice_count`` randomly selected hosts
+    // Return host with fewest requests from a set of ``choice_count`` randomly selected hosts.
+    // Best selection method for most scenarios.
     N_CHOICES = 0;
 
-    // Return host with fewest requests from all hosts
+    // Return host with fewest requests from all hosts.
+    // Useful in some niche use cases involving low request rates and one of:
+    // (example 1) low request limits on workloads, or (example 2) few hosts.
+    //
+    // Example 1: Consider a workload type that can only accept one connection at a time.
+    // If such workloads are deployed across many hosts, only a small percentage of those
+    // workloads have zero connections at any given time, and the rate of new connections is low,
+    // the ``FULL_SCAN`` method is more likely to select a suitable host than ``N_CHOICES``.
+    //
+    // Example 2: Consider a workload type that is only deployed on 2 hosts. With default settings,
+    // the ``N_CHOICES`` method will return the host with more active requests 25% of the time.
+    // If the request rate is sufficiently low, the behavior of always selecting the host with least
+    // requests as of the last metrics refresh may be preferable.
     FULL_SCAN = 1;
   }
 
