@@ -2,10 +2,9 @@
 
 #include <functional>
 
+#include "library/cc/log_level.h"
+#include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
-#include "log_level.h"
-#include "pulse_client.h"
-#include "stream_client.h"
 
 namespace Envoy {
 class Engine;
@@ -22,9 +21,9 @@ public:
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
-  PulseClientSharedPtr pulseClient();
 
   envoy_status_t terminate();
+  Envoy::Engine* engine() { return engine_; }
 
 private:
   Engine(::Envoy::Engine* engine);
@@ -38,7 +37,6 @@ private:
 
   Envoy::Engine* engine_;
   StreamClientSharedPtr stream_client_;
-  PulseClientSharedPtr pulse_client_;
   bool terminated_;
 };
 

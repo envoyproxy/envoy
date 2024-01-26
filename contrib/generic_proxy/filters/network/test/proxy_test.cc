@@ -658,8 +658,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
   EXPECT_CALL(*server_codec_, respond(_, _, _))
       .WillOnce(Invoke([&](Status status, absl::string_view, const Request&) -> ResponsePtr {
         auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-        response->status_ = {static_cast<uint32_t>(status.code()),
-                             status.code() == StatusCode::kOk};
+        response->status_ = {static_cast<int>(status.code()), status.code() == StatusCode::kOk};
         response->message_ = status.message();
         return response;
       }));

@@ -29,7 +29,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // **Current Implementation Status:**
 // All options and processing modes are implemented except for the following:
 //
-// * Request and response attributes are not sent and not processed.
 // * Dynamic metadata in responses from the external processor is ignored.
 // * "async mode" is not implemented.
 
@@ -126,7 +125,6 @@ message ExternalProcessor {
   // for a reply.
   bool async_mode = 4;
 
-  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the request_headers message.
@@ -134,7 +132,6 @@ message ExternalProcessor {
   // for the list of supported attributes and their types.
   repeated string request_attributes = 5;
 
-  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the response_headers message.

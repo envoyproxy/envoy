@@ -640,6 +640,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test that connection is AbortReset closed during callback.
 TEST_P(ConnectionImplTest, ClientAbortResetDuringCallback) {
   Network::ClientConnectionPtr upstream_connection_;
@@ -786,6 +787,7 @@ TEST_P(ConnectionImplTest, ServerResetCloseRuntimeDisabled) {
   server_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 struct MockConnectionStats {
   Connection::ConnectionStats toBufferStats() {
@@ -1111,6 +1113,7 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test normal RST close without readDisable.
 TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
   setUpBasicConnection();
@@ -1188,6 +1191,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadEarlyCloseDisabledThenWrite) {
   client_connection_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 // Test that connection half-close is sent and received properly.
 TEST_P(ConnectionImplTest, HalfClose) {
@@ -1229,6 +1233,7 @@ TEST_P(ConnectionImplTest, HalfClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test that connection is immediately closed when RST is detected even
 // half-close is enabled
 TEST_P(ConnectionImplTest, HalfCloseResetClose) {
@@ -1346,7 +1351,6 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-#if !defined(WIN32)
 // Test that no remote close event will be propagated back to peer, when a connection is
 // half-closed and then the connection is RST closed. Writing data to the half closed and then
 // reset connection will lead to broken pipe error rather than reset error.
