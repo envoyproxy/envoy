@@ -56,8 +56,6 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   region = config.region();
 
   if (region.empty()) {
-    ENVOY_LOG_MISC(debug, "creating region provider chain");
-
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
     absl::optional<std::string> regionopt = region_provider->getRegion();
     if (!regionopt.has_value()) {
@@ -114,8 +112,6 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   region = per_route_config.aws_request_signing().region();
 
   if (region.empty()) {
-    ENVOY_LOG_MISC(debug, "creating region provider chain");
-
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
     absl::optional<std::string> regionopt = region_provider->getRegion();
     if (!regionopt.has_value()) {

@@ -1,3 +1,5 @@
+#include <filesystem>
+
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
@@ -8,10 +10,8 @@
 
 using testing::_;
 using testing::ElementsAre;
-// using testing::InSequence;
 using testing::NiceMock;
 using testing::Pair;
-// using testing::Ref;
 using testing::Return;
 using testing::Throw;
 
@@ -56,7 +56,6 @@ aws_session_token = profile4_token
 )";
 
 TEST(UtilityTest, TestProfileResolver) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   absl::flat_hash_map<std::string, std::string> elements = {{"AWS_ACCESS_KEY_ID", "testoverwrite"},
                                                             {"AWS_SECRET_ACCESS_KEY", ""}};

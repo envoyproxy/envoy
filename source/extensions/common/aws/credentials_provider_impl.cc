@@ -209,7 +209,7 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   Utility::resolveProfileElements(credentials_file, profile, elements);
   // if profile file fails to load, or these elements are not found in the profile, their values
   // will remain blank when retrieving them from the hash map
-  access_key_id = elements.find(AWS_SECRET_ACCESS_KEY)->second;
+  access_key_id = elements.find(AWS_ACCESS_KEY_ID)->second;
   secret_access_key = elements.find(AWS_SECRET_ACCESS_KEY)->second;
   session_token = elements.find(AWS_SESSION_TOKEN)->second;
 

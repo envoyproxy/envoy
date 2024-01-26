@@ -292,6 +292,7 @@ match_excluded_headers:
         cb(filter_callbacks);
       },
       EnvoyException);
+  }
 
   TEST(AwsRequestSigningFilterConfigTest, UpstreamFactoryTest) {
 

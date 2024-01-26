@@ -145,7 +145,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_NoRegion) {
   region_name_ = "test_region_env";
   region_location_ = RegionLocation::NotProvided;
   credentials_factory_name_ = "envoy.grpc_credentials.aws_iam";
-  EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "AWS region");
+  EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "Region string");
 }
 
 TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials) {
