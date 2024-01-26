@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 57]
+// [#next-free-field: 58]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -147,6 +147,17 @@ message Cluster {
     V6_ONLY = 2;
     V4_PREFERRED = 3;
     ALL = 4;
+  }
+
+  enum FirstAddressFamilyVersion {
+    DEFAULT = 0;
+    V4 = 1;
+    V6 = 2;
+  }
+
+  message HappyEyeballsConfig {
+    FirstAddressFamilyVersion first_address_family_version = 1;
+    int32 first_address_family_count = 2;
   }
 
   enum ClusterProtocolSelection {
@@ -1190,6 +1201,10 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // b/216628756
+  // Add configurations for happy eyeballs algorithm
+  HappyEyeballsConfig happy_eyeballs_config = 57;
 }
 
 // Extensible load balancing policy configuration.

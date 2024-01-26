@@ -1273,6 +1273,13 @@ public:
    */
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
+  /**
+   * @return const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig
+   * the configuration for happy eyeballs for this cluster.
+   */
+  virtual const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig
+  happyEyeballsConfig() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

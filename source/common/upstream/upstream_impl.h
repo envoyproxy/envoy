@@ -1052,6 +1052,15 @@ public:
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
+  const ClusterProto::HappyEyeballsConfig happyEyeballsConfig() const override {
+    if (happy_eyeballs_config_ == nullptr) {
+      ClusterProto::HappyEyeballsConfig default_config;
+      default_config.set_first_address_family_version(ClusterProto::DEFAULT);
+      default_config.set_first_address_family_count(1);
+      return default_config;
+    }
+    return *happy_eyeballs_config_;
+  }
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -1155,6 +1164,8 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
+  const std::shared_ptr<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
+      happy_eyeballs_config_;
 };
 
 /**
