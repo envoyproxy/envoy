@@ -181,17 +181,9 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
                                                            jlong engine_handle) {
   jni_log("[Envoy]", "dumpStats");
   auto engine = reinterpret_cast<Envoy::Engine*>(engine_handle);
-  envoy_data data;
-  jint result = engine->dumpStats(&data);
+  std::string stats = engine->dumpStats();
   Envoy::JNI::JniHelper jni_helper(env);
-  if (result != ENVOY_SUCCESS) {
-    return jni_helper.newStringUtf("").release();
-  }
-
-  Envoy::JNI::LocalRefUniquePtr<jstring> str = Envoy::JNI::envoyDataToJavaString(jni_helper, data);
-  release_envoy_data(data);
-
-  return str.release();
+  return jni_helper.newStringUtf(stats.c_str()).release();
 }
 
 // JvmCallbackContext
