@@ -70,6 +70,7 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
   case ActivationToken::XDS:
     return {};
   }
+  return {};
 }
 
 void StreamActivation::resetActivation() const {
