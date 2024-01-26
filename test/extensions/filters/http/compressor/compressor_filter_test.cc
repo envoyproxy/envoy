@@ -422,7 +422,6 @@ TEST_F(CompressorFilterTest, ContentEncodingAlreadyEncoded) {
 // No compression when upstream response status code is 206 Partial Content.
 // single part
 TEST_F(CompressorFilterTest, PartialContentSinglePartResponse) {
-
   doRequestNoCompression({{":method", "get"}, {"range", "bytes=0-255"}});
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-length", "256"}, {"content-range", "bytes 0-255/1024"}, {":status", "206"}};
