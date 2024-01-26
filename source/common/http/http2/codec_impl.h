@@ -268,10 +268,10 @@ protected:
                       public Event::DeferredDeletable,
                       public Http::MultiplexedStreamImplBase,
                       public ScopeTrackedObject {
-    enum HeadersState {
-      HCAT_REQUEST,
-      HCAT_RESPONSE,
-      HCAT_HEADERS,
+    enum class HeadersState {
+      Request,
+      Response,
+      Headers, // Signifies additional headers after the initial request/response set.
     };
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
@@ -565,7 +565,7 @@ protected:
     ResponseDecoder& response_decoder_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
-    HeadersState headers_state_ = HCAT_RESPONSE;
+    HeadersState headers_state_ = HeadersState::Response;
   };
 
   using ClientStreamImplPtr = std::unique_ptr<ClientStreamImpl>;
@@ -631,7 +631,7 @@ protected:
 
   private:
     RequestDecoder* request_decoder_{};
-    HeadersState headers_state_ = HCAT_REQUEST;
+    HeadersState headers_state_ = HeadersState::Request;
   };
 
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
