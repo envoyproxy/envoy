@@ -23,10 +23,6 @@ public:
 
   void add(const ScopeTrackedObject& object) { tracked_objects_.push_back(object); }
 
-  ScopedExecutionContext scoped_execution_context() const override {
-    return ScopedExecutionContext();
-  }
-
   void dumpState(std::ostream& os, int indent_level) const override {
     for (auto iter = tracked_objects_.rbegin(); iter != tracked_objects_.rend(); ++iter) {
       iter->get().dumpState(os, indent_level);

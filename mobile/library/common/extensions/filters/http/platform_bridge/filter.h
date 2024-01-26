@@ -122,9 +122,6 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override;
-  ScopedExecutionContext scoped_execution_context() const override {
-    return ScopedExecutionContext();
-  }
 
   // Common stream instrumentation.
   envoy_final_stream_intel finalStreamIntel();

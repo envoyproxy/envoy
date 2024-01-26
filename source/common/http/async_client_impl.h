@@ -263,10 +263,6 @@ private:
   ResponseTrailerMapOptRef responseTrailers() override { return {}; }
 
   // ScopeTrackedObject
-  ScopedExecutionContext scoped_execution_context() const override {
-    return ScopedExecutionContext();
-  }
-
   void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "AsyncClient " << this << DUMP_MEMBER(stream_id_) << "\n";

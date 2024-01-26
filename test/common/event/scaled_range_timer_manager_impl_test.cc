@@ -321,7 +321,7 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
   }
 
   if (getScope() != nullptr) {
-    EXPECT_CALL(scope_, scoped_execution_context()).Times(2);
+    EXPECT_CALL(scope_, scopedExecutionContext()).Times(2);
   }
 
   timer->enableTimer(std::chrono::seconds(2), getScope());
@@ -350,7 +350,7 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ScheduleWithScalingFactorZero) {
   EXPECT_CALL(callback, Call).WillOnce([&] { EXPECT_EQ(dispatcher_.scope_, getScope()); });
 
   if (getScope() != nullptr) {
-    EXPECT_CALL(scope_, scoped_execution_context());
+    EXPECT_CALL(scope_, scopedExecutionContext());
   }
 
   timer->enableTimer(std::chrono::seconds(1), getScope());

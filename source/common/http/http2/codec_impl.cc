@@ -1926,7 +1926,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
       options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
 }
 
-ScopedExecutionContext ConnectionImpl::scoped_execution_context() const {
+ScopedExecutionContext ConnectionImpl::scopedExecutionContext() const {
   ExecutionContext* execution_context = GetConnectionExecutionContextMutable(connection_);
   return ScopedExecutionContext(execution_context);
 }

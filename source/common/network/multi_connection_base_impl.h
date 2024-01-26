@@ -131,9 +131,6 @@ public:
   bool readEnabled() const override;
   bool aboveHighWatermark() const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;
-  ScopedExecutionContext scoped_execution_context() const override {
-    return ScopedExecutionContext();
-  }
   void dumpState(std::ostream& os, int indent_level) const override;
 
 private:

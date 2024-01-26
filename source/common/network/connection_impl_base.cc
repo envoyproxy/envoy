@@ -42,7 +42,7 @@ void ConnectionImplBase::setDelayedCloseTimeout(std::chrono::milliseconds timeou
   delayed_close_timeout_ = timeout;
 }
 
-ScopedExecutionContext ConnectionImplBase::scoped_execution_context() const {
+ScopedExecutionContext ConnectionImplBase::scopedExecutionContext() const {
   ExecutionContext* execution_context = GetConnectionExecutionContextMutable(*this);
   return ScopedExecutionContext(execution_context);
 }

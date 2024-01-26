@@ -264,9 +264,6 @@ private:
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override;
-    ScopedExecutionContext scoped_execution_context() const override {
-      return ScopedExecutionContext();
-    }
 
     void setResponseDetails(absl::string_view response_details) {
       response_details_ = response_details;

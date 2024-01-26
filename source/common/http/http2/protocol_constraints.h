@@ -55,9 +55,6 @@ public:
   Status checkOutboundFrameLimits();
 
   // ScopeTrackedObject
-  ScopedExecutionContext scoped_execution_context() const override {
-    return ScopedExecutionContext();
-  }
   void dumpState(std::ostream& os, int indent_level) const override;
 
 private:

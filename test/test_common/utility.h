@@ -1212,9 +1212,6 @@ class MessageTrackedObject : public ScopeTrackedObject {
 public:
   MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
   void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
-  ScopedExecutionContext scoped_execution_context() const override {
-    return ScopedExecutionContext();
-  }
 
 private:
   absl::string_view sv_;

@@ -175,9 +175,6 @@ protected:
       void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
       absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
       // ScopeTrackedObject
-      ScopedExecutionContext scoped_execution_context() const override {
-        return ScopedExecutionContext();
-      }
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 
       SyntheticReadCallbacks& parent_;
