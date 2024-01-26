@@ -2,7 +2,6 @@
 
 #include "library/common/data/utility.h"
 #include "library/common/engine.h"
-#include "library/common/main_interface.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -24,11 +23,9 @@ StreamClientSharedPtr Engine::streamClient() {
   return std::make_shared<StreamClient>(shared_from_this());
 }
 
-PulseClientSharedPtr Engine::pulseClient() { return std::make_shared<PulseClient>(); }
-
 std::string Engine::dumpStats() {
   envoy_data data;
-  if (dump_stats(reinterpret_cast<envoy_engine_t>(engine_), &data) == ENVOY_FAILURE) {
+  if (engine_->dumpStats(&data) == ENVOY_FAILURE) {
     return "";
   }
   const std::string to_return = Data::Utility::copyToString(data);

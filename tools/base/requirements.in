@@ -38,7 +38,12 @@ pyyaml
 setuptools
 slack_sdk
 sphinx>=7,<7.2
+sphinxcontrib-applehelp>=1.0.8
+sphinxcontrib-devhelp>=1.0.6
 sphinxcontrib.googleanalytics
+sphinxcontrib-htmlhelp>=2.0.5
+sphinxcontrib-qthelp>=1.0.7
+sphinxcontrib-serializinghtml>=1.1.10
 thrift
 verboselogs
 yapf
