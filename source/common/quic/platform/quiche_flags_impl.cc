@@ -26,7 +26,7 @@ constexpr std::pair<absl::string_view, bool> quiche_reloadable_flag_overrides[]{
 #undef QUICHE_RELOADABLE_FLAG_OVERRIDE
 
 #define QUICHE_PROTOCOL_FLAG_OVERRIDE(flag_name, value) {STRINGIFY(flag_name), value},
-constexpr std::pair<absl::string_view, std::variant<bool, uint32_t>>
+constexpr std::pair<absl::string_view, absl::variant<bool, uint32_t>>
     quiche_protocol_flag_overrides[]{OVERRIDDEN_PROTOCOL_FLAGS(QUICHE_PROTOCOL_FLAG_OVERRIDE)};
 #undef QUICHE_PROTOCOL_FLAG_OVERRIDE
 
@@ -45,8 +45,8 @@ template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val)
   }
   for (const auto& [flag_name, new_value_variant] : quiche_protocol_flag_overrides) {
     if (flag_name == name) {
-      if (std::holds_alternative<bool>(new_value_variant)) {
-        return std::get<bool>(new_value_variant);
+      if (absl::holds_alternative<bool>(new_value_variant)) {
+        return absl::get<bool>(new_value_variant);
       }
     }
   }
@@ -56,8 +56,8 @@ template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val)
 template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int32_t val) {
   for (const auto& [flag_name, new_value_variant] : quiche_protocol_flag_overrides) {
     if (flag_name == name) {
-      if (std::holds_alternative<uint32_t>(new_value_variant)) {
-        return std::get<uint32_t>(new_value_variant);
+      if (absl::holds_alternative<uint32_t>(new_value_variant)) {
+        return absl::get<uint32_t>(new_value_variant);
       }
     }
   }
