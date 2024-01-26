@@ -47,11 +47,10 @@ SigningAlgorithm getSigningAlgorithm(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
-    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-
-  auto& server_context = context.serverFactoryContext();
+absl::StatusOr<Http::FilterFactoryCb>
+AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
+    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& server_context) {
 
   std::string region;
   region = config.region();
@@ -98,7 +97,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
   }
 
   auto filter_config =
-      std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, context.scope(),
+      std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, dual_info.scope,
                                          config.host_rewrite(), config.use_unsigned_payload());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
@@ -166,6 +165,8 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
  */
 REGISTER_FACTORY(AwsRequestSigningFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAwsRequestSigningFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters

@@ -1,9 +1,9 @@
 #include "stream_callbacks.h"
 
-#include "bridge_utility.h"
+#include "library/cc/bridge_utility.h"
+#include "library/cc/response_headers_builder.h"
+#include "library/cc/response_trailers_builder.h"
 #include "library/common/data/utility.h"
-#include "response_headers_builder.h"
-#include "response_trailers_builder.h"
 
 namespace Envoy {
 namespace Platform {

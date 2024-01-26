@@ -35,7 +35,7 @@ public:
    * @param config, the Envoy bootstrap configuration to use.
    * @param log_level, the log level.
    */
-  envoy_status_t run(std::string config, std::string log_level);
+  envoy_status_t run(const std::string& config, const std::string& log_level);
   envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
 
   /**
@@ -49,17 +49,44 @@ public:
    */
   Event::ProvisionalDispatcher& dispatcher();
 
-  /**
-   * Accessor for the http client. Must be called from the dispatcher's context.
-   * @return Http::Client&, the (default) http client.
-   */
-  Http::Client& httpClient();
+  envoy_stream_t initStream();
 
-  /**
-   * Accessor for the network configuraator. Must be called from the dispatcher's context.
-   * @return Network::ConnectivityManager&, the network connectivity_manager.
-   */
-  Network::ConnectivityManager& networkConnectivityManager();
+  // These functions are wrappers around http client functions, which hand off
+  // to http client functions of the same name after doing a dispatcher post
+  // (thread context switch)
+  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+                             bool explicit_flow_control) {
+    return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
+      http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
+    });
+  }
+  envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
+    return dispatcher_->post([&, stream, headers, end_stream]() {
+      http_client_->sendHeaders(stream, headers, end_stream);
+    });
+  }
+  envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read) {
+    return dispatcher_->post(
+        [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
+  }
+  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
+    return dispatcher_->post(
+        [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
+  }
+  envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+    return dispatcher_->post(
+        [&, stream, trailers]() { http_client_->sendTrailers(stream, trailers); });
+  }
+
+  envoy_status_t cancelStream(envoy_stream_t stream) {
+    return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
+  }
+
+  // These functions are wrappers around networkConnectivityManager functions, which hand off
+  // to networkConnectivityManager after doing a dispatcher post (thread context switch)
+  envoy_status_t setProxySettings(const char* host, const uint16_t port);
+  envoy_status_t resetConnectivityState();
+  envoy_status_t setPreferredNetwork(envoy_network_t network);
 
   /**
    * Increment a counter with a given string of elements and by the given count.
@@ -67,14 +94,17 @@ public:
    * @param tags, custom tags of the reporting stat.
    * @param count, amount to add to the counter.
    */
-  envoy_status_t recordCounterInc(const std::string& elements, envoy_stats_tags tags,
+  envoy_status_t recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
                                   uint64_t count);
 
   /**
-   * Dump Envoy stats into the returned buffer
-   * @returns a buffer with referenced stats dumped in Envoy's standard text format.
+   * Dump Envoy stats into the provided envoy_data
+   * @params envoy_data which will be filed with referenced stats dumped in Envoy's standard text
+   * format.
+   * @return failure status if the engine is no longer running.
+   * This can be called from any thread, but will block on engine-thread processing.
    */
-  Buffer::OwnedImpl dumpStats();
+  envoy_status_t dumpStats(envoy_data* out);
 
   /**
    * Get cluster manager from the Engine.

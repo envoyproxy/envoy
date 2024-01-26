@@ -52,7 +52,7 @@ Example filter configuration:
     :linenos:
     :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`
 
-Note that this filter also supports per route configuration:
+This filter also supports per route configuration. Below is an example of route-level config overriding the config at the virtual-host level.
 
 .. literalinclude:: _include/aws-request-signing-filter-route-level-override.yaml
     :language: yaml
@@ -61,9 +61,7 @@ Note that this filter also supports per route configuration:
     :linenos:
     :caption: :download:`aws-request-signing-filter-route-level-override.yaml <_include/aws-request-signing-filter-route-level-override.yaml>`
 
-Above shows an example of route-level config overriding the config on the virtual-host level.
-
-An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to a AWS VPC Lattice service:
+An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to an Amazon VPC Lattice service:
 
 .. literalinclude:: _include/aws-request-signing-filter-sigv4a.yaml
     :language: yaml
@@ -71,6 +69,27 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
     :lineno-start: 26
     :linenos:
     :caption: :download:`aws-request-signing-filter-sigv4a.yaml <_include/aws-request-signing-filter-sigv4a.yaml>`
+
+
+Configuration as an upstream HTTP filter
+----------------------------------------
+SigV4 or SigV4A request signatures are calculated using the HTTP host, URL and payload as input. Depending on the configuration, Envoy may modify one or more of
+these prior to forwarding to the Cluster subsystem, but after the signature has been calculated and inserted into the HTTP headers. Modifying fields in a SigV4 or SigV4A
+signed request will result in an invalid signature.
+
+To avoid invalid signatures, the AWS Request Signing Filter can be configured as an upstream HTTP filter. This allows signatures to be
+calculated as a final step before the HTTP request is forwarded upstream, ensuring signatures are correctly calculated over the updated
+HTTP fields.
+
+Configuring this filter as an upstream HTTP filter is done in a similar way to the downstream case, but using the :ref:`http_filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`
+filter chain within the cluster configuration.
+
+.. literalinclude:: _include/aws-request-signing-filter-upstream.yaml
+    :language: yaml
+    :lines: 47-57
+    :lineno-start: 47
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-upstream.yaml <_include/aws-request-signing-filter-upstream.yaml>`
 
 .. include:: _include/aws_credentials.rst
 

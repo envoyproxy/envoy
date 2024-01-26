@@ -18,8 +18,7 @@ namespace UriTemplate {
 namespace Match {
 
 bool UriTemplateMatcher::match(absl::string_view path) const {
-  RE2 matching_pattern_regex = RE2(convertPathPatternSyntaxToRegex(path_template_).value());
-  return RE2::FullMatch(Http::PathUtil::removeQueryAndFragment(path), matching_pattern_regex);
+  return RE2::FullMatch(Http::PathUtil::removeQueryAndFragment(path), matching_pattern_regex_);
 }
 
 absl::string_view UriTemplateMatcher::uriTemplate() const { return path_template_; }

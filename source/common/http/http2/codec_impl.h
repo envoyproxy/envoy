@@ -687,7 +687,7 @@ private:
   friend class Http2CodecImplTestFixture;
 
   virtual ConnectionCallbacks& callbacks() PURE;
-  virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
+  virtual Status onBeginHeaders(int32_t stream_id, int headers_category) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   Status onPing(uint64_t opaque_data, bool is_ack);
@@ -757,7 +757,7 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  Status onBeginHeaders(const nghttp2_frame* frame) override;
+  Status onBeginHeaders(int32_t stream_id, int headers_category) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t) override;
@@ -784,7 +784,7 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  Status onBeginHeaders(const nghttp2_frame* frame) override;
+  Status onBeginHeaders(int32_t stream_id, int headers_category) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
   Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                             uint32_t padding_length) override;
