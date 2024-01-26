@@ -1702,12 +1702,14 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
         drop_percentage.denominator()));
   }
 
-  // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.
-  // If it is enabled, choose the smaller one between it and the EDS config.
+  // If DropOverloadRuntimeKey is not enabled, take the EDS drop_overload config.
+  // If DropOverloadRuntimeKey is enabled, take it.
   float drop_ratio = float(drop_percentage.numerator()) / (denominator);
-  uint64_t drop_ratio_runtime =
-      runtime_.snapshot().getInteger(ClusterImplBase::DropOverloadRuntimeKey, 100);
-  drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(100));
+  uint64_t drop_percent_runtime =
+      runtime_.snapshot().getInteger(ClusterImplBase::DropOverloadRuntimeKey, UINT32_MAX);
+  if (drop_percent_runtime != UINT32_MAX) {
+    drop_ratio = float(drop_percent_runtime) / float(100);
+  }
   drop_overload_ = UnitFloat(drop_ratio);
   return absl::OkStatus();
 }

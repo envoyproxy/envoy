@@ -352,7 +352,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
 
 TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideSmall) { dropOverloadRuntimeTest(10, 0.1); }
 
-TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideLarge) { dropOverloadRuntimeTest(80, 0.5); }
+TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideLarge) { dropOverloadRuntimeTest(80, 0.8); }
 
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
 protected:
