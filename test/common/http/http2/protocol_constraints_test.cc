@@ -99,8 +99,8 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenData) {
   const bool is_empty = true;
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(
-      isInboundFramesWithEmptyPayloadError(constraints.trackInboundFrame(type, end_stream, is_empty)));
+  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
+      constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.status()));
   EXPECT_EQ(1, stats_store_.counter("http2.inbound_empty_frames_flood").value());
 }
@@ -118,8 +118,8 @@ TEST_F(ProtocolConstraintsTest, OutboundAndInboundFrameFloodStatusIsIdempotent) 
   const bool is_empty = true;
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(
-      isInboundFramesWithEmptyPayloadError(constraints.trackInboundFrame(type, end_stream, is_empty)));
+  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
+      constraints.trackInboundFrame(type, end_stream, is_empty)));
 
   // Then trigger outbound control flood
   constraints.incrementOutboundFrameCount(true);
@@ -138,8 +138,8 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenDataWithPadding) {
   const bool is_empty = true;
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(
-      isInboundFramesWithEmptyPayloadError(constraints.trackInboundFrame(type, end_stream, is_empty)));
+  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
+      constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.status()));
   EXPECT_EQ(1, stats_store_.counter("http2.inbound_empty_frames_flood").value());
 }
@@ -157,8 +157,8 @@ TEST_F(ProtocolConstraintsTest, InboundZeroLenDataEndStreamResetCounter) {
   end_stream = false;
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
   EXPECT_TRUE(constraints.trackInboundFrame(type, end_stream, is_empty).ok());
-  EXPECT_TRUE(
-      isInboundFramesWithEmptyPayloadError(constraints.trackInboundFrame(type, end_stream, is_empty)));
+  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(
+      constraints.trackInboundFrame(type, end_stream, is_empty)));
   EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.status()));
   EXPECT_EQ(1, stats_store_.counter("http2.inbound_empty_frames_flood").value());
 }

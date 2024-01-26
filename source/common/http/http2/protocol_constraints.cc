@@ -62,8 +62,7 @@ Status ProtocolConstraints::checkOutboundFrameLimits() {
   return okStatus();
 }
 
-Status ProtocolConstraints::trackInboundFrame(uint8_t type, bool end_stream,
-                                              bool is_empty) {
+Status ProtocolConstraints::trackInboundFrame(uint8_t type, bool end_stream, bool is_empty) {
   switch (type) {
   case NGHTTP2_HEADERS:
   case NGHTTP2_CONTINUATION:
