@@ -52,13 +52,13 @@ public:
     std::string long_string_; // PascalCase string
   };
 
-  using ResponseFlagsVec = std::vector<FlagStrings>;
+  using ResponseFlagsVecType = std::vector<FlagStrings>;
   // Node hash map is used to avoid the key/value pair pointer change of the string_view when the
   // map is resized. And the performance is not a concern here because the map is only used when
   // loading the config.
-  using ResponseFlagsMap = absl::node_hash_map<std::string, FlagLongString>;
-  static const ResponseFlagsVec& responseFlagsVec();
-  static const ResponseFlagsMap& responseFlagsMap();
+  using ResponseFlagsMapType = absl::node_hash_map<std::string, FlagLongString>;
+  static const ResponseFlagsVecType& responseFlagsVec();
+  static const ResponseFlagsMapType& responseFlagsMap();
 
   using FlagStringsAndEnum = std::pair<const FlagStrings, ResponseFlag>;
 
@@ -195,7 +195,7 @@ private:
    */
   static uint16_t registerCustomFlag(absl::string_view flag, absl::string_view flag_long);
 
-  static ResponseFlagsMap& mutableResponseFlagsMap();
+  static ResponseFlagsMapType& mutableResponseFlagsMapType();
 };
 
 class TimingUtility {

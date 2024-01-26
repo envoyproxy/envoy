@@ -42,9 +42,9 @@ const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, boo
   return absl::StrJoin(flag_strings_vec, ",");
 }
 
-ResponseFlagUtils::ResponseFlagsMap& ResponseFlagUtils::mutableResponseFlagsMap() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(ResponseFlagsMap, []() {
-    ResponseFlagsMap map;
+ResponseFlagUtils::ResponseFlagsMapType& ResponseFlagUtils::mutableResponseFlagsMapType() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(ResponseFlagsMapType, []() {
+    ResponseFlagsMapType map;
     // Initialize the map with the all core flags first to ensure no custom flags
     // conflict with them.
     RELEASE_ASSERT(CORE_RESPONSE_FLAGS.size() == ResponseFlag::LastFlag + 1,
@@ -63,7 +63,7 @@ ResponseFlagUtils::ResponseFlagsMap& ResponseFlagUtils::mutableResponseFlagsMap(
 
 uint16_t ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag,
                                                absl::string_view custom_flag_long) {
-  auto& mutable_flags = mutableResponseFlagsMap();
+  auto& mutable_flags = mutableResponseFlagsMapType();
   RELEASE_ASSERT(!mutable_flags.contains(custom_flag),
                  fmt::format("Flag: {}/{} already registered", custom_flag, custom_flag_long));
 
@@ -74,11 +74,11 @@ uint16_t ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag,
   return next_flag;
 }
 
-const ResponseFlagUtils::ResponseFlagsVec& ResponseFlagUtils::responseFlagsVec() {
-  CONSTRUCT_ON_FIRST_USE(ResponseFlagsVec, []() {
+const ResponseFlagUtils::ResponseFlagsVecType& ResponseFlagUtils::responseFlagsVec() {
+  CONSTRUCT_ON_FIRST_USE(ResponseFlagsVecType, []() {
     static_assert(ResponseFlag::LastFlag == 27,
                   "A flag has been added. Add the new flag to CORE_RESPONSE_FLAGS.");
-    ResponseFlagsVec res;
+    ResponseFlagsVecType res;
 
     uint16_t max_flag = ResponseFlag::LastFlag;
     for (const auto& flag : responseFlagsMap()) {
@@ -99,8 +99,8 @@ const ResponseFlagUtils::ResponseFlagsVec& ResponseFlagUtils::responseFlagsVec()
     return res;
   }());
 }
-const ResponseFlagUtils::ResponseFlagsMap& ResponseFlagUtils::responseFlagsMap() {
-  return mutableResponseFlagsMap();
+const ResponseFlagUtils::ResponseFlagsMapType& ResponseFlagUtils::responseFlagsMap() {
+  return mutableResponseFlagsMapType();
 }
 
 absl::optional<uint16_t> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {

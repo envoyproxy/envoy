@@ -220,7 +220,7 @@ ResponseFlagFilter::ResponseFlagFilter(
 
   // Preallocate the vector to avoid frequent heap allocations. 64 should be enough for most use
   // cases.
-  configured_flags_.resize(StreamInfo::ResponseFlagUtils::ResponseFlagsVec().size(), false);
+  configured_flags_.resize(StreamInfo::ResponseFlagUtils::responseFlagsVec().size(), false);
   for (int i = 0; i < config.flags_size(); i++) {
     absl::optional<uint16_t> response_flag =
         StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
