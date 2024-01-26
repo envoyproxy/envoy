@@ -29,7 +29,7 @@
                                                      than the threshold allows.                    \
                                                      TODO(#8826) Ideally we should use the         \
                                                      negotiated value from upstream which is not   \
-                                                     accessible for now. 512MB is way to large,    \
+                                                     accessible for now. 512MB is way too large,   \
                                                      but the actual bytes buffered should be bound \
                                                      by the negotiated upstream flow control       \
                                                      window. */
