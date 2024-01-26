@@ -14,6 +14,11 @@ bug_fixes:
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
+- area: load balancing
+  change: |
+    Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
+    a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.edf_lb_locality_scheduler_init_fix`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

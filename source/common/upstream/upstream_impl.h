@@ -600,7 +600,7 @@ public:
 
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint64_t seed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
@@ -656,13 +656,18 @@ private:
   // @param locality_weights the weighting of each locality.
   // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
   // weight of a locality.
-  static void rebuildLocalityScheduler(
-      std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
-      std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
-      const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
-      HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-      HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-      LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
+  // @param seed a random number of initial picks to "invoke" on the locality scheduler. This
+  // allows to distribute the load between different localities across worker threads and a fleet
+  // of Envoys.
+  static void
+  rebuildLocalityScheduler(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+                           std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+                           const HostsPerLocality& eligible_hosts_per_locality,
+                           const HostVector& eligible_hosts,
+                           HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+                           HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
+                           LocalityWeightsConstSharedPtr locality_weights,
+                           uint32_t overprovisioning_factor, uint64_t seed);
 
   static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
 
@@ -700,7 +705,7 @@ public:
 
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint64_t seed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
@@ -759,7 +764,8 @@ private:
 
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                     const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
+                     const HostVector& hosts_removed, uint64_t seed,
+                     absl::optional<bool> weighted_priority_health,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
@@ -780,7 +786,7 @@ public:
   // PrioritySet
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint64_t seed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
@@ -1270,6 +1276,7 @@ protected:
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_{};
 
 protected:
+  Random::RandomGenerator& random_;
   TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
 
@@ -1302,7 +1309,7 @@ using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
   PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
-                       PrioritySet::HostUpdateCb* update_cb);
+                       PrioritySet::HostUpdateCb* update_cb, Random::RandomGenerator& random);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void initializePriorityFor(
@@ -1339,6 +1346,7 @@ private:
   PriorityState priority_state_;
   const envoy::config::core::v3::Node& local_info_node_;
   PrioritySet::HostUpdateCb* update_cb_;
+  Random::RandomGenerator& random_;
 };
 
 using PriorityStateManagerPtr = std::unique_ptr<PriorityStateManager>;

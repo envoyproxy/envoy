@@ -303,7 +303,7 @@ class EdfSchedulerSpecialTest : public testing::TestWithParam<uint64_t> {};
 // equal to the weights. Trying the case of 2 weights between 0 to 100, in steps
 // of 0.001. This test takes too long, and therefore it is disabled by default.
 // If the EDF scheduler is enable, it can be manually executed.
-TEST_P(EdfSchedulerSpecialTest, DISABLED_ExhustiveValidator) {
+TEST_P(EdfSchedulerSpecialTest, DISABLED_ExhaustiveValidator) {
   const uint64_t start_idx = GetParam();
   for (uint64_t i = start_idx; i < start_idx + BATCH_SIZE; ++i) {
     const double w1 = 0.001 * i;
