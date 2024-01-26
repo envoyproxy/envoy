@@ -236,7 +236,7 @@ private:
     }
 
     // ScopeTrackedObject
-    ScopedExecutionContext scoped_execution_context() const override {
+    ScopedExecutionContext scopedExecutionContext() const override {
       ExecutionContext* execution_context =
           GetConnectionExecutionContextMutable(connection_manager_.read_callbacks_->connection());
       return ScopedExecutionContext(execution_context);
