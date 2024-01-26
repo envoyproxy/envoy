@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -9,7 +11,7 @@ namespace External {
 /**
  * Register an external runtime API for usage (e.g. in extensions).
  */
-void registerApi(absl::string_view name, void* api);
+void registerApi(std::string&& name, void* api);
 
 /**
  * Retrieve an external runtime API for usage (e.g. in extensions).
