@@ -357,48 +357,53 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
     return {};
   }
   auto value = key.StringOrDie().value();
+  if (value == Node) {
+    if (local_info_) {
+      return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
+    }
+    return {};
+  }
+  if (info_ == nullptr) {
+    return {};
+  }
   if (value == ClusterName) {
-    const auto cluster_info = info_.upstreamClusterInfo();
+    const auto cluster_info = info_->upstreamClusterInfo();
     if (cluster_info && cluster_info.value()) {
       return CelValue::CreateString(&cluster_info.value()->name());
     }
   } else if (value == ClusterMetadata) {
-    const auto cluster_info = info_.upstreamClusterInfo();
+    const auto cluster_info = info_->upstreamClusterInfo();
     if (cluster_info && cluster_info.value()) {
       return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(), &arena_);
     }
   } else if (value == RouteName) {
-    if (info_.route()) {
-      return CelValue::CreateString(&info_.route()->routeName());
+    if (info_->route()) {
+      return CelValue::CreateString(&info_->route()->routeName());
     }
   } else if (value == RouteMetadata) {
-    if (info_.route()) {
-      return CelProtoWrapper::CreateMessage(&info_.route()->metadata(), &arena_);
+    if (info_->route()) {
+      return CelProtoWrapper::CreateMessage(&info_->route()->metadata(), &arena_);
     }
   } else if (value == UpstreamHostMetadata) {
-    const auto upstream_info = info_.upstreamInfo();
+    const auto upstream_info = info_->upstreamInfo();
     if (upstream_info && upstream_info->upstreamHost()) {
       return CelProtoWrapper::CreateMessage(upstream_info->upstreamHost()->metadata().get(),
                                             &arena_);
     }
   } else if (value == FilterChainName) {
-    const auto filter_chain_info = info_.downstreamAddressProvider().filterChainInfo();
+    const auto filter_chain_info = info_->downstreamAddressProvider().filterChainInfo();
     const absl::string_view filter_chain_name =
         filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
     return CelValue::CreateStringView(filter_chain_name);
   } else if (value == ListenerMetadata) {
-    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    const auto listener_info = info_->downstreamAddressProvider().listenerInfo();
     if (listener_info) {
       return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &arena_);
     }
   } else if (value == ListenerDirection) {
-    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    const auto listener_info = info_->downstreamAddressProvider().listenerInfo();
     if (listener_info) {
       return CelValue::CreateInt64(listener_info->direction());
-    }
-  } else if (value == Node) {
-    if (local_info_) {
-      return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
     }
   }
   return {};

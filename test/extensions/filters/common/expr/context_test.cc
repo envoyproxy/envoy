@@ -856,7 +856,7 @@ TEST(Context, XDSAttributes) {
   info.downstream_connection_info_provider_->setListenerInfo(listener_info);
 
   Protobuf::Arena arena;
-  XDSWrapper wrapper(arena, info, &local_info);
+  XDSWrapper wrapper(arena, &info, &local_info);
 
   {
     const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
