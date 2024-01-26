@@ -264,34 +264,23 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
   statsAsText(all_stats, histograms, response);
 }
 
-envoy_status_t Engine::dumpStats(envoy_data* out) {
-  // If the engine isn't running, fail.
+std::string Engine::dumpStats() {
   if (!main_thread_.joinable()) {
-    return ENVOY_FAILURE;
+    return "";
   }
 
+  std::string stats;
   absl::Notification stats_received;
   if (dispatcher_->post([&]() -> void {
         Envoy::Buffer::OwnedImpl instance;
         handlerStats(server_->stats(), instance);
-        *out = Envoy::Data::Utility::toBridgeData(instance, 1024 * 1024 * 100);
+        stats = instance.toString();
         stats_received.Notify();
       }) == ENVOY_SUCCESS) {
     stats_received.WaitForNotification();
-    return ENVOY_SUCCESS;
+    return stats;
   }
-  return ENVOY_FAILURE;
-}
-
-std::string Engine::dumpStats() {
-  envoy_data data;
-  if (dumpStats(&data) == ENVOY_FAILURE) {
-    return "";
-  }
-  const std::string to_return = Data::Utility::copyToString(data);
-  release_envoy_data(data);
-
-  return to_return;
+  return stats;
 }
 
 Upstream::ClusterManager& Engine::getClusterManager() {

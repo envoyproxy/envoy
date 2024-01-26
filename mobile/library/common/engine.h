@@ -118,14 +118,6 @@ public:
 
 private:
   envoy_status_t main(std::unique_ptr<Envoy::OptionsImplBase>&& options);
-  /**
-   * Dump Envoy stats into the provided envoy_data
-   * @params envoy_data which will be filed with referenced stats dumped in Envoy's standard text
-   * format.
-   * @return failure status if the engine is no longer running.
-   * This can be called from any thread, but will block on engine-thread processing.
-   */
-  envoy_status_t dumpStats(envoy_data* out);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
 
