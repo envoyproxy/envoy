@@ -1,6 +1,7 @@
 #include "source/common/network/common_connection_filter_states.h"
 
 namespace Envoy {
+namespace Network {
 
 const ExecutionContext*
 GetConnectionExecutionContextReadOnly(const Network::Connection& connection) {
@@ -14,4 +15,5 @@ ExecutionContext* GetConnectionExecutionContextMutable(const Network::Connection
   return const_cast<ExecutionContext*>(GetConnectionExecutionContextReadOnly(connection));
 }
 
+} // namespace Network
 } // namespace Envoy

@@ -5,9 +5,10 @@
 #include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
+namespace Network {
 
 static constexpr absl::string_view kConnectionExecutionContextFilterStateName =
-    "connection-execution-context";
+    "envoy.network.connection_execution_context";
 
 // ConnectionExecutionContextFilterState is an optional connection-level filter state that goes by
 // the name kConnectionExecutionContextFilterStateName. It owns a ExecutionContext, whose
@@ -33,4 +34,5 @@ GetConnectionExecutionContextReadOnly(const Network::Connection& connection);
 // Returns the mutable ExecutionContext of a connection. Or nullptr if not found.
 ExecutionContext* GetConnectionExecutionContextMutable(const Network::Connection& connection);
 
+} // namespace Network
 } // namespace Envoy
