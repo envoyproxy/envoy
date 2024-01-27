@@ -1,6 +1,5 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-#import "library/common/main_interface.h"
 #import "library/cc/engine_builder.h"
 #include "source/common/protobuf/utility.h"
 

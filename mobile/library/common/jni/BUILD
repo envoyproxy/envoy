@@ -75,7 +75,7 @@ envoy_cc_library(
         ":android_network_utility_lib",
         ":jni_utility_lib",
         "//library/cc:engine_builder_lib",
-        "//library/common:envoy_main_interface_lib",
+        "//library/common:engine_lib",
         "//library/common/api:c_types",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
@@ -123,7 +123,7 @@ envoy_cc_library(
         ":jni_impl_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
-        "//library/common:envoy_main_interface_lib",
+        "//library/common:engine_lib",
         "//library/common/jni/import:jni_import_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
