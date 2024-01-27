@@ -46,6 +46,7 @@
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
@@ -500,9 +501,10 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
-  stats_store_.setStatsMatcher(
-      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
-  stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
+  stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
+      bootstrap_.stats_config(), stats_store_.symbolTable()));
+  stats_store_.setHistogramSettings(
+      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config()));
 
   const std::string server_stats_prefix = "server.";
   const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
@@ -581,7 +583,9 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  absl::Status creation_status;
+  Configuration::InitialImpl initial_config(bootstrap_, creation_status);
+  THROW_IF_NOT_OK(creation_status);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -736,7 +740,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
-  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -805,12 +809,13 @@ void InstanceBase::onRuntimeReady() {
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                         *stats_store_.rootScope(), false)
-              ->createUncachedRawAsyncClient(),
-          stats_store_, *ssl_context_manager_, info_factory_);
+          factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
+          *ssl_context_manager_, info_factory_);
     }
     END_TRY
     CATCH(const EnvoyException& e, {

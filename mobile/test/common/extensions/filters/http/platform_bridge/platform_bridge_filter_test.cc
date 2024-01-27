@@ -43,7 +43,7 @@ public:
   void setUpFilter(std::string name, envoy_http_filter* platform_filter) {
     envoymobile::extensions::filters::http::platform_bridge::PlatformBridge config;
     config.set_platform_filter_name(name);
-    Api::External::registerApi(config.platform_filter_name(), platform_filter);
+    Api::External::registerApi(std::string(config.platform_filter_name()), platform_filter);
 
     config_ = std::make_shared<PlatformBridgeFilterConfig>(context_, config);
     filter_ = std::make_shared<PlatformBridgeFilter>(config_, dispatcher_);

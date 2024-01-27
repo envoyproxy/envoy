@@ -2,7 +2,6 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/engine.h"
-#include "library/common/main_interface.h"
 
 namespace Envoy {
 
@@ -22,8 +21,13 @@ struct TestEngine {
   }
 
   envoy_status_t terminate() { return engine_->terminate(); }
+  bool isTerminated() const { return engine_->isTerminated(); }
 
-  ~TestEngine() { engine_->terminate(); }
+  ~TestEngine() {
+    if (!engine_->isTerminated()) {
+      engine_->terminate();
+    }
+  }
 };
 
 class EngineTest : public testing::Test {
@@ -55,6 +59,7 @@ TEST_F(EngineTest, EarlyExit) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
+  ASSERT_TRUE(engine_->isTerminated());
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   engine_->engine_->startStream(0, {}, false);
@@ -74,19 +79,18 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
                                    [](void*) -> void {} /*on_exit*/, &test_context /*context*/};
 
   engine_ = std::make_unique<TestEngine>(callbacks, level);
-  envoy_engine_t handle = engine_->handle();
+  engine_->handle();
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification getClusterManagerInvoked;
-  envoy_data stats_data;
   // Running engine functions should work because the engine is running
-  EXPECT_EQ(ENVOY_SUCCESS, dump_stats(handle, &stats_data));
-  release_envoy_data(stats_data);
+  EXPECT_EQ("runtime.load_success: 1\n", engine_->engine_->dumpStats());
 
   engine_->terminate();
+  ASSERT_TRUE(engine_->isTerminated());
 
   // Now that the engine has been shut down, we no longer expect scheduling to work.
-  EXPECT_EQ(ENVOY_FAILURE, dump_stats(handle, &stats_data));
+  EXPECT_EQ("", engine_->engine_->dumpStats());
 
   engine_.reset();
 }

@@ -20,12 +20,22 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
+- area: http1
+  change: |
+    Removed ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers`` runtime flag and legacy code paths.
+- area: overload manager
+  change: |
+    removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
 
 new_features:
 - area: filters
   change: |
     Added the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`,
     which can be used to inject credentials into the HTTP headers.
+- area: aws_request_signing
+  change: |
+    Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter

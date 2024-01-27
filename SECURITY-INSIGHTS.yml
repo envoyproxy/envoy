@@ -7,7 +7,7 @@ header:
   changelog: https://www.envoyproxy.io/docs/envoy/latest/version_history/version_history#version-history
   license: https://github.com/envoyproxy/envoy/blob/main/LICENSE
 project-lifecycle:
-  stage: active
+  status: active
   bug-fixes-only: false
   core-maintainers:  # from https://github.com/envoyproxy/envoy/blob/main/OWNERS.md
 # Senior maintainers
@@ -38,6 +38,8 @@ dependencies:
   third-party-packages: true
   dependencies-lists:
     - https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/external_deps
+  env-dependencies-policy:
+    policy-url: https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md
 distribution-points:
   - https://github.com/envoyproxy/envoy
 documentation:
