@@ -20,6 +20,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
+- area: http1
+  change: |
+    Removed ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers`` runtime flag and legacy code paths.
 - area: overload manager
   change: |
     removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
