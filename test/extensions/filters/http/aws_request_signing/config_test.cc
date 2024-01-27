@@ -396,7 +396,6 @@ match_excluded_headers:
       EnvoyException);
 }
 
-
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
 } // namespace Extensions
