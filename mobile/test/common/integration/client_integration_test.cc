@@ -14,7 +14,7 @@
 
 #include "extension_registry.h"
 #include "library/common/data/utility.h"
-#include "library/common/main_interface.h"
+#include "library/common/engine.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
@@ -957,10 +957,11 @@ TEST_P(ClientIntegrationTest, Proxying) {
     return;
   }
   initialize();
-
-  set_proxy_settings(rawEngine(), fake_upstreams_[0]->localAddress()->asString().c_str(),
-                     fake_upstreams_[0]->localAddress()->ip()->port());
-
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_->engine()->setProxySettings(fake_upstreams_[0]->localAddress()->asString().c_str(),
+                                        fake_upstreams_[0]->localAddress()->ip()->port());
+  }
   // The initial request will do the DNS lookup.
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();

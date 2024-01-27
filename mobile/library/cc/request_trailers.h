@@ -1,7 +1,7 @@
 #pragma once
 
-#include "request_trailers_builder.h"
-#include "trailers.h"
+#include "library/cc/request_trailers_builder.h"
+#include "library/cc/trailers.h"
 
 namespace Envoy {
 namespace Platform {

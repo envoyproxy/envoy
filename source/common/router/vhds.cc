@@ -100,7 +100,7 @@ absl::Status VhdsSubscription::onConfigUpdate(
               config_update_info_->protobufConfigurationCast().name(),
               config_update_info_->configHash());
     if (route_config_provider_ != nullptr) {
-      THROW_IF_NOT_OK(route_config_provider_->onConfigUpdate());
+      RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
   }
 
