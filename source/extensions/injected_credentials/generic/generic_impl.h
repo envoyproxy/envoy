@@ -20,6 +20,8 @@ public:
 
   // Common::CredentialInjector
   RequestPtr requestCredential(Callbacks& callbacks) override {
+    // Generic credential injector does not need to make a request to get the credential.
+    // It can get the credential from the secret directly. So it can call onSuccess() immediately.
     callbacks.onSuccess();
     return nullptr;
   };
