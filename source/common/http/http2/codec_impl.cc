@@ -1390,6 +1390,29 @@ void ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const u
   output.addDrainTracker(releasor);
 }
 
+Status ConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint8_t type,
+                                          uint8_t flags, uint32_t padding_length) {
+  Status result;
+  ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
+                 connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
+                 static_cast<uint64_t>(length), padding_length);
+
+  result = protocol_constraints_.trackInboundFrames(length, type, flags, padding_length);
+  if (!result.ok()) {
+    ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
+                   result.message());
+    if (isInboundFramesWithEmptyPayloadError(result)) {
+      ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
+      if (stream) {
+        stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
+      }
+      // Above if is defensive, because the stream has just been created and therefore always
+      // exists.
+    }
+  }
+  return result;
+}
+
 ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
   ENVOY_CONN_LOG(trace, "send data: bytes={}", connection_, length);
   Buffer::OwnedImpl buffer;
@@ -2069,30 +2092,6 @@ int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
   return saveHeader(stream_id, std::move(name), std::move(value));
 }
 
-// TODO(yanavlasov): move to the base class once the runtime flag is removed.
-Status ClientConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint8_t type,
-                                                uint8_t flags, uint32_t padding_length) {
-  Status result;
-  ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
-                 connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
-                 static_cast<uint64_t>(length), padding_length);
-
-  result = protocol_constraints_.trackInboundFrames(length, type, flags, padding_length);
-  if (!result.ok()) {
-    ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
-                   result.message());
-    if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
-      if (stream) {
-        stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
-      }
-      // Above if is defensive, because the stream has just been created and therefore always
-      // exists.
-    }
-  }
-  return result;
-}
-
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
   connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
 
@@ -2169,28 +2168,6 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
     }
   }
   return saveHeader(stream_id, std::move(name), std::move(value));
-}
-
-Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint8_t type,
-                                                uint8_t flags, uint32_t padding_length) {
-  ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
-                 connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
-                 static_cast<uint64_t>(length), padding_length);
-
-  auto result = protocol_constraints_.trackInboundFrames(length, type, flags, padding_length);
-  if (!result.ok()) {
-    ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
-                   result.message());
-    if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
-      if (stream) {
-        stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
-      }
-      // Above if is defensive, because the stream has just been created and therefore always
-      // exists.
-    }
-  }
-  return result;
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
