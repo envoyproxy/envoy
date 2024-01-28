@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -45,6 +46,11 @@ const (
 	HTTP11 = "HTTP/1.1"
 	HTTP20 = "HTTP/2.0"
 	HTTP30 = "HTTP/3.0"
+)
+
+const (
+	NoWaitingCallback  = 0
+	MayWaitingCallback = 1
 )
 
 var protocolsIdToName = map[uint64]string{
@@ -59,12 +65,57 @@ type panicInfo struct {
 	details string
 }
 type httpRequest struct {
-	req            *C.httpRequest
-	httpFilter     api.StreamFilter
-	pInfo          panicInfo
-	sema           sync.WaitGroup
-	waitingOnEnvoy int32
-	mutex          sync.Mutex
+	req             *C.httpRequest
+	httpFilter      api.StreamFilter
+	pInfo           panicInfo
+	waitingLock     sync.Mutex // protect waitingCallback
+	cond            sync.Cond
+	waitingCallback int32
+
+	// protect multiple cases:
+	// 1. protect req_->strValue in the C++ side from being used concurrently.
+	// 2. protect waitingCallback from being modified in markMayWaitingCallback concurrently.
+	mutex sync.Mutex
+}
+
+// markWaitingOnEnvoy marks the request may be waiting a callback from envoy.
+// Must be the NoWaitingCallback state since it's invoked under the r.mutex lock.
+// We do not do lock waitingCallback here, to reduce lock contention.
+func (r *httpRequest) markMayWaitingCallback() {
+	if !atomic.CompareAndSwapInt32(&r.waitingCallback, NoWaitingCallback, MayWaitingCallback) {
+		panic("markWaitingCallback: unexpected state")
+	}
+}
+
+// markNoWaitingOnEnvoy marks the request is not waiting a callback from envoy.
+// Can not make sure it's in the MayWaitingCallback state, since the state maybe changed by OnDestroy.
+func (r *httpRequest) markNoWaitingCallback() {
+	atomic.StoreInt32(&r.waitingCallback, NoWaitingCallback)
+}
+
+// checkOrWaitCallback checks if we need to wait a callback from envoy, and wait it.
+func (r *httpRequest) checkOrWaitCallback() {
+	// need acquire the lock, since there might be concurrency race with resumeWaitCallback.
+	r.cond.L.Lock()
+	defer r.cond.L.Unlock()
+
+	// callback or OnDestroy already called, no need to wait.
+	if atomic.LoadInt32(&r.waitingCallback) == NoWaitingCallback {
+		return
+	}
+	r.cond.Wait()
+}
+
+// resumeWaitCallback resumes the goroutine that waiting for the callback from envoy.
+func (r *httpRequest) resumeWaitCallback() {
+	// need acquire the lock, since there might be concurrency race with checkOrWaitCallback.
+	r.cond.L.Lock()
+	defer r.cond.L.Unlock()
+
+	if atomic.CompareAndSwapInt32(&r.waitingCallback, MayWaitingCallback, NoWaitingCallback) {
+		// Broadcast is safe even there is no waiters.
+		r.cond.Broadcast()
+	}
 }
 
 func (r *httpRequest) pluginName() string {
