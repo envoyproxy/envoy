@@ -361,6 +361,40 @@ stat_prefix: foo_prefix
       EnvoyException);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4ANoRegion) {
+  const std::string yaml = R"EOF(
+aws_request_signing:
+  service_name: s3
+  signing_algorithm: AWS_SIGV4A
+  host_rewrite: new-host
+  match_excluded_headers:
+    - prefix: x-envoy
+    - exact: foo
+    - exact: bar
+stat_prefix: foo_prefix
+  )EOF";
+
+  TestEnvironment::unsetEnvVar("HOME");
+  TestEnvironment::unsetEnvVar("AWS_CONFIG");
+  TestEnvironment::unsetEnvVar("AWS_PROFILE");
+  TestEnvironment::unsetEnvVar("AWS_REGION");
+  TestEnvironment::unsetEnvVar("AWS_DEFAULT_REGION");
+  TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+
+  AwsRequestSigningProtoPerRouteConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  EXPECT_THROW(
+      {
+        const auto route_config = factory.createRouteSpecificFilterConfig(
+            proto_config, context, ProtobufMessage::getNullValidationVisitor());
+      },
+      EnvoyException);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionNoRegionAvailable) {
   const std::string yaml = R"EOF(
 service_name: s3
