@@ -469,7 +469,10 @@ void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& met
 }
 
 // Only relevant to determine whether the xDS stream is reachable.
-void GoogleAsyncRequestImpl::onServiceReachable() {}
+void GoogleAsyncRequestImpl::onServiceReachable() {
+  // TODO(adisuissa): This is currently not implemented for GoogleGrpc, but will
+  // be in the near future.
+}
 
 void GoogleAsyncRequestImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}
 
