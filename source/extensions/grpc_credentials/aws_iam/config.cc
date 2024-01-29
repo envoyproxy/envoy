@@ -50,13 +50,13 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
 
         if (region.empty()) {
           auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-          absl::optional<std::string> regionopt = region_provider->getRegion();
-          if (!regionopt.has_value()) {
+          absl::optional<std::string> regionOpt = region_provider->getRegion();
+          if (!regionOpt.has_value()) {
             throw EnvoyException(
                 "Region string cannot be retrieved from configuration, environment or "
                 "profile/config files.");
           }
-          region = regionopt.value();
+          region = regionOpt.value();
         }
 
         // TODO(suniltheta): Due to the reasons explained in
