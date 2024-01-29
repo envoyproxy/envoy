@@ -35,10 +35,7 @@ const std::string ResponseFlagUtils::toString(const StreamInfo& stream_info, boo
 
   const auto& all_flag_strings = responseFlagsVec();
   for (const auto flag : stream_info.responseFlags()) {
-    if (flag.value() >= all_flag_strings.size()) {
-      ASSERT(false, fmt::format("Unexpected flag index: {}", flag));
-      continue;
-    }
+    ASSERT(flag.value() < all_flag_strings.size(), "Flag value out of range");
 
     const auto flag_strings = all_flag_strings[flag.value()];
     flag_strings_vec.push_back(use_long_name ? flag_strings.long_string_
