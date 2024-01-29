@@ -232,26 +232,27 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
-  void setResponseFlag(uint16_t flag) override {
-    ASSERT(flag < ResponseFlagUtils::responseFlagsVec().size());
+  void setResponseFlag(ExtendedResponseFlag flag) override {
+    ASSERT(flag.value() < ResponseFlagUtils::responseFlagsVec().size());
     if (!hasResponseFlag(flag)) {
       response_flags_.push_back(flag);
     }
   }
 
-  bool hasResponseFlag(uint16_t flag) const override {
+  bool hasResponseFlag(ExtendedResponseFlag flag) const override {
     return std::find(response_flags_.begin(), response_flags_.end(), flag) != response_flags_.end();
   }
 
   bool hasAnyResponseFlag() const override { return !response_flags_.empty(); }
 
-  absl::Span<const uint16_t> responseFlags() const override { return response_flags_; }
+  absl::Span<const ExtendedResponseFlag> responseFlags() const override { return response_flags_; }
 
   uint64_t legacyResponseFlags() const override {
     uint64_t legacy_flags = 0;
-    for (uint16_t flag : response_flags_) {
-      if (flag <= static_cast<uint16_t>(ResponseFlag::LastFlag)) {
-        legacy_flags |= (1UL << flag);
+    for (ExtendedResponseFlag flag : response_flags_) {
+      if (flag.value() <= static_cast<uint16_t>(ResponseFlag::LastFlag)) {
+        ASSERT(flag.value() < 64, "Legacy response flag out of range");
+        legacy_flags |= (1UL << flag.value());
       }
     }
     return legacy_flags;
@@ -440,7 +441,7 @@ private:
 public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
-  absl::InlinedVector<uint16_t, 4> response_flags_{};
+  absl::InlinedVector<ExtendedResponseFlag, 4> response_flags_{};
   bool health_check_request_{};
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};

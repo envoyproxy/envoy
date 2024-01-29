@@ -41,7 +41,7 @@ protected:
         sizeof(stream_info) == 840 || sizeof(stream_info) == 856 || sizeof(stream_info) == 888 ||
         sizeof(stream_info) == 776 || sizeof(stream_info) == 728 || sizeof(stream_info) == 744 ||
         sizeof(stream_info) == 680 || sizeof(stream_info) == 696 || sizeof(stream_info) == 688 ||
-        sizeof(stream_info) == 728 || sizeof(stream_info) == 712)
+        sizeof(stream_info) == 736 || sizeof(stream_info) == 728 || sizeof(stream_info) == 712)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -149,7 +149,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
 
   for (size_t i = 0; i < responseFlags.size(); i++) {
-    EXPECT_EQ(static_cast<uint16_t>(responseFlags[i]), stream_info.responseFlags()[i]);
+    EXPECT_EQ(static_cast<uint16_t>(responseFlags[i]), stream_info.responseFlags()[i].value());
   }
 
   EXPECT_EQ(0xFFF, stream_info.legacyResponseFlags());

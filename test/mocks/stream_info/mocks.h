@@ -67,7 +67,7 @@ public:
   ~MockStreamInfo() override;
 
   // StreamInfo::StreamInfo
-  MOCK_METHOD(void, setResponseFlag, (uint16_t response_flag));
+  MOCK_METHOD(void, setResponseFlag, (ExtendedResponseFlag response_flag));
   MOCK_METHOD(void, setResponseCode, (uint32_t));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
   MOCK_METHOD(void, setConnectionTerminationDetails, (absl::string_view));
@@ -104,9 +104,9 @@ public:
   MOCK_METHOD(uint64_t, bytesSent, (), (const));
   MOCK_METHOD(void, addWireBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesSent, (), (const));
-  MOCK_METHOD(bool, hasResponseFlag, (uint16_t), (const));
+  MOCK_METHOD(bool, hasResponseFlag, (ExtendedResponseFlag), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));
-  MOCK_METHOD(absl::Span<const uint16_t>, responseFlags, (), (const));
+  MOCK_METHOD(absl::Span<const ExtendedResponseFlag>, responseFlags, (), (const));
   MOCK_METHOD(uint64_t, legacyResponseFlags, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
@@ -153,7 +153,7 @@ public:
   absl::optional<std::string> connection_termination_details_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
-  absl::InlinedVector<uint16_t, 4> response_flags_{};
+  absl::InlinedVector<ExtendedResponseFlag, 4> response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};

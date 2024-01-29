@@ -97,6 +97,42 @@ enum ResponseFlag : uint16_t {
   LastFlag = DropOverLoad,
 };
 
+class ResponseFlagUtils;
+
+// TODO(wbpcode): rename the ExtendedResponseFlag to ResponseFlag and legacy
+// ResponseFlag to CoreResponseFlag.
+class ExtendedResponseFlag {
+public:
+  ExtendedResponseFlag() = default;
+
+  /**
+   * Construct a response flag from the core response flag enum. The integer
+   * value of the enum is used as the raw integer value of the flag.
+   * @param flag the core response flag enum.
+   */
+  ExtendedResponseFlag(ResponseFlag flag) : raw_value_(flag) {}
+
+  /**
+   * Get the raw integer value of the flag.
+   * @return uint16_t the raw integer value.
+   */
+  uint16_t value() const { return raw_value_; }
+
+  bool operator==(const ExtendedResponseFlag& other) const {
+    return raw_value_ == other.raw_value_;
+  }
+
+private:
+  friend class ResponseFlagUtils;
+
+  // This private constructor is used to create extended response flags from
+  // uint16_t values. This can only be used by ResponseFlagUtils to ensure
+  // only validated values are used.
+  ExtendedResponseFlag(uint16_t value) : raw_value_(value) {}
+
+  uint16_t raw_value_{};
+};
+
 /**
  * Constants for the response code details field of StreamInfo for details sent
  * by core (non-extension) code.
@@ -596,7 +632,7 @@ public:
    * @param response_flag the response flag. Each filter can set independent response flags. The
    * flags are accumulated.
    */
-  virtual void setResponseFlag(uint16_t response_flag) PURE;
+  virtual void setResponseFlag(ExtendedResponseFlag response_flag) PURE;
 
   /**
    * @param code the HTTP response code to set for this request.
@@ -751,7 +787,7 @@ public:
   /**
    * @return whether response flag is set or not.
    */
-  virtual bool hasResponseFlag(uint16_t response_flag) const PURE;
+  virtual bool hasResponseFlag(ExtendedResponseFlag response_flag) const PURE;
 
   /**
    * @return whether any response flag is set or not.
@@ -761,7 +797,7 @@ public:
   /**
    * @return all response flags that are set.
    */
-  virtual absl::Span<const uint16_t> responseFlags() const PURE;
+  virtual absl::Span<const ExtendedResponseFlag> responseFlags() const PURE;
 
   /**
    * @return response flags encoded as an integer. Every bit of the integer is used to represent a

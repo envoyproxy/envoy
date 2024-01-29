@@ -43,18 +43,20 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     EXPECT_EQ(ResponseFlagUtils::CORE_RESPONSE_FLAGS.size() + 2,
               ResponseFlagUtils::responseFlagsMap().size());
 
-    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF), ResponseFlag::LastFlag + 1);
-    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2), ResponseFlag::LastFlag + 2);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF).value(), ResponseFlag::LastFlag + 1);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2).value(), ResponseFlag::LastFlag + 2);
 
     // Verify the custom flags are registered correctly.
     EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF), ResponseFlagUtils::responseFlagsMap().at("CF").flag_);
     EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2), ResponseFlagUtils::responseFlagsMap().at("CF2").flag_);
-    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF)].short_string_, "CF");
-    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF)].long_string_,
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF).value()].short_string_,
+              "CF");
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF).value()].long_string_,
               "CustomFlag");
-    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2)].short_string_,
-              "CF2");
-    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2)].long_string_,
+    EXPECT_EQ(
+        ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2).value()].short_string_,
+        "CF2");
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2).value()].long_string_,
               "CustomFlag2");
 
     // Verify the custom flag could work as expected.
@@ -105,10 +107,9 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 
   for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-    absl::optional<uint16_t> response_flag =
-        ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
+    auto response_flag = ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
     EXPECT_TRUE(response_flag.has_value());
-    EXPECT_EQ(flag_enum, response_flag.value());
+    EXPECT_EQ(flag_enum, response_flag.value().value());
   }
 }
 
@@ -368,7 +369,7 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   for (const auto& [response_flag, proxy_status_error] :
-       std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
+       std::vector<std::pair<ExtendedResponseFlag, ProxyStatusError>>{
            {ResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
            {ResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
            {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
@@ -400,7 +401,7 @@ TEST(ProxyStatusFromStreamInfo, TestUpstreamRequestTimeout) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "false"}});
   NiceMock<MockStreamInfo> stream_info;
-  ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+  ON_CALL(stream_info, hasResponseFlag(ExtendedResponseFlag(ResponseFlag::UpstreamRequestTimeout)))
       .WillByDefault(Return(true));
   EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), ProxyStatusError::ConnectionTimeout);
 }

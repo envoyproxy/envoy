@@ -15,22 +15,33 @@ namespace StreamInfo {
 class CustomResponseFlag {
 public:
   CustomResponseFlag(absl::string_view flag, absl::string_view flag_long);
-  uint16_t flag() const { return flag_; }
+  ExtendedResponseFlag flag() const { return flag_; }
 
 private:
-  uint16_t flag_{};
+  ExtendedResponseFlag flag_;
 };
 
 // Register a custom response flag by specifying the flag and the long name of the flag.
-// This macro should never be used in header files.
+// This macro should only be used in source files to register a flag.
 #define REGISTER_CUSTOM_RESPONSE_FLAG(short, long)                                                 \
   static CustomResponseFlag /* NOLINT(fuchsia-statically-constructed-objects) */                   \
       registered_##short{#short, #long};
 
 // Get the registered flag value. This macro should only be used when calling the
 // 'setResponseFlag' method in the StreamInfo class.
-// **Never use this macro to initialize another static variable.**
-// This macro should never be used in header files.
+// NOTE: Never use this macro to initialize another static variable.
+// Basically, this macro should only be used in the same source file where the flag is
+// registered.
+// If you want to use one flag in multiple files, you can declare a static function in
+// the header file and define it in the source file to return the flag value. Here is an
+// example (NOTE: this function should obey the same rule as the CUSTOM_RESPONSE_FLAG
+// macro and cannot be used to initialize another static variable):
+//
+// // header.h
+// ExtendedResponseFlag getRegisteredFlag();
+// // source.cc
+// REGISTER_CUSTOM_RESPONSE_FLAG(short, long);
+// ExtendedResponseFlag getRegisteredFlag() { return CUSTOM_RESPONSE_FLAG(short); }
 #define CUSTOM_RESPONSE_FLAG(short) registered_##short.flag()
 
 /**
@@ -40,7 +51,7 @@ class ResponseFlagUtils {
 public:
   static const std::string toString(const StreamInfo& stream_info);
   static const std::string toShortString(const StreamInfo& stream_info);
-  static absl::optional<uint16_t> toResponseFlag(absl::string_view response_flag);
+  static absl::optional<ExtendedResponseFlag> toResponseFlag(absl::string_view response_flag);
 
   struct FlagStrings {
     absl::string_view short_string_;
@@ -48,7 +59,7 @@ public:
   };
 
   struct FlagLongString {
-    uint16_t flag_{};
+    ExtendedResponseFlag flag_;
     std::string long_string_; // PascalCase string
   };
 
@@ -193,9 +204,9 @@ private:
    * string.
    * @return uint16_t the flag value.
    */
-  static uint16_t registerCustomFlag(absl::string_view flag, absl::string_view flag_long);
-
-  static ResponseFlagsMapType& mutableResponseFlagsMapType();
+  static ExtendedResponseFlag registerCustomFlag(absl::string_view flag,
+                                                 absl::string_view flag_long);
+  static ResponseFlagsMapType& mutableResponseFlagsMap();
 };
 
 class TimingUtility {
