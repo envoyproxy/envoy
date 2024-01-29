@@ -374,12 +374,14 @@ aws_request_signing:
 stat_prefix: foo_prefix
   )EOF";
 
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   TestEnvironment::unsetEnvVar("HOME");
   TestEnvironment::unsetEnvVar("AWS_CONFIG");
   TestEnvironment::unsetEnvVar("AWS_PROFILE");
-  TestEnvironment::unsetEnvVar("AWS_REGION");
   TestEnvironment::unsetEnvVar("AWS_DEFAULT_REGION");
   TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+  TestEnvironment::setEnvVar("AWS_REGION", "ap-southeast-2", 1);
 
   AwsRequestSigningProtoPerRouteConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
