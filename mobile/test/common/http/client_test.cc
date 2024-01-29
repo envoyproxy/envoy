@@ -22,6 +22,7 @@
 #include "library/common/types/c_types.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -127,6 +128,10 @@ public:
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
+    EXPECT_CALL(dispatcher_, post_(_)).Times(AnyNumber()).WillRepeatedly([](Event::PostCb cb) {
+      cb();
+      return ENVOY_SUCCESS;
+    });
   }
 
   envoy_headers defaultRequestHeaders() {

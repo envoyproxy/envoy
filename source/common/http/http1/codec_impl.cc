@@ -130,11 +130,8 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers")) {
-    // Don't consider 100-continue responses as the actual response.
-    started_response_ = false;
-  }
+  // Don't consider 100-continue responses as the actual response.
+  started_response_ = false;
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
@@ -1140,12 +1137,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme")) {
-      headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
-    } else {
-      headers.setScheme(absolute_url.scheme());
-    }
+    headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
     if (!Utility::schemeIsValid(headers.getSchemeValue())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
       return codecProtocolError("http/1.1 protocol error: invalid scheme");

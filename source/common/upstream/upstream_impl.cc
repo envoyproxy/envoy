@@ -1671,7 +1671,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   if (!cluster_load_assignment.has_policy()) {
     return absl::OkStatus();
   }
-  auto policy = cluster_load_assignment.policy();
+  const auto& policy = cluster_load_assignment.policy();
   if (policy.drop_overloads().size() == 0) {
     return absl::OkStatus();
   }
@@ -1681,7 +1681,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
                     policy.drop_overloads().size()));
   }
 
-  const auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+  const auto& drop_percentage = policy.drop_overloads(0).drop_percentage();
   float denominator = 100;
   switch (drop_percentage.denominator()) {
   case envoy::type::v3::FractionalPercent::HUNDRED:

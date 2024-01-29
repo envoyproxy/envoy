@@ -17,13 +17,37 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
+- area: http1
+  change: |
+    Removed ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers`` runtime flag and legacy code paths.
+- area: overload manager
+  change: |
+    removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
 
 new_features:
+- area: aws_request_signing
+  change: |
+    Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
     to preserve HTTP 1.1 responses.  This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
+- area: ext_proc
+  change: |
+    implemented
+    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.request_attributes>`
+    and
+    :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
+    config APIs to enable sending and receiving attributes to/from the external processing server.
+- area: access log
+  change: |
+    added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
+    identifier.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
