@@ -376,6 +376,7 @@ envoy_cc_library(
         "//envoy/common:execution_context",
         "//envoy/common:scope_tracker_interface",
         "//envoy/event:dispatcher_interface",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
