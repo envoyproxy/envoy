@@ -35,13 +35,17 @@ public:
    * @param config, the Envoy bootstrap configuration to use.
    * @param log_level, the log level.
    */
-  envoy_status_t run(std::string config, std::string log_level);
+  envoy_status_t run(const std::string& config, const std::string& log_level);
   envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
 
   /**
-   * Immediately terminate the engine, if running.
+   * Immediately terminate the engine, if running. Calling this function when
+   * the engine has been terminated will result in `ENVOY_FAILURE`.
    */
   envoy_status_t terminate();
+
+  /** Returns true if the Engine has been terminated; false otherwise. */
+  bool isTerminated() const;
 
   /**
    * Accessor for the provisional event dispatcher.
@@ -82,11 +86,11 @@ public:
     return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
   }
 
-  /**
-   * Accessor for the network configuraator. Must be called from the dispatcher's context.
-   * @return Network::ConnectivityManager&, the network connectivity_manager.
-   */
-  Network::ConnectivityManager& networkConnectivityManager();
+  // These functions are wrappers around networkConnectivityManager functions, which hand off
+  // to networkConnectivityManager after doing a dispatcher post (thread context switch)
+  envoy_status_t setProxySettings(const char* host, const uint16_t port);
+  envoy_status_t resetConnectivityState();
+  envoy_status_t setPreferredNetwork(envoy_network_t network);
 
   /**
    * Increment a counter with a given string of elements and by the given count.
@@ -94,14 +98,13 @@ public:
    * @param tags, custom tags of the reporting stat.
    * @param count, amount to add to the counter.
    */
-  envoy_status_t recordCounterInc(const std::string& elements, envoy_stats_tags tags,
+  envoy_status_t recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
                                   uint64_t count);
 
   /**
-   * Dump Envoy stats into the returned buffer
-   * @returns a buffer with referenced stats dumped in Envoy's standard text format.
+   * Dumps Envoy stats into string. Returns an empty string when an error occurred.
    */
-  Buffer::OwnedImpl dumpStats();
+  std::string dumpStats();
 
   /**
    * Get cluster manager from the Engine.
@@ -139,6 +142,7 @@ private:
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   std::thread main_thread_{}; // Empty placeholder to be populated later.
+  bool terminated_{false};
 };
 
 using EngineSharedPtr = std::shared_ptr<Engine>;

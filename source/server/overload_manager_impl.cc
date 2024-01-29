@@ -420,13 +420,10 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     ENVOY_LOG(debug, "Adding overload action {}", name);
 
     // Validate that this is a well known overload action.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.overload_manager_error_unknown_action")) {
-      auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
-      if (std::find(well_known_actions.begin(), well_known_actions.end(), name) ==
-          well_known_actions.end()) {
-        throw EnvoyException(absl::StrCat("Unknown Overload Manager Action ", name));
-      }
+    const auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
+    if (std::find(well_known_actions.begin(), well_known_actions.end(), name) ==
+        well_known_actions.end()) {
+      throw EnvoyException(absl::StrCat("Unknown Overload Manager Action ", name));
     }
 
     // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
