@@ -22,7 +22,7 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
       return absl::nullopt;
     }
   }
-  ENVOY_LOG_MISC(trace, "Region string retrieved: {}");
+  ENVOY_LOG_MISC(debug, "Region string retrieved: {}");
   return region;
 }
 
@@ -41,7 +41,7 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG_MISC(trace, "Region string retrieved: {}");
+  ENVOY_LOG_MISC(debug, "Region string retrieved: {}");
   return it->second;
 }
 
@@ -61,7 +61,7 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG_MISC(trace, "Region string retrieved: {}");
+  ENVOY_LOG_MISC(debug, "Region string retrieved: {}");
   return it->second;
 }
 
