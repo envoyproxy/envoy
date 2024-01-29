@@ -17,6 +17,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace LocalRateLimitFilter {
 
+constexpr absl::string_view LocalRateLimitedResponseDetails = "local_rate_limited";
+
 const std::string& PerConnectionRateLimiter::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "per_connection_local_rate_limiter");
 }
