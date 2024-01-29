@@ -40,6 +40,8 @@ is used as a region set. A region set is a single region, or comma seperated lis
 such as ``us-east-*`` or even ``*``. By using ``AWS_SIGV4A`` and wildcarded regions it is possible to simplify the overall envoy configuration for
 multi-region implementations.
 
+*Note*: The :ref:`region <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter is mandatory, if :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.signing_algorithm>` is set to ``AWS_SIGV4A``.
+
 Example configuration
 ---------------------
 
