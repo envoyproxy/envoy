@@ -43,6 +43,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "trace_context_interface",
     hdrs = ["trace_context.h"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/http:header_map_interface",
+    ],
 )
 
 envoy_cc_library(

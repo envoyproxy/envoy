@@ -29,33 +29,35 @@ public:
   EnvoyException(const std::string& message) : std::runtime_error(message) {}
 };
 
-#define THROW_IF_NOT_OK(status_fn)                                                                 \
-  {                                                                                                \
-    const absl::Status status = status_fn;                                                         \
-    if (!status.ok()) {                                                                            \
-      throwEnvoyExceptionOrPanic(std::string(status.message()));                                   \
+#define THROW_IF_NOT_OK_REF(status)                                                                \
+  do {                                                                                             \
+    if (!(status).ok()) {                                                                          \
+      throwEnvoyExceptionOrPanic(std::string((status).message()));                                 \
     }                                                                                              \
-  }
+  } while (0)
+
+#define THROW_IF_NOT_OK(status_fn)                                                                 \
+  do {                                                                                             \
+    const absl::Status status = (status_fn);                                                       \
+    THROW_IF_NOT_OK_REF(status);                                                                   \
+  } while (0)
 
 // Simple macro to handle bridging functions which return absl::StatusOr, and
 // functions which throw errors.
 //
-// The completely unnecessary throw action argument is just so 'throw' appears
-// at the call site, so format checks about use of exceptions are triggered.
-#ifdef ENVOY_DISABLE_EXCEPTIONS
-#define THROW_IF_STATUS_NOT_OK(variable, throw_action)                                             \
-  if (!variable.status().ok()) {                                                                   \
-    PANIC(std::string(variable.status().message()));                                               \
-  }
-#else
-#define THROW_IF_STATUS_NOT_OK(variable, throw_action)                                             \
-  if (!variable.status().ok()) {                                                                   \
-    throw_action EnvoyException(std::string(variable.status().message()));                         \
-  }
-#endif
+// The completely unnecessary throw_action argument was just so 'throw' appears
+// at the call site, so format checks about use of exceptions would be triggered.
+// This didn't work, so the variable is no longer used and is not duplicated in
+// the macros above.
+#define THROW_IF_STATUS_NOT_OK(variable, throw_action) THROW_IF_NOT_OK_REF(variable.status());
 
 #define RETURN_IF_STATUS_NOT_OK(variable)                                                          \
   if (!variable.status().ok()) {                                                                   \
     return variable.status();                                                                      \
+  }
+
+#define RETURN_IF_NOT_OK(variable)                                                                 \
+  if (!variable.ok()) {                                                                            \
+    return variable;                                                                               \
   }
 } // namespace Envoy

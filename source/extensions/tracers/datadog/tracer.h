@@ -10,7 +10,18 @@
 #include "source/extensions/tracers/datadog/tracer_stats.h"
 
 #include "datadog/tracer.h"
-#include "datadog/tracer_config.h"
+
+namespace datadog {
+namespace tracing {
+
+class DictReader;
+class FinalizedTracerConfig;
+class Span;
+struct SpanConfig;
+struct TracerConfig;
+
+} // namespace tracing
+} // namespace datadog
 
 namespace Envoy {
 namespace Extensions {
@@ -40,12 +51,13 @@ public:
    * cluster is retrieved in order to send HTTP request containing traces
    * @param scope statistics scope from which \c TracerStats can be created
    * @param thread_local_slot_allocator slot allocator for installing a
-   * thread-local instance of the tracer.
+   * thread-local instance of the tracer
+   * @param time_source clocks used for calculating HTTP request timeouts
    */
   explicit Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                   const datadog::tracing::TracerConfig& config,
                   Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                  ThreadLocal::SlotAllocator& thread_local_slot_allocator);
+                  ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source);
 
   struct ThreadLocalTracer : public ThreadLocal::ThreadLocalObject {
     /**
@@ -73,8 +85,8 @@ public:
    * that the returned span will be a part of; otherwise, the returned span is
    * the root of a new trace
    * @param stream_info contains information about the stream.
-   * @param operation_name the name of the operation representation by this
-   * span, e.g. "handle.request"
+   * @param operation_name the Datadog "resource name" to associate with the span.
+   * See comments in the implementation for more information.
    * @param tracing_decision the sampling decision made in advance by Envoy for
    * this trace. If the decision is to drop the trace, then this tracer will
    * honor that decision. If the decision is to keep the trace, then this tracer
@@ -86,6 +98,10 @@ public:
                              Tracing::Decision tracing_decision) override;
 
 private:
+  datadog::tracing::Span extract_or_create_span(datadog::tracing::Tracer& tracer,
+                                                const datadog::tracing::SpanConfig& span_config,
+                                                const datadog::tracing::DictReader& reader);
+
   TracerStats tracer_stats_;
   ThreadLocal::TypedSlotPtr<ThreadLocalTracer> thread_local_slot_;
 };

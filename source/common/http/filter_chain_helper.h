@@ -6,9 +6,11 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/dependency_manager.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Http {
@@ -19,6 +21,22 @@ using DownstreamFilterConfigProviderManager =
 using UpstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
+
+// Allows graceful handling of missing configuration for ECDS.
+class MissingConfigFilter : public Http::PassThroughDecoderFilter {
+public:
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
+                                       absl::nullopt, EMPTY_STRING);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+};
+
+static Http::FilterFactoryCb MissingConfigFilterFactory =
+    [](Http::FilterChainFactoryCallbacks& cb) {
+      cb.addStreamDecoderFilter(std::make_shared<MissingConfigFilter>());
+    };
 
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
@@ -122,8 +140,12 @@ private:
     }
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, server_context_.messageValidationVisitor(), *factory);
-    Http::FilterFactoryCb callback =
+    absl::StatusOr<Http::FilterFactoryCb> callback_or_error =
         factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
+    if (!callback_or_error.status().ok()) {
+      return callback_or_error.status();
+    }
+    Http::FilterFactoryCb callback = callback_or_error.value();
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());
     const bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
     Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),

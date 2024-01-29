@@ -12,7 +12,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 #include "test/extensions/common/async_files/mocks.h"
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
@@ -63,9 +62,8 @@ public:
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
-    ON_CALL(context_.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
-      return Thread::threadFactoryForTest();
-    });
+    ON_CALL(context_.server_factory_context_.api_, threadFactory())
+        .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   }
 
   void initCache() {
@@ -266,23 +264,25 @@ class MockSingletonManager : public Singleton::ManagerImpl {
 public:
   MockSingletonManager() : Singleton::ManagerImpl(Thread::threadFactoryForTest()) {
     // By default just act like a real SingletonManager, but allow overrides.
-    ON_CALL(*this, get(_, _))
+    ON_CALL(*this, get(_, _, _))
         .WillByDefault(std::bind(&MockSingletonManager::realGet, this, std::placeholders::_1,
-                                 std::placeholders::_2));
+                                 std::placeholders::_2, std::placeholders::_3));
   }
 
   MOCK_METHOD(Singleton::InstanceSharedPtr, get,
-              (const std::string& name, Singleton::SingletonFactoryCb cb));
-  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb) {
-    return Singleton::ManagerImpl::get(name, cb);
+              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin));
+  Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb,
+                                       bool pin) {
+    return Singleton::ManagerImpl::get(name, cb, pin);
   }
 };
 
 class FileSystemHttpCacheTestWithMockFiles : public FileSystemHttpCacheTest {
 public:
   FileSystemHttpCacheTestWithMockFiles() {
-    ON_CALL(context_, singletonManager()).WillByDefault(ReturnRef(mock_singleton_manager_));
-    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _))
+    ON_CALL(context_.server_factory_context_, singletonManager())
+        .WillByDefault(ReturnRef(mock_singleton_manager_));
+    ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _, _))
         .WillByDefault(Return(mock_async_file_manager_factory_));
     ON_CALL(*mock_async_file_manager_factory_, getAsyncFileManager(_, _))
         .WillByDefault(Return(mock_async_file_manager_));
@@ -1252,9 +1252,8 @@ TEST(Registration, GetCacheFromFactory) {
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ON_CALL(factory_context.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
-    return Thread::threadFactoryForTest();
-  });
+  ON_CALL(factory_context.server_factory_context_.api_, threadFactory())
+      .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.file_system_http_cache");

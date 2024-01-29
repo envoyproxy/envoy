@@ -84,7 +84,7 @@ public:
   void resetStream();
   void setupPerTryTimeout();
   void maybeEndDecode(bool end_stream);
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host, bool pool_success);
 
   // Http::StreamDecoder
   void decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -342,10 +342,10 @@ public:
 
   // Unsupported functions.
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
-    IS_ENVOY_BUG("recreateStream called from upstream filter");
+    IS_ENVOY_BUG("recreateStream called from upstream HTTP filter");
   }
   void upgradeFilterChainCreated() override {
-    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream filter");
+    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream HTTP filter");
   }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {*this}; }
 

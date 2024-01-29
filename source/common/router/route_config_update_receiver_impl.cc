@@ -45,8 +45,8 @@ ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
                                bool validate_clusters_default) const {
   ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
   return std::make_shared<ConfigImpl>(
-      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc), optional_http_filters_,
-      factory_context, validator_, validate_clusters_default);
+      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc), factory_context,
+      validator_, validate_clusters_default);
 }
 
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,

@@ -138,6 +138,7 @@ envoy_cc_test_library(
         "//envoy/http:codec_interface",
         "//envoy/network:address_interface",
         "//envoy/server/overload:thread_local_overload_state",
+        "//envoy/tracing:trace_context_interface",
         "//source/common/api:api_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
@@ -289,6 +290,15 @@ envoy_cc_test_library(
         "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
         "//source/common/event:timer_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stats_utility_lib",
+    hdrs = ["stats_utility.h"],
+    deps = [
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 

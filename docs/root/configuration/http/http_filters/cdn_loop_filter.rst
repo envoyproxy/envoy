@@ -7,7 +7,7 @@ The CDN-Loop header filter participates in the cross-CDN loop detection protocol
 8586 <https://tools.ietf.org/html/rfc8586>`_. The CDN-Loop header filter performs two actions.
 First, the filter checks to see how many times a particular CDN identifier has appeared in the
 CDN-Loop header. Next, if the check passes, the filter then appends the CDN identifier to the
-CDN-Loop header and passes the request to the next upstream filter. If the check fails, the filter
+CDN-Loop header and passes the request to the next upstream HTTP filter. If the check fails, the filter
 stops processing on the request and returns an error response.
 
 RFC 8586 is particular in how the CDN-Loop header should be modified. As such:

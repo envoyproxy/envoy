@@ -110,6 +110,10 @@ message JsonToMetadata {
     bool allow_empty_content_type = 3;
   }
 
-  // Rules to match json body of requests
-  MatchRules request_rules = 1 [(validate.rules).message = {required: true}];
+  // At least one of request_rules and response_rules must be provided.
+  // Rules to match json body of requests.
+  MatchRules request_rules = 1;
+
+  // Rules to match json body of responses.
+  MatchRules response_rules = 2;
 }

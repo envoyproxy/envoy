@@ -63,7 +63,7 @@ public:
   void testConfig(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config) {
     Network::FilterFactoryCb cb;
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
-    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.getServerFactoryContext()));
+    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.serverFactoryContext()));
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
@@ -278,8 +278,8 @@ resources:
   EXPECT_TRUE(context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
                   .ok());
-  auto message_ptr = context_.admin_.config_tracker_.config_tracker_callbacks_["trds_routes"](
-      universal_name_matcher);
+  auto message_ptr = context_.server_factory_context_.admin_.config_tracker_
+                         .config_tracker_callbacks_["trds_routes"](universal_name_matcher);
   const auto& dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   EXPECT_EQ(1, dump.dynamic_route_configs().size());

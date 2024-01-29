@@ -5,53 +5,48 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: local_rate_limit
+- area: adaptive concurrency filter stats
   change: |
-    Added new configuration field :ref:`rate_limited_as_resource_exhausted
-    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limited_as_resource_exhausted>`
-    to allow for setting if rate limit grpc response should be RESOURCE_EXHAUSTED instead of the default UNAVAILABLE.
+    Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: xds
+- area: tracers
   change: |
-    Fixed a bug (https://github.com/envoyproxy/envoy/issues/27702) that caused ADS initialization
-    to fail on the first attempt and set a back-off retry interval of up to 1 second, if ADS is
-    using an Envoy Cluster for the backend. The issue was fixed to ensure that ADS initialization
-    happens after the Envoy Cluster it depends upon has been properly initialized. ADS that does
-    not depend on an Envoy Cluster (i.e. GoogleGrpc) is not affected by this change.
-- area: grpc
-  change: |
-    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+    use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.expand_agnostic_stream_lifetime`` and legacy code paths.
-- area: http
+    Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
+- area: http1
   change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
-- area: maglev
+    Removed ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers`` runtime flag and legacy code paths.
+- area: overload manager
   change: |
-    Removed ``envoy.reloadable_features.allow_compact_maglev`` and legacy code paths.
-- area: router
-  change: |
-    Removed the deprecated ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent``
-    runtime flag and legacy code path.
-- area: upstream
-  change: |
-    Removed the deprecated ``envoy.reloadable_features.validate_detailed_override_host_statuses``
-    runtime flag and legacy code path.
-- area: grpc
-  change: |
-    Removed the deprecated ``envoy.reloadable_features.service_sanitize_non_utf8_strings``
-    runtime flag and legacy code path.
+    removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
 
 new_features:
-- area: jwt
+- area: aws_request_signing
   change: |
-    The jwt filter can now serialize non-primitive custom claims when maping claims to headers.
-    These claims will be serialized as JSON and encoded as Base64.
+    Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: grpc reverse bridge
+  change: |
+    Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
+    to preserve HTTP 1.1 responses.  This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
+- area: ext_proc
+  change: |
+    implemented
+    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.request_attributes>`
+    and
+    :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
+    config APIs to enable sending and receiving attributes to/from the external processing server.
+- area: access log
+  change: |
+    added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
+    identifier.
 
 deprecated:

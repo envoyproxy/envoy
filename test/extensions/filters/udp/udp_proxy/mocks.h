@@ -22,7 +22,7 @@ public:
 
   MOCK_METHOD(uint64_t, sessionId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
-  MOCK_METHOD(void, continueFilterChain, ());
+  MOCK_METHOD(bool, continueFilterChain, ());
   MOCK_METHOD(void, injectDatagramToFilterChain, (Network::UdpRecvData & data));
 
   uint64_t session_id_{1};
@@ -58,6 +58,14 @@ public:
   MOCK_METHOD(bool, bufferEnabled, (), (const));
   MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
   MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));
+  MOCK_METHOD(void, propagateResponseHeaders,
+              (Http::ResponseHeaderMapPtr && headers,
+               const StreamInfo::FilterStateSharedPtr& filter_state),
+              (const));
+  MOCK_METHOD(void, propagateResponseTrailers,
+              (Http::ResponseTrailerMapPtr && trailers,
+               const StreamInfo::FilterStateSharedPtr& filter_state),
+              (const));
 
   std::string default_proxy_host_ = "default.host.com";
   std::string default_target_host_ = "default.target.host";

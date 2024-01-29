@@ -95,6 +95,8 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
     }
     computed_buckets_.emplace_back(hist_approx_count_below(new_histogram_ptr, bucket));
   }
+
+  out_of_bound_count_ = hist_approx_count_above(new_histogram_ptr, supported_buckets.back());
 }
 
 HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config)

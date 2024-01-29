@@ -126,6 +126,7 @@ public:
   // prematurely closed.
   static const absl::string_view PrematureResetMinStreamLifetimeSecondsKey;
   static const absl::string_view MaxRequestsPerIoCycle;
+  static const absl::string_view OptionallyDelayClose;
 
 private:
   struct ActiveStream;
@@ -179,6 +180,13 @@ private:
                               public DownstreamStreamFilterCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
+
+    // Event::DeferredDeletable
+    void deleteIsPending() override {
+      // The stream should not be accessed once deferred delete has been called.
+      still_alive_.reset();
+    }
+
     void completeRequest();
 
     const Network::Connection* connection();
@@ -520,6 +528,7 @@ private:
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
+    std::queue<MetadataMapPtr> deferred_metadata_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

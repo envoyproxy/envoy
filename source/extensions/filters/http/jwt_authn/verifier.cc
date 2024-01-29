@@ -127,7 +127,8 @@ public:
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); });
+        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
+        [&ctximpl]() { ctximpl.callback()->clearRouteCache(); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
@@ -176,7 +177,8 @@ public:
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); });
+        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
+        [&ctximpl]() { ctximpl.callback()->clearRouteCache(); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
@@ -208,7 +210,8 @@ public:
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); });
+        [this, &ctximpl](const Status& status) { onComplete(status, ctximpl); },
+        [&ctximpl]() { ctximpl.callback()->clearRouteCache(); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {

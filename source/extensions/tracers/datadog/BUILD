@@ -43,7 +43,9 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
+        "//source/common/tracing:common_values_lib",
         "//source/common/tracing:null_span_lib",
+        "//source/common/tracing:trace_context_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/common/version:version_lib",
         "//source/extensions/tracers/common:factory_base_lib",

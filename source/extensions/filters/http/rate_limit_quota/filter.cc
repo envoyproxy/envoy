@@ -52,7 +52,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 void RateLimitQuotaFilter::createMatcher() {
   RateLimitOnMatchActionContext context;
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> factory(
-      context, factory_context_.getServerFactoryContext(), visitor_);
+      context, factory_context_.serverFactoryContext(), visitor_);
   if (config_->has_bucket_matchers()) {
     matcher_ = factory.create(config_->bucket_matchers())();
   }
@@ -159,7 +159,8 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   ASSERT(client_.send_reports_timer != nullptr);
   // Set the reporting interval and enable the timer.
   const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
-  client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
+  client_.report_interval_ms = std::chrono::milliseconds(reporting_interval);
+  client_.send_reports_timer->enableTimer(client_.report_interval_ms);
 
   initiating_call_ = false;
   // TODO(tyxia) Revisit later.

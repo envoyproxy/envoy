@@ -83,7 +83,7 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _, _, _, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
@@ -155,8 +155,7 @@ request:
 response: {{}}
     )EOF",
                           request_method, request_method.length() + 7));
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
-                     AccessLog::AccessLogType::NotSet);
+    access_log_->log({&request_headers}, stream_info);
   }
 
   Stats::IsolatedStoreImpl scope_;
@@ -248,7 +247,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log_->log({}, stream_info);
   }
 
   {
@@ -286,7 +285,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log_->log({}, stream_info);
   }
 
   {
@@ -406,8 +405,7 @@ response:
   response_body_bytes: 20
   response_code_details: "via_upstream"
 )EOF");
-    access_log_->log(&request_headers, &response_headers, nullptr, stream_info,
-                     AccessLog::AccessLogType::NotSet);
+    access_log_->log({&request_headers, &response_headers}, stream_info);
   }
 
   {
@@ -448,8 +446,7 @@ request:
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
-                     AccessLog::AccessLogType::NotSet);
+    access_log_->log({&request_headers}, stream_info);
   }
 
   {
@@ -464,6 +461,8 @@ response: {}
     ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
     const std::string peerSubject = "peerSubject";
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(peerSubject));
+    const std::string peerIssuer = "peerIssuer";
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(peerIssuer));
     const std::string localSubject = "localSubject";
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(localSubject));
     const std::string sessionId =
@@ -515,14 +514,14 @@ common_properties:
       - uri: peerSan1
       - uri: peerSan2
       subject: peerSubject
+      issuer: peerIssuer
     tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
 request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
 response: {}
 )EOF");
-    access_log_->log(&request_headers, nullptr, nullptr, stream_info,
-                     AccessLog::AccessLogType::NotSet);
+    access_log_->log({&request_headers}, stream_info);
   }
 
   // TLSv1.2
@@ -534,6 +533,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.2";
@@ -578,7 +578,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log_->log({}, stream_info);
   }
 
   // TLSv1.1
@@ -590,6 +590,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.1";
@@ -634,7 +635,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log_->log({}, stream_info);
   }
 
   // TLSv1
@@ -646,6 +647,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1";
@@ -690,7 +692,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log_->log({}, stream_info);
   }
 
   // Unknown TLS version (TLSv1.4)
@@ -702,6 +704,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.4";
@@ -746,7 +749,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log_->log({}, stream_info);
   }
 
   // Intermediate log entry.
@@ -814,7 +817,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+    access_log_->log({}, stream_info);
   }
 }
 
@@ -910,8 +913,7 @@ response:
     "x-logged-trailer": "value,response_trailer_value"
     "x-empty-trailer": ""
 )EOF");
-    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info,
-                     AccessLog::AccessLogType::NotSet);
+    access_log_->log({&request_headers, &response_headers, &response_trailers}, stream_info);
   }
 }
 
@@ -994,8 +996,7 @@ response:
     "x-trailer": "{0},{0}"
 )EOF",
                           "prefix!!suffix"));
-    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info,
-                     AccessLog::AccessLogType::NotSet);
+    access_log_->log({&request_headers, &response_headers, &response_trailers}, stream_info);
   }
 }
 
@@ -1057,7 +1058,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+  access_log_->log({}, stream_info);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadata) {
@@ -1116,7 +1117,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+  access_log_->log({}, stream_info);
 }
 
 TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadataDefaultValue) {
@@ -1172,7 +1173,7 @@ common_properties:
 request: {}
 response: {}
 )EOF");
-  access_log_->log(nullptr, nullptr, nullptr, stream_info, AccessLog::AccessLogType::NotSet);
+  access_log_->log({}, stream_info);
 }
 
 } // namespace

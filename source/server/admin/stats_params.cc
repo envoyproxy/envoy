@@ -4,14 +4,14 @@ namespace Envoy {
 namespace Server {
 
 Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response) {
-  query_ = Http::Utility::parseAndDecodeQueryString(url);
-  used_only_ = query_.find("usedonly") != query_.end();
-  pretty_ = query_.find("pretty") != query_.end();
-  prometheus_text_readouts_ = query_.find("text_readouts") != query_.end();
+  query_ = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(url);
+  used_only_ = query_.getFirstValue("usedonly").has_value();
+  pretty_ = query_.getFirstValue("pretty").has_value();
+  prometheus_text_readouts_ = query_.getFirstValue("text_readouts").has_value();
 
-  auto filter_iter = query_.find("filter");
-  if (filter_iter != query_.end()) {
-    filter_string_ = filter_iter->second;
+  auto filter_val = query_.getFirstValue("filter");
+  if (filter_val.has_value() && !filter_val.value().empty()) {
+    filter_string_ = filter_val.value();
     re2::RE2::Options options;
     options.set_log_errors(false);
     re2_filter_ = std::make_shared<re2::RE2>(filter_string_, options);
@@ -44,14 +44,14 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     return true;
   };
 
-  auto type_iter = query_.find("type");
-  if (type_iter != query_.end() && !parse_type(type_iter->second, type_)) {
+  auto type_val = query_.getFirstValue("type");
+  if (type_val.has_value() && !type_val.value().empty() && !parse_type(type_val.value(), type_)) {
     response.add("invalid &type= param");
     return Http::Code::BadRequest;
   }
 
-  const absl::optional<std::string> hidden_value = Utility::queryParam(query_, "hidden");
-  if (hidden_value.has_value()) {
+  const absl::optional<std::string> hidden_value = query_.getFirstValue("hidden");
+  if (hidden_value.has_value() && !hidden_value.value().empty()) {
     if (hidden_value.value() == "include") {
       hidden_ = HiddenFlag::Include;
     } else if (hidden_value.value() == "only") {
@@ -65,7 +65,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(query_);
-  if (format_value.has_value()) {
+  if (format_value.has_value() && !format_value.value().empty()) {
     if (format_value.value() == "prometheus") {
       format_ = StatsFormat::Prometheus;
     } else if (format_value.value() == "json") {

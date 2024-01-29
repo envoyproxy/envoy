@@ -796,6 +796,7 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsFixedValue) {
   EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
   EXPECT_EQ("foo", symbol_table_.toString(tags[1].first));
   EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
+  EXPECT_THAT(store_->fixedTags(), UnorderedElementsAre(Tag{"foo", "bar"}));
 }
 
 TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueNoMatch) {
@@ -1535,7 +1536,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.97 * million_);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.99 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

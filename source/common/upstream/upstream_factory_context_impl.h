@@ -9,7 +9,7 @@ namespace Upstream {
 
 /*
  * Upstream Factory Context used by both Clusters and Routers to configure
- * upstream filters.
+ * upstream HTTP filters.
  */
 class UpstreamFactoryContextImpl : public Server::Configuration::UpstreamFactoryContext {
 public:
@@ -17,7 +17,7 @@ public:
                              Init::Manager& init_manager, Stats::Scope& scope)
       : server_context_(context), init_manager_(init_manager), scope_(scope) {}
 
-  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_context_;
   }
 

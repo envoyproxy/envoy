@@ -24,6 +24,7 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
@@ -126,7 +127,9 @@ public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-               const std::string& stats_prefix)
+               const std::string& stats_prefix,
+               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+               const LocalInfo::LocalInfo& local_info)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
@@ -136,7 +139,9 @@ public:
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
-        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())) {}
+        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
+        expression_manager_(builder, local_info, config.request_attributes(),
+                            config.response_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -164,7 +169,9 @@ public:
     return disallowed_headers_;
   }
 
-  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+
+  const ExpressionManager& expressionManager() const { return expression_manager_; }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -172,17 +179,6 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
-  const std::vector<Matchers::StringMatcherPtr>
-  initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list) {
-    std::vector<Matchers::StringMatcherPtr> header_matchers;
-    for (const auto& matcher : header_list.patterns()) {
-      header_matchers.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
-    }
-    return header_matchers;
-  }
-
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
   const std::chrono::milliseconds message_timeout_;
@@ -191,7 +187,7 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
-  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  const ProtobufWkt::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
   // If set to true, disable the immediate response from the ext_proc server, which means
@@ -201,6 +197,8 @@ private:
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
+
+  const ExpressionManager expression_manager_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -210,21 +208,36 @@ public:
   explicit FilterConfigPerRoute(
       const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
 
-  void merge(const FilterConfigPerRoute& other);
+  // This constructor is used as a way to merge more-specific config into less-specific config in a
+  // clearly defined way (e.g. route config into vh config). All fields on this class must be const
+  // and thus must be initialized in the ctor initialization list.
+  FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                       const FilterConfigPerRoute& more_specific);
 
   bool disabled() const { return disabled_; }
-  const absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
   processingMode() const {
     return processing_mode_;
   }
-  const absl::optional<envoy::config::core::v3::GrpcService>& grpcService() const {
+  const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
 
 private:
-  bool disabled_;
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode> processing_mode_;
-  absl::optional<envoy::config::core::v3::GrpcService> grpc_service_;
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+  initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  absl::optional<envoy::config::core::v3::GrpcService>
+  initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+  mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                      const FilterConfigPerRoute& more_specific);
+
+  const bool disabled_;
+  const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+      processing_mode_;
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
@@ -300,7 +313,9 @@ private:
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                      ProtobufWkt::Struct* proto);
+
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
@@ -330,7 +345,7 @@ private:
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
 
-  // Set to true then the mergePerRouteConfig() method has been called.
+  // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
 };
 

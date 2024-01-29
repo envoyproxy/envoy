@@ -2,11 +2,12 @@
 
 #include "envoy/network/filter.h"
 
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -62,8 +63,8 @@ public:
   const std::string& name() const override { return name_; }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
+  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+    return listener_info_;
   }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
@@ -97,6 +98,7 @@ private:
   void disconnect();
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
@@ -114,6 +116,7 @@ private:
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
   bool connection_established_{};
+  const Network::ListenerInfoConstSharedPtr listener_info_;
 };
 
 } // namespace ListenerFilters

@@ -65,6 +65,7 @@ The following sandboxes are available:
     load_reporting_service
     locality_load_balancing
     local_ratelimit
+    lua-cluster-specifier
     lua
     mysql
     opentelemetry
@@ -72,6 +73,7 @@ The following sandboxes are available:
     rbac
     redis
     route-mirror
+    single-page-app
     skywalking
     tls-inspector
     tls-sni

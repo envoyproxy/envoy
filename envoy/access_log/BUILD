@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/filesystem:filesystem_interface",
+        "//envoy/formatter:http_formatter_context_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/protobuf",

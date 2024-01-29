@@ -67,11 +67,13 @@ public:
    * Creates a particular session state factory implementation.
    *
    * @param config supplies the configuration for the session state factory extension.
+   * @param context supplies the factory context. Please don't store the reference to
+   * the context as it is only valid during the call.
    * @return SessionStateFactorySharedPtr the session state factory.
    */
   virtual SessionStateFactorySharedPtr
   createSessionStateFactory(const Protobuf::Message& config,
-                            Server::Configuration::CommonFactoryContext& context) PURE;
+                            Server::Configuration::GenericFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.http.stateful_session"; }
 };

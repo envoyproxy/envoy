@@ -7,7 +7,6 @@ load(
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP",
-    "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
 )
 
 licenses(["notice"])  # Apache 2
@@ -27,6 +26,15 @@ go_proto_compiler(
     visibility = ["//visibility:public"],
 )
 
+go_proto_compiler(
+    name = "vtprotobuf_plugin_go",
+    options = ["features=marshal_strict+size"],
+    plugin = "@com_github_planetscale_vtprotobuf//cmd/protoc-gen-go-vtproto",
+    suffix = "_vtproto.pb.go",
+    valid_archive = False,
+    visibility = ["//visibility:public"],
+)
+
 json_data(
     name = "repository_locations",
     data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
@@ -38,6 +46,5 @@ json_data(
         cc = EXTERNAL_PROTO_CC_BAZEL_DEP_MAP,
         go = EXTERNAL_PROTO_GO_BAZEL_DEP_MAP,
         imports = EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP,
-        py = EXTERNAL_PROTO_PY_BAZEL_DEP_MAP,
     ),
 )

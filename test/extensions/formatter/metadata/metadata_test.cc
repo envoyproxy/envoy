@@ -129,6 +129,23 @@ TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
             getTestMetadataFormatter("ROUTE")->formatWithContext(formatter_context_, stream_info_));
 }
 
+// Test that METADATA(LISTENER accesses stream_info listener metadata.
+TEST_F(MetadataFormatterTest, ListenerMetadata) {
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  EXPECT_CALL(*listener_info, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
+  stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
+  EXPECT_EQ(
+      "test_value",
+      getTestMetadataFormatter("LISTENER")->formatWithContext(formatter_context_, stream_info_));
+}
+
+// Test that METADATA(LISTENER handles no listener info.
+TEST_F(MetadataFormatterTest, NoListenerMetadata) {
+  EXPECT_EQ(
+      "-",
+      getTestMetadataFormatter("LISTENER")->formatWithContext(formatter_context_, stream_info_));
+}
+
 } // namespace Formatter
 } // namespace Extensions
 } // namespace Envoy

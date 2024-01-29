@@ -37,9 +37,12 @@ public:
   HttpConnectionManagerConfigTest() {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+    ON_CALL(context_, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info_));
   }
+  NiceMock<Network::MockListenerInfo> listener_info_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.mainThreadDispatcher().timeSource()};
+  Http::SlowDateProviderImpl date_provider_{
+      context_.server_factory_context_.mainThreadDispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockTracerManager> tracer_manager_;

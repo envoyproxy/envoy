@@ -128,9 +128,8 @@ resources:
       factory_context.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
           ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
           .ok());
-  auto message_ptr =
-      factory_context.admin_.config_tracker_.config_tracker_callbacks_["genericrds_routes"](
-          universal_name_matcher);
+  auto message_ptr = factory_context.server_factory_context_.admin_.config_tracker_
+                         .config_tracker_callbacks_["genericrds_routes"](universal_name_matcher);
   const auto& dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
   EXPECT_EQ(1, dump.dynamic_route_configs().size());
@@ -274,6 +273,7 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
+  envoy::config::core::v3::TypedExtensionConfig codec_config;
 
   const std::string yaml_config_0 = R"EOF(
     name: mock_generic_proxy_filter_name_0
@@ -309,9 +309,10 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
 
   // No terminal filter.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
-        EnvoyException, "A terminal L7 filter is necessary for generic proxy");
+    EXPECT_THROW_WITH_MESSAGE(Factory::filtersFactoryFromProto(filters_proto_config, codec_config,
+                                                               "test", factory_context),
+                              EnvoyException,
+                              "A terminal L7 filter is necessary for generic proxy");
   }
 
   // Error terminal filter position.
@@ -319,17 +320,32 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(true));
 
     EXPECT_THROW_WITH_MESSAGE(
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
+        Factory::filtersFactoryFromProto(filters_proto_config, codec_config, "test",
+                                         factory_context),
         EnvoyException,
         "Terminal filter: mock_generic_proxy_filter_name_0 must be the last generic L7 "
         "filter");
   }
 
+  // Codec validation error.
+  {
+    ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
+    ON_CALL(mock_filter_config_0, validateCodec(_))
+        .WillByDefault(Return(absl::InvalidArgumentError("codec validation error")));
+
+    EXPECT_THROW_WITH_MESSAGE(Factory::filtersFactoryFromProto(filters_proto_config, codec_config,
+                                                               "test", factory_context),
+                              EnvoyException, "codec validation error");
+  }
+
   {
     ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
     ON_CALL(mock_filter_config_1, isTerminalFilter()).WillByDefault(Return(true));
-    auto factories =
-        Factory::filtersFactoryFromProto(filters_proto_config, "test", factory_context);
+    ON_CALL(mock_filter_config_0, validateCodec(_)).WillByDefault(Return(absl::OkStatus()));
+    ON_CALL(mock_filter_config_1, validateCodec(_)).WillByDefault(Return(absl::OkStatus()));
+
+    auto factories = Factory::filtersFactoryFromProto(filters_proto_config, codec_config, "test",
+                                                      factory_context);
     EXPECT_EQ(2, factories.size());
   }
 }
@@ -364,7 +380,9 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
   NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
+  NiceMock<Network::MockListenerInfo> listener_info;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ON_CALL(factory_context, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info));
   factory_context.server_factory_context_.cluster_manager_.initializeClusters({"zipkin"}, {});
   factory_context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
       {"zipkin"});

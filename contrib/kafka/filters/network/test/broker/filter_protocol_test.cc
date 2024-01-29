@@ -12,6 +12,7 @@
 #include "contrib/kafka/filters/network/source/broker/filter.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/external/responses.h"
+#include "contrib/kafka/filters/network/test/broker/mock_filter_config.h"
 #include "contrib/kafka/filters/network/test/buffer_based_test.h"
 #include "contrib/kafka/filters/network/test/message_utilities.h"
 #include "gtest/gtest.h"
@@ -35,7 +36,7 @@ protected:
   Stats::TestUtil::TestStore store_;
   Stats::Scope& scope_{*store_.rootScope()};
   Event::TestRealTimeSystem time_source_;
-  KafkaBrokerFilter testee_{scope_, time_source_, "prefix"};
+  KafkaBrokerFilter testee_{scope_, time_source_, BrokerFilterConfig{"prefix", false, {}}};
 
   Network::FilterStatus consumeRequestFromBuffer() {
     return testee_.onData(RequestB::buffer_, false);

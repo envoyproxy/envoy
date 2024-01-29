@@ -2199,7 +2199,7 @@ TEST_P(Http2FrameIntegrationTest, HostDifferentFromAuthority) {
   sendFrame(request);
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,two.example.com");
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com");
   upstream_request_->encodeHeaders(default_response_headers_, true);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
@@ -2216,12 +2216,59 @@ TEST_P(Http2FrameIntegrationTest, HostSameAsAuthority) {
   sendFrame(request);
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,one.example.com");
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com");
   upstream_request_->encodeHeaders(default_response_headers_, true);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
   tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, HostConcatenatedWithAuthorityWithOverride) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_discard_host_header", "false");
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", "two.example.com"}});
+  sendFrame(request);
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,two.example.com");
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  tcp_client_->close();
+}
+
+// All HTTP/2 static headers must be before non-static headers.
+// Verify that codecs validate this.
+TEST_P(Http2FrameIntegrationTest, HostBeforeAuthorityIsRejected) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(yanavlasov): fix this check for oghttp2 in UHV mode.
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
+  beginSession();
+
+  Http2Frame request = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0),
+                                                         Http2Frame::HeadersFlags::EndHeaders);
+  request.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodPost);
+  request.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  request.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Path, "/path");
+  // Add the `host` header before `:authority`
+  request.appendHeaderWithoutIndexing({"host", "two.example.com"});
+  request.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "one.example.com");
+  request.adjustPayloadSize();
+
+  sendFrame(request);
+
+  // By default codec treats stream errors as protocol errors and closes the connection.
+  tcp_client_->waitForDisconnect();
+  tcp_client_->close();
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
 }
 
 TEST_P(Http2FrameIntegrationTest, MultipleHeaderOnlyRequests) {
@@ -2263,6 +2310,61 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequests) {
 
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
     auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a",
+                                          Http2Frame::DataFlags::EndStream);
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto frame = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+    EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  }
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
+  // Allow metadata usage.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  config_helper_.prependFilter(R"EOF(
+  name: metadata-control-filter
+  )EOF");
+
+  const int kRequestsSentPerIOCycle = 20;
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  beginSession();
+
+  std::string buffer;
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto request =
+        Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                    {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    Http::MetadataMap metadata_map{{"should_continue", absl::StrCat(i)}};
+    auto metadata = Http2Frame::makeMetadataFrameFromMetadataMap(
+        Http2Frame::makeClientStreamId(i), metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+    absl::StrAppend(&buffer, std::string(metadata));
+  }
+
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "",
                                           Http2Frame::DataFlags::EndStream);
     absl::StrAppend(&buffer, std::string(data));
   }
@@ -2468,6 +2570,17 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   // Ensure premature reset detection does not get in the way
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count", "1001");
+  // Disable the request timeout, iouring may failed the test due to request timeout.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_route()
+            ->mutable_timeout()
+            ->set_seconds(0);
+      });
   beginSession();
 
   std::string buffer;

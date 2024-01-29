@@ -980,6 +980,8 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
+  bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
+
   UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
@@ -1042,7 +1044,7 @@ public:
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
-    // Upgrade filter chains not yet supported for upstream filters.
+    // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
 
@@ -1152,6 +1154,7 @@ private:
   const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
+  const bool per_endpoint_stats_ : 1;
 };
 
 /**
@@ -1216,6 +1219,8 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  UnitFloat dropOverload() const override { return drop_overload_; }
+  void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
@@ -1242,6 +1247,9 @@ protected:
   void onInitDone();
 
   virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
+
+  absl::Status parseDropOverloadConfig(
+      const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
   // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
   // register with this init manager are expected to be for implementations of SdsApi (see
@@ -1280,6 +1288,8 @@ private:
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
+  UnitFloat drop_overload_{0};
+  static constexpr int kDropOverloadSize = 1;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

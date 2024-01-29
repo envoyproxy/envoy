@@ -28,6 +28,7 @@
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
+using testing::ContainsRegex;
 using testing::Eq;
 using testing::Optional;
 using testing::Ref;
@@ -40,25 +41,6 @@ namespace {
 TEST(UtilityTest, ComputeHashedVersion) {
   EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}").first);
   EXPECT_EQ("hash_33bf00a859c4ba3f", Utility::computeHashedVersion("foo").first);
-}
-
-TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
-  envoy::config::core::v3::ApiConfigSource api_config_source;
-  api_config_source.mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
-  EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
-}
-
-TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
-  envoy::config::core::v3::ApiConfigSource api_config_source;
-  EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
-}
-
-TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
-  envoy::config::core::v3::ApiConfigSource api_config_source;
-  api_config_source.mutable_request_timeout()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
-  EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
 TEST(UtilityTest, ConfigSourceDefaultInitFetchTimeout) {
@@ -96,11 +78,10 @@ TEST(UtilityTest, createTagProducerWithDefaultTgs) {
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
   Api::ApiPtr api = Api::createApiForTest();
 
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkFilesystemSubscriptionBackingPath("foo", *api), EnvoyException,
-      "paths must refer to an existing path in the system: 'foo' does not exist");
+  EXPECT_EQ(Utility::checkFilesystemSubscriptionBackingPath("foo", *api).message(),
+            "paths must refer to an existing path in the system: 'foo' does not exist");
   std::string test_path = TestEnvironment::temporaryDirectory();
-  Utility::checkFilesystemSubscriptionBackingPath(test_path, *api);
+  EXPECT_TRUE(Utility::checkFilesystemSubscriptionBackingPath(test_path, *api).ok());
 }
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {
@@ -142,10 +123,12 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    EXPECT_THROW_WITH_REGEX(
+    EXPECT_EQ(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false),
-        EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
+                                               false)
+            .status()
+            .message(),
+        "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
   }
 
   {
@@ -153,12 +136,13 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services();
     api_config_source.add_grpc_services();
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must have a single gRPC service "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}::.DELTA_.GRPC must have a single gRPC service "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
@@ -166,12 +150,13 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_cluster_names();
     // this also logs a warning for setting REST cluster names for a gRPC API config.
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
@@ -179,12 +164,13 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
@@ -192,22 +178,25 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     // this also logs a warning for configuring gRPC clusters for a REST API config.
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}, if not a gRPC type, must not have a gRPC service "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}, if not a gRPC type, must not have a gRPC service "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_cluster_names("foo");
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{} type must be gRPC:", api_config_source.GetTypeName()));
+    EXPECT_THAT(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                               false)
+            .status()
+            .message(),
+        ContainsRegex(fmt::format("{} type must be gRPC:", api_config_source.GetTypeName())));
   }
 
   {
@@ -218,7 +207,9 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, false);
+    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .ok());
   }
 
   {
@@ -228,7 +219,9 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_CALL(
         async_client_manager,
         factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true);
+    EXPECT_TRUE(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true)
+            .ok());
   }
 }
 
@@ -277,7 +270,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
 
     // valid default base and max interval values
     JitteredExponentialBackOffStrategyPtr strategy;
-    strategy = Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, 1000);
+    strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, 1000).value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
@@ -285,7 +279,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
 
     // only valid base interval value
     strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+            .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     // time limit will be 10 * provided default base interval
@@ -293,16 +288,16 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(500 * 10 + 1));
 
     // invalid base interval value
-    EXPECT_THROW_WITH_MESSAGE(
-        JitteredExponentialBackOffStrategyPtr strategy =
-            Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt),
-        EnvoyException, "default_base_interval_ms must be greater than zero");
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+                  .status()
+                  .message(),
+              "default_base_interval_ms must be greater than zero");
 
     // invalid max interval value < base interval value
-    EXPECT_THROW_WITH_MESSAGE(
-        JitteredExponentialBackOffStrategyPtr strategy =
-            Utility::prepareJitteredExponentialBackOffStrategy(config, random, 1000, 500),
-        EnvoyException,
+    EXPECT_EQ(
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 1000, 500)
+            .status()
+            .message(),
         "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
   }
 
@@ -317,7 +312,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
     EXPECT_FALSE(config.has_retry_policy());
 
     JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+            .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     // time limit will be 10 * provided default base interval
@@ -325,10 +321,10 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(500 * 10 + 1));
 
     // test an invalid default base interval
-    EXPECT_THROW_WITH_MESSAGE(
-        JitteredExponentialBackOffStrategyPtr strategy =
-            Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt),
-        EnvoyException, "default_base_interval_ms must be greater than zero");
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+                  .status()
+                  .message(),
+              "default_base_interval_ms must be greater than zero");
   }
 
   // provide ApiConfigSource config without any configured retry values
@@ -342,7 +338,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
 
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
-                                                           absl::nullopt);
+                                                           absl::nullopt)
+            .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     // time limit will be 10 * provided default base interval
@@ -350,10 +347,11 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
                         ->isOverTimeLimit(500 * 10 + 1));
 
     // test an invalid default base interval
-    EXPECT_THROW_WITH_MESSAGE(JitteredExponentialBackOffStrategyPtr strategy =
-                                  Utility::prepareJitteredExponentialBackOffStrategy(
-                                      api_config_source, random, 0, absl::nullopt),
-                              EnvoyException, "default_base_interval_ms must be greater than zero");
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 0,
+                                                                 absl::nullopt)
+                  .status()
+                  .message(),
+              "default_base_interval_ms must be greater than zero");
   }
 }
 
@@ -374,7 +372,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
     TestUtility::loadFromYaml(config_yaml, config);
     EXPECT_TRUE(config.has_retry_policy());
     JitteredExponentialBackOffStrategyPtr strategy =
-        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+            .value();
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
     EXPECT_EQ(
         false,
@@ -402,7 +401,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
 
     JitteredExponentialBackOffStrategyPtr strategy =
         Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
-                                                           absl::nullopt);
+                                                           absl::nullopt)
+            .value();
 
     EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
 
@@ -439,7 +439,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
           test_max_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+              .value();
 
       // provided time limit is equal to max time limit
       EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
@@ -465,7 +466,8 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
           test_base_interval_ms / 1000);
 
       JitteredExponentialBackOffStrategyPtr strategy =
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt);
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+              .value();
 
       // max_interval should be less than or equal test_base_interval * 10
       EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
@@ -491,8 +493,10 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
       config.mutable_retry_policy()->mutable_retry_back_off()->mutable_max_interval()->set_seconds(
           test_max_interval_ms);
 
-      EXPECT_ANY_THROW(
-          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt));
+      EXPECT_FALSE(
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+              .status()
+              .ok());
     }
   }
 }
@@ -698,31 +702,34 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
-  EXPECT_THROW_WITH_REGEX(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
+  EXPECT_EQ(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
+      "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException,
+  EXPECT_EQ(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
       fmt::format("{} must have a statically defined non-EDS cluster: "
                   "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
                   api_config_source->GetTypeName()));
 
   // All ok.
   primary_clusters.insert("foo_cluster");
-  Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source);
+  EXPECT_TRUE(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .ok());
 
   // API with cluster_names set should be rejected.
   api_config_source->add_cluster_names("foo_cluster");
-  EXPECT_THROW_WITH_REGEX(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException,
-      fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
-                  "specified:",
-                  api_config_source->GetTypeName()));
+  EXPECT_THAT(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
+      ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
+                                "specified:",
+                                api_config_source->GetTypeName())));
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {
@@ -733,16 +740,18 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
 
   // Non-existent cluster.
   api_config_source->add_cluster_names("foo_cluster");
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException,
+  EXPECT_EQ(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
       fmt::format("{} must have a statically defined non-EDS cluster: "
                   "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
                   api_config_source->GetTypeName()));
 
   // All ok.
   primary_clusters.insert("foo_cluster");
-  Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source);
+  EXPECT_TRUE(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .ok());
 }
 
 // Validates CheckCluster functionality.
@@ -750,21 +759,21 @@ TEST(UtilityTest, CheckCluster) {
   NiceMock<Upstream::MockClusterManager> cm;
 
   // Validate that proper error is thrown, when cluster is not available.
-  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
-                            "prefix: unknown cluster 'foo'");
+  EXPECT_THAT(Utility::checkCluster("prefix", "foo", cm, false).status().message(),
+              ContainsRegex("prefix: unknown cluster 'foo'"));
 
   // Validate that proper error is thrown, when dynamic cluster is passed when it is not expected.
   cm.initializeClusters({"foo"}, {});
   ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
-                            "prefix: invalid cluster 'foo': currently only "
-                            "static (non-CDS) clusters are supported");
-  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
+  EXPECT_EQ(Utility::checkCluster("prefix", "foo", cm, false).status().message(),
+            "prefix: invalid cluster 'foo': currently only "
+            "static (non-CDS) clusters are supported");
+  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, true).ok());
 
   // Validate that bootstrap cluster does not throw any exceptions.
   ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(false));
-  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
-  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, false));
+  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, true).ok());
+  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, false).ok());
 }
 
 // Validates getGrpcControlPlane() functionality.

@@ -332,7 +332,6 @@ cc_proto_descriptor_library_aspect = aspect(
     attr_aspects = ["deps"],
     fragments = ["cpp"],
     toolchains = use_cpp_toolchain(),
-    incompatible_use_toolchain_transition = True,
 )
 
 cc_proto_descriptor_library = rule(

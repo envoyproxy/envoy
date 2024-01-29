@@ -33,16 +33,11 @@ class Custom(val yaml: String) : BaseConfiguration()
  */
 open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsServerPort: Int) {
   companion object {
-    private const val DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS: Int = 60 * 60 * 24 * 90 // 90 days
     private const val DEFAULT_XDS_TIMEOUT_IN_SECONDS: Int = 5
   }
 
-  internal var authHeader: String? = null
-  internal var authToken: String? = null
-  internal var jwtToken: String? = null
-  internal var jwtTokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
+  internal var grpcInitialMetadata = mutableMapOf<String, String>()
   internal var sslRootCerts: String? = null
-  internal var sni: String? = null
   internal var rtdsResourceName: String? = null
   internal var rtdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
   internal var enableCds: Boolean = false
@@ -50,35 +45,23 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
   internal var cdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
 
   /**
-   * Sets the authentication HTTP header and token value for authenticating with the xDS management
+   * Adds a header to the initial HTTP metadata headers sent on the gRPC stream.
+   *
+   * A common use for the initial metadata headers is for authentication to the xDS management
    * server.
    *
-   * @param header The HTTP authentication header.
-   * @param token The authentication token to be sent in the header.
-   * @return this builder.
-   */
-  fun setAuthenticationToken(header: String, token: String): XdsBuilder {
-    this.authHeader = header
-    this.authToken = token
-    return this
-  }
-
-  /**
-   * Sets JWT as the authentication method to the xDS management server, using the given token.
+   * For example, if using API keys to authenticate to Traffic Director on GCP (see
+   * https://cloud.google.com/docs/authentication/api-keys for details), invoke:
+   * builder.addInitialStreamHeader("x-goog-api-key", apiKeyToken)
+   * .addInitialStreamHeader("X-Android-Package", appPackageName)
+   * .addInitialStreamHeader("X-Android-Cert", sha1KeyFingerprint)
    *
-   * @param token The JWT token used to authenticate the client to the xDS management server.
-   * @param tokenLifetimeInSeconds <optional> The lifetime of the JWT token, in seconds. If none
-   *   (or 0) is specified, then defaultJwtTokenLifetimeSeconds is used.
+   * @param header The HTTP header name to add to the initial gRPC stream's metadata.
+   * @param value The HTTP header value to add to the initial gRPC stream's metadata.
    * @return this builder.
    */
-  fun setJwtAuthenticationToken(
-    token: String,
-    tokenLifetimeInSeconds: Int = DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
-  ): XdsBuilder {
-    this.jwtToken = token
-    this.jwtTokenLifetimeInSeconds =
-      if (tokenLifetimeInSeconds > 0) tokenLifetimeInSeconds
-      else DEFAULT_JWT_TOKEN_LIFETIME_IN_SECONDS
+  fun addInitialStreamHeader(header: String, value: String): XdsBuilder {
+    this.grpcInitialMetadata.put(header, value)
     return this
   }
 
@@ -91,19 +74,6 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
    */
   fun setSslRootCerts(rootCerts: String): XdsBuilder {
     this.sslRootCerts = rootCerts
-    return this
-  }
-
-  /**
-   * Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake and
-   * the authority HTTP header. If not set, the SNI is set by default to the xDS server address and
-   * the authority HTTP header is not set.
-   *
-   * @param sni The SNI value.
-   * @return this builder.
-   */
-  fun setSni(sni: String): XdsBuilder {
-    this.sni = sni
     return this
   }
 
@@ -168,7 +138,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
   private var logLevel = LogLevel.INFO
-  private var grpcStatsDomain: String? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
@@ -183,6 +152,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
+  private var quicCanonicalSuffixes = mutableListOf<String>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
   private var enableSocketTagging = false
@@ -190,7 +160,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
   private var maxConnectionsPerHost = 7
-  private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
   private var perTryIdleTimeoutSeconds = 15
   private var appVersion = "unspecified"
@@ -200,7 +169,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
-  private var statsSinks = listOf<String>()
   private var enablePlatformCertificatesValidation = false
   private var nodeId: String = ""
   private var nodeRegion: String = ""
@@ -217,33 +185,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
    */
   fun addLogLevel(logLevel: LogLevel): EngineBuilder {
     this.logLevel = logLevel
-    return this
-  }
-
-  /**
-   * Specifies the domain (e.g. `example.com`) to use in the default gRPC stat sink to flush stats.
-   *
-   * Setting this value enables the gRPC stat sink, which periodically flushes stats via the gRPC
-   * MetricsService API. The flush interval is specified via addStatsFlushSeconds.
-   *
-   * @param grpcStatsDomain The domain to use for the gRPC stats sink.
-   * @return this builder.
-   */
-  fun addGrpcStatsDomain(grpcStatsDomain: String?): EngineBuilder {
-    this.grpcStatsDomain = grpcStatsDomain
-    return this
-  }
-
-  /**
-   * Adds additional stats sinks, in the form of the raw YAML/JSON configuration. Sinks added in
-   * this fashion will be included in addition to the gRPC stats sink that may be enabled via
-   * addGrpcStatsDomain.
-   *
-   * @param statsSinks Configurations of stat sinks to add.
-   * @return this builder.
-   */
-  fun addStatsSinks(statsSinks: List<String>): EngineBuilder {
-    this.statsSinks = statsSinks
     return this
   }
 
@@ -451,17 +392,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
    */
   fun setMaxConnectionsPerHost(maxConnectionsPerHost: Int): EngineBuilder {
     this.maxConnectionsPerHost = maxConnectionsPerHost
-    return this
-  }
-
-  /**
-   * Add an interval at which to flush Envoy stats.
-   *
-   * @param statsFlushSeconds interval at which to flush Envoy stats.
-   * @return this builder.
-   */
-  fun addStatsFlushSeconds(statsFlushSeconds: Int): EngineBuilder {
-    this.statsFlushSeconds = statsFlushSeconds
     return this
   }
 
@@ -685,6 +615,17 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   }
 
   /**
+   * Add a host suffix that's known to speak QUIC.
+   *
+   * @param suffix the suffix string.
+   * @return This builder.
+   */
+  fun addQuicCanonicalSuffix(suffix: String): EngineBuilder {
+    this.quicCanonicalSuffixes.add(suffix)
+    return this
+  }
+
+  /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
    * @return A new instance of Envoy.
@@ -693,7 +634,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   fun build(): Engine {
     val engineConfiguration =
       EnvoyConfiguration(
-        grpcStatsDomain,
         connectTimeoutSeconds,
         dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase,
@@ -708,6 +648,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,
+        quicCanonicalSuffixes,
         enableGzipDecompression,
         enableBrotliDecompression,
         enableSocketTagging,
@@ -715,7 +656,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost,
-        statsFlushSeconds,
         streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds,
         appVersion,
@@ -725,19 +665,14 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         platformFilterChain,
         stringAccessors,
         keyValueStores,
-        statsSinks,
         runtimeGuards,
         enablePlatformCertificatesValidation,
         xdsBuilder?.rtdsResourceName,
         xdsBuilder?.rtdsTimeoutInSeconds ?: 0,
         xdsBuilder?.xdsServerAddress,
         xdsBuilder?.xdsServerPort ?: 0,
-        xdsBuilder?.authHeader,
-        xdsBuilder?.authToken,
-        xdsBuilder?.jwtToken,
-        xdsBuilder?.jwtTokenLifetimeInSeconds ?: 0,
+        xdsBuilder?.grpcInitialMetadata ?: mapOf<String, String>(),
         xdsBuilder?.sslRootCerts,
-        xdsBuilder?.sni,
         nodeId,
         nodeRegion,
         nodeZone,

@@ -353,11 +353,24 @@ envoy_cc_test_binary(
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
-        "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
-        "//source/extensions/load_balancing_policies/subset:config",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "hotrestart_small_main",
+    srcs = ["hotrestart_main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
+    deps = [
+        "//source/exe:main_common_lib",
+        "//source/exe:platform_impl_lib",
+        "//source/exe:process_wide_lib",
+        "//source/exe:stripped_main_base_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
     ],
 )
 
@@ -368,7 +381,18 @@ envoy_py_test(
         "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
         "//conditions:default": ["hotrestart_handoff_test.py"],
     }),
-    data = [":hotrestart_main"],
+    args = [
+        "--envoy-binary=$(location :hotrestart_main)",
+        "--h3-request=$(location //tools/h3_request)",
+        "--ca-certs=$(location //test/config/integration/certs:cacert.pem)",
+        "--ca-key=$(location //test/config/integration/certs:cakey.pem)",
+    ],
+    data = [
+        ":hotrestart_main",
+        "//test/config/integration/certs:cacert.pem",
+        "//test/config/integration/certs:cakey.pem",
+        "//tools/h3_request",
+    ],
     main = select({
         "//bazel:disable_hot_restart_or_admin": "null_test.py",
         "//conditions:default": "hotrestart_handoff_test.py",
@@ -381,6 +405,7 @@ envoy_py_test(
     ],
     deps = [
         requirement("aiohttp"),
+        requirement("cryptography"),
     ],
 )
 
@@ -403,14 +428,15 @@ envoy_sh_test(
 )
 
 envoy_sh_test(
-    name = "run_envoy_test",
+    name = "run_envoy_small_test",
     size = "large",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = [":hotrestart_main"],
+    cc_binary = [":hotrestart_small_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cc_test(
@@ -536,6 +562,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/integration/filters:encode1xx_local_reply_config_lib",
         "//test/integration/filters:local_reply_during_decoding_filter_lib",
+        "//test/integration/filters:metadata_control_filter_lib",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
@@ -1075,6 +1102,8 @@ envoy_cc_test_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:codec_stats_lib",
+        "//source/common/listener_manager:active_raw_udp_listener_config",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1083,8 +1112,6 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
-        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -1100,7 +1127,7 @@ envoy_cc_test_library(
         "//source/common/quic:quic_server_factory_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]) + envoy_select_envoy_mobile_listener([
-        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "//source/common/listener_manager:listener_manager_lib",
     ]),
 )
 
@@ -1278,6 +1305,7 @@ envoy_cc_test_library(
         "//source/common/http:headers_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1293,7 +1321,6 @@ envoy_cc_test_library(
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
-        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -1553,7 +1580,9 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//test/extensions/quic/proof_source:pending_proof_source_factory_impl_lib",
+    ]),
 )
 
 envoy_cc_test(
@@ -1748,6 +1777,7 @@ envoy_cc_test(
         "cpu:3",
     ],
     deps = [
+        ":fake_access_log_lib",
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
         ":tcp_proxy_integration_test_lib",
@@ -1842,6 +1872,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        "//source/common/stream_info:utility_lib",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//source/extensions/upstreams/http/udp:config",
@@ -2473,6 +2504,21 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "fake_access_log_proto",
+    srcs = ["fake_access_log.proto"],
+)
+
+envoy_cc_test_library(
+    name = "fake_access_log_lib",
+    hdrs = [
+        "fake_access_log.h",
+    ],
+    deps = [
+        ":fake_access_log_proto_cc_proto",
     ],
 )
 

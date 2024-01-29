@@ -45,31 +45,20 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
 
 class MockAccessLog : public AccessLog::Instance {
 public:
-  MOCK_METHOD(void, log,
-              (const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-               const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
-               AccessLog::AccessLogType));
+  MOCK_METHOD(void, log, (const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&));
 };
 
-class TestAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
-  AccessLog::InstanceSharedPtr createAccessLogInstance(
-      const Protobuf::Message&, AccessLog::FilterPtr&&,
-      Server::Configuration::ListenerAccessLogFactoryContext& context) override {
-    // Check that expected listener metadata is present
-    EXPECT_EQ(1, context.listenerMetadata().typed_filter_metadata().size());
-    const auto iter =
-        context.listenerMetadata().typed_filter_metadata().find("test.listener.typed.metadata");
-    EXPECT_NE(iter, context.listenerMetadata().typed_filter_metadata().end());
-    return std::make_shared<NiceMock<MockAccessLog>>();
-  }
-
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::CommonFactoryContext&) override {
-    // This method should never be called in this test
-    ASSERT(false);
-    return nullptr;
+                          Server::Configuration::FactoryContext& context) override {
+    // Check that expected listener metadata is present
+    EXPECT_EQ(1, context.listenerInfo().metadata().typed_filter_metadata().size());
+    const auto iter = context.listenerInfo().metadata().typed_filter_metadata().find(
+        "test.listener.typed.metadata");
+    EXPECT_NE(iter, context.listenerInfo().metadata().typed_filter_metadata().end());
+    return std::make_shared<NiceMock<MockAccessLog>>();
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -82,8 +71,7 @@ public:
 // Validate that access logger gets the right context with access to listener metadata
 TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog) {
   TestAccessLogFactory factory;
-  Registry::InjectFactory<Server::Configuration::AccessLogInstanceFactory> factory_register(
-      factory);
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   // Add some typed metadata to the listener.
   ProtobufWkt::StringValue value;

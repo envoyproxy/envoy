@@ -280,16 +280,20 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
 
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), context.messageValidationVisitor(), factory);
-  auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
+  auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, prefix, context);
+  if (!filter_factory_or_error.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(filter_factory_or_error.status().message()));
+  }
+  auto filter_factory = filter_factory_or_error.value();
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
   Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context,
-                                                                context.getServerFactoryContext()};
+                                                                context.serverFactoryContext()};
 
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
-      matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
+      matcher_factory(action_context, context.serverFactoryContext(), validation_visitor);
   absl::optional<Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData>> factory_cb =
       std::nullopt;
   if (proto_config.has_xds_matcher()) {

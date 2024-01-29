@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp.wasm",
     ]),
     extension_names = ["envoy.stat_sinks.wasm"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/stat_sinks/wasm:config",
         "//test/extensions/common/wasm:wasm_runtime",
@@ -39,6 +40,7 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.stat_sinks.wasm"],
     external_deps = ["abseil_optional"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/extensions/common/wasm:wasm_lib",
