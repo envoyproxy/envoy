@@ -24,6 +24,14 @@ public:
   Matcher(Envoy::StreamInfo::ResponseFlag value) {
     *this = Eq(Envoy::StreamInfo::ExtendedResponseFlag(value));
   }
+
+  explicit Matcher(const MatcherInterface<const Envoy::StreamInfo::ExtendedResponseFlag&>* impl)
+      : internal::MatcherBase<Envoy::StreamInfo::ExtendedResponseFlag>(impl) {}
+
+  template <typename U>
+  explicit Matcher(const MatcherInterface<U>* impl,
+                   typename std::enable_if<!std::is_same<U, const U&>::value>::type* = nullptr)
+      : internal::MatcherBase<Envoy::StreamInfo::ExtendedResponseFlag>(impl) {}
 };
 
 } // namespace testing
