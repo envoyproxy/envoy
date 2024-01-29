@@ -13,6 +13,21 @@
 
 #include "gmock/gmock.h"
 
+namespace testing {
+
+template <>
+class Matcher<Envoy::StreamInfo::ExtendedResponseFlag>
+    : public internal::MatcherBase<Envoy::StreamInfo::ExtendedResponseFlag> {
+public:
+  explicit Matcher() = default;
+  Matcher(Envoy::StreamInfo::ExtendedResponseFlag value) { *this = Eq(value); }
+  Matcher(Envoy::StreamInfo::ResponseFlag value) {
+    *this = Eq(Envoy::StreamInfo::ExtendedResponseFlag(value));
+  }
+};
+
+} // namespace testing
+
 namespace Envoy {
 namespace StreamInfo {
 
