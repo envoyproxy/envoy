@@ -1,5 +1,7 @@
 #include "library/common/apple/utility.h"
 
+#include "source/common/common/assert.h"
+
 namespace Envoy {
 namespace Apple {
 
@@ -14,13 +16,15 @@ std::string toString(CFStringRef cf_string) {
   }
 
   CFIndex length = CFStringGetLength(cf_string);
+  // Adding 1 to accomodate the `\0` null delimiter in a C string.
   CFIndex size = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
   char* c_str = static_cast<char*>(malloc(size));
   // Use less efficient method of getting c string if CFStringGetCStringPtr failed.
+  const bool ret = CFStringGetCString(cf_string, c_str, size, kCFStringEncodingUTF8);
+  ENVOY_BUG(ret, "CFStringGetCString failed to convert CFStringRef to C string.");
+
   std::string ret_str;
-  if (CFStringGetCString(cf_string, c_str, size, kCFStringEncodingUTF8)) {
-    ret_str = std::string(c_str);
-  }
+  ret_str = std::string(c_str);
 
   free(c_str);
   return ret_str;
@@ -32,7 +36,9 @@ int toInt(CFNumberRef number) {
   }
 
   int value;
-  CFNumberGetValue(number, kCFNumberSInt64Type, &value);
+  const bool ret = CFNumberGetValue(number, kCFNumberSInt32Type, &value);
+  ENVOY_BUG(ret, "CFNumberGetValue failed to convert CFNumberRef to int.");
+
   return value;
 }
 

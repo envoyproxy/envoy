@@ -122,6 +122,7 @@ envoy_cc_library(
             "apple_proxy_resolution.cc",
             "apple_proxy_resolver.cc",
             "apple_system_proxy_settings_monitor.cc",
+            "system_proxy_settings.cc",
         ],
         "//conditions:default": [],
     }),

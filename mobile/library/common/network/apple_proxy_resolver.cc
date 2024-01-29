@@ -35,13 +35,12 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
 
   const auto proxy_settings = proxy_settings_.value();
   if (!proxy_settings.isPacEnabled()) {
-    auto settings = ProxySettings(proxy_settings.hostname(), proxy_settings.port());
+    ProxySettings settings(proxy_settings.hostname(), proxy_settings.port());
     if (settings.isDirect()) {
       return ProxyResolutionResult::NO_PROXY_CONFIGURED;
-    } else {
-      proxies.push_back(settings);
-      return ProxyResolutionResult::RESULT_COMPLETED;
     }
+    proxies.emplace_back(std::move(settings));
+    return ProxyResolutionResult::RESULT_COMPLETED;
   }
 
   // TODO(abeyad): As stated in ApplePacProxyResolver's comments,

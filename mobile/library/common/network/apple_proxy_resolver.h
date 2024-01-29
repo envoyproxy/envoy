@@ -28,6 +28,13 @@ public:
    */
   void start();
 
+  /**
+   * Resolves the proxy settings for the target URL. The result of proxy resolution is returned in
+   * the ProxyResolutionResult enum. If proxy resolution returns RESULT_COMPLETED, the `proxies`
+   * vector gets populated with the resolved proxy setting. If proxy resolution returns
+   * RESULT_IN_PROGRESS, the `proxy_resolution_did_complete` function gets invoked upon successful
+   * resolution of the proxy settings.
+   */
   virtual ProxyResolutionResult
   resolveProxy(const std::string& target_url_string, std::vector<ProxySettings>& proxies,
                std::function<void(std::vector<ProxySettings>& proxies)>

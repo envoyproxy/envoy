@@ -51,13 +51,22 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
           static_cast<CFNumberRef>(CFDictionaryGetValue(cf_dictionary, kCFProxyPortNumberKey));
       std::string hostname = Apple::toString(cf_host);
       int port = Apple::toInt(cf_port);
-      proxies.push_back(ProxySettings(std::move(hostname), port));
+      proxies.emplace_back(ProxySettings(std::move(hostname), port));
     } else if (is_direct_proxy) {
       proxies.push_back(ProxySettings::direct());
     }
   }
 
   callback_wrapper->pac_resolution_callback(proxies);
+}
+
+// Creates a CFURLRef from a C++ string URL.
+CFURLRef createCFURL(absl::string_view url_string) {
+  auto cf_url_string =
+      CFStringCreateWithCString(kCFAllocatorDefault, url_string.begin(), kCFStringEncodingUTF8);
+  auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, /*baseURL=*/nullptr);
+  CFRelease(cf_url_string);
+  return cf_url;
 }
 
 } // namespace
@@ -71,7 +80,11 @@ void ApplePacProxyResolver::resolveProxies(
 
   std::unique_ptr<PacResultCallbackWrapper> callback_wrapper =
       std::make_unique<PacResultCallbackWrapper>(proxy_resolution_did_complete);
-  CFStreamClientContext context = {0, callback_wrapper.release(), nullptr, nullptr, nullptr};
+  // According to https://developer.apple.com/documentation/corefoundation/cfstreamclientcontext,
+  // the version must be 0.
+  CFStreamClientContext context = {/*version=*/0, /*info=*/callback_wrapper.release(),
+                                   /*retain=*/nullptr, /*release=*/nullptr,
+                                   /*copyDescription=*/nullptr};
   // Even though neither the name of the method nor Apple's documentation mentions that, manual
   // testing shows that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched
   // PAC file and does not fetch it on every proxy resolution request.
@@ -83,14 +96,6 @@ void ApplePacProxyResolver::resolveProxies(
 
   CFRelease(cf_target_url);
   CFRelease(cf_proxy_autoconfiguration_file_url);
-}
-
-CFURLRef ApplePacProxyResolver::createCFURL(absl::string_view url_string) {
-  auto cf_url_string =
-      CFStringCreateWithCString(kCFAllocatorDefault, url_string.begin(), kCFStringEncodingUTF8);
-  auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, NULL);
-  CFRelease(cf_url_string);
-  return cf_url;
 }
 
 } // namespace Network

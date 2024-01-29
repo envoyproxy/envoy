@@ -378,8 +378,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - parameter enableProxying: whether to enable Envoy's support for proxies.
   ///
-  ///                             @return This builder.
-  ///
+  /// - returns: This builder.
   @discardableResult
   public func enableProxying(_ enableProxying: Bool) -> Self {
     self.enableProxying = enableProxying

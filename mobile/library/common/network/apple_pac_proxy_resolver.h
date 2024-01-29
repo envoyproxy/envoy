@@ -1,7 +1,5 @@
 #pragma once
 
-#include <CFNetwork/CFNetwork.h>
-
 #include <functional>
 #include <vector>
 
@@ -29,10 +27,6 @@ public:
   resolveProxies(absl::string_view target_url_string,
                  absl::string_view proxy_autoconfiguration_file_url_string,
                  std::function<void(std::vector<ProxySettings>&)> proxy_resolution_did_complete);
-
-private:
-  // Creates a CFURLRef from a C++ string URL.
-  CFURLRef createCFURL(absl::string_view url_string);
 };
 
 } // namespace Network

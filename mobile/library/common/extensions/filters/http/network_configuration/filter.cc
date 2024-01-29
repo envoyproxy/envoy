@@ -112,9 +112,8 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
   switch (proxy_resolution_result) {
   case Network::ProxyResolutionResult::NO_PROXY_CONFIGURED:
     return Http::FilterHeadersStatus::Continue;
-  case Network::ProxyResolutionResult::RESULT_COMPLETED: {
+  case Network::ProxyResolutionResult::RESULT_COMPLETED:
     return continueWithProxySettings(Network::ProxySettings::create(proxy_settings_));
-  }
   case Network::ProxyResolutionResult::RESULT_IN_PROGRESS:
     // `onProxyResolutionComplete` method will be called once the proxy resolution completes
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;

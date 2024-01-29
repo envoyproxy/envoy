@@ -17,6 +17,7 @@ using ProxySettingsConstSharedPtr = std::shared_ptr<const ProxySettings>;
  * settings after reading and parsing the PAC URL.
  *
  * TODO(abeyad): rename this class to ProxySetting (the plural in the name is confusing).
+ * TODO(abeyad): Move the implementation of this class into a .cc file.
  */
 class ProxySettings {
 public:
