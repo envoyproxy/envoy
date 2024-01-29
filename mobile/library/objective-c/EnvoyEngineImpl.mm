@@ -569,17 +569,12 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (NSString *)dumpStats {
-  envoy_data data;
-  envoy_status_t status = _engine->dumpStats(&data);
-  if (status != ENVOY_SUCCESS) {
+  std::string status = _engine->dumpStats();
+  if (status == "") {
     return @"";
   }
 
-  NSString *stringCopy = [[NSString alloc] initWithBytes:data.bytes
-                                                  length:data.length
-                                                encoding:NSUTF8StringEncoding];
-  release_envoy_data(data);
-  return stringCopy;
+  return @(status.c_str());
 }
 
 - (void)terminate {

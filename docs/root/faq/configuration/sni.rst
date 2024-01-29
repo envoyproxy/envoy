@@ -19,6 +19,8 @@ The following is a YAML example of the above requirement.
     socket_address: { address: 127.0.0.1, port_value: 1234 }
   listener_filters:
   - name: "envoy.filters.listener.tls_inspector"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   filter_chains:
   - filter_chain_match:
       server_names: ["example.com", "www.example.com"]

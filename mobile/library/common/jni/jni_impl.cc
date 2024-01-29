@@ -181,17 +181,9 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
                                                            jlong engine_handle) {
   jni_log("[Envoy]", "dumpStats");
   auto engine = reinterpret_cast<Envoy::Engine*>(engine_handle);
-  envoy_data data;
-  jint result = engine->dumpStats(&data);
+  std::string stats = engine->dumpStats();
   Envoy::JNI::JniHelper jni_helper(env);
-  if (result != ENVOY_SUCCESS) {
-    return jni_helper.newStringUtf("").release();
-  }
-
-  Envoy::JNI::LocalRefUniquePtr<jstring> str = Envoy::JNI::envoyDataToJavaString(jni_helper, data);
-  release_envoy_data(data);
-
-  return str.release();
+  return jni_helper.newStringUtf(stats.c_str()).release();
 }
 
 // JvmCallbackContext
@@ -964,8 +956,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerKeyValueStore(JNIEnv* e
 
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr native_java_string = jni_helper.getStringUtfChars(name, nullptr);
-  std::string api_name(native_java_string.get());
-  Envoy::Api::External::registerApi(api_name, api);
+  Envoy::Api::External::registerApi(/*name=*/std::string(native_java_string.get()), api);
   return ENVOY_SUCCESS;
 }
 
@@ -1003,8 +994,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr native_java_string =
       jni_helper.getStringUtfChars(filter_name, nullptr);
-  std::string api_name(native_java_string.get());
-  Envoy::Api::External::registerApi(api_name, api);
+  Envoy::Api::External::registerApi(/*name=*/std::string(native_java_string.get()), api);
   return ENVOY_SUCCESS;
 }
 
@@ -1129,8 +1119,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr native_java_string =
       jni_helper.getStringUtfChars(accessor_name, nullptr);
-  std::string api_name(native_java_string.get());
-  Envoy::Api::External::registerApi(api_name, string_accessor);
+  Envoy::Api::External::registerApi(/*name=*/std::string(native_java_string.get()),
+                                    string_accessor);
   return ENVOY_SUCCESS;
 }
 

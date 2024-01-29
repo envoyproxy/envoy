@@ -39,9 +39,13 @@ public:
   envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
 
   /**
-   * Immediately terminate the engine, if running.
+   * Immediately terminate the engine, if running. Calling this function when
+   * the engine has been terminated will result in `ENVOY_FAILURE`.
    */
   envoy_status_t terminate();
+
+  /** Returns true if the Engine has been terminated; false otherwise. */
+  bool isTerminated() const;
 
   /**
    * Accessor for the provisional event dispatcher.
@@ -98,13 +102,9 @@ public:
                                   uint64_t count);
 
   /**
-   * Dump Envoy stats into the provided envoy_data
-   * @params envoy_data which will be filed with referenced stats dumped in Envoy's standard text
-   * format.
-   * @return failure status if the engine is no longer running.
-   * This can be called from any thread, but will block on engine-thread processing.
+   * Dumps Envoy stats into string. Returns an empty string when an error occurred.
    */
-  envoy_status_t dumpStats(envoy_data* out);
+  std::string dumpStats();
 
   /**
    * Get cluster manager from the Engine.
@@ -142,6 +142,7 @@ private:
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   std::thread main_thread_{}; // Empty placeholder to be populated later.
+  bool terminated_{false};
 };
 
 using EngineSharedPtr = std::shared_ptr<Engine>;
