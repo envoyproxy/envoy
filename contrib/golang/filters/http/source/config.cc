@@ -1,3 +1,4 @@
+#include <string>
 #include "contrib/golang/filters/http/source/config.h"
 
 #include "envoy/registry/registry.h"
@@ -33,9 +34,10 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
       proto_config, dso_lib, fmt::format("{}golang.", stats_prefix), context);
   config->newGoPluginConfig();
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
-    const std::string worker_name = callbacks.dispatcher().name();
-    const uint32_t worker_id =
-        std::stoi(worker_name.substr(worker_name.find_first_of('_') + 1, worker_name.size()));
+    const std::string& worker_name = callbacks.dispatcher().name();
+    auto pos = worker_name.find_first_of('_');
+    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{id}");
+    const uint32_t worker_id = std::stoi(worker_name.substr(pos + 1));
     auto filter = std::make_shared<Filter>(config, dso_lib, worker_id);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
