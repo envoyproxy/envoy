@@ -1,6 +1,7 @@
 #include "source/common/network/happy_eyeballs_connection_impl.h"
 
 #include "envoy/network/address.h"
+
 #include "source/common/network/connection_impl.h"
 
 namespace Envoy {
@@ -122,7 +123,7 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
   auto other = in.begin();
 
   // First_family_ip_version is default to the first valid ip version
-  // unless overwriten by happy_eyeballs_config.
+  // unless overwritten by happy_eyeballs_config.
   Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
   int first_address_family_count = happy_eyeballs_config.first_address_family_count();

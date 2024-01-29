@@ -155,11 +155,6 @@ message Cluster {
     V6 = 2;
   }
 
-  message HappyEyeballsConfig {
-    FirstAddressFamilyVersion first_address_family_version = 1;
-    int32 first_address_family_count = 2;
-  }
-
   enum ClusterProtocolSelection {
     // Cluster can only operate on one of the possible upstream protocols (HTTP1.1, HTTP2).
     // If :ref:`http2_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.http2_protocol_options>` are
@@ -168,6 +163,15 @@ message Cluster {
 
     // Use HTTP1.1 or HTTP2, depending on which one is used on the downstream connection.
     USE_DOWNSTREAM_PROTOCOL = 1;
+  }
+
+  message HappyEyeballsConfig {
+    // Specify the ip version of the first address being sorted in happy
+    // eyeballs.
+    FirstAddressFamilyVersion first_address_family_version = 1;
+
+    // Specify the count of addresses being interleaved by the sorting algorithm.
+    int32 first_address_family_count = 2;
   }
 
   // TransportSocketMatch specifies what transport socket config will be used
