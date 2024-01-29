@@ -151,8 +151,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       [this, config](Http::HeaderMap& headers) {
         config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },
-      config->rateLimitedGrpcStatus(),
-      ResponseCodeDetails::get().LocalRateLimited);
+      config->rateLimitedGrpcStatus(), LocalRateLimitedResponseDetails);
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
 
   return Http::FilterHeadersStatus::StopIteration;

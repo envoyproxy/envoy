@@ -42,10 +42,7 @@ struct LocalRateLimitStats {
   ALL_LOCAL_RATE_LIMIT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-struct ResponseCodeDetailsValues {
-  const std::string LocalRateLimited = "local_rate_limited";
-};
-using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailsValues>;
+constexpr absl::string_view LocalRateLimitedResponseDetails = "local_rate_limited";
 
 /**
  * Type of virtual host rate limit options
