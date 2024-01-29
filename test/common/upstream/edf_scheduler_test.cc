@@ -230,6 +230,15 @@ TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEqualToEmptyWithAddedEntries) {
   }
 }
 
+// Validating that calling `createWithPicks()` with no entries returns an empty
+// scheduler.
+TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEmptyEntries) {
+  EdfScheduler<double> sched = EdfScheduler<double>::createWithPicks(
+      {}, [](const double& w) { return w; }, 123);
+  EXPECT_EQ(nullptr, sched.peekAgain([](const double&) { return 0; }));
+  EXPECT_EQ(nullptr, sched.pickAndAdd([](const double&) { return 0; }));
+}
+
 // Emulates first-pick scenarios by creating a scheduler with the given
 // weights and a random number of pre-picks, and validates that the next pick
 // of all the weights is close to the given weights.
