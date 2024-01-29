@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_flags.h"
+#include "source/common/quic/platform/quiche_logging_impl.h"
 
 using QuicheFlagSaverImpl = absl::FlagSaver;
 
@@ -39,6 +40,20 @@ inline std::string QuicheGetCommonSourcePathImpl() {
   std::string test_srcdir(getenv("TEST_SRCDIR"));
   return absl::StrCat(test_srcdir, "/external/com_github_google_quiche/quiche/common");
 }
+
+class QuicheScopedDisableExitOnDFatalImpl {
+public:
+ QuicheScopedDisableExitOnDFatalImpl() {
+    original_value_ = isDFatalExitDisabled();
+    setDFatalExitDisabled(true);
+ }
+ ~QuicheScopedDisableExitOnDFatalImpl(){
+   setDFatalExitDisabled(original_value_);
+ }
+
+private:
+  bool original_value_;
+};
 
 } // namespace test
 } // namespace quiche

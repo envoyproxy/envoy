@@ -28,6 +28,7 @@ envoy_cc_test(
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",
+        "//source/common/quic/platform:quiche_logging_impl_lib",
         "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
