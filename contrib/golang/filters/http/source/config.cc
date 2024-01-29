@@ -1,5 +1,6 @@
-#include <string>
 #include "contrib/golang/filters/http/source/config.h"
+
+#include <string>
 
 #include "envoy/registry/registry.h"
 
