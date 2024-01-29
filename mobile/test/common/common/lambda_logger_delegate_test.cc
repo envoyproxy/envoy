@@ -16,7 +16,7 @@ public:
   static envoy_event_tracker tracker;
 
   static void SetUpTestSuite() {
-    Api::External::registerApi(envoy_event_tracker_api_name, &tracker);
+    Api::External::registerApi(std::string(envoy_event_tracker_api_name), &tracker);
   }
 };
 

@@ -78,7 +78,7 @@ without further review.
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
-* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (nezdolik@spotify.com)
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)

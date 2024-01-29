@@ -2,10 +2,10 @@
 
 #include <vector>
 
+#include "library/cc/request_headers.h"
+#include "library/cc/request_trailers.h"
+#include "library/cc/stream_callbacks.h"
 #include "library/common/types/c_types.h"
-#include "request_headers.h"
-#include "request_trailers.h"
-#include "stream_callbacks.h"
 
 namespace Envoy {
 class Engine;
