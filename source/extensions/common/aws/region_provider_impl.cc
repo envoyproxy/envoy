@@ -12,7 +12,6 @@ static const char AWS_DEFAULT_REGION[] = "AWS_DEFAULT_REGION";
 constexpr char REGION[] = "REGION";
 
 absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
-  ENVOY_LOG_MISC(debug, "called EnvironmentRegionProvider::getRegion");
   std::string region;
 
   // Search for the region in environment variables AWS_REGION and AWS_DEFAULT_REGION
@@ -23,11 +22,11 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
       return absl::nullopt;
     }
   }
+  ENVOY_LOG_MISC(trace, "Region string retrieved: {}");
   return region;
 }
 
 absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
-  ENVOY_LOG_MISC(debug, "called AWSCredentialsFileRegionProvider::getRegion");
   absl::flat_hash_map<std::string, std::string> elements = {{REGION, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
@@ -41,6 +40,8 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
   if (it == elements.end()) {
     return absl::nullopt;
   }
+
+  ENVOY_LOG_MISC(trace, "Region string retrieved: {}");
   return it->second;
 }
 
@@ -60,6 +61,7 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
     return absl::nullopt;
   }
 
+  ENVOY_LOG_MISC(trace, "Region string retrieved: {}");
   return it->second;
 }
 

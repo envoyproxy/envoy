@@ -57,10 +57,10 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
   if (region.empty()) {
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-    absl::optional<std::string> regionopt = region_provider->getRegion();
+    auto regionopt = region_provider->getRegion();
     if (!regionopt.has_value()) {
-      throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
-                           "profile/config files.");
+      throw EnvoyException("AWS region is not set in xDS configuration and failed to retrieve from "
+                           "environment variable or AWS profile/config files.");
     }
     region = regionopt.value();
   }
@@ -113,10 +113,10 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
 
   if (region.empty()) {
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-    absl::optional<std::string> regionopt = region_provider->getRegion();
+    auto regionopt = region_provider->getRegion();
     if (!regionopt.has_value()) {
-      throw EnvoyException("Region string cannot be retrieved from configuration, environment or "
-                           "profile/config files.");
+      throw EnvoyException("AWS region is not set in xDS configuration and failed to retrieve from "
+                           "environment variable or AWS profile/config files.");
     }
     region = regionopt.value();
   }

@@ -8,6 +8,11 @@ minor_behavior_changes:
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+- area: aws
+  change: |
+    AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
+    grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
+    xDS region will take preference. aws_request_signer documentation now reflects the region chain.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -45,9 +50,5 @@ new_features:
   change: |
     added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
     identifier.
-- area: aws
-  change: |
-    AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
-    grpc_credentials/aws_iam extensions.
 
 deprecated:
