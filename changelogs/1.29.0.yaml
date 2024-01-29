@@ -251,7 +251,7 @@ new_features:
   change: |
     Added support to TCP Proxy for recording the latency in ``UpstreamTiming`` from when the first
     initial connection to the upstream cluster was attempted to when either the
-    connection was successfully established or the filiter failed to initialize
+    connection was successfully established or the filter failed to initialize
     any connection to the upstream.
 - area: ratelimit
   change: |
