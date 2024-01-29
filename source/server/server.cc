@@ -46,6 +46,7 @@
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
@@ -500,9 +501,10 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
-  stats_store_.setStatsMatcher(
-      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
-  stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
+  stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
+      bootstrap_.stats_config(), stats_store_.symbolTable()));
+  stats_store_.setHistogramSettings(
+      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config()));
 
   const std::string server_stats_prefix = "server.";
   const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
@@ -805,12 +807,13 @@ void InstanceBase::onRuntimeReady() {
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                         *stats_store_.rootScope(), false)
-              ->createUncachedRawAsyncClient(),
-          stats_store_, *ssl_context_manager_, info_factory_);
+          factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
+          *ssl_context_manager_, info_factory_);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
