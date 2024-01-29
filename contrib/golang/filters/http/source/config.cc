@@ -38,7 +38,10 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
     const std::string& worker_name = callbacks.dispatcher().name();
     auto pos = worker_name.find_first_of('_');
     ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{id}");
-    const uint32_t worker_id = std::stoi(worker_name.substr(pos + 1));
+    uint32_t worker_id;
+    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_id)) {
+      IS_ENVOY_BUG("failed to parse worker id from name");
+    }
     auto filter = std::make_shared<Filter>(config, dso_lib, worker_id);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
