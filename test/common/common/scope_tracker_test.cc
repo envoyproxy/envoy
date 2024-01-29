@@ -22,6 +22,7 @@ protected:
 };
 
 TEST_F(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
+  setExecutionContextEnabled(false);
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   MockScopeTrackedObject tracked_object;
