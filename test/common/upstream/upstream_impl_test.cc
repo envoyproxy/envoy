@@ -50,6 +50,7 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -5566,8 +5567,14 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
 }
 
-// Weighted initialization is properly randomized.
-TEST_F(HostSetImplLocalityTest, WeightedRandomization) {
+// Validates that with weighted initialization all localities are chosen
+// proportionally to their weight.
+TEST_F(HostSetImplLocalityTest, WeightedAllChosen) {
+  // This test should remain when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
+  // is deprecated.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "true"}});
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -5584,10 +5591,7 @@ TEST_F(HostSetImplLocalityTest, WeightedRandomization) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 6, 3}};
 
   // Keep track of how many times each locality is picked, initialized to 0.
-  uint32_t locality_picked_count[3];
-  for (uint32_t i = 0; i < 3; ++i) {
-    locality_picked_count[i] = 0;
-  }
+  uint32_t locality_picked_count[] = {0, 0, 0};
 
   // Create the load-balancer 10 times, each with a different seed number (from
   // 0 to 10), do a single pick, and validate that the number of picks equals
@@ -5603,6 +5607,35 @@ TEST_F(HostSetImplLocalityTest, WeightedRandomization) {
   EXPECT_EQ(locality_picked_count[0], 1);
   EXPECT_EQ(locality_picked_count[1], 6);
   EXPECT_EQ(locality_picked_count[2], 3);
+}
+
+// Validates that the non-randomized initialization works. This test should be
+// removed when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
+// is deprecated.
+TEST_F(HostSetImplLocalityTest, WeightedNoRandomization) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "false"}});
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
+
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                          std::make_shared<const HealthyHostVector>(hosts),
+                                          hosts_per_locality),
+                        locality_weights, {}, {}, 0, absl::nullopt);
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
 // Gentle failover between localities as health diminishes.
