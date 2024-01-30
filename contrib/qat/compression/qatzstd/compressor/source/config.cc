@@ -74,8 +74,8 @@ Envoy::Compression::Compressor::CompressorFactoryPtr
 QatzstdCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::qatzstd::compressor::v3alpha::Qatzstd& proto_config,
     Server::Configuration::FactoryContext& context) {
-  return std::make_unique<QatzstdCompressorFactory>(proto_config, context.mainThreadDispatcher(),
-                                                    context.api(), context.threadLocal());
+  return std::make_unique<QatzstdCompressorFactory>(proto_config, context.serverFactoryContext().mainThreadDispatcher(),
+                                                    context.serverFactoryContext().api(), context.serverFactoryContext().threadLocal());
 }
 
 /**
