@@ -36,11 +36,7 @@ RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_convert_legacy_lb_config);
 RUNTIME_GUARD(envoy_reloadable_features_copy_response_code_to_downstream_stream_info);
-<<<<<<< HEAD
-=======
-RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
->>>>>>> upstream/main
 RUNTIME_GUARD(envoy_reloadable_features_detect_and_raise_rst_tcp_connection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_first_resolve_complete);

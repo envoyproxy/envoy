@@ -25,32 +25,10 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers`` runtime flag and legacy code paths.
 - area: overload manager
   change: |
-<<<<<<< HEAD
-    Removed ``envoy_reloadable_features_finish_reading_on_decode_trailers`` runtime flag and legacy code paths.
-- area: dns
-  change: |
-    Removed ``envoy.restart_features.use_apple_api_for_dns_lookups`` and legacy code paths.
-- area: runtime
-  change: |
-    Removed ``envoy.restart_features.remove_runtime_singleton`` and legacy code paths.
-- area: xDS
-  change: |
-    Removed ``envoy.restart_features.explicit_wildcard_resource`` and legacy code paths.
-- area: quic
-  change: |
-    Removed ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` and legacy code paths.
-- area: healthcheck
-  change: |
-    Removed ``envoy.reloadable_features_successful_active_health_check_uneject_host`` runtime option and
-    substituted it with :ref:`outlier_detection.successful_active_health_check_uneject_host
-    <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
-    outlier detection configuration flag.
+    removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
 - area: resource_monitors
   change: |
-    Removed ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` and legacy code paths.
-=======
-    removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
->>>>>>> upstream/main
+    removed ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` and legacy code paths.
 
 new_features:
 - area: aws_request_signing
