@@ -1274,10 +1274,11 @@ public:
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
   /**
-   * @return const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig
-   * the configuration for happy eyeballs for this cluster.
+   * @return std::optional<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
+   * an optional value of the configuration for happy eyeballs for this cluster.
    */
-  virtual const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig
+  virtual const std::optional<
+      envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const PURE;
 
 protected:

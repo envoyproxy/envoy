@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 58]
+// [#next-free-field: 57]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -149,12 +149,6 @@ message Cluster {
     ALL = 4;
   }
 
-  enum FirstAddressFamilyVersion {
-    DEFAULT = 0;
-    V4 = 1;
-    V6 = 2;
-  }
-
   enum ClusterProtocolSelection {
     // Cluster can only operate on one of the possible upstream protocols (HTTP1.1, HTTP2).
     // If :ref:`http2_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.http2_protocol_options>` are
@@ -163,15 +157,6 @@ message Cluster {
 
     // Use HTTP1.1 or HTTP2, depending on which one is used on the downstream connection.
     USE_DOWNSTREAM_PROTOCOL = 1;
-  }
-
-  message HappyEyeballsConfig {
-    // Specify the ip version of the first address being sorted in happy
-    // eyeballs.
-    FirstAddressFamilyVersion first_address_family_version = 1;
-
-    // Specify the count of addresses being interleaved by the sorting algorithm.
-    int32 first_address_family_count = 2;
   }
 
   // TransportSocketMatch specifies what transport socket config will be used
@@ -1205,10 +1190,6 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
-
-  // b/216628756
-  // Add configurations for happy eyeballs algorithm
-  HappyEyeballsConfig happy_eyeballs_config = 57;
 }
 
 // Extensible load balancing policy configuration.
@@ -1255,6 +1236,21 @@ message UpstreamConnectionOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.UpstreamConnectionOptions";
 
+  enum FirstAddressFamilyVersion {
+    DEFAULT = 0;
+    V4 = 1;
+    V6 = 2;
+  }
+
+  message HappyEyeballsConfig {
+    // Specify the ip version of the first address being sorted in happy
+    // eyeballs.
+    FirstAddressFamilyVersion first_address_family_version = 1;
+
+    // Specify the count of addresses being interleaved by the sorting algorithm.
+    int32 first_address_family_count = 2;
+  }
+
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
   core.v3.TcpKeepalive tcp_keepalive = 1;
 
@@ -1262,6 +1258,11 @@ message UpstreamConnectionOptions {
   // This can be used by extensions during processing of requests. The association mechanism is
   // implementation specific. Defaults to false due to performance concerns.
   bool set_local_interface_name_on_upstream_connections = 2;
+
+  // Configurations for happy eyeballs algorithm.
+  // Add specs for first_address_family_version and first_address_family_count
+  // when sorting destination ip addresses.
+  HappyEyeballsConfig happy_eyeballs_config = 3;
 }
 
 message TrackClusterStats {

@@ -1,4 +1,3 @@
-#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/network/address.h"
 
 #include "source/common/network/address_impl.h"
@@ -57,8 +56,9 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
   auto ip_v6_3 = std::make_shared<Address::Ipv6Instance>("ff02::3", 0);
   auto ip_v6_4 = std::make_shared<Address::Ipv6Instance>("ff02::4", 0);
 
-  envoy::config::cluster::v3::Cluster::HappyEyeballsConfig config;
-  config.set_first_address_family_version(envoy::config::cluster::v3::Cluster::V4);
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig config;
+  config.set_first_address_family_version(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
   config.set_first_address_family_count(2);
 
   // All v4 address so unchanged.

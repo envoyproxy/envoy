@@ -1623,8 +1623,9 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   MockClusterMockPrioritySet cluster;
 
   // pass in custom happy_eyeballs_config
-  envoy::config::cluster::v3::Cluster::HappyEyeballsConfig config;
-  config.set_first_address_family_version(envoy::config::cluster::v3::Cluster::V4);
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig config;
+  config.set_first_address_family_version(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
   config.set_first_address_family_count(2);
   EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(config));
 

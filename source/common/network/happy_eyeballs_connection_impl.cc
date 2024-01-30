@@ -28,7 +28,8 @@ HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options,
-    const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig& happy_eyeballs_config)
+    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+        happy_eyeballs_config)
     : dispatcher_(dispatcher),
       address_list_(sortAddressesWithConfig(address_list, happy_eyeballs_config)),
       upstream_local_address_selector_(upstream_local_address_selector),
@@ -109,43 +110,36 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionProvider::sortAddressesWithConfig(
     const std::vector<Address::InstanceConstSharedPtr>& in,
-    const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig& happy_eyeballs_config) {
+    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+        happy_eyeballs_config) {
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_sort_address", "sort address with happy_eyeballs config.");
   std::vector<Address::InstanceConstSharedPtr> address_list;
   address_list.reserve(in.size());
 
-  // Iterator which will advance through all addresses matching the first
-  // family.
-  auto first = in.begin();
-  // Iterator which will advance through all addresses not matching the first
-  // family. This initial value is ignored and will be overwritten in the loop
-  // below.
-  auto other = in.begin();
-
-  // First_family_ip_version is default to the first valid ip version
+  // First_family_ip_version defaults to the first valid ip version
   // unless overwritten by happy_eyeballs_config.
   Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
   int first_address_family_count = happy_eyeballs_config.first_address_family_count();
   switch (happy_eyeballs_config.first_address_family_version()) {
-  case envoy::config::cluster::v3::Cluster::DEFAULT:
+  case envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT:
     break;
-  case envoy::config::cluster::v3::Cluster::V4:
+  case envoy::config::cluster::v3::UpstreamConnectionOptions::V4:
     first_family_ip_version = Address::IpVersion::v4;
     break;
-  case envoy::config::cluster::v3::Cluster::V6:
+  case envoy::config::cluster::v3::UpstreamConnectionOptions::V6:
     first_family_ip_version = Address::IpVersion::v6;
     break;
   default:
     break;
   }
 
-  while (first != in.end() && first->get()->ip()->version() != first_family_ip_version) {
-    first++;
-  }
-  while (other != in.end() && other->get()->ip()->version() == first_family_ip_version) {
-    other++;
-  }
+  auto first = std::find_if(in.begin(), in.end(), [&](const auto& val) {
+    return hasMatchingIpVersion(first_family_ip_version, val);
+  });
+  auto other = std::find_if(in.begin(), in.end(), [&](const auto& val) {
+    return !hasMatchingIpVersion(first_family_ip_version, val);
+  });
 
   // Address::IpVersion first_family_ip_version(Address::IpVersion::v4);
   while (first != in.end() || other != in.end()) {

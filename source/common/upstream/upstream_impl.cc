@@ -505,11 +505,12 @@ Host::CreateConnectionData HostImpl::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list.size() > 1) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs") &&
+        cluster.happyEyeballsConfig().has_value()) {
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
       connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
           dispatcher, address_list, source_address_selector, socket_factory,
-          transport_socket_options, host, options, cluster.happyEyeballsConfig());
+          transport_socket_options, host, options, cluster.happyEyeballsConfig().value());
     } else {
       ENVOY_LOG(debug, "Upstream using happy eyeballs without config.");
       connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
