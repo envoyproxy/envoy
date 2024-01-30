@@ -1990,5 +1990,71 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
   EXPECT_THAT(log, testing::HasSubstr("200 \"foo\""));
 }
 
+// Validate that the correct transport parameter is sent when `send_disable_active_migration` is
+// enabled.
+TEST_P(QuicHttpIntegrationTest, SendDisableActiveMigration) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_send_disable_active_migration()
+        ->set_value(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
+            quic_connection_->peer_address().host().ToString());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+
+  // Validate the setting was transmitted.
+  EXPECT_TRUE(quic_session->config()->DisableConnectionMigration());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1024 * 1024)}};
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+}
+
+// Validate that the transport parameter is not sent when `send_disable_active_migration` is
+// unset.
+TEST_P(QuicHttpIntegrationTest, UnsetSendDisableActiveMigration) {
+  autonomous_upstream_ = true;
+
+  // No config modifier to enable the setting.
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
+            quic_connection_->peer_address().host().ToString());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+
+  // Validate the setting was not transmitted.
+  EXPECT_FALSE(quic_session->config()->DisableConnectionMigration());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1024 * 1024)}};
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+}
+
 } // namespace Quic
 } // namespace Envoy
