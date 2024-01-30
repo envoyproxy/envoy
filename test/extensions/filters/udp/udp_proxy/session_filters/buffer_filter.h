@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
@@ -33,10 +34,18 @@ public:
 
   void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
+    // Verify that the filter is able to access the stream info.
+    callbacks.streamInfo().filterState()->setData(
+        "test.read", std::make_shared<Router::StringAccessorImpl>("val"),
+        Envoy::StreamInfo::FilterState::StateType::Mutable);
   }
 
   void initializeWriteFilterCallbacks(WriteFilterCallbacks& callbacks) override {
     write_callbacks_ = &callbacks;
+    // Verify that the filter is able to access the stream info.
+    callbacks.streamInfo().filterState()->setData(
+        "test.write", std::make_shared<Router::StringAccessorImpl>("val"),
+        Envoy::StreamInfo::FilterState::StateType::Mutable);
   }
 
   ReadFilterStatus onNewSession() override { return ReadFilterStatus::Continue; }

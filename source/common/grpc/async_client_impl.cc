@@ -123,6 +123,7 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
       // TODO(mattklein123): clang-tidy is showing a use after move when passing to
       // onReceiveInitialMetadata() above. This looks like an actual bug that I will fix in a
       // follow up.
+      // NOLINTNEXTLINE(bugprone-use-after-move)
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
@@ -254,7 +255,8 @@ void AsyncRequestImpl::cancel() {
 }
 
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata, nullptr);
+  Tracing::HttpTraceContext trace_context(metadata);
+  current_span_->injectContext(trace_context, nullptr);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

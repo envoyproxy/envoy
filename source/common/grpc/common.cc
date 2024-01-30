@@ -15,6 +15,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
+#include "source/common/grpc/codec.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
@@ -284,44 +285,6 @@ Common::prepareHeaders(const std::string& host_name, const std::string& service_
   return message;
 }
 
-void Common::checkForHeaderOnlyError(Http::ResponseMessage& http_response) {
-  // First check for grpc-status in headers. If it is here, we have an error.
-  absl::optional<Status::GrpcStatus> grpc_status_code =
-      Common::getGrpcStatus(http_response.headers());
-  if (!grpc_status_code) {
-    return;
-  }
-
-  if (grpc_status_code.value() == Status::WellKnownGrpcStatus::InvalidCode) {
-    throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
-  }
-
-  throw Exception(grpc_status_code.value(), Common::getGrpcMessage(http_response.headers()));
-}
-
-void Common::validateResponse(Http::ResponseMessage& http_response) {
-  if (Http::Utility::getResponseStatus(http_response.headers()) != enumToInt(Http::Code::OK)) {
-    throw Exception(absl::optional<uint64_t>(), "non-200 response code");
-  }
-
-  checkForHeaderOnlyError(http_response);
-
-  // Check for existence of trailers.
-  if (!http_response.trailers()) {
-    throw Exception(absl::optional<uint64_t>(), "no response trailers");
-  }
-
-  absl::optional<Status::GrpcStatus> grpc_status_code =
-      Common::getGrpcStatus(*http_response.trailers());
-  if (!grpc_status_code || grpc_status_code.value() < 0) {
-    throw Exception(absl::optional<uint64_t>(), "bad grpc-status trailer");
-  }
-
-  if (grpc_status_code.value() != 0) {
-    throw Exception(grpc_status_code.value(), Common::getGrpcMessage(*http_response.trailers()));
-  }
-}
-
 const std::string& Common::typeUrlPrefix() {
   CONSTRUCT_ON_FIRST_USE(std::string, "type.googleapis.com");
 }
@@ -332,7 +295,7 @@ std::string Common::typeUrl(const std::string& qualified_name) {
 
 void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
-  header[0] = 0; // flags
+  header[0] = GRPC_FH_DEFAULT; // flags
   const uint32_t nsize = htonl(buffer.length());
   safeMemcpyUnsafeDst(&header[1], &nsize);
   buffer.prepend(absl::string_view(&header[0], 5));

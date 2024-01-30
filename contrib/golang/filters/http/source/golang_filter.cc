@@ -211,11 +211,10 @@ void Filter::onDestroy() {
 }
 
 // access_log is executed before the log of the stream filter
-void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
-                 Envoy::AccessLog::AccessLogType type) {
+void Filter::log(const Formatter::HttpFormatterContext& log_context,
+                 const StreamInfo::StreamInfo&) {
   // `log` may be called multiple times with different log type
-  switch (type) {
+  switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:
   case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
   case Envoy::AccessLog::AccessLogType::DownstreamEnd: {
@@ -226,12 +225,12 @@ void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHead
       initRequest(state);
 
       request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
-          const_cast<Http::RequestHeaderMap*>(headers));
+          const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
     }
 
     state.enterLog();
     req_->phase = static_cast<int>(state.phase());
-    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(type));
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
     state.leaveLog();
   } break;
   default:
@@ -599,7 +598,7 @@ CAPIStatus Filter::continueStatus(GolangStatus status) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getHeader(absl::string_view key, GoString* go_value) {
+CAPIStatus Filter::getHeader(absl::string_view key, uint64_t* value_data, int* value_len) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -619,8 +618,8 @@ CAPIStatus Filter::getHeader(absl::string_view key, GoString* go_value) {
 
   if (!result.empty()) {
     auto str = result[0]->value().getStringView();
-    go_value->p = str.data();
-    go_value->n = str.length();
+    *value_data = reinterpret_cast<uint64_t>(str.data());
+    *value_len = str.length();
   }
   return CAPIStatus::CAPIOK;
 }
@@ -807,6 +806,27 @@ CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::drainBuffer(Buffer::Instance* buffer, uint64_t length) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  auto& state = getProcessorState();
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (!state.doDataList.checkExisting(buffer)) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  buffer->drain(length);
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                                    bufferAction action) {
   // lock until this function return since it may running in a Go thread.
@@ -989,7 +1009,7 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
+CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) {
   // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -1060,12 +1080,13 @@ CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }
 
-  value_str->p = req_->strValue.data();
-  value_str->n = req_->strValue.length();
+  *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
+  *value_len = req_->strValue.length();
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* buf_slice) {
+CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, uint64_t* buf_data,
+                                      int* buf_len) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -1081,10 +1102,10 @@ CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* b
   if (!state.isThreadSafe()) {
     auto weak_ptr = weak_from_this();
     ENVOY_LOG(debug, "golang filter getDynamicMetadata posting request to dispatcher");
-    state.getDispatcher().post([this, &state, weak_ptr, filter_name, buf_slice] {
+    state.getDispatcher().post([this, &state, weak_ptr, filter_name, buf_data, buf_len] {
       ENVOY_LOG(debug, "golang filter getDynamicMetadata request in worker thread");
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        populateSliceWithMetadata(state, filter_name, buf_slice);
+        populateSliceWithMetadata(state, filter_name, buf_data, buf_len);
         dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
         ENVOY_LOG(info, "golang filter has gone or destroyed in getDynamicMetadata");
@@ -1093,21 +1114,20 @@ CAPIStatus Filter::getDynamicMetadata(const std::string& filter_name, GoSlice* b
     return CAPIStatus::CAPIYield;
   } else {
     ENVOY_LOG(debug, "golang filter getDynamicMetadata replying directly");
-    populateSliceWithMetadata(state, filter_name, buf_slice);
+    populateSliceWithMetadata(state, filter_name, buf_data, buf_len);
   }
 
   return CAPIStatus::CAPIOK;
 }
 
 void Filter::populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
-                                       GoSlice* buf_slice) {
+                                       uint64_t* buf_data, int* buf_len) {
   const auto& metadata = state.streamInfo().dynamicMetadata().filter_metadata();
   const auto filter_it = metadata.find(filter_name);
   if (filter_it != metadata.end()) {
     filter_it->second.SerializeToString(&req_->strValue);
-    buf_slice->data = req_->strValue.data();
-    buf_slice->len = req_->strValue.length();
-    buf_slice->cap = req_->strValue.length();
+    *buf_data = reinterpret_cast<uint64_t>(req_->strValue.data());
+    *buf_len = req_->strValue.length();
   }
 }
 
@@ -1199,7 +1219,8 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_str) {
+CAPIStatus Filter::getStringFilterState(absl::string_view key, uint64_t* value_data,
+                                        int* value_len) {
   // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -1218,20 +1239,20 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
         state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key);
     if (go_filter_state) {
       req_->strValue = go_filter_state->value();
-      value_str->p = req_->strValue.data();
-      value_str->n = req_->strValue.length();
+      *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
+      *value_len = req_->strValue.length();
     }
   } else {
     auto key_str = std::string(key);
     auto weak_ptr = weak_from_this();
-    state.getDispatcher().post([this, &state, weak_ptr, key_str, value_str] {
+    state.getDispatcher().post([this, &state, weak_ptr, key_str, value_data, value_len] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         auto go_filter_state =
             state.streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key_str);
         if (go_filter_state) {
           req_->strValue = go_filter_state->value();
-          value_str->p = req_->strValue.data();
-          value_str->n = req_->strValue.length();
+          *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
+          *value_len = req_->strValue.length();
         }
         dynamic_lib_->envoyGoRequestSemaDec(req_);
       } else {
@@ -1243,7 +1264,8 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, GoString* value_s
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str, int* rc) {
+CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
+                                     int* rc) {
   // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -1265,13 +1287,13 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str
   }
 
   if (state.isThreadSafe()) {
-    return getStringPropertyCommon(path, value_str, state);
+    return getStringPropertyCommon(path, value_data, value_len, state);
   }
 
   auto weak_ptr = weak_from_this();
-  state.getDispatcher().post([this, &state, weak_ptr, path, value_str, rc] {
+  state.getDispatcher().post([this, &state, weak_ptr, path, value_data, value_len, rc] {
     if (!weak_ptr.expired() && !hasDestroyed()) {
-      *rc = getStringPropertyCommon(path, value_str, state);
+      *rc = getStringPropertyCommon(path, value_data, value_len, state);
       dynamic_lib_->envoyGoRequestSemaDec(req_);
     } else {
       ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
@@ -1280,13 +1302,13 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, GoString* value_str
   return CAPIStatus::CAPIYield;
 }
 
-CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, GoString* value_str,
-                                           ProcessorState& state) {
+CAPIStatus Filter::getStringPropertyCommon(absl::string_view path, uint64_t* value_data,
+                                           int* value_len, ProcessorState& state) {
   activation_info_ = &state.streamInfo();
   CAPIStatus status = getStringPropertyInternal(path, &req_->strValue);
   if (status == CAPIStatus::CAPIOK) {
-    value_str->p = req_->strValue.data();
-    value_str->n = req_->strValue.length();
+    *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
+    *value_len = req_->strValue.length();
   }
   return status;
 }
@@ -1436,6 +1458,7 @@ void Filter::initRequest(ProcessorState& state) {
   req_->configId = getMergedConfigId(state);
   req_->plugin_name.data = config_->pluginName().data();
   req_->plugin_name.len = config_->pluginName().length();
+  req_->worker_id = worker_id_;
 }
 
 /* ConfigId */
@@ -1469,6 +1492,7 @@ FilterConfig::FilterConfig(
     Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
+      concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
       metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
 
@@ -1486,6 +1510,7 @@ void FilterConfig::newGoPluginConfig() {
   config_->config_ptr = buf_ptr;
   config_->config_len = buf.length();
   config_->is_route_config = 0;
+  config_->concurrency = concurrency_;
 
   config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 
@@ -1499,7 +1524,7 @@ void FilterConfig::newGoPluginConfig() {
 
 FilterConfig::~FilterConfig() {
   if (config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_, 0);
   }
 }
 
@@ -1656,10 +1681,10 @@ RoutePluginConfig::RoutePluginConfig(
 RoutePluginConfig::~RoutePluginConfig() {
   absl::WriterMutexLock lock(&mutex_);
   if (config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_);
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(config_id_, 0);
   }
-  if (merged_config_id_ > 0) {
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+  if (merged_config_id_ > 0 && config_id_ != merged_config_id_) {
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_, 0);
   }
 }
 
@@ -1698,7 +1723,13 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
       return merged_config_id_;
     }
     // upper level config changed, merged_config_id_ is outdated.
-    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_);
+    // there is a concurrency race:
+    // 1. when A envoy worker thread is using the cached merged_config_id_ and it will call into Go
+    //    after some time.
+    // 2. while B envoy worker thread may update the merged_config_id_ in getMergedConfigId, that
+    //    will delete the id.
+    // so, we delay deleting the id in the Go side.
+    dso_lib_->envoyGoFilterDestroyHttpPluginConfig(merged_config_id_, 1);
   }
 
   if (config_id_ == 0) {

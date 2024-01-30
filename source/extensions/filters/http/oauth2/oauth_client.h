@@ -28,6 +28,11 @@ public:
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                                    const std::string& secret, const std::string& cb_url,
                                    AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+
+  virtual void asyncRefreshAccessToken(const std::string& refresh_token,
+                                       const std::string& client_id, const std::string& secret,
+                                       AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
@@ -38,8 +43,9 @@ public:
 
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
-  OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri)
-      : cm_(cm), uri_(uri) {}
+  OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
+                   const std::chrono::seconds default_expires_in)
+      : cm_(cm), uri_(uri), default_expires_in_(default_expires_in) {}
 
   ~OAuth2ClientImpl() override {
     if (in_flight_request_ != nullptr) {
@@ -55,11 +61,15 @@ public:
                            const std::string& secret, const std::string& cb_url,
                            AuthType auth_type) override;
 
+  void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
+                               const std::string& secret, AuthType auth_type) override;
+
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason f) override;
+
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 
@@ -70,12 +80,13 @@ private:
 
   Upstream::ClusterManager& cm_;
   const envoy::config::core::v3::HttpUri uri_;
+  const std::chrono::seconds default_expires_in_;
 
   // Tracks any outstanding in-flight requests, allowing us to cancel the request
   // if the filter ends before the request completes.
   Http::AsyncClient::Request* in_flight_request_{nullptr};
 
-  enum class OAuthState { Idle, PendingAccessToken };
+  enum class OAuthState { Idle, PendingAccessToken, PendingAccessTokenByRefreshToken };
 
   // Due to the asynchronous nature of this functionality, it is helpful to have managed state which
   // is tracked here.

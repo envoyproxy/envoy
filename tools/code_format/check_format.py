@@ -384,18 +384,28 @@ class FormatChecker:
 
     def allow_listed_for_unpack_to(self, file_path):
         return file_path.startswith("./test") or file_path in [
-            "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
+            "./source/common/protobuf/deterministic_hash.cc",
+            "./source/common/protobuf/utility.cc",
+            "./source/common/protobuf/utility.h",
         ]
 
     def allow_listed_for_raw_try(self, file_path):
         return file_path in self.config.paths["raw_try"]["include"]
 
     def deny_listed_for_exceptions(self, file_path):
-        # Returns true when it is a non test header file or the file_path is in DENYLIST or
-        # it is under tools/testdata subdirectory.
-        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) \
-            or (file_path.endswith('.cc') and file_path.startswith("./source/") and not file_path.startswith("./source/extensions/") and not file_path in self.config.paths["exception"]["include"]) \
-            or self.is_in_subdir(file_path, 'tools/testdata')
+        # Returns if this file is deny listed for exceptions.
+        # Header files are strongly discouraged from throwing exceptions, both for
+        # core and exception code. Source files are also discouraged but
+        # extensions source files are currently exempt from checks as many factory creation
+        # calls do not yet support StatusOr.
+        return ((
+            file_path.endswith('.h') and file_path.startswith("./source/")
+            and not file_path.startswith("./source/extensions/")
+            and not file_path in self.config.paths["exception"]["include"]) or (
+                file_path.endswith('.cc') and file_path.startswith("./source/")
+                and not file_path.startswith("./source/extensions/")
+                and not file_path in self.config.paths["exception"]["include"])
+                or self.is_in_subdir(file_path, 'tools/testdata'))
 
     def allow_listed_for_build_urls(self, file_path):
         return file_path in self.config.paths["build_urls"]["include"]
@@ -783,14 +793,19 @@ class FormatChecker:
                 "Don't call memcpy() directly; use safeMemcpy, safeMemcpyUnsafeSrc, safeMemcpyUnsafeDst or MemBlockBuilder instead."
             )
 
-        if self.deny_listed_for_exceptions(file_path):
+        def has_non_comment_throw(line):
             # Skpping cases where 'throw' is a substring of a symbol like in "foothrowBar".
             if "throw" in line.split():
                 comment_match = self.config.re["comment"].search(line)
                 if comment_match is None or comment_match.start(0) > line.find("throw"):
-                    report_error(
-                        "Don't introduce throws into exception-free files, use error "
-                        + "statuses instead.")
+                    return True
+            return False
+
+        if self.deny_listed_for_exceptions(file_path):
+            if has_non_comment_throw(line) or "THROW" in line or "throwExceptionOrPanic" in line:
+                report_error(
+                    "Don't introduce throws into exception-free files, use error "
+                    "statuses instead.")
 
     def check_build_line(self, line, file_path, report_error):
         if "@bazel_tools" in line and not (self.is_starlark_file(file_path)
@@ -889,9 +904,11 @@ class FormatChecker:
             return []
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
-                return [f"ERROR: something went wrong while executing: {e.cmd}"]
+                return [
+                    f"ERROR: something went wrong while executing: {e.cmd}\n{e.output.decode()}"
+                ]
             # In case we can't find any line numbers, record an error message first.
-            error_messages = [f"{error_message} for file: {file_path}\n{e}"]
+            error_messages = [f"{error_message} for file: {file_path}\n{e.output.decode()}"]
             for line in e.output.decode('utf-8').splitlines():
                 for num in regex.findall(line):
                     error_messages.append("  %s:%s" % (file_path, num))

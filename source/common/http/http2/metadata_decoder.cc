@@ -19,7 +19,7 @@ public:
 
   // HpackDecoderListener
   void OnHeaderListStart() override {}
-  void OnHeader(const std::string& name, const std::string& value) override {
+  void OnHeader(absl::string_view name, absl::string_view value) override {
     map_.emplace(name, value);
   }
   void OnHeaderListEnd() override {}
@@ -143,7 +143,7 @@ bool MetadataDecoder::decodeMetadataPayload(bool end_metadata) {
     while (db.HasData()) {
       if (!decoder_context_->decoder.DecodeFragment(&db)) {
         ENVOY_LOG_MISC(error, "Failed to decode payload: {}",
-                       decoder_context_->decoder.detailed_error());
+                       http2::HpackDecodingErrorToString(decoder_context_->decoder.error()));
         return false;
       }
     }
@@ -153,7 +153,7 @@ bool MetadataDecoder::decodeMetadataPayload(bool end_metadata) {
     const bool result = decoder_context_->decoder.EndDecodingBlock();
     if (!result) {
       ENVOY_LOG_MISC(error, "Failed to decode payload: {}",
-                     decoder_context_->decoder.detailed_error());
+                     http2::HpackDecodingErrorToString(decoder_context_->decoder.error()));
       return false;
     }
   }

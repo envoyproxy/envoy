@@ -20,6 +20,10 @@ static_resources:
               library_id: my-configurable-plugin-id
               library_path: "lib/my_configurable_plugin.so"
               plugin_name: my_configurable_plugin
+              plugin_config:
+                "@type": type.googleapis.com/xds.type.v3.TypedStruct
+                value:
+                  foo: default_foo
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

@@ -35,7 +35,7 @@ public:
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
 
-  Upstream::LoadBalancerConfigPtr loadConfig(ProtobufTypes::MessagePtr config,
+  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
                                              ProtobufMessage::ValidationVisitor& visitor) override;
 };
 

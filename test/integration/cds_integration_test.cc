@@ -157,8 +157,10 @@ public:
       cluster_creator_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaDeferredCluster, CdsIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_DEFERRED_CLUSTERS_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaDeferredCluster, CdsIntegrationTest,
+    DELTA_SOTW_GRPC_CLIENT_DEFERRED_CLUSTERS_INTEGRATION_PARAMS,
+    Grpc::DeltaSotwDeferredClustersIntegrationParamTest::protocolTestParamsToString);
 
 // 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
 // 2) Envoy is told of a cluster via CDS.
@@ -303,8 +305,10 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, DeferredCreationClusterStatsTest,
-                         DELTA_SOTW_GRPC_CLIENT_DEFERRED_CLUSTERS_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDelta, DeferredCreationClusterStatsTest,
+    DELTA_SOTW_GRPC_CLIENT_DEFERRED_CLUSTERS_INTEGRATION_PARAMS,
+    Grpc::DeltaSotwDeferredClustersIntegrationParamTest::protocolTestParamsToString);
 
 // Test that DeferredCreationTrafficStats gets created and updated correctly.
 TEST_P(DeferredCreationClusterStatsTest,
@@ -331,8 +335,9 @@ TEST_P(DeferredCreationClusterStatsTest,
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
+  test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
+                                          TestUtility::DefaultTimeout);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized"), nullptr);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 
   // No cluster_2 traffic stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
@@ -362,14 +367,15 @@ TEST_P(DeferredCreationClusterStatsTest,
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // Now the cluster_1 stats are gone.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
+                                          TestUtility::DefaultTimeout);
   // cluster_2 traffic stats stays.
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total")->value(), 0);
 }
 
 // Test that DeferredCreationTrafficStats with cluster_1 create-remove-create sequence.
 TEST_P(DeferredCreationClusterStatsTest,
-       DeferredCreationTrafficStatsWithClusterCreateDeleteRecrete) {
+       DeferredCreationTrafficStatsWithClusterCreateDeleteRecreate) {
   initializeDeferredCreationTest(/*enable_deferred_creation_stats=*/true);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
@@ -387,8 +393,9 @@ TEST_P(DeferredCreationClusterStatsTest,
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
   // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
+  test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
+                                          TestUtility::DefaultTimeout);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized"), nullptr);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
   // Now add cluster1 back.
   updateCluster();
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
@@ -405,7 +412,7 @@ TEST_P(DeferredCreationClusterStatsTest,
 
 // Test that Non-DeferredCreationTrafficStats with cluster_1 create-remove-create sequence.
 TEST_P(DeferredCreationClusterStatsTest,
-       NonDeferredCreationTrafficStatsWithClusterCreateDeleteRecrete) {
+       NonDeferredCreationTrafficStatsWithClusterCreateDeleteRecreate) {
   initializeDeferredCreationTest(/*enable_deferred_creation_stats=*/false);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
 
@@ -420,7 +427,8 @@ TEST_P(DeferredCreationClusterStatsTest,
   // cluster_2 traffic stats created.
   EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total")->value(), 0);
   // Now the cluster_1 stats are gone.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
+                                          TestUtility::DefaultTimeout);
   // Now add cluster1 back.
   updateCluster();
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);

@@ -127,7 +127,7 @@ public:
     if (default_configuration_) {
       auto status = onConfigUpdate(*default_configuration_, "", nullptr);
       if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
+        throwEnvoyExceptionOrPanic(std::string(status.message()));
       }
     }
   }
@@ -219,8 +219,13 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return {factory->name(),
-            factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_)};
+    absl::StatusOr<Http::FilterFactoryCb> error_or_factory =
+        factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
+    if (!error_or_factory.status().ok()) {
+      throwEnvoyExceptionOrPanic(std::string(error_or_factory.status().message()));
+    }
+
+    return {factory->name(), error_or_factory.value()};
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -304,7 +309,7 @@ public:
       const std::string& filter_chain_type, absl::string_view stat_prefix,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImpl<FactoryCb>(
-            subscription, require_type_urls, factory_context.threadLocal(),
+            subscription, require_type_urls, factory_context.serverFactoryContext().threadLocal(),
             std::move(default_config), last_filter_in_filter_chain, filter_chain_type, stat_prefix,
             listener_filter_matcher),
         factory_context_(factory_context) {}
@@ -344,6 +349,22 @@ private:
         Registry::FactoryRegistry<Server::Configuration::NamedUdpListenerFilterConfigFactory>::
             getFactoryByType(message.GetTypeName());
     return factory->createFilterFactoryFromProto(message, factory_context_);
+  }
+};
+
+class QuicListenerDynamicFilterConfigProviderImpl
+    : public ListenerDynamicFilterConfigProviderImpl<Network::QuicListenerFilterFactoryCb> {
+public:
+  using ListenerDynamicFilterConfigProviderImpl::ListenerDynamicFilterConfigProviderImpl;
+
+private:
+  Network::QuicListenerFilterFactoryCb
+  instantiateFilterFactory(const Protobuf::Message& message) const override {
+    auto* factory =
+        Registry::FactoryRegistry<Server::Configuration::NamedQuicListenerFilterConfigFactory>::
+            getFactoryByType(message.GetTypeName());
+    return factory->createListenerFilterFactoryFromProto(message, listener_filter_matcher_,
+                                                         factory_context_);
   }
 };
 
@@ -754,6 +775,19 @@ public:
 
 protected:
   const std::string getConfigDumpType() const override { return "ecds_filter_udp_listener"; }
+};
+
+// QUIC listener filter
+class QuicListenerFilterConfigProviderManagerImpl
+    : public FilterConfigProviderManagerImpl<
+          Server::Configuration::NamedQuicListenerFilterConfigFactory,
+          Network::QuicListenerFilterFactoryCb, Server::Configuration::ListenerFactoryContext,
+          QuicListenerDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "quic_listener_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_quic_listener"; }
 };
 
 } // namespace Filter

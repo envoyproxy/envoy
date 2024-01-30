@@ -33,6 +33,7 @@ const std::string& Schema::toString(Type type) {
 }
 
 Options::Options(int argc, const char* const* argv) {
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("schema_validator_tool", ' ', VersionInfo::version());
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true,
                                            "", "string", cmd);
@@ -82,8 +83,7 @@ public:
   bool skipValidation() override { return false; }
   void onDeprecatedField(absl::string_view description, bool) override {
     if (options_.failOnDeprecated()) {
-      throw ProtobufMessage::DeprecatedProtoFieldException(
-          absl::StrCat("Failing due to deprecated field: ", description));
+      throw EnvoyException(absl::StrCat("Failing due to deprecated field: ", description));
     }
   }
   void onWorkInProgress(absl::string_view description) override {
@@ -125,7 +125,7 @@ void Validator::validate(const Options& options) {
 }
 
 void Validator::run(int argc, const char* const* argv) {
-  Options options(argc, argv);
+  Options options(argc, argv); // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
   Validator v;
 
   v.validate(options);

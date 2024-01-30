@@ -92,7 +92,7 @@ protected:
   Api::Api& api_;
 
 private:
-  void validateUpdateSize(int num_resources);
+  absl::Status validateUpdateSize(int num_resources);
   void initialize();
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);
@@ -107,7 +107,7 @@ private:
   Config::SubscriptionPtr subscription_;
   const std::string sds_config_name_;
 
-  uint64_t secret_hash_;
+  uint64_t secret_hash_{0};
   uint64_t files_hash_;
   Cleanup clean_up_;
   Config::SubscriptionFactory& subscription_factory_;
@@ -138,7 +138,8 @@ public:
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
     auto& server_context = secret_provider_context.serverFactoryContext();
-    Config::Utility::checkLocalInfo("TlsCertificateSdsApi", server_context.localInfo());
+    THROW_IF_NOT_OK(
+        Config::Utility::checkLocalInfo("TlsCertificateSdsApi", server_context.localInfo()));
     return std::make_shared<TlsCertificateSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         server_context.mainThreadDispatcher().timeSource(),
@@ -224,8 +225,8 @@ public:
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
     auto& server_context = secret_provider_context.serverFactoryContext();
-    Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
-                                    server_context.localInfo());
+    THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
+                                                    server_context.localInfo()));
     return std::make_shared<CertificateValidationContextSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         server_context.mainThreadDispatcher().timeSource(),
@@ -322,7 +323,8 @@ public:
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
     auto& server_context = secret_provider_context.serverFactoryContext();
-    Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi", server_context.localInfo());
+    THROW_IF_NOT_OK(
+        Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi", server_context.localInfo()));
     return std::make_shared<TlsSessionTicketKeysSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         server_context.mainThreadDispatcher().timeSource(),
@@ -395,7 +397,8 @@ public:
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
     auto& server_context = secret_provider_context.serverFactoryContext();
-    Config::Utility::checkLocalInfo("GenericSecretSdsApi", server_context.localInfo());
+    THROW_IF_NOT_OK(
+        Config::Utility::checkLocalInfo("GenericSecretSdsApi", server_context.localInfo()));
     return std::make_shared<GenericSecretSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         server_context.mainThreadDispatcher().timeSource(),

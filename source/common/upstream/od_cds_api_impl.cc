@@ -25,7 +25,7 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
                                                                            "name"),
       helper_(cm, "odcds"), cm_(cm), notifier_(notifier),
-      scope_(scope.createScope("cluster_manager.odcds.")), status_(StartStatus::NotStarted) {
+      scope_(scope.createScope("cluster_manager.odcds.")) {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
   const auto resource_name = getResourceName();
@@ -63,7 +63,7 @@ OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
     notifier_.notifyMissingCluster(resource_name);
   }
   if (!exception_msgs.empty()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
   return absl::OkStatus();

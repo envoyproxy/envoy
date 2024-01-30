@@ -30,7 +30,7 @@ public:
    * @return std::string byte string representation of a number.
    */
   template <typename Type> static std::string toByteString(Type value) {
-    return std::string(reinterpret_cast<const char*>(&value), sizeof(Type));
+    return {reinterpret_cast<const char*>(&value), sizeof(Type)};
   }
 
   /**
@@ -42,7 +42,7 @@ public:
    */
   template <typename Type> static std::string toBigEndianByteString(Type value) {
     auto bytes = toEndianness<ByteOrder::BigEndian>(value);
-    return std::string(reinterpret_cast<const char*>(&bytes), sizeof(Type));
+    return {reinterpret_cast<const char*>(&bytes), sizeof(Type)};
   }
 
   using Replacements = std::vector<std::pair<const std::string, const std::string>>;

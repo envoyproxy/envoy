@@ -24,10 +24,10 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
   const Api::SysCallIntResult result = SocketImpl::bind(connection_info_provider_->localAddress());
   if (SOCKET_FAILURE(result.return_value_)) {
     close();
-    throw SocketBindException(fmt::format("cannot bind '{}': {}",
-                                          connection_info_provider_->localAddress()->asString(),
-                                          errorDetails(result.errno_)),
-                              result.errno_);
+    const std::string error =
+        fmt::format("cannot bind '{}': {}", connection_info_provider_->localAddress()->asString(),
+                    errorDetails(result.errno_));
+    throw SocketBindException(error, result.errno_);
   }
   return {0, 0};
 }

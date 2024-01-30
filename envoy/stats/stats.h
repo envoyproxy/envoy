@@ -26,6 +26,10 @@ class SymbolTable;
 
 /**
  * General interface for all stats objects.
+ *
+ * Note: some methods must match those in `PrimitiveMetricMetadata` because stats sinks
+ * use templates to handle either type. The interface is not used for size/performance
+ * reasons.
  */
 class Metric : public RefcountInterface {
 public:

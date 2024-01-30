@@ -123,44 +123,6 @@ Specify the log level to be used when running the underlying Envoy engine.
   // Swift
   builder.addLogLevel(.warn)
 
-~~~~~~~~~~~~~~~~~~~~~~
-``addGrpcStatsDomain``
-~~~~~~~~~~~~~~~~~~~~~~
-
-Specify a domain which implements the
-:tree:`stats endpoint <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L139-L145>`
-in order to take advantage of the
-`stats emitted by Envoy <https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cluster_stats>`_
-(and subsequently Envoy Mobile).
-
-Note that only stats specified in the configuration's
-:tree:`inclusion list <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L146-L167>`
-will be emitted.
-
-Passing ``nil``/``null`` disables stats emission, and this is the default value.
-
-**Example**::
-
-  // Kotlin
-  builder.addGrpcStatsDomain("envoy-mobile.envoyproxy.io")
-
-  // Swift
-  builder.addGrpcStatsDomain("envoy-mobile.envoyproxy.io")
-
-~~~~~~~~~~~~~~~~~~~~~~~~
-``addStatsFlushSeconds``
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify the rate at which Envoy Mobile should flush its queued stats.
-
-**Example**::
-
-  // Kotlin
-  builder.addStatsFlushSeconds(5L)
-
-  // Swift
-  builder.addStatsFlushSeconds(5)
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``addStreamIdleTimeoutSeconds``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,7 +162,6 @@ for further information.
 ~~~~~~~~~~~~~~~~~
 
 Specify the version of the app using Envoy Mobile.
-This information is sent as metadata when flushing stats.
 
 **Example**::
 
@@ -215,7 +176,6 @@ This information is sent as metadata when flushing stats.
 ~~~~~~~~~~~~
 
 Specify the version of the app using Envoy Mobile.
-This information is sent as metadata when flushing stats.
 
 **Example**::
 
@@ -362,6 +322,55 @@ Specify whether to enable transparent response Brotli decompression. Defaults to
 
 Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
 are used.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableHttp3``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable HTTP/3. Defaults to true. Only available when the Envoy Mobile build has HTTP/3 included.
+When HTTP/3 is enabled, the client will first talk HTTP/2 with the servers and upon receiving alt-svc in the response,
+following traffic will be sent via HTTP/3.
+
+**Example**::
+
+  // Kotlin
+  builder.enableHttp3(true)
+
+  // Swift
+  builder.enableHttp3(true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addQuicHint``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a host port pair that's known to support QUIC. Only available when HTTP/3 is enabled.
+It can be called multiple times to append a list of QUIC hints.
+This allows HTTP/3 to be used for the first request to the hosts and avoid the HTTP/2 -> HTTP/3 switch as mentioned in enableHttp3.
+
+**Example**::
+
+  // Kotlin
+  builder.addQuicHint("www.example.com", 443)
+
+  // Swift
+  builder.addQuicHint("www.example.com", 443)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addQuicCanonicalSuffix``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a canonical suffix that's known to speak QUIC.
+This feature works as a extension to QUIC hints in such way that:
+if `.abc.com` is added to canonical suffix, and `foo.abc.com` is added to QUIC hint, then all requests to
+`*.abc.com` will be considered QUIC ready.
+
+**Example**::
+
+  // Kotlin
+  builder.addQuicCanonicalSuffix(".example.com")
+
+  // Swift
+  builder.addQuicCanonicalSuffix(".example.com")
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``
@@ -585,7 +594,6 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
   val streamClient = AndroidEngineBuilder(baseContext, Yaml(yamlFileString))
     .addLogLevel(LogLevel.WARN)
-    .addStatsFlushSeconds(60)
     ...
     .build()
     .streamClient()
@@ -594,7 +602,6 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
   let streamClient = try EngineBuilder(yaml: yamlFileString)
     .addLogLevel(.warn)
-    .addStatsFlushSeconds(60)
     ...
     .build()
     .streamClient()

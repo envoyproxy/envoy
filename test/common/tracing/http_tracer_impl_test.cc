@@ -519,9 +519,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   absl::optional<uint32_t> response_code(503);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
-  ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout))
-      .WillByDefault(Return(true));
-  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  stream_info.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("503")));
@@ -707,6 +705,58 @@ TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
                                             config);
+}
+
+TEST(HttpTraceContextTest, HttpTraceContextTest) {
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    HttpTraceContext trace_context(request_headers);
+
+    // Protocol.
+    EXPECT_EQ(trace_context.protocol(), "");
+    request_headers.addCopy(Http::Headers::get().Protocol, "HTTP/x");
+    EXPECT_EQ(trace_context.protocol(), "HTTP/x");
+
+    // Host.
+    EXPECT_EQ(trace_context.host(), "");
+    request_headers.addCopy(Http::Headers::get().Host, "test.com:233");
+    EXPECT_EQ(trace_context.host(), "test.com:233");
+
+    // Path.
+    EXPECT_EQ(trace_context.path(), "");
+    request_headers.addCopy(Http::Headers::get().Path, "/anything");
+    EXPECT_EQ(trace_context.path(), "/anything");
+
+    // Method.
+    EXPECT_EQ(trace_context.method(), "");
+    request_headers.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Options);
+    EXPECT_EQ(trace_context.method(), Http::Headers::get().MethodValues.Options);
+
+    // Set.
+    trace_context.set("foo", "bar");
+    EXPECT_EQ(request_headers.get_("foo"), "bar");
+
+    // Get.
+    EXPECT_EQ(trace_context.get("foo").value(), "bar");
+
+    // Remove.
+    trace_context.remove("foo");
+    EXPECT_EQ(request_headers.get_("foo"), "");
+    EXPECT_EQ(trace_context.get("foo"), absl::nullopt);
+  }
+
+  {
+    size_t size = 0;
+    Http::TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
+    HttpTraceContext trace_context(request_headers);
+    trace_context.forEach([&size](absl::string_view key, absl::string_view val) {
+      size += key.size();
+      size += val.size();
+      return true;
+    });
+    // 'host' will be converted to ':authority'.
+    EXPECT_EQ(23, size);
+  }
 }
 
 } // namespace

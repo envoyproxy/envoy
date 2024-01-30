@@ -32,6 +32,7 @@ CONTRIB_V3_ALLOW_LIST = [
     'envoy.extensions.filters.network.client_ssl_auth.v3',
     'envoy.extensions.filters.network.generic_proxy.action.v3',
     'envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3',
+    'envoy.extensions.filters.network.generic_proxy.codecs.kafka.v3',
     'envoy.extensions.filters.network.generic_proxy.matcher.v3',
     'envoy.extensions.filters.network.generic_proxy.router.v3',
     'envoy.extensions.filters.network.generic_proxy.v3',
@@ -177,18 +178,18 @@ def get_import_deps(proto_path):
                     continue
                 # Special case handling for UDPA annotations.
                 if import_path.startswith('udpa/annotations/'):
-                    imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
+                    imports.append('@com_github_cncf_xds//udpa/annotations:pkg')
                     continue
                 if import_path.startswith('xds/type/matcher/v3/'):
-                    imports.append('@com_github_cncf_udpa//xds/type/matcher/v3:pkg')
+                    imports.append('@com_github_cncf_xds//xds/type/matcher/v3:pkg')
                     continue
                 # Special case for handling XDS annotations.
                 if import_path.startswith('xds/annotations/v3/'):
-                    imports.append('@com_github_cncf_udpa//xds/annotations/v3:pkg')
+                    imports.append('@com_github_cncf_xds//xds/annotations/v3:pkg')
                     continue
                 # Special case handling for XDS core.
                 if import_path.startswith('xds/core/v3/'):
-                    imports.append('@com_github_cncf_udpa//xds/core/v3:pkg')
+                    imports.append('@com_github_cncf_xds//xds/core/v3:pkg')
                     continue
                 # Explicit remapping for external deps, compute paths for envoy/*.
                 if import_path in data["external_proto_deps"]["imports"]:

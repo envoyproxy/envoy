@@ -31,6 +31,8 @@ struct FilterStats {
   ALL_AWS_REQUEST_SIGNING_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+enum class SigningAlgorithm { SIGV4, SIGV4A };
+
 /**
  * Abstract filter configuration.
  */
@@ -54,7 +56,7 @@ public:
   virtual const std::string& hostRewrite() const PURE;
 
   /**
-   * @return  whether or not to buffer and sign the payload.
+   * @return whether or not to buffer and sign the payload.
    */
   virtual bool useUnsignedPayload() const PURE;
 };

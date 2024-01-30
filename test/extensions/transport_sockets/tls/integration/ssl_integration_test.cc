@@ -25,6 +25,7 @@
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -463,8 +464,8 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
   // Config client to use an async cert validator which defer the actual validation by 5ms.
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-      new envoy::config::core::v3::TypedExtensionConfig();
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
@@ -474,7 +475,7 @@ typed_config:
   initialize();
 
   Network::ClientConnectionPtr connection = makeSslClientConnection(
-      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config));
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()));
   ConnectionStatusCallbacks callbacks;
   connection->addConnectionCallbacks(callbacks);
   connection->connect();
@@ -492,8 +493,8 @@ typed_config:
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceedsWithLocalAddress) {
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-      new envoy::config::core::v3::TypedExtensionConfig();
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
@@ -508,7 +509,7 @@ typed_config:
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
-      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config),
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
       *context_manager_, *api_);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
@@ -545,8 +546,8 @@ typed_config:
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterTearDown) {
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-      new envoy::config::core::v3::TypedExtensionConfig();
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
@@ -563,7 +564,7 @@ typed_config:
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
-      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config),
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
       *context_manager_, *api_);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
@@ -594,8 +595,8 @@ typed_config:
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationAfterSslShutdown) {
-  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config =
-      new envoy::config::core::v3::TypedExtensionConfig();
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
 typed_config:
@@ -612,7 +613,7 @@ typed_config:
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
-      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config),
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
       *context_manager_, *api_);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
@@ -861,6 +862,35 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
 // Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
 // Test the access log.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ssl_transport_failure_reason_format", "true"}});
+  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
+                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
+  server_rsa_cert_ = false;
+  server_ecdsa_cert_ = true;
+  initialize();
+  auto codec_client =
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
+  EXPECT_FALSE(codec_client->connected());
+
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    EXPECT_THAT(log_result,
+                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435709:SSL_routines:"
+                           "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS:TLS_error_end"));
+  } else {
+    EXPECT_THAT(log_result,
+                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435640:"
+                           "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end"));
+  }
+}
+
+// Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
+TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLogOriginalFormat) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ssl_transport_failure_reason_format", "false"}});
   useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
                        "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
   server_rsa_cert_ = false;

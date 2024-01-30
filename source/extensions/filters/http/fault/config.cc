@@ -14,8 +14,11 @@ namespace Fault {
 Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
-      config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
+  auto& server_context = context.serverFactoryContext();
+
+  FaultFilterConfigSharedPtr filter_config(
+      std::make_shared<FaultFilterConfig>(config, server_context.runtime(), stats_prefix,
+                                          context.scope(), server_context.timeSource()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };

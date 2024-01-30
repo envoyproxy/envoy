@@ -7,6 +7,7 @@
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
 
+#include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
@@ -43,20 +44,16 @@ struct Bucket {
   BucketAction bucket_action;
   // Cache quota usage.
   QuotaUsage quota_usage;
+  // Rate limiter based on token bucket algorithm.
+  TokenBucketPtr token_bucket_limiter;
 };
 
 using BucketsCache = absl::flat_hash_map<size_t, std::unique_ptr<Bucket>>;
 
 struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota> {
   ThreadLocalClient(Envoy::Event::Dispatcher& dispatcher) {
-    // Create the quota usage report method that sends the reports the RLS server periodically.
-    send_reports_timer = dispatcher.createTimer([this] {
-      if (rate_limit_client != nullptr) {
-        rate_limit_client->sendUsageReport(absl::nullopt);
-      } else {
-        ENVOY_LOG(error, "Rate limit client has been destroyed; no periodical report send");
-      }
-    });
+    // Create the quota usage report method that sends the reports to the RLS server periodically.
+    send_reports_timer = dispatcher.createTimer([this] { sendPeriodicalReports(); });
   }
 
   // Disable copy constructor and assignment.
@@ -73,10 +70,27 @@ struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota>
     }
   }
 
+  // Helper function to send the reports periodically on timer.
+  void sendPeriodicalReports() {
+    if (rate_limit_client != nullptr) {
+      rate_limit_client->sendUsageReport(absl::nullopt);
+    } else {
+      ENVOY_LOG(error, "Rate limit client has been destroyed; no periodical report send");
+    }
+
+    if (send_reports_timer != nullptr) {
+      send_reports_timer->enableTimer(report_interval_ms);
+    } else {
+      ENVOY_LOG(error, "Reports timer has been destroyed; no periodical report send");
+    }
+  }
+
   // Rate limit client. It is owned here (in TLS) and is used by all the buckets.
   std::unique_ptr<RateLimitClient> rate_limit_client;
   // The timer for sending the reports periodically.
   Event::TimerPtr send_reports_timer;
+  // Periodical reporting interval(in milliseconds).
+  std::chrono::milliseconds report_interval_ms = std::chrono::milliseconds::zero();
 };
 
 class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
@@ -96,7 +110,8 @@ private:
 };
 
 struct QuotaBucket {
-  QuotaBucket(Envoy::Server::Configuration::FactoryContext& context) : tls(context.threadLocal()) {
+  QuotaBucket(Envoy::Server::Configuration::FactoryContext& context)
+      : tls(context.serverFactoryContext().threadLocal()) {
     tls.set([](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalBucket>(dispatcher);
     });

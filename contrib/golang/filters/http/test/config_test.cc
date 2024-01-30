@@ -28,8 +28,11 @@ std::string genSoPath(std::string name) {
 TEST(GolangFilterConfigTest, InvalidateEmptyConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
-      GolangFilterConfig().createFilterFactoryFromProto(
-          envoy::extensions::filters::http::golang::v3alpha::Config(), "stats", context),
+      GolangFilterConfig()
+          .createFilterFactoryFromProto(envoy::extensions::filters::http::golang::v3alpha::Config(),
+                                        "stats", context)
+          .status()
+          .IgnoreError(),
       Envoy::ProtoValidationException,
       "ConfigValidationError.LibraryId: value length must be at least 1 characters");
 }
@@ -54,8 +57,11 @@ TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GolangFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();
@@ -77,8 +83,11 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GolangFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();

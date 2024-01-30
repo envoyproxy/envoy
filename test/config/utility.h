@@ -159,7 +159,8 @@ public:
 
   static void
   initializeTls(const ServerSslOptions& options,
-                envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
+                envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context,
+                bool http3);
 
   static void initializeTlsKeyLog(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
@@ -303,8 +304,8 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
-  // By default, this prepends a downstream filter, but if downstream is set to
-  // false it will prepend an upstream filter.
+  // By default, this prepends a downstream HTTP filter, but if downstream is set to
+  // false it will prepend an upstream HTTP filter.
   void prependFilter(const std::string& filter_yaml, bool downstream = true);
 
   // Add an HTTP filter prior to existing filters.
@@ -336,7 +337,8 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig(bool enable_early_data);
+  void addQuicDownstreamTransportSocketConfig(bool enable_early_data,
+                                              std::vector<absl::string_view> custom_alpns);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.

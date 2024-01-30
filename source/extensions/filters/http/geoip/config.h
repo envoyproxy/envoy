@@ -2,9 +2,9 @@
 
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.validate.h"
+#include "envoy/geoip/geoip_provider_driver.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/geoip/geoip_provider_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,9 +22,6 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
-private:
-  GeoipProviderFactoryContextPtr provider_context_;
 };
 
 } // namespace Geoip

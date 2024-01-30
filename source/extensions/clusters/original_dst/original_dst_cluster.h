@@ -185,6 +185,9 @@ private:
   friend class OriginalDstClusterHandle;
 };
 
+constexpr absl::string_view OriginalDstClusterFilterStateKey =
+    "envoy.network.transport_socket.original_dst_address";
+
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:
   OriginalDstClusterFactory() : ClusterFactoryImplBase("envoy.cluster.original_dst") {}

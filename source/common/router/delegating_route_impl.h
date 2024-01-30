@@ -43,7 +43,7 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return base_route_->typedMetadata();
   }
-  bool filterDisabled(absl::string_view name) const override {
+  absl::optional<bool> filterDisabled(absl::string_view name) const override {
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }

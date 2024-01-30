@@ -49,7 +49,7 @@ public:
             &writer, /*owns_writer=*/false, supported_versions,
             createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
                                          "example.com", "h3-29"),
-            generator) {}
+            generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -162,6 +162,7 @@ public:
                                      proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
+  quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
 };
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
@@ -200,8 +201,8 @@ public:
                                quic::QuicServerId("example.com", 443, false),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
-                               nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr) {}
+                               dispatcher, send_buffer_limit, crypto_stream_factory,
+                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr, {}) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();

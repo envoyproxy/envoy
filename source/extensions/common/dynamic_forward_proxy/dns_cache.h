@@ -31,7 +31,7 @@ public:
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_mixed_scheme")) {
       return std::string(host);
     }
-    if (Http::HeaderUtility::hostHasPort(host)) {
+    if (Envoy::Http::HeaderUtility::hostHasPort(host)) {
       return std::string(host);
     }
     return absl::StrCat(host, ":", default_port);
@@ -44,6 +44,11 @@ public:
    * async re-resolution. This address may be null in the case of failed resolution.
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
+
+  /**
+   * Returns whether the first DNS resolving attempt is completed or not.
+   */
+  virtual bool firstResolveComplete() const PURE;
 
   /**
    * Returns the host's currently resolved address. These addresses may change periodically due to
@@ -264,7 +269,7 @@ public:
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
-  virtual DnsCacheSharedPtr
+  virtual absl::StatusOr<DnsCacheSharedPtr>
   getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
 
   /**

@@ -42,19 +42,18 @@ std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context,
                                const Upstream::HostDescriptionConstSharedPtr&) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                  span_.traceIdAsHexString());
-  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
+  ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, span_.traceIdAsHexString());
+  ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, span_.idAsHexString());
 
   // Set the parent-span header properly, based on the newly-created span structure.
   if (span_.isSetParentId()) {
-    trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                    span_.parentIdAsHexString());
+    ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.setRefKey(trace_context,
+                                                             span_.parentIdAsHexString());
   }
 
   // Set the sampled header.
-  trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                  span_.sampled() ? SAMPLED : NOT_SAMPLED);
+  ZipkinCoreConstants::get().X_B3_SAMPLED.setRefKey(trace_context,
+                                                    span_.sampled() ? SAMPLED : NOT_SAMPLED);
 }
 
 void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
@@ -78,8 +77,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
-                                /* allow_added_via_api */ true);
+  THROW_IF_STATUS_NOT_OK(Config::Utility::checkCluster("envoy.tracers.zipkin",
+                                                       zipkin_config.collector_cluster(), cm_,
+                                                       /* allow_added_via_api */ true),
+                         throw);
   cluster_ = zipkin_config.collector_cluster();
   hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
                                                           : zipkin_config.collector_cluster();
@@ -105,7 +106,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
         local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
         shared_span_context, time_source_, split_spans_for_request);
     tracer->setReporter(
-        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
+        ReporterImpl::newInstance(std::ref(*this), std::ref(dispatcher), collector));
     return std::make_shared<TlsTracer>(std::move(tracer), *this);
   });
 }
@@ -113,7 +114,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info, const std::string&,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
   SpanContextExtractor extractor(trace_context);
@@ -155,7 +156,7 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
   enableTimer();
 }
 
-ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+ReporterPtr ReporterImpl::newInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                       const CollectorInfo& collector) {
   return std::make_unique<ReporterImpl>(driver, dispatcher, collector);
 }

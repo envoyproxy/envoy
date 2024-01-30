@@ -6,6 +6,7 @@ This page lists all active maintainers and their areas of expertise. This can be
 routing PRs, questions, etc. to the right place.
 
 # Senior maintainers
+<!--- If you modify senior maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml  -->
 
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
@@ -29,8 +30,11 @@ routing PRs, questions, etc. to the right place.
   * Docs, tooling, CI, containers and sandbox examples
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management, Envoy Mobile.
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+  * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 
 # Maintainers
+<!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
 
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
@@ -38,8 +42,6 @@ routing PRs, questions, etc. to the right place.
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
   * Data plane, overload management, flow control.
-* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
-  * Performance, Dubbo.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
   * Bazel, CI, compilers, linkers, general build issues, etc.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
@@ -48,6 +50,8 @@ routing PRs, questions, etc. to the right place.
   * Caches, file filters, and file I/O.
 * Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
   * Listeners, iouring, data plane.
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
+  * Load balancing, GeoIP, overload manager, security.
 
 # Envoy mobile maintainers
 
@@ -74,7 +78,7 @@ without further review.
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
-* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (nezdolik@spotify.com)
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)

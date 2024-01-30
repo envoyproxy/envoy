@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.set_filter_state.v3;
+
+import "envoy/extensions/filters/common/set_filter_state/v3/value.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.set_filter_state.v3";
+option java_outer_classname = "SetFilterStateProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/set_filter_state/v3;set_filter_statev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Set-Filter-State Filter]
+//
+// This filter sets or updates the dynamic filter state. See :ref:`the filter
+// documentation <config_network_filters_set_filter_state>` for more
+// information on how this filter should be used.
+//
+// [#extension: envoy.filters.network.set_filter_state]
+
+message Config {
+  // A sequence of the filter state values to apply in the specified order
+  // when a new connection is received.
+  repeated common.set_filter_state.v3.FilterStateValue on_new_connection = 1;
+}

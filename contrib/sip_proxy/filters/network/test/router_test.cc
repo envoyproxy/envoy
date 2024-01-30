@@ -99,8 +99,9 @@ public:
     }
 
     const auto options = std::make_shared<ProtocolOptionsConfigImpl>(sip_protocol_options_config_);
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
-                extensionProtocolOptions(_))
+    EXPECT_CALL(
+        *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+        extensionProtocolOptions(_))
         .WillRepeatedly(Return(options));
 
     EXPECT_CALL(context_, getTransportSocketFactoryContext())
@@ -109,7 +110,8 @@ public:
         .WillRepeatedly(testing::ReturnRef(local_info_));
 
     transaction_infos_ = std::make_shared<TransactionInfos>();
-    context_.cluster_manager_.initializeThreadLocalClusters({cluster_name_});
+    context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {cluster_name_});
 
     StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr};
     SipFilterStats stat = SipFilterStats::generateStats("test.", *store_.rootScope());
@@ -130,7 +132,8 @@ public:
     route_ptr_.reset(route_);
 
     EXPECT_CALL(*router_filter_config_, stats()).WillRepeatedly(ReturnRef(router_stats_));
-    router_ = std::make_unique<Router>(router_filter_config_, context_.clusterManager(), context_);
+    router_ = std::make_unique<Router>(router_filter_config_,
+                                       context_.server_factory_context_.clusterManager(), context_);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -178,18 +181,21 @@ public:
   }
 
   void connectUpstream() {
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
         }));
 
     conn_state_.reset();
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 connectionState())
         .WillRepeatedly(
             Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
-    context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
+    context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+        .poolReady(upstream_connection_);
 
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
@@ -402,7 +408,8 @@ TEST_F(SipRouterTest, NoTcpConnPool) {
   initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Request);
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
   try {
     startRequest(FilterStatus::Continue);
@@ -423,7 +430,8 @@ TEST_F(SipRouterTest, NoTcpConnPoolEmptyDest) {
   metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
   metadata_->resetAffinityIteration();
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
   try {
     startRequest(FilterStatus::Continue);
@@ -508,7 +516,8 @@ TEST_F(SipRouterTest, CallNoCluster) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq(cluster_name_)))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq(cluster_name_)))
       .WillOnce(Return(nullptr));
 
   try {
@@ -529,7 +538,9 @@ TEST_F(SipRouterTest, ClusterMaintenanceMode) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, maintenanceMode())
+  EXPECT_CALL(
+      *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+      maintenanceMode())
       .WillOnce(Return(true));
 
   try {
@@ -551,7 +562,9 @@ TEST_F(SipRouterTest, NoHost) {
   EXPECT_CALL(route_entry_, clusterName()).WillOnce(ReturnRef(cluster_name_));
   EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, host())
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      host())
       .WillOnce(Return(nullptr));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
@@ -602,12 +615,15 @@ TEST_F(SipRouterTest, CallWithExistingConnection) {
   metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
   metadata_->resetAffinityIteration();
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      newConnection(_))
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-                upstream_connection_);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .newConnectionImpl(cb);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .poolReady(upstream_connection_);
             return nullptr;
           }));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
@@ -635,12 +651,15 @@ TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
   // initializeMetadata(MsgType::Request);
   metadata_->resetDestination();
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      newConnection(_))
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-                upstream_connection_);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .newConnectionImpl(cb);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .poolReady(upstream_connection_);
             return nullptr;
           }));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
@@ -653,8 +672,8 @@ TEST_F(SipRouterTest, PoolFailure) {
   initializeTransaction();
   initializeMetadata(MsgType::Response);
   startRequest();
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(SipRouterTest, NextAffinityAfterPoolFailure) {
@@ -665,20 +684,23 @@ TEST_F(SipRouterTest, NextAffinityAfterPoolFailure) {
   startRequest();
   metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
   metadata_->resetAffinityIteration();
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(SipRouterTest, NewConnectionFailure) {
   initializeTrans();
   initializeRouter();
   initializeTransaction();
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      newConnection(_))
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-                upstream_connection_);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .newConnectionImpl(cb);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .poolReady(upstream_connection_);
             return nullptr;
           }));
   initializeMetadata(MsgType::Response);

@@ -1,11 +1,16 @@
 #include "source/extensions/load_balancing_policies/subset/config.h"
 
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/common/factory_base.h"
 #include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
 namespace Subset {
+
+using SubsetLbProto = envoy::extensions::load_balancing_policies::subset::v3::Subset;
+using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 Upstream::LoadBalancerPtr Factory::create(const Upstream::ClusterInfo& cluster,
                                           const Upstream::PrioritySet& priority_set,
@@ -26,62 +31,9 @@ Upstream::LoadBalancerPtr Factory::create(const Upstream::ClusterInfo& cluster,
  */
 REGISTER_FACTORY(Factory, Upstream::NonThreadAwareLoadBalancerFactory);
 
-using LoadBalancerSubsetInfoImpl =
-    Upstream::LoadBalancerSubsetInfoImplBase<Upstream::SubsetLoadbalancingPolicyProto>;
-
-class SubsetLoadBalancerConfig : public Upstream::LoadBalancerConfig {
-public:
-  SubsetLoadBalancerConfig(const Upstream::SubsetLoadbalancingPolicyProto& subset_config,
-                           ProtobufMessage::ValidationVisitor& visitor)
-      : subset_info_(subset_config) {
-
-    absl::InlinedVector<absl::string_view, 4> missing_policies;
-
-    for (const auto& policy : subset_config.subset_lb_policy().policies()) {
-      auto* factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
-          policy.typed_extension_config(), /*is_optional=*/true);
-
-      if (factory != nullptr) {
-        // Load and validate the configuration.
-        auto sub_lb_proto_message = factory->createEmptyConfigProto();
-        Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                               visitor, *sub_lb_proto_message);
-
-        sub_load_balancer_config_ = factory->loadConfig(std::move(sub_lb_proto_message), visitor);
-        sub_load_balancer_factory_ = factory;
-        break;
-      }
-
-      missing_policies.push_back(policy.typed_extension_config().name());
-    }
-
-    if (sub_load_balancer_factory_ == nullptr) {
-      throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
-                                       "implementation for subset lb with names from [{}]",
-                                       absl::StrJoin(missing_policies, ", ")));
-    }
-  }
-
-  Upstream::ThreadAwareLoadBalancerPtr
-  createLoadBalancer(const Upstream::ClusterInfo& cluster_info,
-                     const Upstream::PrioritySet& child_priority_set, Runtime::Loader& runtime,
-                     Random::RandomGenerator& random, TimeSource& time_source) const {
-    return sub_load_balancer_factory_->create(*sub_load_balancer_config_, cluster_info,
-                                              child_priority_set, runtime, random, time_source);
-  }
-
-  const Upstream::LoadBalancerSubsetInfo& subsetInfo() const { return subset_info_; }
-
-private:
-  LoadBalancerSubsetInfoImpl subset_info_;
-
-  Upstream::LoadBalancerConfigPtr sub_load_balancer_config_;
-  Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory_{};
-};
-
 class ChildLoadBalancerCreatorImpl : public Upstream::ChildLoadBalancerCreator {
 public:
-  ChildLoadBalancerCreatorImpl(const SubsetLoadBalancerConfig& subset_config,
+  ChildLoadBalancerCreatorImpl(const Upstream::SubsetLoadBalancerConfig& subset_config,
                                const Upstream::ClusterInfo& cluster_info)
       : subset_config_(subset_config), cluster_info_(cluster_info) {}
 
@@ -95,13 +47,13 @@ public:
   }
 
 private:
-  const SubsetLoadBalancerConfig& subset_config_;
+  const Upstream::SubsetLoadBalancerConfig& subset_config_;
   const Upstream::ClusterInfo& cluster_info_;
 };
 
 class LbFactory : public Upstream::LoadBalancerFactory {
 public:
-  LbFactory(const SubsetLoadBalancerConfig& subset_config,
+  LbFactory(const Upstream::SubsetLoadBalancerConfig& subset_config,
             const Upstream::ClusterInfo& cluster_info, Runtime::Loader& runtime,
             Random::RandomGenerator& random, TimeSource& time_source)
       : subset_config_(subset_config), cluster_info_(cluster_info), runtime_(runtime),
@@ -119,7 +71,7 @@ public:
   bool recreateOnHostChange() const override { return false; }
 
 private:
-  const SubsetLoadBalancerConfig& subset_config_;
+  const Upstream::SubsetLoadBalancerConfig& subset_config_;
   const Upstream::ClusterInfo& cluster_info_;
 
   Runtime::Loader& runtime_;
@@ -144,7 +96,8 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                         Runtime::Loader& runtime, Random::RandomGenerator& random,
                         TimeSource& time_source) {
 
-  const auto* typed_config = dynamic_cast<const SubsetLoadBalancerConfig*>(lb_config.ptr());
+  const auto* typed_config =
+      dynamic_cast<const Upstream::SubsetLoadBalancerConfig*>(lb_config.ptr());
   // The load balancing policy configuration will be loaded and validated in the main thread when we
   // load the cluster configuration. So we can assume the configuration is valid here.
   ASSERT(typed_config != nullptr,
@@ -161,14 +114,37 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 }
 
 Upstream::LoadBalancerConfigPtr
-SubsetLbFactory::loadConfig(ProtobufTypes::MessagePtr config,
+SubsetLbFactory::loadConfig(const Protobuf::Message& config,
                             ProtobufMessage::ValidationVisitor& visitor) {
-  ASSERT(config != nullptr);
-  auto* proto_config = dynamic_cast<Upstream::SubsetLoadbalancingPolicyProto*>(config.get());
+
+  auto active_or_legacy = Common::ActiveOrLegacy<SubsetLbProto, ClusterProto>::get(&config);
+  ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
+
+  if (active_or_legacy.hasLegacy()) {
+    if (active_or_legacy.legacy()->lb_policy() ==
+        envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(
+                          active_or_legacy.legacy()->lb_policy())));
+    }
+
+    auto sub_lb_pair =
+        Upstream::LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
+            *active_or_legacy.legacy(), visitor);
+
+    if (!sub_lb_pair.ok()) {
+      throw EnvoyException(std::string(sub_lb_pair.status().message()));
+    }
+
+    return std::make_unique<Upstream::SubsetLoadBalancerConfig>(
+        active_or_legacy.legacy()->lb_subset_config(), std::move(sub_lb_pair->config),
+        sub_lb_pair->factory);
+  }
 
   // Load the subset load balancer configuration. This will contains child load balancer
   // config and child load balancer factory.
-  return std::make_unique<SubsetLoadBalancerConfig>(*proto_config, visitor);
+  return std::make_unique<Upstream::SubsetLoadBalancerConfig>(*active_or_legacy.active(), visitor);
 }
 
 /**

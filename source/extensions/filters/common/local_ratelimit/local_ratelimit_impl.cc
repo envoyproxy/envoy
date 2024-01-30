@@ -17,11 +17,13 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
     const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
-        envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors)
+        envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
+    bool always_consume_default_token_bucket)
     : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
-      time_source_(dispatcher.timeSource()) {
+      time_source_(dispatcher.timeSource()),
+      always_consume_default_token_bucket_(always_consume_default_token_bucket) {
   if (fill_timer_ && fill_interval < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }
@@ -175,10 +177,12 @@ bool LocalRateLimiterImpl::requestAllowed(
   // Matched descriptors will be sorted by tokens per second and tokens consumed in order.
   // In most cases, if one of them is limited the remaining descriptors will not consume
   // their tokens.
+  bool matched_descriptor = false;
   if (!descriptors_.empty() && !request_descriptors.empty()) {
     for (const auto& descriptor : sorted_descriptors_) {
       for (const auto& request_descriptor : request_descriptors) {
         if (descriptor == request_descriptor) {
+          matched_descriptor = true;
           // Descriptor token is not enough.
           if (!requestAllowedHelper(*descriptor.token_state_)) {
             return false;
@@ -188,8 +192,12 @@ bool LocalRateLimiterImpl::requestAllowed(
       }
     }
   }
-  // Since global tokens are not sorted, it should be larger than other descriptors.
-  return requestAllowedHelper(tokens_);
+
+  if (!matched_descriptor || always_consume_default_token_bucket_) {
+    // Since global tokens are not sorted, it should be larger than other descriptors.
+    return requestAllowedHelper(tokens_);
+  }
+  return true;
 }
 
 int LocalRateLimiterImpl::tokensFillPerSecond(LocalDescriptorImpl& descriptor) {

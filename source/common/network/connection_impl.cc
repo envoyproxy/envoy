@@ -18,7 +18,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
@@ -292,12 +292,14 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   if (enable_rst_detect_send_ && (detected_close_type_ == DetectedCloseType::RemoteReset ||
                                   detected_close_type_ == DetectedCloseType::LocalReset)) {
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
         envoy::config::core::v3::SocketOption::STATE_LISTENING);
     if (!ok) {
       ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on connection {}", id());
     }
+#endif
   }
 
   // It is safe to call close() since there is an IO handle check.
@@ -685,6 +687,9 @@ void ConnectionImpl::onReadReady() {
   if (enable_rst_detect_send_ && result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
+    if (result.bytes_processed_ != 0) {
+      onRead(new_buffer_size);
+    }
     setDetectedCloseType(DetectedCloseType::RemoteReset);
     closeSocket(ConnectionEvent::RemoteClose);
     return;

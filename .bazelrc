@@ -48,6 +48,8 @@ build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVI
 
 build --test_summary=terse
 
+build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
+
 # TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
@@ -59,6 +61,7 @@ common --experimental_allow_tags_propagation
 
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
+build:linux --copt=-fdebug-types-section
 build:linux --copt=-fPIC
 build:linux --copt=-Wno-deprecated-declarations
 build:linux --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
@@ -89,6 +92,14 @@ build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Use gold linker for gcc compiler.
 build:gcc --linkopt=-fuse-ld=gold
+
+# Clang-tidy
+# TODO(phlax): enable this, its throwing some errors as well as finding more issues
+# build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
+build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
+build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
+build:clang-tidy --output_groups=report
+build:clang-tidy --build_tag_filters=-notidy
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1
@@ -215,7 +226,8 @@ build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],
 build:coverage --remote_download_minimal
 build:coverage --define=tcmalloc=gperftools
 build:coverage --define=no_debug_info=1
-build:coverage --linkopt=-Wl,-s
+# `--no-relax` is required for coverage to not err with `relocation R_X86_64_REX_GOTPCRELX`
+build:coverage --linkopt=-Wl,-s,--no-relax
 build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:test-coverage --test_arg="-l trace"
@@ -224,6 +236,8 @@ build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:fuzz-coverage --test_tag_filters=-nocoverage
+
+build:cache-local --remote_cache=grpc://localhost:9092
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
@@ -289,6 +303,7 @@ build:remote-windows --spawn_strategy=remote,local
 build:remote-windows --strategy=Javac=remote,local
 build:remote-windows --strategy=Closure=remote,local
 build:remote-windows --strategy=Genrule=remote,local
+build:remote-windows --strategy=CppLink=local
 build:remote-windows --remote_timeout=7200
 build:remote-windows --google_default_credentials=true
 build:remote-windows --remote_download_toplevel
@@ -343,7 +358,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:1f2f7ee78f894859de0fa7a415b0bedde1f6c560@sha256:6a6a64be3f4e3c4380531ad1624f9419d1fe99dde4e5eeb04e2d538a92f27205
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:0ca52447572ee105a4730da5e76fe47c9c5a7c64@sha256:d736c58f06f36848e7966752cc7e01519cc1b5101a178d5c6634807e8ac3deab
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -429,7 +444,7 @@ build:windows --define hot_restart=disabled
 build:windows --define tcmalloc=disabled
 build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
-build:windows --cxxopt="/std:c++17"
+build:windows --cxxopt="/std:c++20"
 build:windows --output_groups=+pdb_file
 
 # TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
@@ -472,11 +487,12 @@ build:windows --features=static_link_msvcrt
 build:windows --dynamic_mode=off
 
 # RBE (Google)
-build:rbe-google --google_default_credentials=true
-build:rbe-google --remote_cache=grpcs://remotebuildexecution.googleapis.com
+build:cache-google --google_default_credentials=true
+build:cache-google --remote_cache=grpcs://remotebuildexecution.googleapis.com
+build:cache-google --remote_instance_name=projects/envoy-ci/instances/default_instance
+build:cache-google --remote_timeout=7200
 build:rbe-google --remote_executor=grpcs://remotebuildexecution.googleapis.com
-build:rbe-google --remote_timeout=7200
-build:rbe-google --remote_instance_name=projects/envoy-ci/instances/default_instance
+build:rbe-google --config=cache-google
 
 build:rbe-google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
 build:rbe-google-bes --bes_results_url=https://source.cloud.google.com/results/invocations/
@@ -492,6 +508,18 @@ build:rbe-engflow --grpc_keepalive_time=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
 build:rbe-engflow --bes_upload_mode=fully_async
+
+build:rbe-envoy-engflow --google_default_credentials=false
+build:rbe-envoy-engflow --remote_cache=grpcs://morganite.cluster.engflow.com
+build:rbe-envoy-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
+build:rbe-envoy-engflow --bes_backend=grpcs://morganite.cluster.engflow.com/
+build:rbe-envoy-engflow --bes_results_url=https://morganite.cluster.engflow.com/invocation/
+build:rbe-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+build:rbe-envoy-engflow --grpc_keepalive_time=30s
+build:rbe-envoy-engflow --remote_timeout=3600s
+build:rbe-envoy-engflow --bes_timeout=3600s
+build:rbe-envoy-engflow --bes_upload_mode=fully_async
+build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:0ca52447572ee105a4730da5e76fe47c9c5a7c64@sha256:d736c58f06f36848e7966752cc7e01519cc1b5101a178d5c6634807e8ac3deab
 
 #############################################################################
 # debug: Various Bazel debugging flags

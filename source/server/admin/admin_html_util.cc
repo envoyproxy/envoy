@@ -124,14 +124,14 @@ void AdminHtmlUtil::finalize(Buffer::Instance& response) { response.add("</body>
 void AdminHtmlUtil::renderHandlerParam(Buffer::Instance& response, absl::string_view id,
                                        absl::string_view name, absl::string_view path,
                                        Admin::ParamDescriptor::Type type,
-                                       OptRef<const Http::Utility::QueryParams> query,
+                                       OptRef<const Http::Utility::QueryParamsMulti> query,
                                        const std::vector<absl::string_view>& enum_choices,
                                        bool submit_on_change) {
   std::string value;
   if (query.has_value()) {
-    auto iter = query->find(std::string(name));
-    if (iter != query->end()) {
-      value = iter->second;
+    auto result = query->getFirstValue(name);
+    if (result.has_value()) {
+      value = result.value();
     }
   }
 
@@ -171,7 +171,7 @@ void AdminHtmlUtil::renderHandlerParam(Buffer::Instance& response, absl::string_
 
 void AdminHtmlUtil::renderEndpointTableRow(Buffer::Instance& response,
                                            const Admin::UrlHandler& handler,
-                                           OptRef<const Http::Utility::QueryParams> query,
+                                           OptRef<const Http::Utility::QueryParamsMulti> query,
                                            int index, bool submit_on_change, bool active) {
   absl::string_view path = handler.prefix_;
 

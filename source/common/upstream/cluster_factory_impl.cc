@@ -115,10 +115,12 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     }
   }
 
-  new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
+  auto detector_or_error = Outlier::DetectorImplFactory::createForCluster(
       *new_cluster_pair.first, cluster, server_context.mainThreadDispatcher(),
       server_context.runtime(), context.outlierEventLogger(),
-      server_context.api().randomGenerator()));
+      server_context.api().randomGenerator());
+  RETURN_IF_STATUS_NOT_OK(detector_or_error);
+  new_cluster_pair.first->setOutlierDetector(detector_or_error.value());
 
   return status_or_cluster;
 }

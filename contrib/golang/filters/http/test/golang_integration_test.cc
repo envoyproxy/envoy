@@ -65,8 +65,8 @@ public:
   RetrieveDynamicMetadataFilterConfig()
       : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("validate-dynamic-metadata") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamEncoderFilter(std::make_shared<::Envoy::RetrieveDynamicMetadataFilter>());
     };
@@ -177,7 +177,7 @@ typed_config:
         [so_id](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          // for testing http filter level config, a new virtualhost wihtout per route config
+          // for testing http filter level config, a new virtualhost without per route config
           auto vh = hcm.mutable_route_config()->add_virtual_hosts();
           vh->add_domains("filter-level.com");
           vh->set_name("filter-level.com");
@@ -186,7 +186,7 @@ typed_config:
           rt->mutable_route()->set_cluster("cluster_0");
 
           // virtualhost level per route config
-          const std::string key = "envoy.filters.http.golang";
+          const std::string key = "golang";
           const auto yaml_fmt =
               R"EOF(
               "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
@@ -500,7 +500,7 @@ typed_config:
     EXPECT_EQ(header_0_existing,
               !response->headers().get(Http::LowerCaseString("x-test-header-0")).empty());
 
-    if (set_header != "") {
+    if (!set_header.empty()) {
       EXPECT_EQ("test-value", getHeader(response->headers(), set_header));
     }
     cleanup();
@@ -551,6 +551,15 @@ typed_config:
     // verify content-type
     EXPECT_EQ("text/html", getHeader(response->headers(), "content-type"));
 
+    // verify two values
+    auto values = response->headers().get(Http::LowerCaseString("x-two-values"));
+    if (values.size() == 2) {
+      EXPECT_EQ("foo", values[0]->value().getStringView());
+      EXPECT_EQ("bar", values[1]->value().getStringView());
+    } else {
+      EXPECT_EQ(values.size(), 2);
+    }
+
     cleanup();
   }
 
@@ -565,7 +574,7 @@ typed_config:
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    // 100 + 200 > 150, excced buffer limit.
+    // 100 + 200 > 150, exceed buffer limit.
     codec_client_->sendData(request_encoder, std::string(100, '-'), false);
     codec_client_->sendData(request_encoder, std::string(200, '-'), true);
 
@@ -662,13 +671,74 @@ typed_config:
     cleanup();
   }
 
+  void testActionWithoutData(std::string query) {
+    initializeBasicFilter(ACTION, "test.com");
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/test?" + query},
+                                                   {":scheme", "http"},
+                                                   {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+
+    if (query.find("encodeHeadersRet") != std::string::npos) {
+      waitForNextUpstreamRequest();
+
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+      upstream_request_->encodeHeaders(response_headers, true);
+    }
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("500", response->headers().getStatusValue());
+
+    EXPECT_EQ(1, test_server_->counter("http.config_test.golang.panic_error")->value());
+
+    cleanup();
+  }
+
+  void testBufferApi(std::string query) {
+    initializeBasicFilter(BUFFER, "test.com");
+
+    auto path = std::string("/test?") + query;
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},
+        {":path", path},
+        {":scheme", "http"},
+        {":authority", "test.com"},
+    };
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Http::RequestEncoder& request_encoder = encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    std::string data = "";
+    for (int i = 0; i < 10; i++) {
+      data += "12345";
+    }
+    codec_client_->sendData(request_encoder, data, true);
+
+    waitForNextUpstreamRequest();
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl response_data("goodbye");
+    upstream_request_->encodeData(response_data, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanup();
+  }
+
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
+  const std::string BUFFER{"buffer"};
   const std::string ROUTECONFIG{"routeconfig"};
   const std::string PROPERTY{"property"};
   const std::string ACCESSLOG{"access_log"};
   const std::string METRIC{"metric"};
+  const std::string ACTION{"action"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -728,10 +798,10 @@ TEST_P(GolangIntegrationTest, Passthrough) {
 
   ASSERT_TRUE(response->waitForEndStream());
 
-  // check status for pasthrough
+  // check status for passthrough
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // check body for pasthrough
+  // check body for passthrough
   auto body = absl::StrFormat("%s%s", good, bye);
   EXPECT_EQ(body, response->body());
 
@@ -753,6 +823,14 @@ TEST_P(GolangIntegrationTest, PluginNotFound) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanup();
 }
+
+TEST_P(GolangIntegrationTest, BufferDrain) { testBufferApi("Drain"); }
+
+TEST_P(GolangIntegrationTest, BufferReset) { testBufferApi("Reset"); }
+
+TEST_P(GolangIntegrationTest, BufferResetAfterDrain) { testBufferApi("ResetAfterDrain"); }
+
+TEST_P(GolangIntegrationTest, BufferLen) { testBufferApi("Len"); }
 
 TEST_P(GolangIntegrationTest, Property) {
   initializePropertyConfig(PROPERTY, genSoPath(PROPERTY), PROPERTY);
@@ -857,6 +935,7 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamStart) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("r;r2", getHeader(upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamStart"));
 
   cleanup();
 }
@@ -887,11 +966,12 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("r", getHeader(upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamPeriodic"));
 
   cleanup();
 }
 
-// Mertic API testing
+// Metric API testing
 TEST_P(GolangIntegrationTest, Metric) { testMetric("/test"); }
 
 // Metric API testing in async mode.
@@ -954,7 +1034,7 @@ TEST_P(GolangIntegrationTest, LocalReply_DecodeData_Async) {
 }
 
 // The next filter(lua filter) send local reply after Go filter continue in decode header phase.
-// Go filter will terimiate when lua filter send local reply.
+// Go filter will terminate when lua filter send local reply.
 TEST_P(GolangIntegrationTest, LuaRespondAfterGoHeaderContinue) {
   // put lua filter after golang filter
   // golang filter => lua filter.
@@ -1065,6 +1145,38 @@ TEST_P(GolangIntegrationTest, DynamicMetadata_Async) {
 
 TEST_P(GolangIntegrationTest, DynamicMetadata_Async_Sleep) {
   testDynamicMetadata("/test?dymeta=1&async=1&sleep=1");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBuffer) {
+  testActionWithoutData("decodeHeadersRet=StopAndBuffer");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBufferWatermark) {
+  testActionWithoutData("decodeHeadersRet=StopAndBufferWatermark");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBuffer_Async) {
+  testActionWithoutData("decodeHeadersRet=StopAndBuffer&aysnc=1");
+}
+
+TEST_P(GolangIntegrationTest, DecodeHeadersWithoutData_StopAndBufferWatermark_Async) {
+  testActionWithoutData("decodeHeadersRet=StopAndBufferWatermark&aysnc=1");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBuffer) {
+  testActionWithoutData("encodeHeadersRet=StopAndBuffer");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBufferWatermark) {
+  testActionWithoutData("encodeHeadersRet=StopAndBufferWatermark");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBuffer_Async) {
+  testActionWithoutData("encodeHeadersRet=StopAndBuffer&aysnc=1");
+}
+
+TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBufferWatermark_Async) {
+  testActionWithoutData("encodeHeadersRet=StopAndBufferWatermark&aysnc=1");
 }
 
 } // namespace Envoy

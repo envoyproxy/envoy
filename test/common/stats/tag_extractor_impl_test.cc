@@ -430,6 +430,26 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   redis_prefix.name_ = tag_names.REDIS_PREFIX;
   redis_prefix.value_ = "my_redis_prefix";
   regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
+
+  // Dns Filter Prefix
+  Tag dns_filter_prefix;
+  dns_filter_prefix.name_ = tag_names.DNS_FILTER_PREFIX;
+  dns_filter_prefix.value_ = "my_dns_prefix";
+  regex_tester.testRegex("dns_filter.my_dns_prefix.local_a_record_answers",
+                         "dns_filter.local_a_record_answers", {dns_filter_prefix});
+
+  // Connection Limit Filter Prefix
+  Tag connection_limit_prefix;
+  connection_limit_prefix.name_ = tag_names.CONNECTION_LIMIT_PREFIX;
+  connection_limit_prefix.value_ = "my_connection_limit_prefix";
+  regex_tester.testRegex("connection_limit.my_connection_limit_prefix.limited_connections",
+                         "connection_limit.limited_connections", {connection_limit_prefix});
+
+  // RBAC Filter Prefix
+  Tag rbac_prefix;
+  rbac_prefix.name_ = tag_names.RBAC_PREFIX;
+  rbac_prefix.value_ = "my_rbac_prefix";
+  regex_tester.testRegex("my_rbac_prefix.rbac.allowed", "rbac.allowed", {rbac_prefix});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

@@ -4,7 +4,7 @@ namespace Envoy {
 
 class TestRunner {
 public:
-  static int RunTests(int argc, char** argv);
+  static int runTests(int argc, char** argv);
 };
 
 } // namespace Envoy

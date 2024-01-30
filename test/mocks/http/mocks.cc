@@ -97,7 +97,8 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
       }));
   ON_CALL(*this, routeConfig())
       .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
-  ON_CALL(*this, upstreamOverrideHost()).WillByDefault(Return(absl::optional<absl::string_view>()));
+  ON_CALL(*this, upstreamOverrideHost())
+      .WillByDefault(Return(absl::optional<Upstream::LoadBalancerContext::OverrideHost>()));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
@@ -227,11 +228,11 @@ MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 namespace Http {
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
-  return IsSubsetOfHeadersMatcher(expected_headers);
+  return {expected_headers};
 }
 
 IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers) {
-  return IsSupersetOfHeadersMatcher(expected_headers);
+  return {expected_headers};
 }
 
 MockReceivedSettings::MockReceivedSettings() {

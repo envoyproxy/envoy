@@ -35,6 +35,8 @@ public:
     main_callback();
   }
 
+  void setDispatcher(Event::Dispatcher* dispatcher) { dispatcher_ptr_ = dispatcher; }
+
   void shutdownThread_() {
     shutdown_ = true;
     // Reverse order which is same as the production code.
@@ -82,7 +84,7 @@ public:
       if (parent_.defer_data_) {
         parent_.deferred_data_[index_] = cb;
       } else {
-        parent_.data_[index_] = cb(parent_.dispatcher_);
+        parent_.data_[index_] = cb(*parent_.dispatcher_ptr_);
       }
     }
 
@@ -93,13 +95,14 @@ public:
 
   void call() {
     for (unsigned i = 0; i < deferred_data_.size(); i++) {
-      data_[i] = deferred_data_[i](dispatcher_);
+      data_[i] = deferred_data_[i](*dispatcher_ptr_);
     }
     deferred_data_.clear();
   }
 
   uint32_t current_slot_{};
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::Dispatcher* dispatcher_ptr_ = &dispatcher_;
   std::vector<ThreadLocalObjectSharedPtr> data_;
   std::vector<Slot::InitializeCb> deferred_data_;
   bool defer_data_{};

@@ -81,7 +81,7 @@ private:
  * Builds the rate limit client.
  */
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const envoy::config::core::v3::GrpcService& grpc_service,
+                          const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                           const std::chrono::milliseconds timeout);
 
 } // namespace RateLimit

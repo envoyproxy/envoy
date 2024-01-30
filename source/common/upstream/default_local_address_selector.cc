@@ -10,7 +10,7 @@ DefaultUpstreamLocalAddressSelector::DefaultUpstreamLocalAddressSelector(
     : upstream_local_addresses_(std::move(upstream_local_addresses)) {
   // If bind config is not provided, we insert at least one
   // ``UpstreamLocalAddress`` with null address.
-  ASSERT(upstream_local_addresses_.size() > 0);
+  ASSERT(!upstream_local_addresses_.empty());
 }
 
 UpstreamLocalAddress DefaultUpstreamLocalAddressSelector::getUpstreamLocalAddressImpl(

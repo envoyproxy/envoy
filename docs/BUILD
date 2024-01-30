@@ -26,10 +26,15 @@ filegroup(
             "root/**/envoy-dynamic-lds-demo.yaml",
             "root/**/envoy-dynamic-filesystem-demo.yaml",
             "root/operations/_include/traffic_tapping_*.yaml",
+            "root/configuration/http/http_filters/_include/checksum_filter.yaml",
             # TODO(phlax/windows-dev): figure out how to get this working on windows
             #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/other_features/_include/dlb.yaml",
+            "root/configuration/other_features/_include/hyperscan_matcher.yaml",
+            "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
+            "root/configuration/other_features/_include/hyperscan_regex_engine.yaml",
+            "root/configuration/other_features/_include/qatzip.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
             "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
             "root/configuration/overview/_include/xds_api/oauth-sds-example.yaml",
@@ -47,6 +52,7 @@ filegroup(
 filegroup(
     name = "contrib_configs",
     srcs = [
+        "root/configuration/http/http_filters/_include/checksum_filter.yaml",
         "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
     ] + select({
         "//bazel:windows_x86_64": [],
@@ -119,7 +125,7 @@ genrule(
     srcs = [":empty_extensions.json"],
     outs = ["empty_protos_rst.tar.gz"],
     cmd = """
-    $(location //tools/protodoc:generate_empty) \\
+    $(location //tools/protodoc:generate_empty) \
         $(location empty_extensions.json) $@
     """,
     tools = ["//tools/protodoc:generate_empty"],
@@ -154,6 +160,8 @@ pkg_files(
     srcs = glob([
         "root/**/*.css",
         "root/**/*.ico",
+        "root/**/*.jpeg",
+        "root/**/*.jpg",
         "root/**/*.js",
         "root/**/*.json",
         "root/**/*.pb",
@@ -176,7 +184,7 @@ genrule(
     name = "version_histories",
     outs = ["version_histories.tar.gz"],
     cmd = """
-    $(location //tools/docs:generate_version_histories) $@
+    $(location //tools/docs:generate_version_histories) --path=$$(dirname $(location //:VERSION.txt)) $@
     """,
     tools = [
         ":versions.yaml",
@@ -244,14 +252,18 @@ pkg_tar(
 genrule(
     name = "html_release",
     outs = ["html_release.tar.gz"],
+    # BUILD_SHA must be set in release builds
+    # The Envoy workspace will provide this on stamped builds. For external builds
+    # you must either pass an env var or pass it through the workspace's status.
     cmd = """
     . $(location //bazel:volatile_env) \
+    && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
     && $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
-         --build_sha="$${BUILD_DOCS_SHA:-$${BUILD_SCM_REVISION}}" \
+         --build_sha="$$_BUILD_SHA" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
          --version_file=$(location //:VERSION.txt) \
-         --descriptor_path=$(location @envoy_api//:v3_proto_set) \\
+         --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location rst) \
          $@
     """,
@@ -272,6 +284,7 @@ genrule(
     cmd = """
     $(location //tools/docs:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
+         --build_sha="$${BUILD_DOCS_SHA:-}" \
          --version_file=$(location //:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location :rst) \
@@ -283,4 +296,9 @@ genrule(
         "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
+)
+
+alias(
+    name = "docs",
+    actual = ":html_release",
 )

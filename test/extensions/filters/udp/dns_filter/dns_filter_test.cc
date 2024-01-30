@@ -75,9 +75,10 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto store = stats_store_.createScope("dns_scope");
     ON_CALL(listener_factory_, scope()).WillByDefault(ReturnRef(*store));
-    ON_CALL(listener_factory_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(listener_factory_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(random_, random()).WillByDefault(Return(3));
-    ON_CALL(listener_factory_, random()).WillByDefault(ReturnRef(random_));
+    ON_CALL(listener_factory_.server_factory_context_.api_, randomGenerator())
+        .WillByDefault(ReturnRef(random_));
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();
     NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
@@ -645,7 +646,7 @@ TEST_F(DnsFilterTest, RepeatedTypeAQuerySuccess) {
   for (size_t i = 0; i < loopCount; i++) {
 
     // Generate a changing, non-zero query ID for each lookup
-    const uint16_t query_id = (random_.random() + i) & 0xFFFF;
+    const uint16_t query_id = (random_.random() + i) % 0xFFFF + 1;
     const std::string query =
         Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, query_id);
     ASSERT_FALSE(query.empty());
@@ -1722,7 +1723,7 @@ TEST_F(DnsFilterTest, InvalidQueryNameTest2) {
   EXPECT_FALSE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
 
-  // TODO(abaptiste): underflow/overflow stats
+  // TODO(suniltheta): underflow/overflow stats
   EXPECT_EQ(1, config_->stats().downstream_rx_invalid_queries_.value());
 }
 

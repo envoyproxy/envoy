@@ -27,7 +27,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
-  Config::Utility::checkLocalInfo(type_url, local_info_);
+  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo(type_url, local_info_));
   SubscriptionStats stats = Utility::generateStats(scope);
 
   std::string subscription_type = "";
@@ -50,28 +50,29 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
-    Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
+    THROW_IF_NOT_OK(Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_));
     subscription_type = "envoy.config_subscription.filesystem";
     break;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource: {
-    Utility::checkFilesystemSubscriptionBackingPath(config.path_config_source().path(), api_);
+    THROW_IF_NOT_OK(
+        Utility::checkFilesystemSubscriptionBackingPath(config.path_config_source().path(), api_));
     subscription_type = "envoy.config_subscription.filesystem";
     break;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
-                                                            api_config_source);
-    Utility::checkTransportVersion(api_config_source);
+    THROW_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                                            api_config_source));
+    THROW_IF_NOT_OK(Utility::checkTransportVersion(api_config_source));
     switch (api_config_source.api_type()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC:
-      throw EnvoyException("Unsupported config source AGGREGATED_GRPC");
+      throwEnvoyExceptionOrPanic("Unsupported config source AGGREGATED_GRPC");
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC:
-      throw EnvoyException("Unsupported config source AGGREGATED_DELTA_GRPC");
+      throwEnvoyExceptionOrPanic("Unsupported config source AGGREGATED_DELTA_GRPC");
     case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           "REST_LEGACY no longer a supported ApiConfigSource. "
           "Please specify an explicit supported api_type in the following config:\n" +
           config.DebugString());
@@ -86,7 +87,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       break;
     }
     if (subscription_type.empty()) {
-      throw EnvoyException("Invalid API config source API type");
+      throwEnvoyExceptionOrPanic("Invalid API config source API type");
     }
     break;
   }
@@ -95,13 +96,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     break;
   }
   default:
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
   ConfigSubscriptionFactory* factory =
       Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "Didn't find a registered config subscription factory implementation for name: '{}'",
         subscription_type));
   }
@@ -113,7 +114,7 @@ SubscriptionPtr createFromFactoryOrThrow(ConfigSubscriptionFactory::Subscription
   ConfigSubscriptionFactory* factory =
       Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "Didn't find a registered config subscription factory implementation for name: '{}'",
         subscription_type));
   }
@@ -147,13 +148,13 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   switch (collection_locator.scheme()) {
   case xds::core::v3::ResourceLocator::FILE: {
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
-    Utility::checkFilesystemSubscriptionBackingPath(path, api_);
+    THROW_IF_NOT_OK(Utility::checkFilesystemSubscriptionBackingPath(path, api_));
     factory_config.set_path(path);
     return createFromFactoryOrThrow(data, "envoy.config_subscription.filesystem_collection");
   }
   case xds::core::v3::ResourceLocator::XDSTP: {
     if (resource_type != collection_locator.resource_type()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("xdstp:// type does not match {} in {}", resource_type,
                       Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
     }
@@ -161,8 +162,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
       const envoy::config::core::v3::ApiConfigSource& api_config_source =
           config.api_config_source();
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
-                                                              api_config_source);
+      THROW_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                                              api_config_source));
       // All Envoy collections currently are xDS resource graph roots and require node context
       // parameters.
       options.add_xdstp_node_context_params_ = true;
@@ -179,8 +180,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                                         "envoy.config_subscription.aggregated_grpc_collection");
       }
       default:
-        throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
-                                         api_config_source.DebugString()));
+        throwEnvoyExceptionOrPanic(fmt::format("Unknown xdstp:// transport API type in {}",
+                                               api_config_source.DebugString()));
       }
     }
     case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
@@ -191,14 +192,15 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
       return createFromFactoryOrThrow(data, "envoy.config_subscription.ads_collection");
     }
     default:
-      throw EnvoyException("Missing or not supported config source specifier in "
-                           "envoy::config::core::v3::ConfigSource for a collection. Only ADS and "
-                           "gRPC in delta-xDS mode are supported.");
+      throwEnvoyExceptionOrPanic(
+          "Missing or not supported config source specifier in "
+          "envoy::config::core::v3::ConfigSource for a collection. Only ADS and "
+          "gRPC in delta-xDS mode are supported.");
     }
   }
   default:
     // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
-    throw EnvoyException("Unsupported code path");
+    throwEnvoyExceptionOrPanic("Unsupported code path");
   }
 }
 

@@ -10,6 +10,8 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -26,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 19]
+// [#next-free-field: 23]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -63,6 +65,12 @@ message ExtAuthz {
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
 
+  // When ``failure_mode_allow`` and ``failure_mode_allow_header_add`` are both set to true,
+  // ``x-envoy-auth-failure-mode-allowed: true`` will be added to request headers if the communication
+  // with the authorization service has failed, or if the authorization service has returned a
+  // HTTP 5xx error.
+  bool failure_mode_allow_header_add = 19;
+
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
   // request message indicating if the body data is partial.
@@ -85,7 +93,10 @@ message ExtAuthz {
   type.v3.HttpStatus status_on_error = 7;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
-  // ext_authz service. :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is passed as an opaque ``protobuf::Struct``.
+  // ext_authz service. The :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
+  // is passed as an opaque ``protobuf::Struct``.
+  //
+  // Please note that this field exclusively applies to the gRPC ext_authz service and has no effect on the HTTP service.
   //
   // For example, if the ``jwt_authn`` filter is used and :ref:`payload_in_metadata
   // <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>` is set,
@@ -99,12 +110,27 @@ message ExtAuthz {
   repeated string metadata_context_namespaces = 8;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
-  // ext_authz service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an ``protobuf::Any``.
+  // ext_authz service. :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
+  // is passed as a ``protobuf::Any``.
   //
-  // It works in a way similar to ``metadata_context_namespaces`` but allows envoy and external authz server to share the protobuf message definition
-  // in order to do a safe parsing.
+  // Please note that this field exclusively applies to the gRPC ext_authz service and has no effect on the HTTP service.
+  //
+  // It works in a way similar to ``metadata_context_namespaces`` but allows Envoy and ext_authz server to share
+  // the protobuf message definition in order to do a safe parsing.
   //
   repeated string typed_metadata_context_namespaces = 16;
+
+  // Specifies a list of route metadata namespaces whose values, if present, will be passed to the
+  // ext_authz service at :ref:`route_metadata_context <envoy_v3_api_field_service.auth.v3.AttributeContext.route_metadata_context>` in
+  // :ref:`CheckRequest <envoy_v3_api_field_service.auth.v3.CheckRequest.attributes>`.
+  // :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is passed as an opaque ``protobuf::Struct``.
+  repeated string route_metadata_context_namespaces = 21;
+
+  // Specifies a list of route metadata namespaces whose values, if present, will be passed to the
+  // ext_authz service at :ref:`route_metadata_context <envoy_v3_api_field_service.auth.v3.AttributeContext.route_metadata_context>` in
+  // :ref:`CheckRequest <envoy_v3_api_field_service.auth.v3.CheckRequest.attributes>`.
+  // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` is passed as an ``protobuf::Any``.
+  repeated string route_typed_metadata_context_namespaces = 22;
 
   // Specifies if the filter is enabled.
   //
@@ -185,6 +211,10 @@ message ExtAuthz {
   // When this field is true, Envoy will include the SNI name used for TLSClientHello, if available, in the
   // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
   bool include_tls_session = 18;
+
+  // Whether to increment cluster statistics (e.g. cluster.<cluster_name>.upstream_rq_*) on authorization failure.
+  // Defaults to true.
+  google.protobuf.BoolValue charge_cluster_response_stats = 20;
 }
 
 // Configuration for buffering the request data.
@@ -304,8 +334,8 @@ message AuthorizationResponse {
   type.matcher.v3.ListStringMatcher allowed_upstream_headers = 1;
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
-  // response headers that have a correspondent match will be added to the client's response. Note
-  // that coexistent headers will be appended.
+  // response headers that have a correspondent match will be added to the original client request.
+  // Note that coexistent headers will be appended.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers_to_append = 3;
 
   // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
@@ -371,6 +401,19 @@ message CheckSettings {
   map<string, string> context_extensions = 1 [(udpa.annotations.sensitive) = true];
 
   // When set to true, disable the configured :ref:`with_request_body
-  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a route.
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a specific route.
+  //
+  // Please note that only one of *disable_request_body_buffering* or
+  // :ref:`with_request_body <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.with_request_body>`
+  // may be specified.
   bool disable_request_body_buffering = 2;
+
+  // Enable or override request body buffering, which is configured using the
+  // :ref:`with_request_body <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
+  // option for a specific route.
+  //
+  // Please note that only only one of *with_request_body* or
+  // :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>`
+  // may be specified.
+  BufferSettings with_request_body = 3;
 }

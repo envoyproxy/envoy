@@ -67,11 +67,12 @@ public:
     grpc_service->mutable_envoy_grpc()->set_cluster_name("sds_cluster");
   }
 
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     auto secret_provider =
-        factory_context.clusterManager()
+        factory_context.serverFactoryContext()
+            .clusterManager()
             .clusterManagerFactory()
             .secretManager()
             .findOrCreateGenericSecretProvider(config_source_, "encryption_key",
@@ -80,7 +81,7 @@ public:
     return
         [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
           callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(
-              factory_context.api(), secret_provider));
+              factory_context.serverFactoryContext().api(), secret_provider));
         };
   }
 

@@ -73,6 +73,8 @@ categories:
 - envoy.filters.listener
 - envoy.filters.network
 - envoy.filters.udp_listener
+- envoy.filters.udp.session
+- envoy.filters.quic_listener
 - envoy.formatter
 - envoy.geoip_providers
 - envoy.grpc_credentials
@@ -119,6 +121,7 @@ categories:
 - envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.injected_credentials
 - envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
@@ -134,6 +137,8 @@ categories:
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
 - envoy.router.cluster_specifier_plugin
+- envoy.tracers.opentelemetry.resource_detectors
+- envoy.tracers.opentelemetry.samplers
 
 status_values:
 - name: stable

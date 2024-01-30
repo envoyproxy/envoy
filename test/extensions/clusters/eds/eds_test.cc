@@ -258,7 +258,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   initialize();
   try {
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    THROW_IF_NOT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   } catch (const EnvoyException& e) {
     eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
@@ -284,7 +284,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   const auto decoded_resources = TestUtility::decodeResources(
       {cluster_load_assignment, cluster_load_assignment}, "cluster_name");
   try {
-    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+    THROW_IF_NOT_OK(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
   } catch (const EnvoyException& e) {
     eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
@@ -1820,7 +1820,6 @@ TEST_F(EdsTest, EndpointLocality) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
 TEST_F(EdsTest, EndpointCombineDuplicateLocalities) {
@@ -1869,7 +1868,6 @@ TEST_F(EdsTest, EndpointCombineDuplicateLocalities) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
 // Validate that onConfigUpdate() updates the endpoint locality of an existing endpoint.
@@ -1912,7 +1910,6 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
     EXPECT_EQ("hello", locality.zone());
     EXPECT_EQ("world", locality.sub_zone());
   }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 
   // Update locality now
   locality->set_region("space");
@@ -1934,6 +1931,12 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
 // locality weighted balancing isn't configured and the cluster does not use LB policy extensions.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.convert_legacy_lb_config", "false"}});
+
+  // Reset the cluster after the runtime change.
+  resetCluster();
+
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
@@ -2830,11 +2833,9 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
 
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-  EXPECT_THROW_WITH_MESSAGE(
-      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
-      EnvoyException,
-      "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
-      "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
+  EXPECT_EQ(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
+            "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
 class EdsCachedAssignmentTest : public testing::Test {

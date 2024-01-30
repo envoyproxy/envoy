@@ -540,8 +540,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::ResponseFlag::LocalReset);
     EXPECT_EQ("LR", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LR")));
@@ -549,8 +548,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS_LONG");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::ResponseFlag::LocalReset);
     EXPECT_EQ("LocalReset", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LocalReset")));
@@ -604,14 +602,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(18443)));
 
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("18443")));
-    }
-
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 19443)};
@@ -619,14 +609,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("19443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(19443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("19443")));
-    }
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
@@ -660,14 +642,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("443")));
-    }
   }
 
   {
@@ -754,14 +728,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(8443)));
 
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("8443")));
-    }
-
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
@@ -769,14 +735,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("9443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(9443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("9443")));
-    }
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
@@ -805,14 +763,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("0", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(0)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("0")));
-    }
   }
 
   {
@@ -834,14 +784,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("63443", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(63443)));
-
-    {
-      TestScopedRuntime scoped_runtime;
-      scoped_runtime.mergeValues({{"envoy.reloadable_features.format_ports_as_numbers", "false"}});
-
-      EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                  ProtoEq(ValueUtil::stringValue("63443")));
-    }
   }
 
   {
@@ -852,7 +794,14 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(id)));
   }
-
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CONNECTION_ID");
+    uint64_t id = 1234;
+    stream_info.upstreamInfo()->setUpstreamConnectionId(id);
+    EXPECT_EQ("1234", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::numberValue(id)));
+  }
   {
     StreamInfoFormatter upstream_format("STREAM_ID");
 
@@ -918,6 +867,30 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    StreamInfoFormatter upstream_connection_pool_callback_duration_format(
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
+    EXPECT_EQ(absl::nullopt,
+              upstream_connection_pool_callback_duration_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter upstream_connection_pool_callback_duration_format(
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
+    upstream_timing.recordConnectionPoolCallbackLatency(
+        MonotonicTime(std::chrono::nanoseconds(10000000)), time_system);
+
+    EXPECT_EQ("15",
+              upstream_connection_pool_callback_duration_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::numberValue(15.0)));
   }
 }
 
@@ -4001,7 +3974,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "%START_TIME(%E4n)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
-    FormatterImpl formatter(format);
+    FormatterImpl formatter(format, false);
     EXPECT_EQ("%E4n", formatter.formatWithContext(formatter_context, stream_info));
   }
 #endif

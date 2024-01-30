@@ -17,6 +17,10 @@ var (
 	respSize      string
 	canRunAsyncly bool
 
+	canRunAsynclyForDownstreamStart bool
+
+	canRunAsynclyForDownstreamPeriodic bool
+
 	referers = []string{}
 )
 
@@ -47,6 +51,8 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		header.Set("respCode", respCode)
 		header.Set("respSize", respSize)
 		header.Set("canRunAsyncly", strconv.FormatBool(canRunAsyncly))
+		header.Set("canRunAsynclyForDownstreamStart", strconv.FormatBool(canRunAsynclyForDownstreamStart))
+		header.Set("canRunAsynclyForDownstreamPeriodic", strconv.FormatBool(canRunAsynclyForDownstreamPeriodic))
 
 		header.Set("referers", strings.Join(referers, ";"))
 
@@ -68,6 +74,13 @@ func (f *filter) OnLogDownstreamStart() {
 	}
 
 	referers = append(referers, referer)
+
+	wg.Add(1)
+	go func() {
+		time.Sleep(1 * time.Millisecond)
+		canRunAsynclyForDownstreamStart = true
+		wg.Done()
+	}()
 }
 
 func (f *filter) OnLogDownstreamPeriodic() {
@@ -78,6 +91,13 @@ func (f *filter) OnLogDownstreamPeriodic() {
 	}
 
 	referers = append(referers, referer)
+
+	wg.Add(1)
+	go func() {
+		time.Sleep(1 * time.Millisecond)
+		canRunAsynclyForDownstreamPeriodic = true
+		wg.Done()
+	}()
 }
 
 func (f *filter) OnLog() {

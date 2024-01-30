@@ -22,6 +22,7 @@
 #include "library/common/types/c_types.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -127,6 +128,10 @@ public:
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
+    EXPECT_CALL(dispatcher_, post_(_)).Times(AnyNumber()).WillRepeatedly([](Event::PostCb cb) {
+      cb();
+      return ENVOY_SUCCESS;
+    });
   }
 
   envoy_headers defaultRequestHeaders() {
@@ -148,7 +153,7 @@ public:
           response_encoder_ = &encoder;
           return std::make_unique<TestHandle>(*request_decoder_);
         }));
-    http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_, 0);
+    http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_);
   }
 
   void resumeDataIfExplicitFlowControl(int32_t bytes) {
@@ -442,7 +447,7 @@ TEST_P(ClientTest, MultipleStreams) {
         response_encoder2 = &encoder;
         return std::make_unique<TestHandle>(request_decoder2);
       }));
-  http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_, 0);
+  http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_);
 
   // Send request headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -703,7 +708,7 @@ TEST_P(ClientTest, NullAccessors) {
         response_encoder_ = &encoder;
         return std::make_unique<TestHandle>(*request_decoder_);
       }));
-  http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_, 0);
+  http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_);
 
   EXPECT_FALSE(response_encoder_->http1StreamEncoderOptions().has_value());
   EXPECT_FALSE(response_encoder_->streamErrorOnInvalidHttpMessage());

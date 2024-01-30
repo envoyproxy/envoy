@@ -32,8 +32,8 @@ Common::Redis::Client::PoolRequest* makeSingleServerRequest(
   // If a transaction is active, clients_[0] is the primary connection to the cluster.
   // The subsequent clients in the array are used for mirroring.
   transaction.current_client_idx_ = 0;
-  auto handler = route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
-                                                callbacks, transaction);
+  auto handler = route->upstream(command)->makeRequest(key, ConnPool::RespVariant(incoming_request),
+                                                       callbacks, transaction);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
       transaction.current_client_idx_++;
@@ -62,8 +62,8 @@ makeFragmentedRequest(const RouteSharedPtr& route, const std::string& command,
                       const std::string& key, const Common::Redis::RespValue& incoming_request,
                       ConnPool::PoolCallbacks& callbacks,
                       Common::Redis::Client::Transaction& transaction) {
-  auto handler = route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
-                                                callbacks, transaction);
+  auto handler = route->upstream(command)->makeRequest(key, ConnPool::RespVariant(incoming_request),
+                                                       callbacks, transaction);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
       if (mirror_policy->shouldMirror(command)) {

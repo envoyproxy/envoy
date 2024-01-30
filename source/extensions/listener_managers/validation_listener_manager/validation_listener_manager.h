@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
@@ -35,6 +35,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters, context);
   }
+  Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) override {
+    return ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
+        filters, context, quic_listener_config_provider_manager_);
+  }
   Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                      const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
@@ -57,6 +63,7 @@ public:
 private:
   Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
   Instance& parent_;
 };
 

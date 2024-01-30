@@ -93,13 +93,35 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr());
-  const Network::FilterChain* filter_chain =
-      listener_config_->filterChainManager().findFilterChain(*connection_socket, *stream_info);
+
+  auto listener_filter_manager = std::make_unique<QuicListenerFilterManagerImpl>(
+      dispatcher_, *connection_socket, *stream_info);
+  const bool success = listener_config_->filterChainFactory().createQuicListenerFilterChain(
+      *listener_filter_manager);
+  const Network::FilterChain* filter_chain = nullptr;
+  if (success) {
+    listener_filter_manager->startFilterChain();
+    // Quic listener filters are not supposed to pause the filter chain iteration unless it closes
+    // the connection socket. If any listener filter have closed the socket, do not get a network
+    // filter chain. Thus early fail the connection.
+    if (connection_socket->ioHandle().isOpen()) {
+      for (auto address_family : {quiche::IpAddressFamily::IP_V4, quiche::IpAddressFamily::IP_V6}) {
+        absl::optional<quic::QuicSocketAddress> address =
+            quic_config.GetPreferredAddressToSend(address_family);
+        if (address.has_value() && address->IsInitialized() &&
+            !listener_filter_manager->shouldAdvertiseServerPreferredAddress(address.value())) {
+          quic_config.ClearAlternateServerAddressToSend(address_family);
+        }
+      }
+      filter_chain =
+          listener_config_->filterChainManager().findFilterChain(*connection_socket, *stream_info);
+    }
+  }
 
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, std::move(connection_socket),
-      connection_id_generator);
+      connection_id_generator, std::move(listener_filter_manager));
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
@@ -117,6 +139,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
         std::reference_wrapper<Network::Connection>(*quic_session));
     quic_session->storeConnectionMapPosition(connections_by_filter_chain_, *filter_chain,
                                              connections_by_filter_chain_[filter_chain].begin());
+  } else {
+    quic_session->close(Network::ConnectionCloseType::FlushWrite, "no filter chain found");
   }
   quic_session->Initialize();
   connection_handler_.incNumConnections();
@@ -153,13 +177,26 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
     // Retain the number of connections in the list early because closing the connection will change
     // the size.
     const size_t num_connections = connections.size();
+    bool delete_sessions_immediately = false;
     for (size_t i = 0; i < num_connections; ++i) {
       Network::Connection& connection = connections.front().get();
       // This will remove the connection from the list. And the last removal will remove connections
       // from the map as well.
       connection.close(Network::ConnectionCloseType::NoFlush);
+      if (!delete_sessions_immediately &&
+          dynamic_cast<QuicFilterManagerConnectionImpl&>(connection).fix_quic_lifetime_issues()) {
+        // If `envoy.reloadable_features.quic_fix_filter_manager_uaf` is true, the closed sessions
+        // need to be deleted right away to consistently handle quic lifetimes. Because upon
+        // returning the filter chain configs will be destroyed, and no longer safe to be accessed.
+        // If any filters access those configs during destruction, it'll be use-after-free
+        delete_sessions_immediately = true;
+      }
     }
     ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
+    if (delete_sessions_immediately) {
+      // Explicitly destroy closed sessions in the current call stack.
+      DeleteSessions();
+    }
   }
 }
 

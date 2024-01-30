@@ -20,7 +20,7 @@ public:
   getUpstreamLocalAddressImpl(const Network::Address::InstanceConstSharedPtr&) const override {
     ++(*num_calls_);
     if (return_empty_source_address_) {
-      return UpstreamLocalAddress();
+      return {};
     }
     current_idx_ = (current_idx_ + 1) % upstream_local_addresses_.size();
     return upstream_local_addresses_[current_idx_];
@@ -40,7 +40,7 @@ public:
       bool return_empty_source_address = false)
       : num_calls_(num_calls), return_empty_source_address_{return_empty_source_address} {}
 
-  UpstreamLocalAddressSelectorConstSharedPtr createLocalAddressSelector(
+  absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr> createLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
       absl::optional<std::string>) const override {
     return std::make_shared<TestUpstreamLocalAddressSelector>(upstream_local_addresses, num_calls_,

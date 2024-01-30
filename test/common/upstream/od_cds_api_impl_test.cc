@@ -142,11 +142,9 @@ TEST_F(OdCdsApiImplTest, ValidateDuplicateClusters) {
   cluster_1.set_name("duplicate_cluster");
   const auto decoded_resources = TestUtility::decodeResources({cluster_1, cluster_1});
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok()),
-      EnvoyException,
-      "Error adding/updating cluster(s) duplicate_cluster: duplicate cluster "
-      "duplicate_cluster found");
+  ASSERT_EQ(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").message(),
+            "Error adding/updating cluster(s) duplicate_cluster: duplicate cluster "
+            "duplicate_cluster found");
 }
 
 // Check that notifier gets a message about potentially missing cluster.

@@ -69,6 +69,8 @@ envoy_cc_test(
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/config:config_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -100,10 +102,16 @@ envoy_cc_test(
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//source/extensions/load_balancing_policies/least_request:config",
         "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/upstreams/http/generic:config",
         "//test/config:v2_link_hacks",
         "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/matcher:matcher_mocks",
@@ -160,7 +168,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    deps = ["//source/common/upstream:scheduler_lib"],
+    deps = [
+        "//source/common/upstream:scheduler_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -245,9 +256,9 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:stats_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )
@@ -473,7 +484,6 @@ envoy_cc_benchmark_binary(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
-        "//source/extensions/load_balancing_policies/subset:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:printers_lib",
@@ -486,33 +496,6 @@ envoy_benchmark_test(
     name = "load_balancer_benchmark_test",
     timeout = "long",
     benchmark_binary = "load_balancer_benchmark",
-)
-
-envoy_cc_test(
-    name = "subset_lb_test",
-    srcs = ["subset_lb_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
-        "//source/extensions/load_balancing_policies/subset:config",
-        "//test/mocks:common_lib",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/upstream:host_mocks",
-        "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
-        "//test/mocks/upstream:load_balancer_mocks",
-        "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
 )
 
 envoy_cc_test(
@@ -575,6 +558,13 @@ envoy_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/mocks/upstream:typed_load_balancer_factory_mocks",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
@@ -617,7 +607,6 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
-        "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -660,6 +649,7 @@ envoy_cc_test(
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/integration/clusters:custom_static_cluster",
@@ -804,6 +794,7 @@ envoy_cc_test(
     srcs = ["local_address_selector_integration_test.cc"],
     deps = [
         "test_local_address_selector",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/mocks/upstream:cluster_info_mocks",

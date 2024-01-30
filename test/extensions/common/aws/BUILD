@@ -3,6 +3,7 @@ load(
     "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -14,18 +15,35 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//source/common/http:message_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
+        "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:signer_interface",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
 envoy_cc_test(
-    name = "signer_impl_test",
-    srcs = ["signer_impl_test.cc"],
+    name = "sigv4_signer_impl_test",
+    srcs = ["sigv4_signer_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
-        "//source/extensions/common/aws:signer_impl_lib",
+        "//source/extensions/common/aws:sigv4_signer_impl_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "sigv4a_signer_impl_test",
+    srcs = ["sigv4a_signer_impl_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:message_lib",
+        "//source/extensions/common/aws:sigv4a_key_derivation_lib",
+        "//source/extensions/common/aws:sigv4a_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -35,8 +53,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    copts = envoy_select_boringssl(
+        [
+            "-DENVOY_SSL_FIPS",
+        ],
+    ),
     deps = [
         "//source/extensions/common/aws:utility_lib",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -51,14 +75,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "metadata_fetcher_test",
+    srcs = ["metadata_fetcher_test.cc"],
+    deps = [
+        "//source/extensions/common/aws:metadata_fetcher_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/extensions/filters/http/common:mock_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "credentials_provider_impl_test",
     srcs = ["credentials_provider_impl_test.cc"],
     deps = [
         "//source/extensions/common/aws:credentials_provider_impl_lib",
+        "//source/extensions/common/aws:metadata_fetcher_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",

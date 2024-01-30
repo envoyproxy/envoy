@@ -417,15 +417,19 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
-    throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid path: ", path));
   }
 
   Filesystem::Directory directory(path);
-  for (const Filesystem::DirectoryEntry& entry : directory) {
+  Filesystem::DirectoryIteratorImpl it = directory.begin();
+  THROW_IF_NOT_OK_REF(it.status());
+  for (; it != directory.end(); ++it) {
+    THROW_IF_NOT_OK_REF(it.status());
+    Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
     if (prefix.empty()) {
@@ -446,7 +450,9 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
-      const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
+      auto file_or_error = api.fileSystem().fileReadToEnd(full_path);
+      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      const std::string text_file{file_or_error.value()};
 
       const auto lines = StringUtil::splitToken(text_file, "\n");
       for (const auto& line : lines) {
@@ -472,6 +478,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 #endif
     }
   }
+  THROW_IF_NOT_OK_REF(it.status());
 }
 
 ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
@@ -486,7 +493,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
   case ProtobufWkt::Value::KIND_NOT_SET:
   case ProtobufWkt::Value::kListValue:
   case ProtobufWkt::Value::kNullValue:
-    throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
     SnapshotImpl::addEntry(values_, prefix, v, "");
@@ -527,7 +534,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
     if (!ret.second) {
-      throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
+      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
@@ -535,7 +542,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       if (admin_layer_ != nullptr) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
       }
       admin_layer_ = std::make_unique<AdminLayer>(layer.name(), stats_);
@@ -553,7 +560,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       init_manager_.add(subscriptions_.back()->init_target_);
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
-      throw EnvoyException("layer specifier not set");
+      throwEnvoyExceptionOrPanic("layer specifier not set");
     }
   }
 
@@ -701,7 +708,7 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
 
 void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
-    throw EnvoyException("No admin layer specified");
+    throwEnvoyExceptionOrPanic("No admin layer specified");
   }
   admin_layer_->mergeValues(values);
   loadNewSnapshot();

@@ -1,6 +1,9 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("//bazel:apple.bzl", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 exports_files([
     "EnvoyEngine.h",
@@ -24,13 +27,13 @@ envoy_objc_library(
         "EnvoyHTTPFilterFactory.h",
         "EnvoyHTTPFilterFactory.m",
         "EnvoyHTTPStream.h",
-        "EnvoyHTTPStreamImpl.m",
+        "EnvoyHTTPStreamImpl.mm",
         "EnvoyLogger.h",
         "EnvoyLogger.m",
         "EnvoyNativeFilterConfig.h",
         "EnvoyNativeFilterConfig.m",
         "EnvoyNetworkMonitor.h",
-        "EnvoyNetworkMonitor.m",
+        "EnvoyNetworkMonitor.mm",
         "EnvoyStringAccessor.h",
         "EnvoyStringAccessor.m",
     ],
@@ -54,7 +57,7 @@ envoy_objc_library(
         ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
         "//library/cc:engine_builder_lib",
-        "//library/common:envoy_main_interface_lib",
+        "//library/common:engine_lib",
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
     ],

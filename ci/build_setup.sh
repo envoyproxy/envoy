@@ -56,6 +56,10 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
+  if [[ -n "$CLANG_TOOLCHAIN_SETUP" ]]; then
+    return
+  fi
+  export CLANG_TOOLCHAIN_SETUP=1
   ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
@@ -76,18 +80,20 @@ function setup_clang_toolchain() {
   echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
-export BUILD_DIR=${BUILD_DIR:-/build}
-if [[ ! -d "${BUILD_DIR}" ]]
-then
-  echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
-  mkdir -p "${BUILD_DIR}"
+if [[ -z "${BUILD_DIR}" ]]; then
+    echo "BUILD_DIR not set - defaulting to ~/.cache/envoy-bazel" >&2
+    BUILD_DIR="${HOME}/.cache/envoy-bazel"
 fi
+if [[ ! -d "${BUILD_DIR}" ]]; then
+    echo "${BUILD_DIR} missing - Creating." >&2
+    mkdir -p "${BUILD_DIR}"
+fi
+export BUILD_DIR
 
 # Environment setup.
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
-export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
   BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
@@ -120,14 +126,6 @@ bazel () {
 export _bazel
 export -f bazel
 
-if [[ -n "$BAZEL_NO_CACHE_TEST_RESULTS" ]]; then
-    VERSION_DEV="$(cut -d- -f2 "${ENVOY_SRCDIR}/VERSION.txt")"
-    # Use uncached test results for non-release commits to a branch.
-    if [[ $VERSION_DEV == "dev" ]]; then
-        BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
-    fi
-fi
-
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
 BAZEL_GLOBAL_OPTIONS=(
@@ -138,7 +136,6 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_GLOBAL_OPTIONS[@]}"
   "--verbose_failures"
   "--experimental_generate_json_trace_profile"
-  "--action_env=CLANG_FORMAT"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 

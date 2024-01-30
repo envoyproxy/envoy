@@ -85,6 +85,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
+  uint32_t concurrency_;
 
   GolangFilterStats stats_;
 
@@ -170,9 +171,10 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
-  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib)
-      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this) {
-  }
+  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib,
+                  uint32_t worker_id)
+      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
+        worker_id_(worker_id) {}
 
   // Http::StreamFilterBase
   void onDestroy() ABSL_LOCKS_EXCLUDED(mutex_) override;
@@ -204,11 +206,8 @@ public:
   }
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           Envoy::AccessLog::AccessLogType access_log_type) override;
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info) override;
 
   void onStreamComplete() override {}
 
@@ -220,25 +219,27 @@ public:
 
   CAPIStatus sendPanicReply(absl::string_view details);
 
-  CAPIStatus getHeader(absl::string_view key, GoString* go_value);
+  CAPIStatus getHeader(absl::string_view key, uint64_t* value_data, int* value_len);
   CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
   CAPIStatus setHeader(absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus removeHeader(absl::string_view key);
   CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
+  CAPIStatus drainBuffer(Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action);
   CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
   CAPIStatus setTrailer(absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus removeTrailer(absl::string_view key);
-  CAPIStatus getStringValue(int id, GoString* value_str);
+  CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
 
-  CAPIStatus getDynamicMetadata(const std::string& filter_name, GoSlice* buf_slice);
+  CAPIStatus getDynamicMetadata(const std::string& filter_name, uint64_t* buf_data, int* buf_len);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
   CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
                                   int life_span, int stream_sharing);
-  CAPIStatus getStringFilterState(absl::string_view key, GoString* value_str);
-  CAPIStatus getStringProperty(absl::string_view path, GoString* value_str, GoInt32* rc);
+  CAPIStatus getStringFilterState(absl::string_view key, uint64_t* value_data, int* value_len);
+  CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
+                               GoInt32* rc);
 
 private:
   bool hasDestroyed() {
@@ -273,9 +274,9 @@ private:
                                   const absl::string_view& buf);
 
   void populateSliceWithMetadata(ProcessorState& state, const std::string& filter_name,
-                                 GoSlice* buf_slice);
+                                 uint64_t* buf_data, int* buf_len);
 
-  CAPIStatus getStringPropertyCommon(absl::string_view path, GoString* value_str,
+  CAPIStatus getStringPropertyCommon(absl::string_view path, uint64_t* value_data, int* value_len,
                                      ProcessorState& state);
   CAPIStatus getStringPropertyInternal(absl::string_view path, std::string* result);
   absl::optional<google::api::expr::runtime::CelValue> findValue(absl::string_view name,
@@ -315,6 +316,10 @@ private:
 
   // the filter enter encoding phase
   bool enter_encoding_{false};
+
+  // The ID of the worker that is processing this request, this enables the go filter to dedicate
+  // memory to each worker and not require locks
+  uint32_t worker_id_ = 0;
 };
 
 // Go code only touch the fields in httpRequest

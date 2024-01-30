@@ -22,9 +22,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: SkyWalking tracer]
 
 // Configuration for the SkyWalking tracer. Please note that if SkyWalking tracer is used as the
-// provider of http tracer, then
-// :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
-// in the router must be set to true to get the correct topology and tracing data. Moreover, SkyWalking
+// provider of tracing, then
+// :ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`
+// in the tracing config must be set to true to get the correct topology and tracing data. Moreover, SkyWalking
 // Tracer does not support SkyWalking extension header (``sw8-x``) temporarily.
 // [#extension: envoy.tracers.skywalking]
 message SkyWalkingConfig {

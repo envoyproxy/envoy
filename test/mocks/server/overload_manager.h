@@ -17,6 +17,8 @@ public:
   MOCK_METHOD(bool, tryAllocateResource, (OverloadProactiveResourceName, int64_t));
   MOCK_METHOD(bool, tryDeallocateResource, (OverloadProactiveResourceName, int64_t));
   MOCK_METHOD(bool, isResourceMonitorEnabled, (OverloadProactiveResourceName));
+  MOCK_METHOD(ProactiveResourceMonitorOptRef, getProactiveResourceMonitorForTest,
+              (OverloadProactiveResourceName));
 
 private:
   const OverloadActionState disabled_state_;
@@ -35,6 +37,7 @@ public:
   MOCK_METHOD(Event::ScaledRangeTimerManagerFactory, scaledTimerFactory, (), (override));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
   MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (absl::string_view));
+  MOCK_METHOD(void, stop, ());
 
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;
 };

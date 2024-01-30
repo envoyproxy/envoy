@@ -164,7 +164,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Trailers) {
     return CelValue::CreateMap(&trailers_);
   } else if (value == Flags) {
-    return CelValue::CreateInt64(info_.responseFlags());
+    return CelValue::CreateInt64(info_.legacyResponseFlags());
   } else if (value == GrpcStatus) {
     auto const& optional_status = Grpc::Common::getGrpcStatus(
         trailers_.value_ ? *trailers_.value_ : *Http::StaticEmptyHeaders::get().response_trailers,
@@ -208,6 +208,11 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   } else if (value == ConnectionTerminationDetails) {
     if (info_.connectionTerminationDetails().has_value()) {
       return CelValue::CreateString(&info_.connectionTerminationDetails().value());
+    }
+    return {};
+  } else if (value == DownstreamTransportFailureReason) {
+    if (!info_.downstreamTransportFailureReason().empty()) {
+      return CelValue::CreateStringView(info_.downstreamTransportFailureReason());
     }
     return {};
   }
@@ -298,6 +303,7 @@ public:
   // Default stubs.
   int size() const override { return 0; }
   bool empty() const override { return true; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return &WrapperFields::get().Empty;
   }
@@ -380,6 +386,20 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
     const absl::string_view filter_chain_name =
         filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
     return CelValue::CreateStringView(filter_chain_name);
+  } else if (value == ListenerMetadata) {
+    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &arena_);
+    }
+  } else if (value == ListenerDirection) {
+    const auto listener_info = info_.downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelValue::CreateInt64(listener_info->direction());
+    }
+  } else if (value == Node) {
+    if (local_info_) {
+      return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
+    }
   }
   return {};
 }

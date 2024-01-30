@@ -23,9 +23,7 @@ protected:
   AllocatorImplTest() : pool_(symbol_table_), alloc_(symbol_table_) {}
   ~AllocatorImplTest() override { clearStorage(); }
 
-  StatNameStorage makeStatStorage(absl::string_view name) {
-    return StatNameStorage(name, symbol_table_);
-  }
+  StatNameStorage makeStatStorage(absl::string_view name) { return {name, symbol_table_}; }
 
   StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
