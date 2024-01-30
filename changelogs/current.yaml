@@ -8,15 +8,15 @@ minor_behavior_changes:
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
-- area: stateful_session
-  change: |
-    Support 0 TTL for proto-encoded cookies.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
+- area: stateful_session
+  change: |
+    Support 0 TTL for proto-encoded cookies, which disables cookie expiration by Envoy.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
