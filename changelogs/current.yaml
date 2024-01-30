@@ -40,8 +40,8 @@ new_features:
 - area: quic
   change: |
     Added QUIC protocol option :ref:`send_disable_active_migration
-    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to discourage client endpoints from
-    active migration.
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to make the server send clients a transport
+    parameter to discourage client endpoints from active migration.
 - area: ext_proc
   change: |
     implemented
