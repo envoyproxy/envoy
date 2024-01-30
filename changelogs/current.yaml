@@ -39,8 +39,9 @@ new_features:
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
 - area: quic
   change: |
-    Added QUIC protocol option :ref:`send_disable_active_migration <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>`
-    to discourage client endpoints from active migration.
+    Added QUIC protocol option :ref:`send_disable_active_migration
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to discourage client endpoints from
+    active migration.
 - area: ext_proc
   change: |
     implemented
