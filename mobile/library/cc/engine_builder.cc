@@ -269,6 +269,11 @@ EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enablePortMigration(bool enable_port_migration) {
+  enable_port_migration_ = enable_port_migration;
+  return *this;
+}
+
 #endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
@@ -735,6 +740,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       alpn_options.mutable_auto_config()
           ->mutable_alternate_protocols_cache_options()
           ->add_canonical_suffixes(suffix);
+    }
+
+    if (enable_port_migration_) {
+      alpn_options.mutable_auto_config()
+          ->mutable_http3_protocol_options()
+          ->mutable_quic_protocol_options()
+          ->mutable_num_timeouts_to_trigger_port_migration()
+          ->set_value(4);
     }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
