@@ -196,9 +196,15 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       processing_mode_(mergeProcessingMode(less_specific, more_specific)),
       grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
                                                             : less_specific.grpcService()),
-      untyped_forwarding_namespaces_(more_specific.untypedForwardingMetadataNamespaces()),
-      typed_forwarding_namespaces_(more_specific.typedForwardingMetadataNamespaces()),
-      untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces()) {}
+      untyped_forwarding_namespaces_(more_specific.untypedForwardingMetadataNamespaces().has_value()
+                                         ? more_specific.untypedForwardingMetadataNamespaces()
+                                         : less_specific.untypedForwardingMetadataNamespaces()),
+      typed_forwarding_namespaces_(more_specific.typedForwardingMetadataNamespaces().has_value()
+                                       ? more_specific.typedForwardingMetadataNamespaces()
+                                       : less_specific.typedForwardingMetadataNamespaces()),
+      untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
+                                        ? more_specific.untypedReceivingMetadataNamespaces()
+                                        : less_specific.untypedReceivingMetadataNamespaces()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);

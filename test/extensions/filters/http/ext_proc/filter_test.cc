@@ -3192,6 +3192,70 @@ TEST_F(HttpFilterTest, MetadataOptionsOverride) {
   filter_->onDestroy();
 }
 
+// Validate that when metadata options are not specified as an override, the less-specific
+// namespaces lists are used.
+TEST_F(HttpFilterTest, MetadataOptionsOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  metadata_options:
+    forwarding_namespaces:
+      untyped:
+      - untyped_ns_1
+      typed:
+      - typed_ns_1
+    receiving_namespaces:
+      untyped:
+      - untyped_receiving_ns_1
+  )EOF");
+  ExtProcPerRoute override_cfg;
+  const std::string override_yaml = R"EOF(
+  overrides: {}
+  )EOF";
+  TestUtility::loadFromYaml(override_yaml, override_cfg);
+
+  FilterConfigPerRoute route_config(override_cfg);
+
+  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
+      .WillOnce(
+          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+            cb(route_config);
+          }));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  ASSERT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_1");
+  ASSERT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().untypedForwardingMetadataNamespaces()[0], "untyped_ns_1");
+
+  ASSERT_EQ(filter_->encodingState().typedForwardingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().typedForwardingMetadataNamespaces()[0], "typed_ns_1");
+
+  ASSERT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->encodingState().untypedReceivingMetadataNamespaces()[0],
+            "untyped_receiving_ns_1");
+  ASSERT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces().size(), 1);
+  EXPECT_EQ(filter_->decodingState().untypedReceivingMetadataNamespaces()[0],
+            "untyped_receiving_ns_1");
+
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  filter_->onDestroy();
+}
+
 // Verify that the filter sets the processing request with dynamic metadata
 // including when the metadata is on the connection stream info
 TEST_F(HttpFilterTest, SendDynamicMetadata) {
