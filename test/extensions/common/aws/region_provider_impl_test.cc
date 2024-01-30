@@ -21,6 +21,7 @@ public:
     TestEnvironment::unsetEnvVar("AWS_REGION");
     TestEnvironment::unsetEnvVar("AWS_DEFAULT_REGION");
     TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+    TestEnvironment::unsetEnvVar("AWS_SIGV4A_SIGNING_REGION_SET");
   }
 
   RegionProviderChain chain;
@@ -35,6 +36,7 @@ public:
     TestEnvironment::unsetEnvVar("AWS_REGION");
     TestEnvironment::unsetEnvVar("AWS_DEFAULT_REGION");
     TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+    TestEnvironment::unsetEnvVar("AWS_SIGV4A_SIGNING_REGION_SET");
   }
 
   EnvironmentRegionProvider provider_;
@@ -49,6 +51,7 @@ public:
     TestEnvironment::unsetEnvVar("AWS_REGION");
     TestEnvironment::unsetEnvVar("AWS_DEFAULT_REGION");
     TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+    TestEnvironment::unsetEnvVar("AWS_SIGV4A_SIGNING_REGION_SET");
   }
 
   AWSCredentialsFileRegionProvider provider_;
@@ -63,6 +66,7 @@ public:
     TestEnvironment::unsetEnvVar("AWS_REGION");
     TestEnvironment::unsetEnvVar("AWS_DEFAULT_REGION");
     TestEnvironment::unsetEnvVar("AWS_SHARED_CREDENTIALS_FILE");
+    TestEnvironment::unsetEnvVar("AWS_SIGV4A_SIGNING_REGION_SET");
   }
 
   AWSConfigFileRegionProvider provider_;
@@ -99,6 +103,30 @@ region=configdefaultregion
 [profile test]
 region=testregion
 )";
+
+const char CREDENTIALS_FILE_CONTENTS_REGION_SET[] =
+    R"(
+[default]
+aws_access_key_id=default_access_key
+aws_secret_access_key=default_secret
+aws_session_token=default_token
+sigv4a_signing_region_set=*
+
+[profile1]
+aws_access_key_id=profile1_acc=ess_key
+aws_secret_access_key=profile1_secret
+sigv4a_signing_region_set=us-east-1,us-east-2
+)";
+
+const char CONFIG_FILE_CONTENTS_REGION_SET[] =
+    R"(
+[default]
+sigv4a_signing_region_set=*
+
+[profile test]
+sigv4a_signing_region_set=ap-southeast-2,us-east-2
+)";
+
 TEST_F(AWSConfigFileRegionProviderTest, CustomConfigFile) {
   auto temp = TestEnvironment::temporaryDirectory();
   TestEnvironment::setEnvVar("HOME", temp, 1);
@@ -111,6 +139,20 @@ TEST_F(AWSConfigFileRegionProviderTest, CustomConfigFile) {
   TestEnvironment::setEnvVar("AWS_CONFIG_FILE", config_file, 1);
 
   EXPECT_EQ("configdefaultregion", provider_.getRegion().value());
+}
+
+TEST_F(AWSConfigFileRegionProviderTest, CustomConfigFileRegionSet) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string config_file(temp + "/.aws/customconfig");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      config_file, CONFIG_FILE_CONTENTS_REGION_SET, true, false);
+
+  TestEnvironment::setEnvVar("AWS_CONFIG_FILE", config_file, 1);
+
+  EXPECT_EQ("*", provider_.getRegionSet().value());
 }
 
 TEST_F(AWSConfigFileRegionProviderTest, CustomProfile) {
@@ -128,6 +170,21 @@ TEST_F(AWSConfigFileRegionProviderTest, CustomProfile) {
   EXPECT_EQ("testregion", provider_.getRegion().value());
 }
 
+TEST_F(AWSConfigFileRegionProviderTest, CustomProfileRegionSet) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string config_file(temp + "/.aws/config");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      config_file, CONFIG_FILE_CONTENTS_REGION_SET, true, false);
+
+  TestEnvironment::setEnvVar("AWS_CONFIG_FILE", config_file, 1);
+  TestEnvironment::setEnvVar("AWS_PROFILE", "test", 1);
+
+  EXPECT_EQ("ap-southeast-2,us-east-2", provider_.getRegionSet().value());
+}
+
 TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFile) {
   auto temp = TestEnvironment::temporaryDirectory();
   TestEnvironment::setEnvVar("HOME", temp, 1);
@@ -142,7 +199,21 @@ TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFile) {
   EXPECT_EQ("credentialsdefaultregion", provider_.getRegion().value());
 }
 
-TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfile) {
+TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFileRegionSet) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credentials_file(temp + "/.aws/customfile");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credentials_file, CREDENTIALS_FILE_CONTENTS_REGION_SET, true, false);
+
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", credentials_file, 1);
+
+  EXPECT_EQ("*", provider_.getRegionSet().value());
+}
+
+TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfileSharedCredentialsFile) {
   auto temp = TestEnvironment::temporaryDirectory();
   TestEnvironment::setEnvVar("HOME", temp, 1);
   std::filesystem::create_directory(temp + "/.aws");
@@ -155,6 +226,21 @@ TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfile) {
   TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
 
   EXPECT_EQ("profile1region", provider_.getRegion().value());
+}
+
+TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfileSharedCredentialsFileRegionSet) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credentials_file(temp + "/.aws/config");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credentials_file, CREDENTIALS_FILE_CONTENTS_REGION_SET, true, false);
+
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", credentials_file, 1);
+  TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
+
+  EXPECT_EQ("us-east-1,us-east-2", provider_.getRegionSet().value());
 }
 
 TEST_F(RegionProviderChainTest, EnvironmentBeforeCredentialsFile) {

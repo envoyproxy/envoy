@@ -7,9 +7,11 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-static const char AWS_REGION[] = "AWS_REGION";
-static const char AWS_DEFAULT_REGION[] = "AWS_DEFAULT_REGION";
+constexpr char AWS_REGION[] = "AWS_REGION";
+constexpr char AWS_DEFAULT_REGION[] = "AWS_DEFAULT_REGION";
 constexpr char REGION[] = "REGION";
+constexpr char AWS_SIGV4A_SIGNING_REGION_SET[] = "AWS_SIGV4A_SIGNING_REGION_SET";
+constexpr char SIGV4A_SIGNING_REGION_SET[] = "SIGV4A_SIGNING_REGION_SET";
 
 absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
   std::string region;
@@ -24,6 +26,18 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
   }
   ENVOY_LOG_MISC(debug, "Region string retrieved: {}");
   return region;
+}
+
+absl::optional<std::string> EnvironmentRegionProvider::getRegionSet() {
+  std::string regionSet;
+
+  // Search for the region in environment variables AWS_REGION and AWS_DEFAULT_REGION
+  regionSet = Utility::getEnvironmentVariableOrDefault(AWS_SIGV4A_SIGNING_REGION_SET, "");
+  if (regionSet.empty()) {
+    return absl::nullopt;
+  }
+  ENVOY_LOG_MISC(debug, "Region Set string retrieved: {}");
+  return regionSet;
 }
 
 absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
@@ -42,6 +56,25 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
   }
 
   ENVOY_LOG_MISC(debug, "Region string retrieved: {}");
+  return it->second;
+}
+
+absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
+  absl::flat_hash_map<std::string, std::string> elements = {{SIGV4A_SIGNING_REGION_SET, ""}};
+  absl::flat_hash_map<std::string, std::string>::iterator it;
+
+  // Search for the region in the credentials file
+
+  if (!Utility::resolveProfileElements(Utility::getCredentialFilePath(),
+                                       Utility::getCredentialProfileName(), elements)) {
+    return absl::nullopt;
+  }
+  it = elements.find(SIGV4A_SIGNING_REGION_SET);
+  if (it == elements.end()) {
+    return absl::nullopt;
+  }
+
+  ENVOY_LOG_MISC(debug, "Region Set string retrieved: {}");
   return it->second;
 }
 
@@ -65,6 +98,25 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
   return it->second;
 }
 
+absl::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
+  absl::flat_hash_map<std::string, std::string> elements = {{SIGV4A_SIGNING_REGION_SET, ""}};
+  absl::flat_hash_map<std::string, std::string>::iterator it;
+
+  // Search for the region in the config file
+
+  if (!Utility::resolveProfileElements(Utility::getConfigFilePath(),
+                                       Utility::getConfigProfileName(), elements)) {
+    return absl::nullopt;
+  }
+
+  it = elements.find(SIGV4A_SIGNING_REGION_SET);
+  if (it == elements.end()) {
+    return absl::nullopt;
+  }
+
+  ENVOY_LOG_MISC(debug, "Region Set string retrieved: {}");
+  return it->second;
+}
 // Region provider chain. This allows retrieving region information from the following locations (in
 // order):
 // 1. The envoy configuration, in the region parameter
@@ -89,6 +141,16 @@ absl::optional<std::string> RegionProviderChain::getRegion() {
     const auto region = provider->getRegion();
     if (region.has_value()) {
       return region;
+    }
+  }
+  return absl::nullopt;
+}
+
+absl::optional<std::string> RegionProviderChain::getRegionSet() {
+  for (auto& provider : providers_) {
+    const auto regionSet = provider->getRegionSet();
+    if (regionSet.has_value()) {
+      return regionSet;
     }
   }
   return absl::nullopt;

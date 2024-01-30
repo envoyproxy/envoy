@@ -57,7 +57,12 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
   if (region.empty()) {
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-    auto regionOpt = region_provider->getRegion();
+    absl::optional<std::string> regionOpt;
+    if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
+      regionOpt = region_provider->getRegionSet();
+    } else {
+      regionOpt = region_provider->getRegion();
+    }
     if (!regionOpt.has_value()) {
       throw EnvoyException("AWS region is not set in xDS configuration and failed to retrieve from "
                            "environment variable or AWS profile/config files.");
@@ -75,13 +80,8 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
 
   if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
-    if (config.region().empty()) {
-      throw EnvoyException("Region parameter does not contain a SigV4A region set.");
-    }
-    // We use config.region here as environment or file store is not a valid region location for
-    // AWS_SIGV4A
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        config.service_name(), config.region(), credentials_provider,
+        config.service_name(), region, credentials_provider,
         server_context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
@@ -113,7 +113,12 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
 
   if (region.empty()) {
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
-    auto regionOpt = region_provider->getRegion();
+    absl::optional<std::string> regionOpt;
+    if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SIGV4A) {
+      regionOpt = region_provider->getRegionSet();
+    } else {
+      regionOpt = region_provider->getRegion();
+    }
     if (!regionOpt.has_value()) {
       throw EnvoyException("AWS region is not set in xDS configuration and failed to retrieve from "
                            "environment variable or AWS profile/config files.");
@@ -132,12 +137,8 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
 
   if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SIGV4A) {
-    if (per_route_config.aws_request_signing().region().empty()) {
-      throw EnvoyException("Region parameter does not contain a SigV4A region set.");
-    }
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        per_route_config.aws_request_signing().service_name(),
-        per_route_config.aws_request_signing().region(), credentials_provider,
+        per_route_config.aws_request_signing().service_name(), region, credentials_provider,
         context.mainThreadDispatcher().timeSource(), matcher_config);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm

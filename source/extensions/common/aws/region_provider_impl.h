@@ -16,6 +16,8 @@ public:
   EnvironmentRegionProvider() = default;
 
   absl::optional<std::string> getRegion() override;
+
+  absl::optional<std::string> getRegionSet() override;
 };
 
 class AWSCredentialsFileRegionProvider : public RegionProvider,
@@ -25,8 +27,7 @@ public:
 
   absl::optional<std::string> getRegion() override;
 
-private:
-  const std::string region_;
+  absl::optional<std::string> getRegionSet() override;
 };
 
 class AWSConfigFileRegionProvider : public RegionProvider,
@@ -36,8 +37,7 @@ public:
 
   absl::optional<std::string> getRegion() override;
 
-private:
-  const std::string region_;
+  absl::optional<std::string> getRegionSet() override;
 };
 
 class RegionProviderChainFactories {
@@ -66,6 +66,8 @@ public:
   }
 
   absl::optional<std::string> getRegion() override;
+
+  absl::optional<std::string> getRegionSet() override;
 
   RegionProviderSharedPtr createEnvironmentRegionProvider() const override {
     return std::make_shared<EnvironmentRegionProvider>();

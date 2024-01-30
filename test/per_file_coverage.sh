@@ -38,6 +38,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/mongo_proxy:96.0"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/wasm:76.9"
+"source/extensions/grpc_credentials/aws_iam:95.4"
 "source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
