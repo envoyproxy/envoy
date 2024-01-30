@@ -28,7 +28,7 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
 - area: resource_monitors
   change: |
-    removed ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` and legacy code paths.
+    removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` and legacy code paths.
 
 new_features:
 - area: aws_request_signing
