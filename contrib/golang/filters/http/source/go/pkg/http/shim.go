@@ -37,7 +37,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"sync/atomic"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
@@ -83,6 +82,7 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	req := &httpRequest{
 		req: r,
 	}
+	req.cond.L = &req.waitingLock
 	// NP: make sure filter will be deleted.
 	runtime.SetFinalizer(req, requestFinalize)
 
@@ -214,9 +214,6 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 	}
 
 	defer req.RecoverPanic()
-	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
-		req.sema.Done()
-	}
 
 	v := api.AccessLogType(logType)
 
@@ -238,9 +235,8 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.RecoverPanic()
-	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
-		req.sema.Done()
-	}
+
+	req.resumeWaitCallback()
 
 	v := api.DestroyReason(reason)
 
@@ -259,7 +255,5 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 func envoyGoRequestSemaDec(r *C.httpRequest) {
 	req := getRequest(r)
 	defer req.RecoverPanic()
-	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
-		req.sema.Done()
-	}
+	req.resumeWaitCallback()
 }
