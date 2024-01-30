@@ -9,8 +9,7 @@
 #include "library/common/network/apple_pac_proxy_resolver.h"
 #include "library/common/network/apple_system_proxy_settings_monitor.h"
 #include "library/common/network/proxy_resolver_interface.h"
-#include "library/common/network/proxy_types.h"
-#include "library/common/network/system_proxy_settings.h"
+#include "library/common/network/proxy_settings.h"
 
 namespace Envoy {
 namespace Network {
@@ -32,18 +31,17 @@ public:
    * Resolves the proxy settings for the target URL. The result of proxy resolution is returned in
    * the ProxyResolutionResult enum. If proxy resolution returns RESULT_COMPLETED, the `proxies`
    * vector gets populated with the resolved proxy setting. If proxy resolution returns
-   * RESULT_IN_PROGRESS, the `proxy_resolution_did_complete` function gets invoked upon successful
+   * RESULT_IN_PROGRESS, the `proxy_resolution_completed` function gets invoked upon successful
    * resolution of the proxy settings.
    */
   virtual ProxyResolutionResult
   resolveProxy(const std::string& target_url_string, std::vector<ProxySettings>& proxies,
-               std::function<void(std::vector<ProxySettings>& proxies)>
-                   proxy_resolution_did_complete) override;
+               ProxySettingsResolvedCallback proxy_resolution_completed) override;
 
   /*
    * Supplies a function that updates this instance's proxy settings.
    */
-  std::function<void(absl::optional<Network::SystemProxySettings>)> proxySettingsUpdater();
+  SystemProxySettingsReadCallback proxySettingsUpdater();
 
   /**
    * Resets the proxy settings monitor to the supplied monitor instance.

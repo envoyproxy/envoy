@@ -8,8 +8,9 @@ namespace test {
 
 TestAppleSystemProxySettingsMonitor::TestAppleSystemProxySettingsMonitor(
     const std::string& host, const int port,
-    std::function<void(absl::optional<Network::SystemProxySettings>)> proxySettingsDidUpdate)
-    : AppleSystemProxySettingsMonitor(proxySettingsDidUpdate), host_(host), port_(port) {}
+    Network::SystemProxySettingsReadCallback proxy_settings_read_callback)
+    : AppleSystemProxySettingsMonitor(std::move(proxy_settings_read_callback)), host_(host),
+      port_(port) {}
 
 CFDictionaryRef TestAppleSystemProxySettingsMonitor::getSystemProxySettings() const {
   const void* keys[] = {kCFNetworkProxiesHTTPEnable, kCFNetworkProxiesHTTPProxy,

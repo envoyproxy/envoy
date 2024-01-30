@@ -7,9 +7,9 @@
 
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/network/connectivity_manager.h"
+#include "library/common/network/proxy_api.h"
 #include "library/common/network/proxy_resolver_interface.h"
 #include "library/common/network/proxy_settings.h"
-#include "library/common/network/proxy_types.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/types/c_types.h"
 

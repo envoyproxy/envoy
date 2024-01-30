@@ -7,7 +7,7 @@
 #include <functional>
 
 #include "absl/types/optional.h"
-#include "library/common/network/system_proxy_settings.h"
+#include "library/common/network/proxy_settings.h"
 
 namespace Envoy {
 namespace Network {
@@ -21,12 +21,10 @@ public:
    * Creates a new instance of the receiver. Calls provided function every time it detects a
    * change of system proxy settings. Treats invalid PAC URLs as a lack of proxy configuration.
    *
-   * @param proxySettingsDidUpdate The closure to call every time system proxy settings change. The
-   * closure is called on a non-main queue.
+   * @param proxy_settings_read_callback The closure to call every time system proxy settings
+   *                                     change. The closure is called on a non-main queue.
    */
-  AppleSystemProxySettingsMonitor(
-      std::function<void(absl::optional<SystemProxySettings>)> proxySettingsDidUpdate)
-      : proxySettingsDidUpdate_(proxySettingsDidUpdate){};
+  AppleSystemProxySettingsMonitor(SystemProxySettingsReadCallback proxy_settings_read_callback);
   virtual ~AppleSystemProxySettingsMonitor();
 
   /**
@@ -45,7 +43,7 @@ private:
   dispatch_source_t source_;
   dispatch_queue_t queue_;
   bool started_;
-  std::function<void(absl::optional<SystemProxySettings>)> proxySettingsDidUpdate_;
+  SystemProxySettingsReadCallback proxy_settings_read_callback_;
 };
 
 } // namespace Network

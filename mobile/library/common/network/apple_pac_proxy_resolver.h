@@ -20,13 +20,12 @@ public:
    * @param target_url_string A request URL to resolve the proxy for.
    * @param proxy_autoconfiguration_file_url_string A URL at which a proxy configuration file is
    * hosted.
-   * @param proxy_resolution_did_complete A function that's called with result proxies as its
+   * @param proxy_resolution_completed A function that's called with result proxies as its
    * arguments when proxy resolution completes.
    */
-  void
-  resolveProxies(absl::string_view target_url_string,
-                 absl::string_view proxy_autoconfiguration_file_url_string,
-                 std::function<void(std::vector<ProxySettings>&)> proxy_resolution_did_complete);
+  void resolveProxies(absl::string_view target_url_string,
+                      absl::string_view proxy_autoconfiguration_file_url_string,
+                      ProxySettingsResolvedCallback proxy_resolution_completed);
 };
 
 } // namespace Network

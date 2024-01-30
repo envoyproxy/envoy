@@ -25,6 +25,7 @@ envoy_cc_test_library(
         "@envoy//bazel:apple": [
             "//library/common/api:external_api_lib",
             "//library/common/network:apple_proxy_resolution_lib",
+            "//library/common/network:proxy_api_lib",
             "//library/common/network:proxy_settings_lib",
             "//library/common/types:c_types_lib",
         ],

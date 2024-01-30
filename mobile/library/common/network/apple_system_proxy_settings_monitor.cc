@@ -11,6 +11,10 @@ namespace Network {
 // The interval at which system proxy settings should be polled at.
 CFTimeInterval kProxySettingsRefreshRateSeconds = 7;
 
+AppleSystemProxySettingsMonitor::AppleSystemProxySettingsMonitor(
+    SystemProxySettingsReadCallback proxy_settings_read_callback)
+    : proxy_settings_read_callback_(proxy_settings_read_callback) {}
+
 void AppleSystemProxySettingsMonitor::start() {
   if (started_) {
     return;
@@ -26,7 +30,7 @@ void AppleSystemProxySettingsMonitor::start() {
   __block absl::optional<SystemProxySettings> proxy_settings;
   dispatch_sync(queue_, ^{
     proxy_settings = readSystemProxySettings();
-    proxySettingsDidUpdate_(proxy_settings);
+    proxy_settings_read_callback_(std::move(proxy_settings));
   });
 
   source_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue_);
@@ -36,7 +40,7 @@ void AppleSystemProxySettingsMonitor::start() {
     const auto new_proxy_settings = readSystemProxySettings();
     if (new_proxy_settings != proxy_settings) {
       proxy_settings = new_proxy_settings;
-      proxySettingsDidUpdate_(new_proxy_settings);
+      proxy_settings_read_callback_(std::move(new_proxy_settings));
     }
   });
   dispatch_resume(source_);

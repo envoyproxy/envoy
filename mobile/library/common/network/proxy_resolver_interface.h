@@ -20,14 +20,14 @@ public:
    * Resolves proxy for a given url. Depending on the type current system proxy settings the method
    * may return results in synchronous or asynchronous way.
    * @param proxies Result proxies for when the proxy resolution is performed synchronously.
-   * @param proxy_resolution_did_complete A function that's called with result proxies as its
+   * @param proxy_resolution_completed A function that's called with result proxies as its
    * arguments for when the proxy resolution is performed asynchronously.
    * @return Whether there is a proxy or no and whether proxy resolution was performed synchronously
    * or whether it's still running.
    */
-  virtual ProxyResolutionResult resolveProxy(
-      const std::string& target_url_string, std::vector<ProxySettings>& proxies,
-      std::function<void(std::vector<ProxySettings>& proxies)> proxy_resolution_did_complete) PURE;
+  virtual ProxyResolutionResult
+  resolveProxy(const std::string& target_url_string, std::vector<ProxySettings>& proxies,
+               ProxySettingsResolvedCallback proxy_resolution_completed) PURE;
 };
 
 } // namespace Network

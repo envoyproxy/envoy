@@ -10,28 +10,20 @@ namespace Network {
 
 namespace {
 
-struct PacResultCallbackWrapper {
-  PacResultCallbackWrapper(
-      const std::function<void(std::vector<ProxySettings>&)>& proxy_resolution_did_complete)
-      : pac_resolution_callback(proxy_resolution_did_complete) {}
-
-  std::function<void(std::vector<ProxySettings>&)> pac_resolution_callback;
-};
-
 // Called when the PAC URL resolution has executed and the result is available.
 static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies,
                                                  CFErrorRef cf_error) {
   // `ptr` contains the unowned pointer to the PacResultCallbackWrapper. We extract it from the
   // void* and wrap it in a unique_ptr so the memory gets reclaimed at the end of the function when
-  // `callback_wrapper` goes out of scope.
-  std::unique_ptr<PacResultCallbackWrapper> callback_wrapper(
-      static_cast<PacResultCallbackWrapper*>(ptr));
+  // `completion_callback` goes out of scope.
+  std::unique_ptr<ProxySettingsResolvedCallback> completion_callback(
+      static_cast<ProxySettingsResolvedCallback*>(ptr));
 
   std::vector<ProxySettings> proxies;
   if (cf_error != nullptr || cf_proxies == nullptr) {
     // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
     // system (URLSession) is doing.
-    callback_wrapper->pac_resolution_callback(proxies);
+    (*completion_callback)(proxies);
     return;
   }
 
@@ -57,7 +49,7 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
     }
   }
 
-  callback_wrapper->pac_resolution_callback(proxies);
+  (*completion_callback)(proxies);
 }
 
 // Creates a CFURLRef from a C++ string URL.
@@ -73,16 +65,16 @@ CFURLRef createCFURL(absl::string_view url_string) {
 
 void ApplePacProxyResolver::resolveProxies(
     absl::string_view target_url_string, absl::string_view proxy_autoconfiguration_file_url_string,
-    std::function<void(std::vector<ProxySettings>&)> proxy_resolution_did_complete) {
+    ProxySettingsResolvedCallback proxy_resolution_completed) {
   CFURLRef cf_target_url = createCFURL(target_url_string);
   CFURLRef cf_proxy_autoconfiguration_file_url =
       createCFURL(proxy_autoconfiguration_file_url_string);
 
-  std::unique_ptr<PacResultCallbackWrapper> callback_wrapper =
-      std::make_unique<PacResultCallbackWrapper>(proxy_resolution_did_complete);
+  std::unique_ptr<ProxySettingsResolvedCallback> completion_callback =
+      std::make_unique<ProxySettingsResolvedCallback>(std::move(proxy_resolution_completed));
   // According to https://developer.apple.com/documentation/corefoundation/cfstreamclientcontext,
   // the version must be 0.
-  CFStreamClientContext context = {/*version=*/0, /*info=*/callback_wrapper.release(),
+  CFStreamClientContext context = {/*version=*/0, /*info=*/completion_callback.release(),
                                    /*retain=*/nullptr, /*release=*/nullptr,
                                    /*copyDescription=*/nullptr};
   // Even though neither the name of the method nor Apple's documentation mentions that, manual

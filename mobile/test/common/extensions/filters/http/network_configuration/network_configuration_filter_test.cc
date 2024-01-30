@@ -190,8 +190,7 @@ class MockProxyResolver : public Network::ProxyResolver {
 public:
   MOCK_METHOD(Network::ProxyResolutionResult, resolveProxy,
               (const std::string& target_url_string, std::vector<Network::ProxySettings>& proxies,
-               std::function<void(std::vector<Network::ProxySettings>& proxies)>
-                   proxy_resolution_did_complete));
+               ProxySettingsResolvedCallback proxy_resolution_completed));
 };
 
 class NetworkConfigurationFilterProxyResolverApiTest : public NetworkConfigurationFilterTest {
@@ -241,8 +240,7 @@ TEST_F(NetworkConfigurationFilterProxyResolverApiTest, DirectProxyConfigured) {
   EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
       .WillOnce([](const std::string& /*target_url_string*/,
                    std::vector<Network::ProxySettings>& proxies,
-                   std::function<void(
-                       std::vector<Network::ProxySettings>&)> /*proxy_resolution_did_complete*/) {
+                   ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
         proxies.emplace_back(Network::ProxySettings::direct());
         return Network::ProxyResolutionResult::RESULT_COMPLETED;
       });
@@ -255,8 +253,7 @@ TEST_F(NetworkConfigurationFilterProxyResolverApiTest, ProxyWithIpAddressConfigu
   EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
       .WillOnce([](const std::string& /*target_url_string*/,
                    std::vector<Network::ProxySettings>& proxies,
-                   std::function<void(
-                       std::vector<Network::ProxySettings>&)> /*proxy_resolution_did_complete*/) {
+                   ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
         proxies.emplace_back(Network::ProxySettings("127.0.0.1", 8080));
         return Network::ProxyResolutionResult::RESULT_COMPLETED;
       });
@@ -272,8 +269,7 @@ TEST_F(NetworkConfigurationFilterProxyResolverApiTest, ProxyWithHostConfigured) 
   EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
       .WillOnce([](const std::string& /*target_url_string*/,
                    std::vector<Network::ProxySettings>& proxies,
-                   std::function<void(
-                       std::vector<Network::ProxySettings>&)> /*proxy_resolution_did_complete*/) {
+                   ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
         proxies.emplace_back(Network::ProxySettings("foo.com", 8080));
         return Network::ProxyResolutionResult::RESULT_COMPLETED;
       });

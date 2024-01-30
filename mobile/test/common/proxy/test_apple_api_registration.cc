@@ -5,8 +5,8 @@
 #include "library/common/api/external.h"
 #include "library/common/network/apple_proxy_resolution.h"
 #include "library/common/network/apple_proxy_resolver.h"
+#include "library/common/network/proxy_api.h"
 #include "library/common/network/proxy_resolver_interface.h"
-#include "library/common/network/proxy_types.h"
 #include "library/common/types/c_types.h"
 
 // NOLINT(namespace-envoy)

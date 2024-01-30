@@ -99,11 +99,14 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
 
   std::weak_ptr<NetworkConfigurationFilter> weak_self = weak_from_this();
   Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
-      target_url, proxy_settings_, [&weak_self](std::vector<Network::ProxySettings>& proxies) {
+      target_url, proxy_settings_,
+      [&weak_self](const std::vector<Network::ProxySettings>& proxies) {
         if (auto caller_ptr = weak_self.lock()) {
-          caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, &proxies]() {
+          Network::ProxySettingsConstSharedPtr proxy_settings =
+              Network::ProxySettings::create(proxies);
+          caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, proxy_settings]() {
             if (auto filter_ptr = weak_self.lock()) {
-              filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));
+              filter_ptr->onProxyResolutionComplete(proxy_settings);
             }
           });
         }
