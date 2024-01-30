@@ -164,7 +164,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Trailers) {
     return CelValue::CreateMap(&trailers_);
   } else if (value == Flags) {
-    return CelValue::CreateInt64(info_.responseFlags());
+    return CelValue::CreateInt64(info_.legacyResponseFlags());
   } else if (value == GrpcStatus) {
     auto const& optional_status = Grpc::Common::getGrpcStatus(
         trailers_.value_ ? *trailers_.value_ : *Http::StaticEmptyHeaders::get().response_trailers,
@@ -303,6 +303,7 @@ public:
   // Default stubs.
   int size() const override { return 0; }
   bool empty() const override { return true; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return &WrapperFields::get().Empty;
   }

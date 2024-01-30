@@ -700,6 +700,15 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "darwin_any",
+    match_any = [
+        ":darwin",
+        ":darwin_arm64",
+        ":darwin_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "apple_dbg",
     match_all = [
         ":apple",

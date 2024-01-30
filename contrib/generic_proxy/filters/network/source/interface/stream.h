@@ -247,7 +247,7 @@ using StatusCode = absl::StatusCode;
 struct StreamStatus {
 public:
   StreamStatus() = default;
-  StreamStatus(uint32_t code, bool ok) : code_(code), ok_(ok) {}
+  StreamStatus(int code, bool ok) : code_(code), ok_(ok) {}
 
   // Returns true if the status indicates success. This will be used for tracing, logging
   // or stats purposes.
@@ -255,10 +255,10 @@ public:
 
   // Returns the status code value. The code will be used for tracing, logging or stats
   // purposes. The specific code value is application protocol specific.
-  ABSL_MUST_USE_RESULT uint32_t code() const { return code_; }
+  ABSL_MUST_USE_RESULT int code() const { return code_; }
 
 private:
-  uint32_t code_{};
+  int code_{};
   bool ok_{true};
 };
 

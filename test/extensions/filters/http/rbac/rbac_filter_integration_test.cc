@@ -339,6 +339,77 @@ typed_config:
           action: ALLOW
 )EOF";
 
+const std::string RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  matcher:
+    matcher_list:
+      matchers:
+        - predicate:
+            single_predicate:
+              input:
+                name: envoy.matching.inputs.cel_data_input
+                typed_config:
+                  "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+              custom_match:
+                name: envoy.matching.matchers.cel_matcher
+                typed_config:
+                  "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                  expr_match:
+                    parsed_expr:
+                      expr:
+                        id: 3
+                        call_expr:
+                          function: _==_
+                          args:
+                          - id: 2
+                            select_expr:
+                              operand:
+                                id: 1
+                                ident_expr:
+                                  name: request
+                              field: path
+                          - id: 4
+                            const_expr:
+                              string_value: "/test-localhost-deny"
+          on_match:
+            matcher:
+              matcher_tree:
+                input:
+                  name: envoy.matching.inputs.source_ip
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+                custom_match:
+                  name: envoy.matching.matchers.ip
+                  typed_config:
+                    "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
+                    range_matchers:
+                      - ranges:
+                          - address_prefix: 127.0.0.1
+                        on_match:
+                          action:
+                            name: envoy.filters.rbac.action
+                            typed_config:
+                              "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                              name: deny-request
+                              action: DENY
+              on_no_match:
+                action:
+                  name: action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                    name: allow-request
+                    action: ALLOW
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow-request
+          action: ALLOW
+)EOF";
+
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
 // TODO(#26236): Fix test suite for HTTP/3.
@@ -346,6 +417,60 @@ INSTANTIATE_TEST_SUITE_P(
     Protocols, RBACIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(RBACIntegrationTest, WithHttpAttributesCelMatchInputDenied) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The test request utilizing the path '/test-localhost-deny' is expected to be denied by the RBAC
+  // filter. This denial is based on the CEL expression that matches the request's path as
+  // '/test-localhost-deny' and subsequently restricts all access based on the IP Address, in this
+  // instance pointing to localhost.
+  auto deny_response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test-localhost-deny"},
+          {":scheme", "http"},
+          {":authority", "sni.databricks.com"},
+          {"x-forwarded-for", "10.0.0.2"},
+      },
+      1024);
+  ASSERT_TRUE(deny_response->waitForEndStream());
+  ASSERT_TRUE(deny_response->complete());
+  EXPECT_EQ("403", deny_response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny-request]"));
+}
+
+TEST_P(RBACIntegrationTest, WithHttpAttributesCelMatchInputNoMatch) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(RBAC_MATCHER_WITH_HTTP_ATTRS_CEL_MATCH_INPUT_CONFIG);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The test request utilizing the path '/allow' is expected to be allowed by the RBAC filter as it
+  // doesn't match the CEL expression and hit the catch-all path which allows all the traffic.
+  auto allow_response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/allow"},
+          {":scheme", "http"},
+          {":authority", "sni.databricks.com"},
+          {"x-forwarded-for", "10.0.0.2"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(allow_response->waitForEndStream());
+  ASSERT_TRUE(allow_response->complete());
+  EXPECT_EQ("200", allow_response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("via_upstream"));
+}
 
 TEST_P(RBACIntegrationTest, Allowed) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");

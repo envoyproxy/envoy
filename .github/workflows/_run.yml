@@ -253,7 +253,7 @@ jobs:
         warning-match: ${{ inputs.warning-match }}
         working-directory: ${{ inputs.working-directory }}
       env:
-        GITHUB_TOKEN: ${{ steps.checkout.outputs.token && steps.checkout.outputs.token || secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
         ENVOY_RBE: ${{ inputs.rbe != 'false' && 1 || '' }}
         RBE_KEY: ${{ secrets.rbe-key }}

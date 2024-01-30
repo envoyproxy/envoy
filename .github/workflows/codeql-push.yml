@@ -41,8 +41,9 @@ jobs:
         # TODO(phlax): Shift this to an action
         compare_head () {
             while IFS= read -r line; do
-                echo "CHECK: ${line}"
-                bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
+                if [[ -n "$line" ]]; then
+                    bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
+                fi
             done < <(git diff --name-only HEAD "${1}" -- source/* include/*)
         }
         if [[ "$GIT_EVENT" == "pull_request" ]]; then

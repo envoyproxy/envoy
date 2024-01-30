@@ -102,8 +102,8 @@ struct SettingsEntryEquals {
   }
 };
 
-void validateCustomSettingsParameters(
-    const envoy::config::core::v3::Http2ProtocolOptions& options) {
+absl::Status
+validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
   absl::node_hash_set<SettingsEntry, SettingsEntryHash, SettingsEntryEquals> custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
@@ -122,7 +122,7 @@ void validateCustomSettingsParameters(
     switch (it.identifier().value()) {
     case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
-        throwEnvoyExceptionOrPanic(
+        return absl::InvalidArgumentError(
             "server push is not supported by Envoy and can not be enabled via a "
             "SETTINGS parameter.");
       }
@@ -130,8 +130,9 @@ void validateCustomSettingsParameters(
     case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
-      throwEnvoyExceptionOrPanic("the \"allow_connect\" SETTINGS parameter must only be configured "
-                                 "through the named field");
+      return absl::InvalidArgumentError(
+          "the \"allow_connect\" SETTINGS parameter must only be configured "
+          "through the named field");
     case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
@@ -154,16 +155,17 @@ void validateCustomSettingsParameters(
   }
 
   if (!custom_parameter_collisions.empty()) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "inconsistent HTTP/2 custom SETTINGS parameter(s) detected; identifiers = {{{}}}",
         absl::StrJoin(custom_parameter_collisions, ",")));
   }
   if (!parameter_collisions.empty()) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "the {{{}}} HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
         "custom parameters",
         absl::StrJoin(parameter_collisions, ",")));
   }
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -186,23 +188,23 @@ const uint32_t OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const ProtobufWkt::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
-  if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
-    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+  if (ret.status().ok() && !options.has_override_stream_error_on_invalid_http_message() &&
+      hcm_stream_error_set) {
+    ret->mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
   }
   return ret;
 }
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
-  // This will throw an exception when a custom parameter and a named parameter collide.
-  validateCustomSettingsParameters(options);
+  RETURN_IF_NOT_OK(validateCustomSettingsParameters(options));
 
   if (!options.has_override_stream_error_on_invalid_http_message()) {
     options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(

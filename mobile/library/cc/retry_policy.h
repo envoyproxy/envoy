@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "absl/types/optional.h"
-#include "headers.h"
-#include "request_headers.h"
+#include "library/cc/headers.h"
+#include "library/cc/request_headers.h"
 
 namespace Envoy {
 namespace Platform {

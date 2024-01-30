@@ -29,7 +29,7 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
-RUNTIME_GUARD(envoy_reloadable_features_allow_absolute_url_with_mixed_scheme);
+RUNTIME_GUARD(envoy_reloadable_features_abort_filter_chain_on_stream_reset);
 RUNTIME_GUARD(envoy_reloadable_features_append_xfh_idempotent);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_zombie_streams);
 RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
@@ -47,14 +47,16 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_connect_udp_support);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_zone_routing_different_zone_counts);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
+RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_change_http_status);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_handle_empty_response);
 RUNTIME_GUARD(envoy_reloadable_features_handle_uppercase_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_hmac_base64_encoding_only);
-RUNTIME_GUARD(envoy_reloadable_features_http1_allow_codec_error_response_after_1xx_headers);
 RUNTIME_GUARD(envoy_reloadable_features_http1_connection_close_header_in_redirect);
+// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_decode_metadata_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
+// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_http2_validate_authority_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
@@ -74,7 +76,6 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth_make_token_cookie_httponly);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_standard_max_age_value);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_overload_manager_error_unknown_action);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_upstream_request_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_te);
