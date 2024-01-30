@@ -289,7 +289,7 @@ TEST(Context, ResponseAttributes) {
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
-  EXPECT_CALL(info, responseFlags()).WillRepeatedly(Return(0x1));
+  EXPECT_CALL(info, legacyResponseFlags()).WillRepeatedly(Return(0x1));
 
   const absl::optional<std::string> code_details = "unauthorized";
   EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));

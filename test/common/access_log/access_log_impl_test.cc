@@ -1077,7 +1077,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   for (const auto& [flag_strings, response_flag] :
-       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+       StreamInfo::ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     UNREFERENCED_PARAMETER(flag_strings);
 
     TestStreamInfo stream_info(time_source_);

@@ -41,7 +41,7 @@ protected:
         sizeof(stream_info) == 840 || sizeof(stream_info) == 856 || sizeof(stream_info) == 888 ||
         sizeof(stream_info) == 776 || sizeof(stream_info) == 728 || sizeof(stream_info) == 744 ||
         sizeof(stream_info) == 680 || sizeof(stream_info) == 696 || sizeof(stream_info) == 688 ||
-        sizeof(stream_info) == 720 || sizeof(stream_info) == 704)
+        sizeof(stream_info) == 736 || sizeof(stream_info) == 728 || sizeof(stream_info) == 712)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -138,7 +138,6 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
   EXPECT_FALSE(stream_info.hasAnyResponseFlag());
-  EXPECT_FALSE(stream_info.intersectResponseFlags(0));
   for (ResponseFlag flag : responseFlags) {
     // Test cumulative setting of response flags.
     EXPECT_FALSE(stream_info.hasResponseFlag(flag))
@@ -148,12 +147,12 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
         << fmt::format("Flag: {} was expected to be set", flag);
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
-  EXPECT_EQ(0xFFF, stream_info.responseFlags());
 
-  StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  stream_info2.setResponseFlag(FailedLocalHealthCheck);
+  for (size_t i = 0; i < responseFlags.size(); i++) {
+    EXPECT_EQ(static_cast<uint16_t>(responseFlags[i]), stream_info.responseFlags()[i].value());
+  }
 
-  EXPECT_TRUE(stream_info2.intersectResponseFlags(FailedLocalHealthCheck));
+  EXPECT_EQ(0xFFF, stream_info.legacyResponseFlags());
 }
 
 TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {

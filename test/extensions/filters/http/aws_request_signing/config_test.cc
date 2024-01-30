@@ -238,6 +238,14 @@ stat_prefix: foo_prefix
       EnvoyException);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, UpstreamFactoryTest) {
+
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.aws_request_signing");
+  ASSERT_NE(factory, nullptr);
+}
+
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
 } // namespace Extensions

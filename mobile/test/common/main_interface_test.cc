@@ -11,7 +11,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/engine.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/main_interface.h"
 
 using testing::_;
 using testing::HasSubstr;
@@ -282,15 +281,11 @@ TEST_F(MainInterfaceTest, RegisterPlatformApi) {
       engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   uint64_t fake_api;
-  EXPECT_EQ(ENVOY_SUCCESS, register_platform_api("api", &fake_api));
+  Envoy::Api::External::registerApi("api", &fake_api);
 
   engine->terminate();
 
   ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
-}
-
-TEST_F(MainInterfaceTest, PreferredNetwork) {
-  EXPECT_EQ(ENVOY_SUCCESS, set_preferred_network(0, ENVOY_NET_WLAN));
 }
 
 TEST(EngineTest, RecordCounter) {
@@ -305,13 +300,11 @@ TEST(EngineTest, RecordCounter) {
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
                                     &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE, record_counter_inc(0, "counter", envoy_stats_notags, 1));
   std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
-  envoy_engine_t engine_handle = reinterpret_cast<envoy_engine_t>(engine.get());
 
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  EXPECT_EQ(ENVOY_SUCCESS, record_counter_inc(engine_handle, "counter", envoy_stats_notags, 1));
+  EXPECT_EQ(ENVOY_SUCCESS, engine->recordCounterInc("counter", envoy_stats_notags, 1));
 
   engine->terminate();
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -526,11 +519,10 @@ TEST_F(MainInterfaceTest, ResetConnectivityState) {
                                     } /*on_exit*/,
                                     &test_context /*context*/};
   std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
-  envoy_engine_t engine_handle = reinterpret_cast<envoy_engine_t>(engine.get());
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  ASSERT_EQ(ENVOY_SUCCESS, reset_connectivity_state(engine_handle));
+  ASSERT_EQ(ENVOY_SUCCESS, engine->resetConnectivityState());
 
   engine->terminate();
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));

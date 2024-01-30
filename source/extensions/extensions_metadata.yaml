@@ -205,8 +205,10 @@ envoy.filters.http.aws_lambda:
 envoy.filters.http.aws_request_signing:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute

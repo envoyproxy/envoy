@@ -1,5 +1,4 @@
 #include "library/common/engine.h"
-#include "library/common/main_interface.h"
 
 // NOLINT(namespace-envoy)
 

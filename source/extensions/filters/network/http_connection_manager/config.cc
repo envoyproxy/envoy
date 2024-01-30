@@ -339,9 +339,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http3_options_(Http3::Utility::initializeAndValidateOptions(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
-      http2_options_(Http2::Utility::initializeAndValidateOptions(
-          config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
-          config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
           config.http_protocol_options(), context.messageValidationVisitor(),
           config.stream_error_on_invalid_http_message(),
@@ -404,6 +401,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
+
+  auto options_or_error = Http2::Utility::initializeAndValidateOptions(
+      config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
+      config.stream_error_on_invalid_http_message());
+  THROW_IF_STATUS_NOT_OK(options_or_error, throw);
+  http2_options_ = options_or_error.value();
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
