@@ -23,9 +23,9 @@ private:
 
 // Register a custom response flag by specifying the flag and the long name of the flag.
 // This macro should only be used in source files to register a flag.
-#define REGISTER_CUSTOM_RESPONSE_FLAG(short, long)                                                 \
+#define REGISTER_CUSTOM_RESPONSE_FLAG(flag_short_string, flag_long_string)                         \
   static CustomResponseFlag /* NOLINT(fuchsia-statically-constructed-objects) */                   \
-      registered_##short{#short, #long};
+      registered_##flag_short_string{#flag_short_string, #flag_long_string};
 
 // Get the registered flag value. This macro should only be used when calling the
 // 'setResponseFlag' method in the StreamInfo class.
@@ -40,9 +40,9 @@ private:
 // // header.h
 // ResponseFlag getRegisteredFlag();
 // // source.cc
-// REGISTER_CUSTOM_RESPONSE_FLAG(short, long);
-// ResponseFlag getRegisteredFlag() { return CUSTOM_RESPONSE_FLAG(short); }
-#define CUSTOM_RESPONSE_FLAG(short) registered_##short.flag()
+// REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
+// ResponseFlag getRegisteredFlag() { return CUSTOM_RESPONSE_FLAG(CF); }
+#define CUSTOM_RESPONSE_FLAG(flag_short_string) registered_##flag_short_string.flag()
 
 /**
  * Util class for ResponseFlags.
