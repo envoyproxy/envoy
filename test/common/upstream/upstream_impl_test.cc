@@ -3518,6 +3518,33 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
                              .address_->asString());
 }
 
+TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    upstream_connection_options:
+      happy_eyeballs_config:
+        first_address_family_version: V4
+        first_address_family_count: 1
+  )EOF";
+  auto cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+  cluster->initialize([] {});
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig expected_config;
+  expected_config.set_first_address_family_version(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
+  expected_config.set_first_address_family_count(1);
+  EXPECT_TRUE(cluster->info()->happyEyeballsConfig().has_value());
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_version(),
+            envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_count(), 1);
+}
+
 class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 // Test that the correct feature() is set when close_connections_on_host_health_failure is

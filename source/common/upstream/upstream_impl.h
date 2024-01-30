@@ -1053,12 +1053,12 @@ public:
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
-  const std::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {
     if (happy_eyeballs_config_ == nullptr) {
       return std::nullopt;
     }
-    return std::make_optional(*happy_eyeballs_config_);
+    return absl::make_optional(*happy_eyeballs_config_);
   }
 
 protected:

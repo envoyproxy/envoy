@@ -203,7 +203,7 @@ public:
                Http::FilterChainManager& manager),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
-  MOCK_METHOD(const std::optional<
+  MOCK_METHOD(const absl::optional<
                   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
               happyEyeballsConfig, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
