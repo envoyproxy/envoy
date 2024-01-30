@@ -32,24 +32,27 @@ public:
 };
 
 TEST_F(ConfigTest, Basic) {
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_FALSE(config.use_downstream_protocol_);
-  EXPECT_FALSE(config.use_http2_);
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_FALSE(config->use_downstream_protocol_);
+  EXPECT_FALSE(config->use_http2_);
 }
 
 TEST_F(ConfigTest, Downstream) {
   options_.mutable_use_downstream_protocol_config();
   {
-    ProtocolOptionsConfigImpl config(options_, server_context_);
-    EXPECT_TRUE(config.use_downstream_protocol_);
-    EXPECT_FALSE(config.use_http2_);
+    std::shared_ptr<ProtocolOptionsConfigImpl> config =
+        ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+    EXPECT_TRUE(config->use_downstream_protocol_);
+    EXPECT_FALSE(config->use_http2_);
   }
 
   options_.mutable_use_downstream_protocol_config()->mutable_http2_protocol_options();
   {
-    ProtocolOptionsConfigImpl config(options_, server_context_);
-    EXPECT_TRUE(config.use_downstream_protocol_);
-    EXPECT_TRUE(config.use_http2_);
+    std::shared_ptr<ProtocolOptionsConfigImpl> config =
+        ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+    EXPECT_TRUE(config->use_downstream_protocol_);
+    EXPECT_TRUE(config->use_http2_);
   }
 }
 
@@ -60,28 +63,32 @@ TEST(FactoryTest, EmptyProto) {
 
 TEST_F(ConfigTest, Auto) {
   options_.mutable_auto_config();
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_FALSE(config.use_downstream_protocol_);
-  EXPECT_TRUE(config.use_http2_);
-  EXPECT_FALSE(config.use_http3_);
-  EXPECT_TRUE(config.use_alpn_);
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_FALSE(config->use_downstream_protocol_);
+  EXPECT_TRUE(config->use_http2_);
+  EXPECT_FALSE(config->use_http3_);
+  EXPECT_TRUE(config->use_alpn_);
 }
 
 TEST_F(ConfigTest, AutoHttp3) {
   options_.mutable_auto_config();
   options_.mutable_auto_config()->mutable_http3_protocol_options();
   options_.mutable_auto_config()->mutable_alternate_protocols_cache_options();
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_TRUE(config.use_http2_);
-  EXPECT_TRUE(config.use_http3_);
-  EXPECT_TRUE(config.use_alpn_);
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_TRUE(config->use_http2_);
+  EXPECT_TRUE(config->use_http3_);
+  EXPECT_TRUE(config->use_alpn_);
 }
 
 TEST_F(ConfigTest, AutoHttp3NoCache) {
   options_.mutable_auto_config();
   options_.mutable_auto_config()->mutable_http3_protocol_options();
   EXPECT_THROW_WITH_MESSAGE(
-      ProtocolOptionsConfigImpl config(options_, server_context_), EnvoyException,
+      std::shared_ptr<ProtocolOptionsConfigImpl> config =
+          ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value(),
+      EnvoyException,
       "alternate protocols cache must be configured when HTTP/3 is enabled with auto_config");
 }
 
@@ -93,7 +100,9 @@ TEST_F(ConfigTest, KvStoreConcurrencyFail) {
       ->mutable_key_value_store_config();
   server_context_.options_.concurrency_ = 2;
   EXPECT_THROW_WITH_MESSAGE(
-      ProtocolOptionsConfigImpl config(options_, server_context_), EnvoyException,
+      std::shared_ptr<ProtocolOptionsConfigImpl> config =
+          ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value(),
+      EnvoyException,
       "options has key value store but Envoy has concurrency = 2 : key_value_store_config {\n}\n");
 }
 
@@ -180,13 +189,20 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   TestUtility::loadFromYamlAndValidate(yaml_string, options_);
 #ifdef ENVOY_ENABLE_UHV
-  ProtocolOptionsConfigImpl config(options_, server_context_);
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
-  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+  EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
 #else
   // If UHV is disabled, providing config should result in rejection
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  EXPECT_THROW(
+      {
+        std::shared_ptr<ProtocolOptionsConfigImpl> config =
+            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .value();
+      },
+      EnvoyException);
 #endif
 }
 
@@ -204,13 +220,20 @@ TEST_F(ConfigTest, HeaderValidatorConfigWithRuntimeDisabled) {
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   TestUtility::loadFromYamlAndValidate(yaml_string, options_);
 #ifdef ENVOY_ENABLE_UHV
-  ProtocolOptionsConfigImpl config(options_, server_context_);
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
   // Without envoy.reloadable_features.enable_universal_header_validator set UHV is always disabled
-  EXPECT_EQ(nullptr, config.header_validator_factory_);
+  EXPECT_EQ(nullptr, config->header_validator_factory_);
 #else
   // If UHV is disabled, providing config should result in rejection
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  EXPECT_THROW(
+      {
+        std::shared_ptr<ProtocolOptionsConfigImpl> config =
+            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .value();
+      },
+      EnvoyException);
 #endif
 }
 
@@ -225,14 +248,21 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithRuntimeEnabled) {
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
 #ifdef ENVOY_ENABLE_UHV
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  EXPECT_THROW(
+      {
+        std::shared_ptr<ProtocolOptionsConfigImpl> config =
+            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .value();
+      },
+      EnvoyException);
 #endif
 }
 
@@ -242,10 +272,11 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithoutOverride) {
   DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
-  ProtocolOptionsConfigImpl config(options_, server_context_);
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
   // By default envoy.reloadable_features.enable_universal_header_validator is false preventing UHV
   // use
-  EXPECT_EQ(nullptr, config.header_validator_factory_);
+  EXPECT_EQ(nullptr, config->header_validator_factory_);
 }
 
 TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig) {
@@ -266,14 +297,21 @@ TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
 #ifdef ENVOY_ENABLE_UHV
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  EXPECT_THROW(
+      {
+        std::shared_ptr<ProtocolOptionsConfigImpl> config =
+            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .value();
+      },
+      EnvoyException);
 #endif
 }
 
@@ -295,14 +333,21 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
 #ifdef ENVOY_ENABLE_UHV
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  EXPECT_THROW(
+      {
+        std::shared_ptr<ProtocolOptionsConfigImpl> config =
+            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .value();
+      },
+      EnvoyException);
 #endif
 }
 
@@ -324,14 +369,21 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
 #ifdef ENVOY_ENABLE_UHV
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  EXPECT_THROW(
+      {
+        std::shared_ptr<ProtocolOptionsConfigImpl> config =
+            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .value();
+      },
+      EnvoyException);
 #endif
 }
 
@@ -353,14 +405,21 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
   Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
   NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
 #ifdef ENVOY_ENABLE_UHV
-  ProtocolOptionsConfigImpl config(options_, server_context_);
-  EXPECT_NE(nullptr, config.header_validator_factory_->createClientHeaderValidator(
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  EXPECT_NE(nullptr, config->header_validator_factory_->createClientHeaderValidator(
                          ::Envoy::Http::Protocol::Http2, stats));
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW({ ProtocolOptionsConfigImpl config(options_, server_context_); }, EnvoyException);
+  EXPECT_THROW(
+      {
+        std::shared_ptr<ProtocolOptionsConfigImpl> config =
+            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .value();
+      },
+      EnvoyException);
 #endif
 }
 
