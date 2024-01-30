@@ -436,7 +436,10 @@ envoy_sh_test(
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocoverage",
+        "skip_on_windows",
+    ],
 )
 
 envoy_cc_test(
