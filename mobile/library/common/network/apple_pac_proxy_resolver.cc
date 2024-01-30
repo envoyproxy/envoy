@@ -10,10 +10,19 @@ namespace Network {
 
 namespace {
 
-// Called when the PAC URL resolution has executed and the result is available.
-static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies,
-                                                 CFErrorRef cf_error) {
-  // `ptr` contains the unowned pointer to the PacResultCallbackWrapper. We extract it from the
+// Creates a CFURLRef from a C++ string URL.
+CFURLRef createCFURL(absl::string_view url_string) {
+  auto cf_url_string =
+      CFStringCreateWithCString(kCFAllocatorDefault, url_string.begin(), kCFStringEncodingUTF8);
+  auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, /*baseURL=*/nullptr);
+  CFRelease(cf_url_string);
+  return cf_url;
+}
+
+} // namespace
+
+void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFErrorRef cf_error) {
+  // `ptr` contains the unowned pointer to the ProxySettingsResolvedCallback. We extract it from the
   // void* and wrap it in a unique_ptr so the memory gets reclaimed at the end of the function when
   // `completion_callback` goes out of scope.
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback(
@@ -41,9 +50,7 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
           static_cast<CFStringRef>(CFDictionaryGetValue(cf_dictionary, kCFProxyHostNameKey));
       CFNumberRef cf_port =
           static_cast<CFNumberRef>(CFDictionaryGetValue(cf_dictionary, kCFProxyPortNumberKey));
-      std::string hostname = Apple::toString(cf_host);
-      int port = Apple::toInt(cf_port);
-      proxies.emplace_back(ProxySettings(std::move(hostname), port));
+      proxies.emplace_back(ProxySettings(Apple::toString(cf_host), Apple::toInt(cf_port)));
     } else if (is_direct_proxy) {
       proxies.push_back(ProxySettings::direct());
     }
@@ -52,16 +59,17 @@ static void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxie
   (*completion_callback)(proxies);
 }
 
-// Creates a CFURLRef from a C++ string URL.
-CFURLRef createCFURL(absl::string_view url_string) {
-  auto cf_url_string =
-      CFStringCreateWithCString(kCFAllocatorDefault, url_string.begin(), kCFStringEncodingUTF8);
-  auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, /*baseURL=*/nullptr);
-  CFRelease(cf_url_string);
-  return cf_url;
+CFRunLoopSourceRef
+ApplePacProxyResolver::createPacUrlResolverSource(CFURLRef cf_proxy_autoconfiguration_file_url,
+                                                  CFURLRef cf_target_url,
+                                                  CFStreamClientContext* context) {
+  // Even though neither the name of the method nor Apple's documentation mentions that, manual
+  // testing shows that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched
+  // PAC file and does not fetch it on every proxy resolution request.
+  return CFNetworkExecuteProxyAutoConfigurationURL(cf_proxy_autoconfiguration_file_url,
+                                                   cf_target_url,
+                                                   proxyAutoConfigurationResultCallback, context);
 }
-
-} // namespace
 
 void ApplePacProxyResolver::resolveProxies(
     absl::string_view target_url_string, absl::string_view proxy_autoconfiguration_file_url_string,
@@ -74,20 +82,24 @@ void ApplePacProxyResolver::resolveProxies(
       std::make_unique<ProxySettingsResolvedCallback>(std::move(proxy_resolution_completed));
   // According to https://developer.apple.com/documentation/corefoundation/cfstreamclientcontext,
   // the version must be 0.
-  CFStreamClientContext context = {/*version=*/0, /*info=*/completion_callback.release(),
-                                   /*retain=*/nullptr, /*release=*/nullptr,
-                                   /*copyDescription=*/nullptr};
-  // Even though neither the name of the method nor Apple's documentation mentions that, manual
-  // testing shows that `CFNetworkExecuteProxyAutoConfigurationURL` method does caching of fetched
-  // PAC file and does not fetch it on every proxy resolution request.
-  CFRunLoopSourceRef run_loop_source =
-      CFNetworkExecuteProxyAutoConfigurationURL(cf_proxy_autoconfiguration_file_url, cf_target_url,
-                                                proxyAutoConfigurationResultCallback, &context);
+  auto context = std::make_unique<CFStreamClientContext>(
+      CFStreamClientContext{/*version=*/0,
+                            /*info=*/completion_callback.release(),
+                            /*retain=*/nullptr,
+                            /*release=*/nullptr,
+                            /*copyDescription=*/nullptr});
+
+  // Ownership of the context gets released to the CFRunLoopSourceRef. When
+  // `proxyAutoConfigurationResultCallback` gets invoked, the pointer is passed in and is
+  // responsible for releasing the memory.
+  CFRunLoopSourceRef run_loop_source = createPacUrlResolverSource(
+      cf_proxy_autoconfiguration_file_url, cf_target_url, context.release());
 
   CFRunLoopAddSource(CFRunLoopGetMain(), run_loop_source, kCFRunLoopDefaultMode);
 
   CFRelease(cf_target_url);
   CFRelease(cf_proxy_autoconfiguration_file_url);
+  CFRelease(run_loop_source);
 }
 
 } // namespace Network

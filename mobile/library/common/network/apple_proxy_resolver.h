@@ -49,6 +49,12 @@ public:
    */
   void setSettingsMonitorForTest(std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor);
 
+  /**
+   * Resets the PAC URL resolver to the supplied instance.
+   * For tests only.
+   */
+  void setPacResolverForTest(std::unique_ptr<ApplePacProxyResolver>&& resolver);
+
 private:
   std::unique_ptr<AppleSystemProxySettingsMonitor> proxy_settings_monitor_;
   std::unique_ptr<ApplePacProxyResolver> pac_proxy_resolver_;

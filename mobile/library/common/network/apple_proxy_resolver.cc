@@ -18,11 +18,6 @@ SystemProxySettingsReadCallback AppleProxyResolver::proxySettingsUpdater() {
       });
 }
 
-void AppleProxyResolver::setSettingsMonitorForTest(
-    std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor) {
-  proxy_settings_monitor_ = std::move(monitor);
-}
-
 void AppleProxyResolver::start() { proxy_settings_monitor_->start(); }
 
 ProxyResolutionResult
@@ -61,6 +56,15 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
         proxy_resolution_completed(proxies);
       });
   return ProxyResolutionResult::RESULT_IN_PROGRESS;
+}
+
+void AppleProxyResolver::setSettingsMonitorForTest(
+    std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor) {
+  proxy_settings_monitor_ = std::move(monitor);
+}
+
+void AppleProxyResolver::setPacResolverForTest(std::unique_ptr<ApplePacProxyResolver>&& resolver) {
+  pac_proxy_resolver_ = std::move(resolver);
 }
 
 } // namespace Network

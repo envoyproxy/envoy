@@ -6,6 +6,8 @@
 @interface EnvoyTestApi : NSObject
 
 // Registers a test Proxy Resolver API.
-+ (void)registerTestProxyResolver:(NSString *)host port:(NSInteger)port;
++ (void)registerTestProxyResolver:(NSString *)host
+                             port:(NSInteger)port
+                   usePacResolver:(BOOL)usePacResolver;
 
 @end

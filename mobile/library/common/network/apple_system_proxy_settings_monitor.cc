@@ -73,8 +73,8 @@ AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
       static_cast<CFNumberRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPEnable));
   CFNumberRef cf_is_auto_config_proxy_enabled = static_cast<CFNumberRef>(
       CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigEnable));
-  const auto is_http_proxy_enabled = Apple::toInt(cf_is_http_proxy_enabled) > 0;
-  const auto is_auto_config_proxy_enabled = Apple::toInt(cf_is_auto_config_proxy_enabled) > 0;
+  const bool is_http_proxy_enabled = Apple::toInt(cf_is_http_proxy_enabled) > 0;
+  const bool is_auto_config_proxy_enabled = Apple::toInt(cf_is_auto_config_proxy_enabled) > 0;
 
   absl::optional<SystemProxySettings> settings;
   if (is_http_proxy_enabled) {

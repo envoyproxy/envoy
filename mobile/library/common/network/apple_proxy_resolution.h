@@ -9,7 +9,7 @@ extern "C" {
 /**
  * Registers the Apple proxy resolver.
  */
-void register_apple_proxy_resolver();
+void registerAppleProxyResolver();
 
 #ifdef __cplusplus
 }

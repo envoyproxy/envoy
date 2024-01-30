@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-void register_apple_proxy_resolver() {
+void registerAppleProxyResolver() {
   auto resolver = std::make_unique<Envoy::Network::AppleProxyResolver>();
   resolver->start();
 

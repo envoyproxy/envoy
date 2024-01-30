@@ -9,6 +9,7 @@ envoy_cc_test_library(
     srcs = select({
         "@envoy//bazel:apple": [
             "test_apple_api_registration.cc",
+            "test_apple_pac_proxy_resolver.cc",
             "test_apple_proxy_settings_monitor.cc",
         ],
         "//conditions:default": [],
@@ -16,6 +17,7 @@ envoy_cc_test_library(
     hdrs = select({
         "@envoy//bazel:apple": [
             "test_apple_api_registration.h",
+            "test_apple_pac_proxy_resolver.h",
             "test_apple_proxy_settings_monitor.h",
         ],
         "//conditions:default": [],

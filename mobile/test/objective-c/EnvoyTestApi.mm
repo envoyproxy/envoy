@@ -4,8 +4,10 @@
 
 @implementation EnvoyTestApi
 
-+ (void)registerTestProxyResolver:(NSString *)host port:(NSInteger)port {
-  register_test_apple_proxy_resolver([host UTF8String], port);
++ (void)registerTestProxyResolver:(NSString *)host
+                             port:(NSInteger)port
+                   usePacResolver:(BOOL)usePacResolver {
+  registerTestAppleProxyResolver([host UTF8String], port, usePacResolver);
 }
 
 @end

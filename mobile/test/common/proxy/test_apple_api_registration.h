@@ -16,7 +16,7 @@ extern "C" {
  * @param host The hostname of the test proxy.
  * @param port The port of the test proxy.
  */
-void register_test_apple_proxy_resolver(absl::string_view host, int port);
+void registerTestAppleProxyResolver(absl::string_view host, int port, bool use_pac_resolver);
 
 #ifdef __cplusplus
 }
