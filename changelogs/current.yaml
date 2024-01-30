@@ -168,6 +168,9 @@ removed_config_or_runtime:
     substituted it with :ref:`outlier_detection.successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`
     outlier detection configuration flag.
+- area: resource_monitors
+  change: |
+    Removed ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` and legacy code paths.
 
 new_features:
 - area: access_log
