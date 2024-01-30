@@ -48,5 +48,11 @@ new_features:
   change: |
     added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
     identifier.
+- area: http
+  change: |
+    Added mirror policy config :ref:`disable_shadow_host_suffix_append
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>` to toggle appending the
+    ``-shadow`` suffix to mirrored clusters. Defaults to false (appends ``-shadow`` by default).
+    This is useful for mirroring requests when Host-header-based routing is performed.
 
 deprecated:
