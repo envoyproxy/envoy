@@ -3194,7 +3194,7 @@ TEST_F(HttpFilterTest, MetadataOptionsOverride) {
 
 // Validate that when metadata options are not specified as an override, the less-specific
 // namespaces lists are used.
-TEST_F(HttpFilterTest, MetadataOptionsOverride) {
+TEST_F(HttpFilterTest, MetadataOptionsNoOverride) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
