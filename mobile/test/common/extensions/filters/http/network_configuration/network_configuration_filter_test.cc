@@ -11,9 +11,9 @@
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
+#include "library/common/network/proxy_api.h"
 #include "library/common/network/proxy_resolver_interface.h"
 #include "library/common/network/proxy_settings.h"
-#include "library/common/network/proxy_types.h"
 
 using Envoy::Extensions::Common::DynamicForwardProxy::DnsCache;
 using Envoy::Extensions::Common::DynamicForwardProxy::MockDnsCache;
@@ -190,7 +190,7 @@ class MockProxyResolver : public Network::ProxyResolver {
 public:
   MOCK_METHOD(Network::ProxyResolutionResult, resolveProxy,
               (const std::string& target_url_string, std::vector<Network::ProxySettings>& proxies,
-               ProxySettingsResolvedCallback proxy_resolution_completed));
+               Network::ProxySettingsResolvedCallback proxy_resolution_completed));
 };
 
 class NetworkConfigurationFilterProxyResolverApiTest : public NetworkConfigurationFilterTest {
@@ -240,7 +240,7 @@ TEST_F(NetworkConfigurationFilterProxyResolverApiTest, DirectProxyConfigured) {
   EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
       .WillOnce([](const std::string& /*target_url_string*/,
                    std::vector<Network::ProxySettings>& proxies,
-                   ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
+                   Network::ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
         proxies.emplace_back(Network::ProxySettings::direct());
         return Network::ProxyResolutionResult::RESULT_COMPLETED;
       });
@@ -253,7 +253,7 @@ TEST_F(NetworkConfigurationFilterProxyResolverApiTest, ProxyWithIpAddressConfigu
   EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
       .WillOnce([](const std::string& /*target_url_string*/,
                    std::vector<Network::ProxySettings>& proxies,
-                   ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
+                   Network::ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
         proxies.emplace_back(Network::ProxySettings("127.0.0.1", 8080));
         return Network::ProxyResolutionResult::RESULT_COMPLETED;
       });
@@ -269,7 +269,7 @@ TEST_F(NetworkConfigurationFilterProxyResolverApiTest, ProxyWithHostConfigured) 
   EXPECT_CALL(getMockProxyResolver(), resolveProxy(_, proxy_settings, _))
       .WillOnce([](const std::string& /*target_url_string*/,
                    std::vector<Network::ProxySettings>& proxies,
-                   ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
+                   Network::ProxySettingsResolvedCallback /*proxy_resolution_completed*/) {
         proxies.emplace_back(Network::ProxySettings("foo.com", 8080));
         return Network::ProxyResolutionResult::RESULT_COMPLETED;
       });
