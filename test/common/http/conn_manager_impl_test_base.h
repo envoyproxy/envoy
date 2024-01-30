@@ -53,7 +53,7 @@ public:
   void sendRequestHeadersAndData();
   ResponseHeaderMap*
   sendResponseHeaders(ResponseHeaderMapPtr&& response_headers,
-                      absl::optional<StreamInfo::ResponseFlag> response_flag = absl::nullopt,
+                      absl::optional<StreamInfo::CoreResponseFlag> response_flag = absl::nullopt,
                       std::string response_code_details = "details");
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);

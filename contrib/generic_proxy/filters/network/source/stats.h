@@ -28,7 +28,7 @@ private:
   Stats::StatNamePool pool_;
 
   std::vector<Stats::StatName> code_stat_names_;
-  absl::flat_hash_map<StreamInfo::ResponseFlag, Stats::StatName> flag_stat_names_;
+  std::vector<Stats::StatName> flag_stat_names_;
 
   Stats::StatName unknown_code_or_flag_;
 };
