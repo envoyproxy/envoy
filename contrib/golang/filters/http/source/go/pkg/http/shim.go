@@ -46,7 +46,7 @@ var ErrDupRequestKey = errors.New("dup request key")
 var Requests = &requestMap{}
 
 var (
-	initialized = false
+	initialized      = false
 	envoyConcurrency uint32
 )
 
