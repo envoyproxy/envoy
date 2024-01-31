@@ -273,7 +273,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions()),
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value(),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
       overload_manager);
 }
