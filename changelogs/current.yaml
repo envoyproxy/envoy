@@ -40,6 +40,11 @@ new_features:
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
     to preserve HTTP 1.1 responses.  This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
+- area: quic
+  change: |
+    Added QUIC protocol option :ref:`send_disable_active_migration
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to make the server send clients a transport
+    parameter to discourage client endpoints from active migration.
 - area: ext_proc
   change: |
     implemented
