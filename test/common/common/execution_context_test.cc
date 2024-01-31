@@ -6,8 +6,8 @@ namespace Envoy {
 
 class TestExecutionContext : public ExecutionContext {
 public:
-  int activation_depth() const { return activation_depth_; }
-  int activation_generations() const { return activation_generations_; }
+  int activationDepth() const { return activation_depth_; }
+  int activationGenerations() const { return activation_generations_; }
 
 private:
   void activate() override {
@@ -29,31 +29,31 @@ private:
 
 TEST(ExecutionContextTest, NullContext) {
   ScopedExecutionContext scoped_context(nullptr);
-  EXPECT_TRUE(scoped_context.is_null());
+  EXPECT_TRUE(scoped_context.isNull());
 
   ScopedExecutionContext scoped_context2;
-  EXPECT_TRUE(scoped_context2.is_null());
+  EXPECT_TRUE(scoped_context2.isNull());
 }
 
 TEST(ExecutionContextTest, NestedScopes) {
   TestExecutionContext context;
-  EXPECT_EQ(context.activation_depth(), 0);
-  EXPECT_EQ(context.activation_generations(), 0);
+  EXPECT_EQ(context.activationDepth(), 0);
+  EXPECT_EQ(context.activationGenerations(), 0);
 
   {
     ScopedExecutionContext scoped_context(&context);
-    EXPECT_EQ(context.activation_depth(), 1);
-    EXPECT_EQ(context.activation_generations(), 1);
+    EXPECT_EQ(context.activationDepth(), 1);
+    EXPECT_EQ(context.activationGenerations(), 1);
     {
       ScopedExecutionContext nested_scoped_context(&context);
-      EXPECT_EQ(context.activation_depth(), 2);
-      EXPECT_EQ(context.activation_generations(), 1);
+      EXPECT_EQ(context.activationDepth(), 2);
+      EXPECT_EQ(context.activationGenerations(), 1);
     }
-    EXPECT_EQ(context.activation_depth(), 1);
-    EXPECT_EQ(context.activation_generations(), 1);
+    EXPECT_EQ(context.activationDepth(), 1);
+    EXPECT_EQ(context.activationGenerations(), 1);
   }
-  EXPECT_EQ(context.activation_depth(), 0);
-  EXPECT_EQ(context.activation_generations(), 1);
+  EXPECT_EQ(context.activationDepth(), 0);
+  EXPECT_EQ(context.activationGenerations(), 1);
 }
 
 TEST(ExecutionContextTest, DisjointScopes) {
@@ -61,11 +61,11 @@ TEST(ExecutionContextTest, DisjointScopes) {
 
   for (int i = 1; i < 5; i++) {
     ScopedExecutionContext scoped_context(&context);
-    EXPECT_EQ(context.activation_depth(), 1);
-    EXPECT_EQ(context.activation_generations(), i);
+    EXPECT_EQ(context.activationDepth(), 1);
+    EXPECT_EQ(context.activationGenerations(), i);
   }
 
-  EXPECT_EQ(context.activation_depth(), 0);
+  EXPECT_EQ(context.activationDepth(), 0);
 }
 
 } // namespace Envoy

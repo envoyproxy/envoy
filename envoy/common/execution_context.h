@@ -59,7 +59,7 @@ public:
   // also stack-only.
   void* operator new(std::size_t) = delete;
 
-  bool is_null() const { return context_ == nullptr; }
+  bool isNull() const { return context_ == nullptr; }
 
 private:
   ExecutionContext* context_;
