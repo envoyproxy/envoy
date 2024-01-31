@@ -78,7 +78,7 @@ void setFinalStreamIntel(StreamInfo& stream_info, TimeSource& time_source,
     final_intel.sent_byte_count = stream_info.getUpstreamBytesMeter()->wireBytesSent();
     final_intel.received_byte_count = stream_info.getUpstreamBytesMeter()->wireBytesReceived();
   }
-  final_intel.response_flags = stream_info.responseFlags();
+  final_intel.response_flags = stream_info.legacyResponseFlags();
 }
 
 bool isStreamIdleTimeout(const StreamInfo& stream_info) {

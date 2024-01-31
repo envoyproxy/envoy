@@ -540,8 +540,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::ResponseFlag::LocalReset);
     EXPECT_EQ("LR", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LR")));
@@ -549,8 +548,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS_LONG");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::ResponseFlag::LocalReset);
     EXPECT_EQ("LocalReset", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LocalReset")));
