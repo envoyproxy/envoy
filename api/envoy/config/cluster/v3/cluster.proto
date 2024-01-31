@@ -1248,7 +1248,7 @@ message UpstreamConnectionOptions {
     FirstAddressFamilyVersion first_address_family_version = 1;
 
     // Specify the count of addresses being interleaved by the sorting algorithm.
-    int32 first_address_family_count = 2;
+    uint32 first_address_family_count = 2 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.

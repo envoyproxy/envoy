@@ -14,21 +14,8 @@ HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
-    const ConnectionSocket::OptionsSharedPtr options)
-    : dispatcher_(dispatcher), address_list_(sortAddresses(address_list)),
-      upstream_local_address_selector_(upstream_local_address_selector),
-      socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
-      host_(host), options_(options) {}
-
-HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
-    Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
-        upstream_local_address_selector,
-    UpstreamTransportSocketFactory& socket_factory,
-    TransportSocketOptionsConstSharedPtr transport_socket_options,
-    const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options,
-    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+    const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config)
     : dispatcher_(dispatcher),
       address_list_(sortAddressesWithConfig(address_list, happy_eyeballs_config)),
@@ -110,8 +97,11 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionProvider::sortAddressesWithConfig(
     const std::vector<Address::InstanceConstSharedPtr>& in,
-    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+    const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config) {
+  if (!happy_eyeballs_config.has_value()) {
+    return sortAddresses(in);
+  }
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_sort_address", "sort address with happy_eyeballs config.");
   std::vector<Address::InstanceConstSharedPtr> address_list;
   address_list.reserve(in.size());
@@ -120,8 +110,8 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
   // unless overwritten by happy_eyeballs_config.
   Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
-  int first_address_family_count = happy_eyeballs_config.first_address_family_count();
-  switch (happy_eyeballs_config.first_address_family_version()) {
+  int first_address_family_count = happy_eyeballs_config.value().first_address_family_count();
+  switch (happy_eyeballs_config.value().first_address_family_version()) {
   case envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT:
     break;
   case envoy::config::cluster::v3::UpstreamConnectionOptions::V4:

@@ -510,12 +510,12 @@ Host::CreateConnectionData HostImpl::createConnection(
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
       connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
           dispatcher, address_list, source_address_selector, socket_factory,
-          transport_socket_options, host, options, cluster.happyEyeballsConfig().value());
+          transport_socket_options, host, options, cluster.happyEyeballsConfig());
     } else {
       ENVOY_LOG(debug, "Upstream using happy eyeballs without config.");
       connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
           dispatcher, address_list, source_address_selector, socket_factory,
-          transport_socket_options, host, options);
+          transport_socket_options, host, options, absl::nullopt /*happy_eyeballs_config*/);
     }
   } else {
     auto upstream_local_address =

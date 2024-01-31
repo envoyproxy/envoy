@@ -24,17 +24,9 @@ public:
       UpstreamTransportSocketFactory& socket_factory,
       TransportSocketOptionsConstSharedPtr transport_socket_options,
       const Upstream::HostDescriptionConstSharedPtr& host,
-      const ConnectionSocket::OptionsSharedPtr options);
-  HappyEyeballsConnectionProvider(
-      Event::Dispatcher& dispatcher,
-      const std::vector<Address::InstanceConstSharedPtr>& address_list,
-      const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
-          upstream_local_address_selector,
-      UpstreamTransportSocketFactory& socket_factory,
-      TransportSocketOptionsConstSharedPtr transport_socket_options,
-      const Upstream::HostDescriptionConstSharedPtr& host,
       const ConnectionSocket::OptionsSharedPtr options,
-      const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+      const absl::optional<
+          envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config);
   bool hasNextConnection() override;
   ClientConnectionPtr createNextConnection(const uint64_t id) override;
@@ -49,7 +41,8 @@ public:
   sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& address_list);
   static std::vector<Address::InstanceConstSharedPtr> sortAddressesWithConfig(
       const std::vector<Address::InstanceConstSharedPtr>& address_list,
-      const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+      const absl::optional<
+          envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config);
 
 private:
@@ -85,18 +78,6 @@ private:
 class HappyEyeballsConnectionImpl : public MultiConnectionBaseImpl,
                                     Logger::Loggable<Logger::Id::happy_eyeballs> {
 public:
-  HappyEyeballsConnectionImpl(Event::Dispatcher& dispatcher,
-                              const std::vector<Address::InstanceConstSharedPtr>& address_list,
-                              const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
-                                  upstream_local_address_selector,
-                              UpstreamTransportSocketFactory& socket_factory,
-                              TransportSocketOptionsConstSharedPtr transport_socket_options,
-                              const Upstream::HostDescriptionConstSharedPtr& host,
-                              const ConnectionSocket::OptionsSharedPtr options)
-      : MultiConnectionBaseImpl(dispatcher,
-                                std::make_unique<Network::HappyEyeballsConnectionProvider>(
-                                    dispatcher, address_list, upstream_local_address_selector,
-                                    socket_factory, transport_socket_options, host, options)) {}
   HappyEyeballsConnectionImpl(
       Event::Dispatcher& dispatcher,
       const std::vector<Address::InstanceConstSharedPtr>& address_list,
@@ -106,7 +87,8 @@ public:
       TransportSocketOptionsConstSharedPtr transport_socket_options,
       const Upstream::HostDescriptionConstSharedPtr& host,
       const ConnectionSocket::OptionsSharedPtr options,
-      const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+      const absl::optional<
+          envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config)
       : MultiConnectionBaseImpl(dispatcher,
                                 std::make_unique<Network::HappyEyeballsConnectionProvider>(

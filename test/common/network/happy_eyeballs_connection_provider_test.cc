@@ -56,10 +56,11 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
   auto ip_v6_3 = std::make_shared<Address::Ipv6Instance>("ff02::3", 0);
   auto ip_v6_4 = std::make_shared<Address::Ipv6Instance>("ff02::4", 0);
 
-  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig config;
-  config.set_first_address_family_version(
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig he_config;
+  he_config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  config.set_first_address_family_count(2);
+  he_config.set_first_address_family_count(2);
+  auto config = absl::make_optional(he_config);
 
   // All v4 address so unchanged.
   std::vector<Address::InstanceConstSharedPtr> v4_list = {ip_v4_1, ip_v4_2, ip_v4_3, ip_v4_4};
