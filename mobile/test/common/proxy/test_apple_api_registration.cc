@@ -34,7 +34,7 @@ void registerTestAppleProxyResolver(absl::string_view host, int port, const bool
     test_resolver->setPacResolverForTest(
         std::make_unique<Envoy::test::TestApplePacProxyResolver>(std::string(host), port));
   }
-  Start the resolver, as we do when registering the envoy_proxy_resolver API.
+  // Start the resolver, as we do when registering the envoy_proxy_resolver API.
   test_resolver->start();
   // Create a new test ProxyResolverApi.
   auto proxy_resolver = std::make_unique<Envoy::Network::ProxyResolverApi>();
