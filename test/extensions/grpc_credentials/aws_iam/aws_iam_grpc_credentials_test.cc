@@ -4,16 +4,22 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/google_async_client_impl.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/grpc_credentials/aws_iam/config.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
 
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {
 namespace {
+
+using testing::An;
+using testing::Throw;
 
 // AWS IAM credential validation tests.
 class GrpcAwsIamClientIntegrationTest : public GrpcSslClientIntegrationTest {
@@ -156,6 +162,52 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
+}
+
+class MockSigner : public Envoy::Extensions::Common::Aws::Signer {
+public:
+  MockSigner() = default;
+  ~MockSigner() override = default;
+
+  MOCK_METHOD(void, sign, (Http::RequestMessage&, bool));
+
+  MOCK_METHOD(void, sign, (Http::RequestMessage&, bool, absl::string_view));
+  MOCK_METHOD(void, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
+  MOCK_METHOD(void, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
+  MOCK_METHOD(void, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
+};
+
+class MockAuthContext : public ::grpc::AuthContext {
+public:
+  ~MockAuthContext() override = default;
+  MOCK_METHOD(bool, IsPeerAuthenticated, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, GetPeerIdentity, (), (const, override));
+  MOCK_METHOD(std::string, GetPeerIdentityPropertyName, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, FindPropertyValues, (const std::string& name),
+              (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, begin, (), (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, end, (), (const, override));
+  MOCK_METHOD(void, AddProperty, (const std::string& key, const grpc::string_ref& value),
+              (override));
+  MOCK_METHOD(bool, SetPeerIdentityPropertyName, (const std::string& name), (override));
+};
+
+TEST(GrpcAwsIamClientTest, AwsIamGrpcAuth_SignerThrows) {
+  auto mockSign = std::make_unique<MockSigner>();
+  EXPECT_CALL(*mockSign, sign(_, An<bool>(), _)).WillOnce(Throw(EnvoyException("test")));
+
+  std::unique_ptr<Envoy::Extensions::Common::Aws::Signer> signer = std::move(mockSign);
+
+  auto testAwsIamHeaderAuthenticator =
+      new Extensions::GrpcCredentials::AwsIam::AwsIamHeaderAuthenticator(std::move(signer));
+
+  std::string url = "https://a.example.org/test";
+  grpc::string_ref urlGs(url.data(), url.size());
+  std::string method = "POST";
+  grpc::string_ref methodGs(method.data(), method.size());
+  MockAuthContext context;
+  std::multimap<grpc::string, grpc::string> metadata;
+  testAwsIamHeaderAuthenticator->GetMetadata(urlGs, methodGs, context, &metadata);
 }
 
 } // namespace
