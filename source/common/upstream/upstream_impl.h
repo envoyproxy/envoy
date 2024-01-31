@@ -1055,10 +1055,7 @@ public:
 
   const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {
-    if (happy_eyeballs_config_ == nullptr) {
-      return absl::nullopt;
-    }
-    return absl::make_optional(*happy_eyeballs_config_);
+    return happy_eyeballs_config_;
   }
 
 protected:
@@ -1164,8 +1161,7 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
-  const std::shared_ptr<
-      const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
 };
 

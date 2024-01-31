@@ -272,7 +272,8 @@ public:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
-  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig happy_eyeballs_config_;
+  absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      happy_eyeballs_config_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

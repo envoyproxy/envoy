@@ -506,18 +506,16 @@ Host::CreateConnectionData HostImpl::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list.size() > 1) {
+    absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+        happy_eyeballs_config;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs") &&
         cluster.happyEyeballsConfig().has_value()) {
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-      connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
-          dispatcher, address_list, source_address_selector, socket_factory,
-          transport_socket_options, host, options, cluster.happyEyeballsConfig());
-    } else {
-      ENVOY_LOG(debug, "Upstream using happy eyeballs without config.");
-      connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
-          dispatcher, address_list, source_address_selector, socket_factory,
-          transport_socket_options, host, options, absl::nullopt /*happy_eyeballs_config*/);
+      happy_eyeballs_config = cluster.happyEyeballsConfig();
     }
+    connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
+        dispatcher, address_list, source_address_selector, socket_factory, transport_socket_options,
+        host, options, happy_eyeballs_config);
   } else {
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
@@ -1119,10 +1117,10 @@ ClusterInfoImpl::ClusterInfoImpl(
                           config.track_cluster_stats().per_endpoint_stats()),
       happy_eyeballs_config_(
           config.upstream_connection_options().has_happy_eyeballs_config()
-              ? std::make_unique<
+              ? absl::make_optional<
                     envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
                     config.upstream_connection_options().happy_eyeballs_config())
-              : nullptr) {
+              : absl::nullopt) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(
