@@ -79,10 +79,6 @@ public:
   };
 
   ~AllocatorManager() {
-    {
-      Thread::LockGuard guard(mutex_);
-      terminating_ = true;
-    }
     tcmalloc_routine_dispatcher_->exit();
     if (tcmalloc_thread_) {
       tcmalloc_thread_->join();
@@ -94,55 +90,13 @@ private:
   const uint64_t bytes_to_release_;
   const std::chrono::milliseconds memory_release_interval_msec_;
   MemoryAllocatorManagerStats allocator_manager_stats_;
-  Event::TimerPtr memory_release_timer_;
   Thread::ThreadPtr tcmalloc_thread_;
   Event::DispatcherPtr tcmalloc_routine_dispatcher_;
-  Thread::MutexBasicLockable mutex_{};
-  bool terminating_ ABSL_GUARDED_BY(mutex_){false};
+  Event::TimerPtr memory_release_timer_;
+  void configureBackgroundMemoryRelease(Api::Api& api);
+  void tcmallocRelease();
   // Used for testing.
   friend class AllocatorManagerPeer;
-
-  /**
-   * Configures tcmalloc release rate from the page heap. If `bytes_to_release_`
-   * has been initialized to `0`, no heap memory will be released in background.
-   */
-  void configureBackgroundMemoryRelease(Api::Api& api) {
-    RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc have already been initialised");
-    tcmalloc_routine_dispatcher_ = api.allocateDispatcher(std::string(TCMALLOC_ROUTINE_THREAD_ID));
-    memory_release_timer_ = tcmalloc_routine_dispatcher_->createTimer([this]() -> void {
-      Thread::ReleasableLockGuard guard(mutex_);
-      if (terminating_) {
-        guard.release();
-        memory_release_timer_->disableTimer();
-        return;
-      }
-      guard.release();
-      const uint64_t unmapped_bytes_before_release = Stats::totalPageHeapUnmapped();
-      tcmallocRelease();
-      const uint64_t unmapped_bytes_after_release = Stats::totalPageHeapUnmapped();
-      if (unmapped_bytes_after_release > unmapped_bytes_before_release) {
-        // Only increment stats if memory was actually released. As tcmalloc releases memory on a
-        // span granularity, during some release rounds there may be no memory released, if during
-        // past round too much memory was released.
-        // https://github.com/google/tcmalloc/blob/master/tcmalloc/tcmalloc.cc#L298
-        allocator_manager_stats_.released_by_timer_.inc();
-      }
-      memory_release_timer_->enableTimer(memory_release_interval_msec_);
-    });
-    tcmalloc_thread_ = api.threadFactory().createThread(
-        [this]() -> void {
-          ENVOY_LOG_MISC(debug, "Started {}", TCMALLOC_ROUTINE_THREAD_ID);
-          memory_release_timer_->enableTimer(memory_release_interval_msec_);
-          tcmalloc_routine_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-        },
-        Thread::Options{std::string(TCMALLOC_ROUTINE_THREAD_ID)});
-    ENVOY_LOG_MISC(
-        info, fmt::format(
-                  "Configured tcmalloc with background release rate: {} bytes per {} milliseconds",
-                  bytes_to_release_, memory_release_interval_msec_.count()));
-  }
-
-  void tcmallocRelease();
 };
 
 } // namespace Memory
