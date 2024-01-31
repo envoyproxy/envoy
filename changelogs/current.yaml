@@ -34,7 +34,7 @@ new_features:
 - area: ext_proc
   change: |
     Added
-    :ref:`metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.metadata>`
+    :ref:`metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_metadata>`
     config API to allow extending inherited metadata from
     :ref:`ExternalProcessor.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`
     and
