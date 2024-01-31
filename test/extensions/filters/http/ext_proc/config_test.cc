@@ -36,6 +36,15 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
     response_trailer_mode: send
   filter_metadata:
     hello: "world"
+  metadata_options:
+    forwarding_namespaces:
+      typed:
+      - ns1
+      untyped:
+      - ns2
+    receiving_namespaces:
+      untyped:
+      - ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;
@@ -73,6 +82,15 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
     response_trailer_mode: send
   filter_metadata:
     hello: "world"
+  metadata_options:
+    forwarding_namespaces:
+      typed:
+      - ns1
+      untyped:
+      - ns2
+    receiving_namespaces:
+      untyped:
+      - ns2
   )EOF";
 
   ExternalProcessingFilterConfig factory;
@@ -91,7 +109,7 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
 TEST(HttpExtProcConfigTest, CorrectRouteMetadataOnlyConfig) {
   std::string yaml = R"EOF(
   overrides:
-    metadata:
+    grpc_metadata:
       - key: "a"
         value: "a"
   )EOF";

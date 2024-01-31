@@ -140,6 +140,15 @@ public:
         disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
+        untyped_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().untyped().begin(),
+            config.metadata_options().forwarding_namespaces().untyped().end()),
+        typed_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().typed().begin(),
+            config.metadata_options().forwarding_namespaces().typed().end()),
+        untyped_receiving_namespaces_(
+            config.metadata_options().receiving_namespaces().untyped().begin(),
+            config.metadata_options().receiving_namespaces().untyped().end()),
         expression_manager_(builder, local_info, config.request_attributes(),
                             config.response_attributes()) {}
 
@@ -173,6 +182,18 @@ public:
 
   const ExpressionManager& expressionManager() const { return expression_manager_; }
 
+  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
+    return untyped_forwarding_namespaces_;
+  }
+
+  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
+    return typed_forwarding_namespaces_;
+  }
+
+  const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -198,6 +219,10 @@ private:
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
 
+  const std::vector<std::string> untyped_forwarding_namespaces_;
+  const std::vector<std::string> typed_forwarding_namespaces_;
+  const std::vector<std::string> untyped_receiving_namespaces_;
+
   const ExpressionManager expression_manager_;
 };
 
@@ -222,14 +247,31 @@ public:
   const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
-  const std::vector<envoy::config::core::v3::HeaderValue>& metadata() const { return metadata_; }
+  const std::vector<envoy::config::core::v3::HeaderValue>& grpcMetadata() const {
+    return grpc_metadata_;
+  }
+
+  const absl::optional<const std::vector<std::string>>&
+  untypedForwardingMetadataNamespaces() const {
+    return untyped_forwarding_namespaces_;
+  }
+  const absl::optional<const std::vector<std::string>>& typedForwardingMetadataNamespaces() const {
+    return typed_forwarding_namespaces_;
+  }
+  const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
+    return untyped_receiving_namespaces_;
+  }
 
 private:
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
-  std::vector<envoy::config::core::v3::HeaderValue> metadata_;
+  std::vector<envoy::config::core::v3::HeaderValue> grpc_metadata_;
+
+  const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
+  const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
@@ -252,8 +294,14 @@ public:
          const envoy::config::core::v3::GrpcService& grpc_service)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
-        decoding_state_(*this, config->processingMode()),
-        encoding_state_(*this, config->processingMode()) {}
+        decoding_state_(*this, config->processingMode(),
+                        config->untypedForwardingMetadataNamespaces(),
+                        config->typedForwardingMetadataNamespaces(),
+                        config->untypedReceivingMetadataNamespaces()),
+        encoding_state_(*this, config->processingMode(),
+                        config->untypedForwardingMetadataNamespaces(),
+                        config->typedForwardingMetadataNamespaces(),
+                        config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpc_service_config() const {
@@ -298,6 +346,9 @@ public:
             encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
   }
 
+  const ProcessorState& encodingState() { return encoding_state_; }
+  const ProcessorState& decodingState() { return decoding_state_; }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -315,6 +366,12 @@ private:
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
+  void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
+                          const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setEncoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
+  void addDynamicMetadata(const ProcessorState& state,
+                          envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
@@ -342,6 +399,10 @@ private:
 
   // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
+
+  std::vector<std::string> untyped_forwarding_namespaces_{};
+  std::vector<std::string> typed_forwarding_namespaces_{};
+  std::vector<std::string> untyped_receiving_namespaces_{};
 };
 
 extern std::string responseCaseToString(

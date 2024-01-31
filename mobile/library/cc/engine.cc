@@ -1,16 +1,15 @@
 #include "engine.h"
 
-#include "library/common/data/utility.h"
 #include "library/common/engine.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Platform {
 
-Engine::Engine(::Envoy::Engine* engine) : engine_(engine), terminated_(false) {}
+Engine::Engine(::Envoy::Engine* engine) : engine_(engine) {}
 
 Engine::~Engine() {
-  if (!terminated_) {
+  if (!engine_->isTerminated()) {
     terminate();
   }
 }
@@ -23,26 +22,9 @@ StreamClientSharedPtr Engine::streamClient() {
   return std::make_shared<StreamClient>(shared_from_this());
 }
 
-std::string Engine::dumpStats() {
-  envoy_data data;
-  if (engine_->dumpStats(&data) == ENVOY_FAILURE) {
-    return "";
-  }
-  const std::string to_return = Data::Utility::copyToString(data);
-  release_envoy_data(data);
+std::string Engine::dumpStats() { return engine_->dumpStats(); }
 
-  return to_return;
-}
-
-envoy_status_t Engine::terminate() {
-  if (terminated_) {
-    IS_ENVOY_BUG("attempted to double terminate engine");
-    return ENVOY_FAILURE;
-  }
-  envoy_status_t ret = engine_->terminate();
-  terminated_ = true;
-  return ret;
-}
+envoy_status_t Engine::terminate() { return engine_->terminate(); }
 
 } // namespace Platform
 } // namespace Envoy
