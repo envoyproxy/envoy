@@ -79,10 +79,12 @@ CFRunLoopSourceRef TestApplePacProxyResolver::createPacUrlResolverSource(
                              /*cancel=*/nullptr,
                              /*perform=*/runLoopCallback});
 
-  auto run_loop_source = CFRunLoopSourceCreate(kCFAllocatorDefault, /*order=*/0, run_loop_context_.get());
+  auto run_loop_source =
+      CFRunLoopSourceCreate(kCFAllocatorDefault, /*order=*/0, run_loop_context_.get());
   // There are no network events that get triggered to notify this test run loop source that
   // it should process a result, so we have to signal it manually.
   CFRunLoopSourceSignal(run_loop_source);
+
   return run_loop_source;
 }
 
