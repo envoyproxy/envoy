@@ -24,7 +24,6 @@ ProxyResolutionResult
 AppleProxyResolver::resolveProxy(const std::string& target_url_string,
                                  std::vector<ProxySettings>& proxies,
                                  ProxySettingsResolvedCallback proxy_resolution_completed) {
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 1" << std::endl;
   std::string pac_file_url;
   {
     absl::MutexLock l(&mutex_);
@@ -32,20 +31,13 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
       return ProxyResolutionResult::NO_PROXY_CONFIGURED;
     }
 
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 2" << std::endl;
     const auto proxy_settings = proxy_settings_.value();
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 3" << std::endl;
     if (!proxy_settings.isPacEnabled()) {
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 4" << std::endl;
       ProxySettings settings(proxy_settings.hostname(), proxy_settings.port());
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 5" << std::endl;
       if (settings.isDirect()) {
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 6" << std::endl;
         return ProxyResolutionResult::NO_PROXY_CONFIGURED;
       }
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 7" << std::endl;
       proxies.emplace_back(std::move(settings));
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 8" << std::endl;
       return ProxyResolutionResult::RESULT_COMPLETED;
     }
 
@@ -58,7 +50,6 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
   // implement a caching layer with TTLs for PAC file URL resolution within AppleProxyResolver
   // itself.
   ASSERT(!pac_file_url.empty(), "PAC file URL must not be empty if PAC is enabled.");
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 9" << std::endl;
   pac_proxy_resolver_->resolveProxies(
       pac_file_url, target_url_string,
       [&proxy_resolution_completed](const std::vector<ProxySettings>& proxies) {
@@ -66,7 +57,6 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
         proxy_resolution_completed(proxies);
   std::cerr << "==> AAB AppleProxyResolver::resolveProxy lambda finished calling proxy_resolution_completed" << std::endl;
       });
-  std::cerr << "==> AAB AppleProxyResolver::resolveProxy 10" << std::endl;
   return ProxyResolutionResult::RESULT_IN_PROGRESS;
 }
 

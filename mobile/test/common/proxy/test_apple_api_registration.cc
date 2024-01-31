@@ -30,7 +30,6 @@ void registerTestAppleProxyResolver(absl::string_view host, int port, const bool
       std::make_unique<Envoy::test::TestAppleSystemProxySettingsMonitor>(
           std::string(host), port, use_pac_resolver, test_resolver->proxySettingsUpdater()));
   if (use_pac_resolver) {
-    std::cerr << "==> AAB using test PAC Resolver" << std::endl;
     // Create a TestApplePacProxyResolver and set the test resolver to use it.
     test_resolver->setPacResolverForTest(
         std::make_unique<Envoy::test::TestApplePacProxyResolver>(std::string(host), port));

@@ -101,12 +101,18 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
   Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
       target_url, proxy_settings_,
       [&weak_self](const std::vector<Network::ProxySettings>& proxies) {
+        std::cerr << "==> AAB NetworkConfigurationFilter::resolveProxy 1" << std::endl;
         if (auto caller_ptr = weak_self.lock()) {
+        std::cerr << "==> AAB NetworkConfigurationFilter::resolveProxy 2" << std::endl;
           Network::ProxySettingsConstSharedPtr proxy_settings =
               Network::ProxySettings::create(proxies);
+        std::cerr << "==> AAB NetworkConfigurationFilter::resolveProxy 3" << std::endl;
           caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, proxy_settings]() {
+        std::cerr << "==> AAB NetworkConfigurationFilter::resolveProxy INSIDE dispatcher.post() 4" << std::endl;
             if (auto filter_ptr = weak_self.lock()) {
+        std::cerr << "==> AAB NetworkConfigurationFilter::resolveProxy INSIDE dispatcher.post() 5" << std::endl;
               filter_ptr->onProxyResolutionComplete(proxy_settings);
+        std::cerr << "==> AAB NetworkConfigurationFilter::resolveProxy INSIDE dispatcher.post() 6" << std::endl;
             }
           });
         }
