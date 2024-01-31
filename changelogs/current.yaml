@@ -66,6 +66,8 @@ new_features:
     is defined, returned metadata may be written to the specified allowed namespaces.
 - area: monitoring
   change: |
-    Add Envoy::ExecutionContext, which is notified by ScopeTrackerScopeState's constructor and destructor.
+    Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is
+    disabled by default, it can be enabled by runtime feature flag ``envoy.restart_features.enable_execution_context``. For more details,
+    please see https://github.com/envoyproxy/envoy/issues/32012.
 
 deprecated:
