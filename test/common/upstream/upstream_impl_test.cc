@@ -1627,7 +1627,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
   config.set_first_address_family_count(2);
-  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(config));
+  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig())
+      .WillRepeatedly(Return(absl::make_optional(config)));
 
   envoy::config::core::v3::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,

@@ -1056,7 +1056,7 @@ public:
   const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {
     if (happy_eyeballs_config_ == nullptr) {
-      return std::nullopt;
+      return absl::nullopt;
     }
     return absl::make_optional(*happy_eyeballs_config_);
   }
