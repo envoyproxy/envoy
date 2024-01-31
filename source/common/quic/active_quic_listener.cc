@@ -299,7 +299,13 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     // QUICHE implementation, the server preferred address will only be sent if the client sends
     // this non-standard connection option, which is only sent by QUICHE clients. Setting this
     // causes QUICHE to always send the server preferred address if configured to do so.
-    quic_config_.SetInitialReceivedConnectionOptions(quic::QuicTagVector{quic::kSPAD});
+    //
+    // TODO(ggreenway,RyanTheOptimist): Remove this when QUICHE has a better API for managing this
+    // behavior.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.quic_send_server_preferred_address_to_all_clients")) {
+      quic_config_.SetInitialReceivedConnectionOptions(quic::QuicTagVector{quic::kSPAD});
+    }
   }
 
   worker_selector_ =

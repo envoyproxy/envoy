@@ -8,6 +8,10 @@ minor_behavior_changes:
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+- area: quic
+  change: |
+    :ref:`Server preferred address <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.server_preferred_address_config>` is
+    now sent to non-quiche quic clients when configured.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

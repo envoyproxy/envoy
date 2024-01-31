@@ -97,6 +97,7 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_sta
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
+RUNTIME_GUARD(envoy_restart_features_quic_send_server_preferred_address_to_all_clients);
 
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
