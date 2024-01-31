@@ -127,7 +127,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-               const std::string& stats_prefix,
+               const std::string& stats_prefix, bool is_upstream_filter,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
                const LocalInfo::LocalInfo& local_info)
       : failure_mode_allow_(config.failure_mode_allow()),
@@ -140,6 +140,7 @@ public:
         disable_immediate_response_(config.disable_immediate_response()),
         allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
         disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
+        is_upstream_filter_(is_upstream_filter),
         expression_manager_(builder, local_info, config.request_attributes(),
                             config.response_attributes()) {}
 
@@ -173,6 +174,8 @@ public:
 
   const ExpressionManager& expressionManager() const { return expression_manager_; }
 
+  bool isUpstreamFilter() const { return is_upstream_filter_; }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -197,7 +200,8 @@ private:
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
-
+  // is_upstream_filter_ is true if ext_proc filter is in the upstream filter chain.
+  const bool is_upstream_filter_;
   const ExpressionManager expression_manager_;
 };
 
