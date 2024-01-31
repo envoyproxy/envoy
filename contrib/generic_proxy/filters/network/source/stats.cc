@@ -35,11 +35,10 @@ Stats::StatName CodeOrFlags::statNameFromCode(uint32_t code) const {
 }
 
 Stats::StatName CodeOrFlags::statNameFromFlag(StreamInfo::ResponseFlag flag) const {
+  // Any flag value should be less than the size of flag_stat_names_. Because flag_stat_names_
+  // is initialized with all possible flags.
   ASSERT(flag.value() < flag_stat_names_.size());
-  if (flag.value() < flag_stat_names_.size()) {
-    return flag_stat_names_[flag.value()];
-  }
-  return unknown_code_or_flag_;
+  return flag_stat_names_[flag.value()];
 }
 
 void GenericFilterStatsHelper::onRequestReset() { stats_.downstream_rq_reset_.inc(); }

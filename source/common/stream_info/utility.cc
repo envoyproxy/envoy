@@ -16,6 +16,8 @@ namespace {
 
 // This flag is used to ensure that the responseFlagsVec() contains all the flags and no
 // any new custom flags are registered after the responseFlagsVec() is initialized.
+// NOTE: we expect all registrations of custom flags to happen during static initialization
+// before the first use of responseFlagsVec(). So no thread safety is needed here.
 bool& responseFlagsVecInitialized() { MUTABLE_CONSTRUCT_ON_FIRST_USE(bool, false); }
 
 } // namespace
