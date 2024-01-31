@@ -2,9 +2,9 @@
 
 #include <functional>
 
+#include "library/cc/log_level.h"
+#include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
-#include "log_level.h"
-#include "stream_client.h"
 
 namespace Envoy {
 class Engine;
@@ -37,7 +37,6 @@ private:
 
   Envoy::Engine* engine_;
   StreamClientSharedPtr stream_client_;
-  bool terminated_;
 };
 
 using EngineSharedPtr = std::shared_ptr<Engine>;

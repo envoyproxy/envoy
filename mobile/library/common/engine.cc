@@ -32,7 +32,7 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-envoy_status_t Engine::run(const std::string config, const std::string log_level) {
+envoy_status_t Engine::run(const std::string& config, const std::string& log_level) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
@@ -40,7 +40,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
   auto options = std::make_unique<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level.c_str()).ok(), "invalid log level");
+    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
   }
   options->setConcurrency(1);
   return run(std::move(options));
@@ -146,6 +146,10 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
 }
 
 envoy_status_t Engine::terminate() {
+  if (terminated_) {
+    IS_ENVOY_BUG("attempted to double terminate engine");
+    return ENVOY_FAILURE;
+  }
   // If main_thread_ has finished (or hasn't started), there's nothing more to do.
   if (!main_thread_.joinable()) {
     return ENVOY_FAILURE;
@@ -177,11 +181,17 @@ envoy_status_t Engine::terminate() {
   if (std::this_thread::get_id() != main_thread_.get_id()) {
     main_thread_.join();
   }
-
+  terminated_ = true;
   return ENVOY_SUCCESS;
 }
 
-Engine::~Engine() { terminate(); }
+bool Engine::isTerminated() const { return terminated_; }
+
+Engine::~Engine() {
+  if (!terminated_) {
+    terminate();
+  }
+}
 
 envoy_status_t Engine::setProxySettings(const char* hostname, const uint16_t port) {
   return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
@@ -254,23 +264,23 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
   statsAsText(all_stats, histograms, response);
 }
 
-envoy_status_t Engine::dumpStats(envoy_data* out) {
-  // If the engine isn't running, fail.
+std::string Engine::dumpStats() {
   if (!main_thread_.joinable()) {
-    return ENVOY_FAILURE;
+    return "";
   }
 
+  std::string stats;
   absl::Notification stats_received;
   if (dispatcher_->post([&]() -> void {
         Envoy::Buffer::OwnedImpl instance;
         handlerStats(server_->stats(), instance);
-        *out = Envoy::Data::Utility::toBridgeData(instance, 1024 * 1024 * 100);
+        stats = instance.toString();
         stats_received.Notify();
       }) == ENVOY_SUCCESS) {
     stats_received.WaitForNotification();
-    return ENVOY_SUCCESS;
+    return stats;
   }
-  return ENVOY_FAILURE;
+  return stats;
 }
 
 Upstream::ClusterManager& Engine::getClusterManager() {
