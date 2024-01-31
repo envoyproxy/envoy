@@ -133,7 +133,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_ = std::make_shared<FilterConfig>(
-        proto_config, 200ms, 10000, *stats_store_.rootScope(), "",
+        proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         local_info_);
