@@ -2,7 +2,7 @@
 
 @implementation EnvoyLogger
 
-- (instancetype)initWithLogClosure:(void (^)(NSString *))log {
+- (instancetype)initWithLogClosure:(void (^)(int, NSString *))log {
   self = [super init];
   if (!self) {
     return nil;

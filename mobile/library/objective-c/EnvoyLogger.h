@@ -7,12 +7,12 @@ NS_ASSUME_NONNULL_BEGIN
 // Logging interface.
 @interface EnvoyLogger : NSObject
 
-@property (nonatomic, copy) void (^log)(NSString *);
+@property (nonatomic, copy) void (^log)(int, NSString *);
 
 /**
  Create a new instance of the logger.
  */
-- (instancetype)initWithLogClosure:(void (^)(NSString *))log;
+- (instancetype)initWithLogClosure:(void (^)(int, NSString *))log;
 
 @end
 

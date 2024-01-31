@@ -1,4 +1,4 @@
-#include "library/common/common/lambda_logger_delegate.h"
+#include "library/common/common/logger_delegate.h"
 
 #include <iostream>
 
@@ -7,6 +7,29 @@
 
 namespace Envoy {
 namespace Logger {
+
+namespace {
+
+envoy_log_level toEnvoyLogLevel(spdlog::level::level_enum spd_log_level) {
+  switch (spd_log_level) {
+  case spdlog::level::trace:
+    return envoy_log_level::ENVOY_LOG_LEVEL_TRACE;
+  case spdlog::level::debug:
+    return envoy_log_level::ENVOY_LOG_LEVEL_DEBUG;
+  case spdlog::level::info:
+    return envoy_log_level::ENVOY_LOG_LEVEL_INFO;
+  case spdlog::level::warn:
+    return envoy_log_level::ENVOY_LOG_LEVEL_WARN;
+  case spdlog::level::err:
+    return envoy_log_level::ENVOY_LOG_LEVEL_ERROR;
+  case spdlog::level::critical:
+    return envoy_log_level::ENVOY_LOG_LEVEL_CRITICAL;
+  default:
+    PANIC("not implemented");
+  }
+}
+
+} //  namespace
 
 void EventTrackingDelegate::logWithStableName(absl::string_view stable_name, absl::string_view,
                                               absl::string_view, absl::string_view msg) {
@@ -30,8 +53,9 @@ LambdaDelegate::~LambdaDelegate() {
   logger_.release(logger_.context);
 }
 
-void LambdaDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
-  logger_.log(Data::Utility::copyToBridgeData(msg), logger_.context);
+void LambdaDelegate::log(absl::string_view msg, const spdlog::details::log_msg& log_msg) {
+  logger_.log(toEnvoyLogLevel(log_msg.level), Data::Utility::copyToBridgeData(msg),
+              logger_.context);
 }
 
 DefaultDelegate::DefaultDelegate(absl::Mutex& mutex, DelegatingLogSinkSharedPtr log_sink)
@@ -40,6 +64,17 @@ DefaultDelegate::DefaultDelegate(absl::Mutex& mutex, DelegatingLogSinkSharedPtr 
 }
 
 DefaultDelegate::~DefaultDelegate() { restoreDelegate(); }
+
+// SinkDelegate
+void DefaultDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
+  absl::MutexLock l(&mutex_);
+  std::cerr << msg;
+}
+
+void DefaultDelegate::flush() {
+  absl::MutexLock l(&mutex_);
+  std::cerr << std::flush;
+}
 
 } // namespace Logger
 } // namespace Envoy

@@ -25,7 +25,7 @@ envoy_cc_library(
     deps = [
         ":engine_common_lib",
         "//library/common/bridge:utility_lib",
-        "//library/common/common:lambda_logger_delegate_lib",
+        "//library/common/common:logger_delegate_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
