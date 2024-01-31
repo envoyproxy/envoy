@@ -15,8 +15,6 @@ SystemProxySettingsReadCallback AppleProxyResolver::proxySettingsUpdater() {
       [this](absl::optional<SystemProxySettings> proxy_settings) {
         absl::MutexLock l(&mutex_);
         proxy_settings_ = std::move(proxy_settings);
-        std::cerr << "==> AAB SystemProxySettings host=" << proxy_settings_.hostname() << std::endl;
-        std::cerr << "==> AAB SystemProxySettings port=" << proxy_settings_.port() << std::endl;
       });
 }
 
