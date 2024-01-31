@@ -55,6 +55,7 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
       proxies.push_back(ProxySettings::direct());
     }
   }
+  for (const auto& x : proxies) std::cerr << "==> AAB proxy=" << x.asString() << std::endl;
 
   (*completion_callback)(proxies);
 }
