@@ -1,8 +1,7 @@
 #include "stream.h"
 
-#include "bridge_utility.h"
+#include "library/cc/bridge_utility.h"
 #include "library/common/engine.h"
-#include "library/common/main_interface.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {

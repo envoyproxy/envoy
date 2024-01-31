@@ -127,8 +127,6 @@ envoy-dev@googlegroups.com
 envoy-maintainers@googlegroups.com -
 include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
 * Announce in [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH) and [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76) slack channels.
-* Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
-  post.
 
 
 ## Security release schedule

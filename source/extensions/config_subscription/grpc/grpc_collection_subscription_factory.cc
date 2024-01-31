@@ -17,15 +17,17 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
   CustomConfigValidatorsPtr custom_config_validators = std::make_unique<CustomConfigValidatorsImpl>(
       data.validation_visitor_, data.server_, api_config_source.config_validators());
 
-  JitteredExponentialBackOffStrategyPtr backoff_strategy =
-      Utility::prepareJitteredExponentialBackOffStrategy(
-          api_config_source, data.api_.randomGenerator(), SubscriptionFactory::RetryInitialDelayMs,
-          SubscriptionFactory::RetryMaxDelayMs);
+  auto strategy_or_error = Utility::prepareJitteredExponentialBackOffStrategy(
+      api_config_source, data.api_.randomGenerator(), SubscriptionFactory::RetryInitialDelayMs,
+      SubscriptionFactory::RetryMaxDelayMs);
+  THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+  JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
+  auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true);
+  THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
   GrpcMuxContext grpc_mux_context{
-      /*async_client_=*/Config::Utility::factoryForGrpcApiConfigSource(
-          data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true)
-          ->createUncachedRawAsyncClient(),
+      factory_or_error.value()->createUncachedRawAsyncClient(),
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),
       /*local_info_=*/data.local_info_,
