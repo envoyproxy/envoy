@@ -10,7 +10,8 @@ minor_behavior_changes:
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
 - area: QUIC
   change: |
-    Port migration is default turned off.
+    Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
+    is degrading. Can be manually turned on via num_timeouts_to_trigger_port_migration proto.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
