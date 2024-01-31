@@ -4,15 +4,15 @@ namespace Envoy {
 namespace Network {
 
 const ExecutionContext*
-GetConnectionExecutionContextReadOnly(const Network::Connection& connection) {
+getConnectionExecutionContextReadOnly(const Network::Connection& connection) {
   const ConnectionExecutionContextFilterState* filter_state =
       connection.streamInfo().filterState().getDataReadOnly<ConnectionExecutionContextFilterState>(
           kConnectionExecutionContextFilterStateName);
-  return filter_state == nullptr ? nullptr : filter_state->execution_context();
+  return filter_state == nullptr ? nullptr : filter_state->executionContext();
 }
 
-ExecutionContext* GetConnectionExecutionContextMutable(const Network::Connection& connection) {
-  return const_cast<ExecutionContext*>(GetConnectionExecutionContextReadOnly(connection));
+ExecutionContext* getConnectionExecutionContextMutable(const Network::Connection& connection) {
+  return const_cast<ExecutionContext*>(getConnectionExecutionContextReadOnly(connection));
 }
 
 } // namespace Network

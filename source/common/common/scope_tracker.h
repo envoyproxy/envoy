@@ -19,8 +19,7 @@ class ScopeTrackerScopeState {
 public:
   ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::ScopeTracker& tracker)
       : registered_object_(object),
-        scoped_execution_context_(executionContextEnabled() ? object->scopedExecutionContext()
-                                                            : nullptr),
+        scoped_execution_context_(executionContextEnabled() ? object->executionContext() : nullptr),
         tracker_(tracker) {
     tracker_.pushTrackedObject(registered_object_);
   }

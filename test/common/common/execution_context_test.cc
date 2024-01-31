@@ -68,24 +68,4 @@ TEST(ExecutionContextTest, DisjointScopes) {
   EXPECT_EQ(context.activation_depth(), 0);
 }
 
-TEST(ExecutionContextTest, ExtendScopeByMove) {
-  TestExecutionContext context;
-
-  ScopedExecutionContext scoped_context1([&] {
-    ScopedExecutionContext scoped_context0(&context);
-    EXPECT_EQ(context.activation_depth(), 1);
-    EXPECT_EQ(context.activation_generations(), 1);
-    return scoped_context0;
-  }());
-  EXPECT_EQ(context.activation_depth(), 1);
-  EXPECT_EQ(context.activation_generations(), 1);
-  EXPECT_FALSE(scoped_context1.is_null());
-
-  ScopedExecutionContext scoped_context2(std::move(scoped_context1));
-  EXPECT_EQ(context.activation_depth(), 1);
-  EXPECT_EQ(context.activation_generations(), 1);
-  EXPECT_FALSE(scoped_context2.is_null());
-  EXPECT_TRUE(scoped_context1.is_null());
-}
-
 } // namespace Envoy

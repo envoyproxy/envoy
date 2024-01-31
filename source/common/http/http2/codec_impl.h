@@ -156,7 +156,7 @@ public:
   }
 
   // ScopeTrackedObject
-  ScopedExecutionContext scopedExecutionContext() const override;
+  ExecutionContext* executionContext() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:

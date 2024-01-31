@@ -45,7 +45,7 @@ TEST_F(ScopeTrackerScopeStateTest, ExecutionContextEnabled) {
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   MockScopeTrackedObject tracked_object;
-  EXPECT_CALL(tracked_object, scopedExecutionContext());
+  EXPECT_CALL(tracked_object, executionContext());
   ScopeTrackerScopeState scope(&tracked_object, *dispatcher);
 }
 

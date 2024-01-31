@@ -976,9 +976,8 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ScopedExecutionContext ConnectionImpl::scopedExecutionContext() const {
-  ExecutionContext* execution_context = GetConnectionExecutionContextMutable(connection_);
-  return ScopedExecutionContext(execution_context);
+ExecutionContext* ConnectionImpl::executionContext() const {
+  return getConnectionExecutionContextMutable(connection_);
 }
 
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {

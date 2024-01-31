@@ -21,7 +21,7 @@ public:
       std::unique_ptr<ExecutionContext> execution_context)
       : execution_context_(std::move(execution_context)) {}
 
-  const ExecutionContext* execution_context() const { return execution_context_.get(); }
+  const ExecutionContext* executionContext() const { return execution_context_.get(); }
 
 private:
   std::unique_ptr<ExecutionContext> execution_context_;
@@ -29,10 +29,10 @@ private:
 
 // Returns the ExecutionContext of a connection, if any. Or nullptr if not found.
 const ExecutionContext*
-GetConnectionExecutionContextReadOnly(const Network::Connection& connection);
+getConnectionExecutionContextReadOnly(const Network::Connection& connection);
 
 // Returns the mutable ExecutionContext of a connection. Or nullptr if not found.
-ExecutionContext* GetConnectionExecutionContextMutable(const Network::Connection& connection);
+ExecutionContext* getConnectionExecutionContextMutable(const Network::Connection& connection);
 
 } // namespace Network
 } // namespace Envoy

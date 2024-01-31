@@ -236,10 +236,9 @@ private:
     }
 
     // ScopeTrackedObject
-    ScopedExecutionContext scopedExecutionContext() const override {
-      ExecutionContext* execution_context =
-          GetConnectionExecutionContextMutable(connection_manager_.read_callbacks_->connection());
-      return ScopedExecutionContext(execution_context);
+    ExecutionContext* executionContext() const override {
+      return getConnectionExecutionContextMutable(
+          connection_manager_.read_callbacks_->connection());
     }
 
     void dumpState(std::ostream& os, int indent_level = 0) const override {

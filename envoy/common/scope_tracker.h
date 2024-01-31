@@ -19,9 +19,10 @@ class ScopeTrackedObject {
 public:
   virtual ~ScopeTrackedObject() = default;
 
-  /* If the tracked object has a ExecutionContext, this function can return a ScopedExecutionContext
-   * to active and deactive it. */
-  virtual ScopedExecutionContext scopedExecutionContext() const { return ScopedExecutionContext(); }
+  /**
+   * If the tracked object has a ExecutionContext, returns it. Returns nullptr otherwise.
+   */
+  virtual ExecutionContext* executionContext() const { return nullptr; }
 
   /**
    * Dump debug state of the object in question to the provided ostream.

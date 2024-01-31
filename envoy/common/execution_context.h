@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "source/common/common/non_copyable.h"
+
 namespace Envoy {
 
 class ScopedExecutionContext;
@@ -12,16 +14,10 @@ class ScopedExecutionContext;
 // with the execution of a piece of code. activate/deactivate are called when the said execution
 // starts/ends. For an example usage, please see
 // https://github.com/envoyproxy/envoy/issues/32012.
-class ExecutionContext {
+class ExecutionContext : NonCopyable {
 public:
   ExecutionContext() = default;
   virtual ~ExecutionContext() = default;
-
-  // No copy, move or assign.
-  ExecutionContext& operator=(const ExecutionContext&) = delete;
-  ExecutionContext& operator=(ExecutionContext&&) = delete;
-  ExecutionContext(const ExecutionContext&) = delete;
-  ExecutionContext(ExecutionContext&&) = delete;
 
 protected:
   // Called when the current thread starts to run code on behalf of the owner of this object.
@@ -44,37 +40,13 @@ protected:
 //     ScopedExecutionContext scoped_execution_context(&context);
 //     // context.deactivate() called when scoped_execution_context destructs.
 //   }
-//
-// Or, you can 'extend' its scope from a function to its caller via return-by-value:
-//   ScopedExecutionContext InnerFunction() {
-//     // context_.activate() called here.
-//     ScopedExecutionContext scoped_execution_context(&context_);
-//     return scoped_execution_context;  // Does not call context_.deactivate().
-//   }
-//
-//   void OuterFunction() {
-//     ScopedExecutionContext scoped_execution_context = InnerFunction();
-//     // context_.deactivate() called when scoped_execution_context destructs.
-//   }
-class ScopedExecutionContext {
+class ScopedExecutionContext : NonCopyable {
 public:
   ScopedExecutionContext() : ScopedExecutionContext(nullptr) {}
   ScopedExecutionContext(ExecutionContext* context) : context_(context) {
     if (context_ != nullptr) {
       context_->activate();
     }
-  }
-
-  // ScopedExecutionContext is move-constructible. No copy or assign.
-  ScopedExecutionContext& operator=(const ScopedExecutionContext&) = delete;
-  ScopedExecutionContext& operator=(ScopedExecutionContext&&) = delete;
-  ScopedExecutionContext(const ScopedExecutionContext&) = delete;
-  ScopedExecutionContext(ScopedExecutionContext&& other) {
-    if (this == &other) {
-      return;
-    }
-    context_ = other.context_;
-    other.context_ = nullptr;
   }
 
   ~ScopedExecutionContext() {
