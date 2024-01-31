@@ -1660,7 +1660,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
   EXPECT_CALL(*connection, connectionInfoSetter());
-  // Happy eyeballs config specifies the first address faimily is V4
+  // Happy eyeballs config specifies the first address family is V4
   // The underlying connection should be created with the second address(V4) in the
   // list.
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[1], _, _, _))
