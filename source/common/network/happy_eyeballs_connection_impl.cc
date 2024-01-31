@@ -110,7 +110,8 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
   // unless overwritten by happy_eyeballs_config.
   Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
-  int first_address_family_count = happy_eyeballs_config.value().first_address_family_count();
+  auto first_address_family_count =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(happy_eyeballs_config.value(), first_address_family_count, 1);
   switch (happy_eyeballs_config.value().first_address_family_version()) {
   case envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT:
     break;
@@ -133,7 +134,7 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
 
   // Address::IpVersion first_family_ip_version(Address::IpVersion::v4);
   while (first != in.end() || other != in.end()) {
-    int count = 0;
+    uint32_t count = 0;
     while (first != in.end() && ++count <= first_address_family_count) {
       address_list.push_back(*first);
       first = std::find_if(first + 1, in.end(), [&](const auto& val) {

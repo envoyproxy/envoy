@@ -1626,7 +1626,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig config;
   config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  config.set_first_address_family_count(2);
+  config.mutable_first_address_family_count()->set_value(2);
   EXPECT_CALL(*(cluster.info_), happyEyeballsConfig())
       .WillRepeatedly(Return(absl::make_optional(config)));
 
@@ -1660,9 +1660,63 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
   EXPECT_CALL(*connection, connectionInfoSetter());
-  // The underlying connection should be created with the second address in the
+  // Happy eyeballs config specifies the first address faimily is V4
+  // The underlying connection should be created with the second address(V4) in the
   // list.
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[1], _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createTimer_(_));
+
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
+  EXPECT_NE(connection, connection_data.connection_.get());
+}
+
+TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_config_in_happy_eyeballs", "true"}});
+  MockClusterMockPrioritySet cluster;
+
+  // pass in empty happy_eyeballs_config
+  // a default config will be created when flag turned on
+  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(absl::nullopt));
+
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::MockTransportSocketFactory socket_factory;
+
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
+  host->setAddressList(address_list);
+  auto connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  // Happy eyeballs config is empty, the default behavior is respecting the
+  // native order of returned destination addresses.
+  // The underlying connection should be created with the first address in the
+  // list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
 
@@ -3539,11 +3593,13 @@ TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig expected_config;
   expected_config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  expected_config.set_first_address_family_count(1);
+  uint32_t expected_count(1);
+  expected_config.mutable_first_address_family_count()->set_value(expected_count);
   EXPECT_TRUE(cluster->info()->happyEyeballsConfig().has_value());
   EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_version(),
             envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_count(), 1);
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_count().value(),
+            expected_count);
 }
 
 class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};

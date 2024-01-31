@@ -1,3 +1,5 @@
+#include <cstddef>
+
 #include "envoy/network/address.h"
 
 #include "source/common/network/address_impl.h"
@@ -59,7 +61,7 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig he_config;
   he_config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  he_config.set_first_address_family_count(2);
+  he_config.mutable_first_address_family_count()->set_value(2);
   auto config = absl::make_optional(he_config);
 
   // All v4 address so unchanged.
@@ -89,6 +91,27 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
   std::vector<Address::InstanceConstSharedPtr> interleaved3 = {ip_v4_1, ip_v4_2, ip_v6_1, ip_v4_3,
                                                                ip_v4_4, ip_v6_2, ip_v6_3, ip_v6_4};
   EXPECT_EQ(interleaved3, HappyEyeballsConnectionProvider::sortAddressesWithConfig(mixed, config));
+
+  // missing first_address_family_version
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig he_config_no_version;
+  he_config_no_version.mutable_first_address_family_count()->set_value(2);
+  auto config_no_version = absl::make_optional(he_config_no_version);
+  // first_address_family_version should default to DEFAULT when absent.
+  // v6 then v4, return interleaved list.
+  std::vector<Address::InstanceConstSharedPtr> interleaved4 = {ip_v6_1, ip_v6_2, ip_v4_1, ip_v4_2};
+  EXPECT_EQ(interleaved4, HappyEyeballsConnectionProvider::sortAddressesWithConfig(
+                              v6_then_v4, config_no_version));
+
+  // missing first_address_family_count
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig he_config_no_count;
+  he_config_no_count.set_first_address_family_version(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
+  auto config_no_count = absl::make_optional(he_config_no_count);
+  // first_address_family_count should default to 1 when absent.
+  // v6 then v4, return interleaved list.
+  std::vector<Address::InstanceConstSharedPtr> interleaved5 = {ip_v4_1, ip_v6_1, ip_v4_2, ip_v6_2};
+  EXPECT_EQ(interleaved5,
+            HappyEyeballsConnectionProvider::sortAddressesWithConfig(v6_then_v4, config_no_count));
 }
 
 } // namespace Network
