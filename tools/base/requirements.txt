@@ -1022,9 +1022,9 @@ pyflakes==3.2.0 \
     --hash=sha256:1c61603ff154621fb2a9172037d84dca3500def8c8b630657d1701f026f8af3f \
     --hash=sha256:84b5be138a2dfbb40689ca07e2152deb896a65c3a3e24c251c5c62489568074a
     # via flake8
-pygithub==2.1.1 \
-    --hash=sha256:4b528d5d6f35e991ea5fd3f942f58748f24938805cb7fcf24486546637917337 \
-    --hash=sha256:ecf12c2809c44147bce63b047b3d2e9dac8a41b63e90fcb263c703f64936b97c
+pygithub==2.2.0 \
+    --hash=sha256:41042ea53e4c372219db708c38d2ca1fd4fadab75475bac27d89d339596cfad1 \
+    --hash=sha256:e39be7c4dc39418bdd6e3ecab5931c636170b8b21b4d26f9ecf7e6102a3b51c3
     # via -r requirements.in
 pygments==2.17.2 \
     --hash=sha256:b27c2826c47d0f3219f29554824c30c5e8945175d888647acd804ddd04af846c \
@@ -1088,9 +1088,7 @@ pyreadline==2.1 \
 python-dateutil==2.8.2 \
     --hash=sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86 \
     --hash=sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9
-    # via
-    #   icalendar
-    #   pygithub
+    # via icalendar
 python-gnupg==0.5.2 \
     --hash=sha256:01d8013931c9fa3f45824bbea7054c03d6e11f258a72e7e086e168dbcb91854c \
     --hash=sha256:72ce142af6da7f07e433fef148b445fb3e07854acd2f88739008838745c0e9f5
