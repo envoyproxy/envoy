@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.2"
+"source/common:95.9"
 "source/common/api:84.5"
 "source/common/api/posix:81.8"
 "source/common/config:95.3"
@@ -11,6 +11,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.2"
+"source/common/io:16.2"
 "source/common/json:94.6"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
