@@ -30,6 +30,10 @@ bug_fixes:
     fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
     ``propagate_response_headers`` and retry configurations are enabled at the same time, and an upstream
     request is retried multiple times.
+- area: xds
+  change: |
+    Reject xDS configurations where the rate-limit's :ref:`fill_rate <envoy_v3_api_field_config.core.v3.RateLimitSettings.fill_rate>`
+    is set to Infinity or NaN.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

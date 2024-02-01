@@ -178,9 +178,10 @@ public:
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
    * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
-   * @return RateLimitSettings.
+   * @return absl::StatusOr<RateLimitSettings> - returns an error when an
+   *         invalid RateLimit config settings are provided.
    */
-  static RateLimitSettings
+  static absl::StatusOr<RateLimitSettings>
   parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
