@@ -1251,7 +1251,8 @@ message UpstreamConnectionOptions {
     // eyeballs algorithm according to RFC8305#section-4.
     FirstAddressFamilyVersion first_address_family_version = 1;
 
-    // Specify the count of addresses being interleaved by the sorting algorithm.
+    // Specify the number of addresses of the first_address_family_version being
+    // attempted for connection before the other address family.
     google.protobuf.UInt32Value first_address_family_count = 2 [(validate.rules).uint32 = {gte: 1}];
   }
 
