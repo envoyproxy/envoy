@@ -9,7 +9,7 @@
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
 #include "library/cc/log_level.h"
-#include "library/common/engine.h"
+#include "library/common/engine_impl.h"
 #include "library/common/http/header_utility.h"
 #include "spdlog/spdlog.h"
 
@@ -221,7 +221,7 @@ uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
   uint64_t counter_value = 0UL;
   uint64_t* counter_value_ptr = &counter_value;
   absl::Notification counter_value_set;
-  auto engine = reinterpret_cast<Envoy::Engine*>(rawEngine());
+  auto engine = reinterpret_cast<Envoy::EngineImpl*>(rawEngine());
   engine->dispatcher().post([&] {
     Stats::CounterSharedPtr counter = TestUtility::findCounter(engine->getStatsStore(), name);
     if (counter != nullptr) {
@@ -252,7 +252,7 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   uint64_t gauge_value = 0UL;
   uint64_t* gauge_value_ptr = &gauge_value;
   absl::Notification gauge_value_set;
-  auto engine = reinterpret_cast<Envoy::Engine*>(rawEngine());
+  auto engine = reinterpret_cast<Envoy::EngineImpl*>(rawEngine());
   engine->dispatcher().post([&] {
     Stats::GaugeSharedPtr gauge = TestUtility::findGauge(engine->getStatsStore(), name);
     if (gauge != nullptr) {

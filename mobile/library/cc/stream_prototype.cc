@@ -1,6 +1,6 @@
 #include "stream_prototype.h"
 
-#include "library/common/engine.h"
+#include "library/common/engine_impl.h"
 
 namespace Envoy {
 namespace Platform {
