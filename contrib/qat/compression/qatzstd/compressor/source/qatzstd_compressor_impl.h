@@ -25,7 +25,7 @@ using ZstdCDictManagerPtr = std::unique_ptr<ZstdCDictManager>;
  * Implementation of compressor's interface.
  */
 class QatzstdCompressorImpl : public Envoy::Compression::Zstd::Compressor::ZstdCompressorImplBase,
-                              public Logger::Loggable<Logger::Id::decompression> {
+                              public Logger::Loggable<Logger::Id::compression> {
 public:
   QatzstdCompressorImpl(uint32_t compression_level, bool enable_checksum, uint32_t strategy,
                         const ZstdCDictManagerPtr& cdict_manager, uint32_t chunk_size,

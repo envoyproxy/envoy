@@ -5,6 +5,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/common/logger.h"
 #include "source/extensions/compression/common/compressor/factory_base.h"
 
 #include "contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.pb.h"
@@ -44,7 +45,7 @@ public:
   }
 
 private:
-  struct QatzstdThreadLocal : public ThreadLocal::ThreadLocalObject {
+  struct QatzstdThreadLocal : public ThreadLocal::ThreadLocalObject,public Logger::Loggable<Logger::Id::compression> {
     QatzstdThreadLocal();
     ~QatzstdThreadLocal() override;
     void* GetQATSession();

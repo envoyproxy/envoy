@@ -50,7 +50,12 @@ void* QatzstdCompressorFactory::QatzstdThreadLocal::GetQATSession() {
   if (!initialized_) {
 
     int status = QZSTD_startQatDevice();
-    RELEASE_ASSERT(status == QZSTD_OK, "failed to initialize hardware");
+    // RELEASE_ASSERT(status == QZSTD_OK, "failed to initialize hardware");
+    if(status != QZSTD_OK){
+      ENVOY_LOG(warn, "Failed to initialize qat hardware");
+    }else{
+      ENVOY_LOG(debug, "Initialize qat hardware successful");
+    }
     sequenceProducerState_ = QZSTD_createSeqProdState();
     initialized_ = true;
   }
