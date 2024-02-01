@@ -13,6 +13,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/version/version.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/extensions/filters/network/rbac/config.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
@@ -20,10 +21,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/utility.h"
-
-#if defined(USE_CEL)
-#include "source/extensions/filters/network/rbac/config.h"
-#endif // USE_CEL
 
 #include "gtest/gtest.h"
 
@@ -410,7 +407,6 @@ tcp_logs:
   cleanup();
 }
 
-#if defined(USE_CEL)
 // Test RBAC.
 TEST_P(TcpGrpcAccessLogIntegrationTest, RBACAccessLogFlow) {
   config_helper_.addNetworkFilter(R"EOF(
@@ -493,7 +489,6 @@ tcp_logs:
 
   cleanup();
 }
-#endif // USE_CEL
 
 // Ssl Terminated by Envoy, no `ja3` fingerprint.
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedNoJA3) {

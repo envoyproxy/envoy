@@ -32,7 +32,6 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
     external_deps = ["abseil_optional"],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
@@ -56,7 +55,6 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:http_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/bootstrap/wasm:config",
         "//source/extensions/common/wasm:wasm_lib",
@@ -73,7 +71,6 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:start_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
@@ -101,7 +98,6 @@ envoy_extension_cc_test_binary(
         "abseil_optional",
         "benchmark",
     ],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",

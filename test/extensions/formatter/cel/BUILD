@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.formatter.cel"],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",

@@ -17,7 +17,6 @@ envoy_extension_cc_mock(
     name = "mocks",
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/rate_limit_quota",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
@@ -29,7 +28,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/rate_limit_quota:config",
@@ -44,7 +42,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
         ":test_utils",
@@ -65,7 +62,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
     ],
@@ -75,7 +71,6 @@ envoy_extension_cc_test_library(
     name = "client_test_utils",
     hdrs = ["client_test_utils.h"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    tags = ["skip_on_windows"],
     deps = [
         ":mocks",
         "//source/common/http:header_map_lib",
@@ -94,7 +89,6 @@ envoy_extension_cc_test_library(
     name = "test_utils",
     hdrs = ["test_utils.h"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    tags = ["skip_on_windows"],
     deps = [
     ],
 )
@@ -107,7 +101,6 @@ envoy_extension_cc_test(
     shard_count = 2,
     tags = [
         "cpu:3",
-        "skip_on_windows",
     ],
     deps = [
         ":test_utils",

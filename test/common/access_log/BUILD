@@ -21,6 +21,7 @@ envoy_cc_test(
         "//source/common/access_log:access_log_lib",
         "//source/common/stream_info:utility_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/access_loggers/filters/cel:config",
         "//source/extensions/access_loggers/stream:config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
@@ -35,12 +36,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
-    ] + select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "//source/extensions/access_loggers/filters/cel:config",
-        ],
-    }),
+    ],
 )
 
 envoy_cc_test(
