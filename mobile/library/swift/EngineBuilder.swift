@@ -691,7 +691,7 @@ open class EngineBuilder: NSObject {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning,
                                       logger: { level, message in
                                         if let log = self.logger {
-                                          if let lvl = LogLevel(rawValue: Int(level)) {
+                                          if let lvl = LogLevel(rawValue: level) {
                                             log(lvl, message)
                                           }
                                         }

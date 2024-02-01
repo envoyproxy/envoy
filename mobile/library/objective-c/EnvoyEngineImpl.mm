@@ -403,7 +403,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
-                                 logger:(nullable void (^)(int, NSString *))logger
+                                 logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode {
   self = [super init];
