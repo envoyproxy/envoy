@@ -5,12 +5,12 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_test(
-    name = "lambda_logger_delegate_test",
-    srcs = ["lambda_logger_delegate_test.cc"],
+    name = "logger_delegate_test",
+    srcs = ["logger_delegate_test.cc"],
     repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",
-        "//library/common/common:lambda_logger_delegate_lib",
+        "//library/common/common:logger_delegate_lib",
         "//library/common/data:utility_lib",
         "//library/common/types:c_types_lib",
     ],

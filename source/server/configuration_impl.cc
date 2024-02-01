@@ -81,13 +81,16 @@ bool FilterChainUtility::buildQuicFilterChain(
   return true;
 }
 
-StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                 absl::Status& status)
     : deferred_stat_options_(bootstrap.deferred_stat_options()) {
+  status = absl::OkStatus();
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
-    throwEnvoyExceptionOrPanic(
+    status = absl::InvalidArgumentError(
         "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+    return;
   }
 
   flush_interval_ =
@@ -98,9 +101,9 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
   }
 }
 
-void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                          Instance& server,
-                          Upstream::ClusterManagerFactory& cluster_manager_factory) {
+absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  Instance& server,
+                                  Upstream::ClusterManagerFactory& cluster_manager_factory) {
   // In order to support dynamic configuration of tracing providers,
   // a former server-wide Tracer singleton has been replaced by
   // an Tracer instance per "envoy.filters.network.http_connection_manager" filter.
@@ -113,13 +116,15 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   // stats_config_ should be set before creating the ClusterManagers so that it is available
   // from the ServerFactoryContext when creating the static clusters and stats sinks, where
   // stats deferred instantiation setting is read.
-  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+  absl::Status status = absl::OkStatus();
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap, status);
+  RETURN_IF_NOT_OK(status);
 
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
     ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
-    THROW_IF_NOT_OK(server.secretManager().addStaticSecret(secrets[i]));
+    RETURN_IF_NOT_OK(server.secretManager().addStaticSecret(secrets[i]));
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
@@ -131,14 +136,13 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     ENVOY_LOG(debug, "listener #{}:", i);
     absl::StatusOr<bool> update_or_error =
         server.listenerManager().addOrUpdateListener(listeners[i], "", false);
-    if (!update_or_error.status().ok()) {
-      throwEnvoyExceptionOrPanic(std::string(update_or_error.status().message()));
-    }
+    RETURN_IF_STATUS_NOT_OK(update_or_error);
   }
-  initializeWatchdogs(bootstrap, server);
+  RETURN_IF_NOT_OK(initializeWatchdogs(bootstrap, server));
   // This has to happen after ClusterManager initialization, as it depends on config from
   // ClusterManager.
   initializeStatsConfig(bootstrap, server);
+  return absl::OkStatus();
 }
 
 void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
@@ -181,10 +185,10 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   // is no longer validated in this step.
 }
 
-void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                   Instance& server) {
+absl::Status MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                           Instance& server) {
   if (bootstrap.has_watchdog() && bootstrap.has_watchdogs()) {
-    throwEnvoyExceptionOrPanic("Only one of watchdog or watchdogs should be set!");
+    return absl::InvalidArgumentError("Only one of watchdog or watchdogs should be set!");
   }
 
   if (bootstrap.has_watchdog()) {
@@ -196,6 +200,7 @@ void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap
     worker_watchdog_ =
         std::make_unique<WatchdogImpl>(bootstrap.watchdogs().worker_watchdog(), server);
   }
+  return absl::OkStatus();
 }
 
 WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdog,
@@ -225,14 +230,19 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   actions_ = watchdog.actions();
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                         absl::Status& creation_status) {
+  creation_status = absl::OkStatus();
   const auto& admin = bootstrap.admin();
 
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
     auto address_or_error = Network::Address::resolveProtoAddress(admin.address());
-    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    if (!address_or_error.status().ok()) {
+      creation_status = address_or_error.status();
+      return;
+    }
     admin_.address_ = std::move(address_or_error.value());
   }
   admin_.socket_options_ = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();

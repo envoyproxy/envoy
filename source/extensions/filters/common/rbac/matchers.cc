@@ -38,6 +38,13 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
     return std::make_shared<const PathMatcher>(permission.url_path());
+  case envoy::config::rbac::v3::Permission::RuleCase::kUriTemplate: {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(permission.uri_template());
+    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        permission.uri_template().typed_config(), validation_visitor, factory);
+    return std::make_shared<const UriTemplateMatcher>(factory.createPathMatcher(*config));
+  }
   case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
     auto& factory =
         Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
@@ -260,6 +267,12 @@ bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::Request
     return false;
   }
   return path_matcher_.match(headers.getPathValue());
+}
+
+bool UriTemplateMatcher::matches(const Network::Connection&,
+                                 const Envoy::Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo&) const {
+  return uri_template_matcher_->match(headers.getPathValue());
 }
 
 } // namespace RBAC

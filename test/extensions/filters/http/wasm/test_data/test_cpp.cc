@@ -81,6 +81,7 @@ bool TestRootContext::onConfigure(size_t size) {
           {{"plugin_vm_id"}, "vm_id"},
           {{"listener_direction"}, std::string("\x1\0\0\0\0\0\0\0\0", 8)}, // INBOUND
           {{"listener_metadata"}, ""},
+          {{"xds", "node", "metadata", "istio.io/metadata"}, "sample_data"},
       };
       for (const auto& property : properties) {
         std::string value;

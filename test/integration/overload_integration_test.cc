@@ -585,16 +585,12 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortShedsLoadWhenNewReq
 // Test using 100-continue to start the response before doing triggering Overload.
 // Even though Envoy has encoded the 1xx headers, 1xx headers are not the actual response
 // so Envoy should still send the local reply when shedding load.
-TEST_P(
-    LoadShedPointIntegrationTest,
-    Http1ServerDispatchAbortShedsLoadWithLocalReplyWhen1xxResponseStartedWithFlagAllowCodecErrorResponseAfter1xxHeadersEnabled) {
+TEST_P(LoadShedPointIntegrationTest,
+       Http1ServerDispatchAbortShedsLoadWithLocalReplyWhen1xxResponseStarted) {
   // Test only applies to HTTP1.
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
     return;
   }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers", "true"}});
 
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
@@ -632,61 +628,6 @@ TEST_P(
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(response->headers().getStatusValue(), "500");
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
-}
-
-// TODO(kbaichoo): remove this test when the runtime flag is removed.
-TEST_P(
-    LoadShedPointIntegrationTest,
-    Http1ServerDispatchAbortShedsLoadWithLocalReplyWhen1xxResponseStartedWithFlagAllowCodecErrorResponseAfter1xxHeadersDisabled) {
-  // Test only applies to HTTP1.
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
-    return;
-  }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers", "false"}});
-
-  initializeOverloadManager(
-      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
-      name: "envoy.load_shed_points.http1_server_abort_dispatch"
-      triggers:
-        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-          threshold:
-            value: 0.90
-    )EOF"));
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 0);
-
-  // Start the 100-continue request
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/dynamo/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "sni.lyft.com"},
-                                                                 {"expect", "100-contINUE"}});
-
-  // Wait for 100-continue
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  // The continue headers should arrive immediately.
-  response->waitFor1xxHeaders();
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Put envoy in overloaded state and check that it rejects the continuing
-  // dispatch.
-  updateResource(0.95);
-  test_server_->waitForGaugeEq(
-      "overload.envoy.load_shed_points.http1_server_abort_dispatch.scale_percent", 100);
-  codec_client_->sendData(*request_encoder_, 10, true);
-
-  // Since the runtime flag `http1_allow_codec_error_response_after_1xx_headers`
-  // is disabled the downstream client ends up just getting a closed connection.
-  // Envoy's downstream codec does not provide a local reply as we've started
-  // the response.
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  EXPECT_FALSE(response->complete());
   test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
 }
 
