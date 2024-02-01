@@ -58,7 +58,8 @@ new_features:
     identifier.
 - area: aws_lambda
   change: |
-    Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used during signature
+    Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
+    during signature.
 - area: ext_proc
   change: |
     added
