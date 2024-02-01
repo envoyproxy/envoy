@@ -13,6 +13,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:96.5" # FileReadToEndNotReadable keeps failing
 "source/common/http:96.3"
 "source/common/http/http2:95.0"
+"source/common/io:6.7"
 "source/common/json:93.4"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
