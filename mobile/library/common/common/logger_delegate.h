@@ -50,14 +50,9 @@ public:
   ~DefaultDelegate() override;
 
   // SinkDelegate
-  void log(absl::string_view msg, const spdlog::details::log_msg&) override {
-    absl::MutexLock l(&mutex_);
-    std::cerr << msg;
-  }
-  void flush() override {
-    absl::MutexLock l(&mutex_);
-    std::cerr << std::flush;
-  };
+  void log(absl::string_view msg, const spdlog::details::log_msg&) override;
+
+  void flush() override;
 
 private:
   absl::Mutex& mutex_;

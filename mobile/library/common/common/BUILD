@@ -63,9 +63,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "lambda_logger_delegate_lib",
-    srcs = ["lambda_logger_delegate.cc"],
-    hdrs = ["lambda_logger_delegate.h"],
+    name = "logger_delegate_lib",
+    srcs = ["logger_delegate.cc"],
+    hdrs = ["logger_delegate.h"],
     repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",

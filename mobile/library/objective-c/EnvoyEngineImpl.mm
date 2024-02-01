@@ -37,12 +37,12 @@ static void ios_on_exit(void *context) {
   }
 }
 
-static void ios_on_log(envoy_data data, const void *context) {
+static void ios_on_log(envoy_log_level log_level, envoy_data data, const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
   @autoreleasepool {
     EnvoyLogger *logger = (__bridge EnvoyLogger *)context;
-    logger.log(to_ios_string(data));
+    logger.log(log_level, to_ios_string(data));
   }
 }
 
@@ -403,7 +403,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
-                                 logger:(nullable void (^)(NSString *))logger
+                                 logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode {
   self = [super init];
