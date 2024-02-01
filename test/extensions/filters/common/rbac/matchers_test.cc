@@ -538,6 +538,50 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   checkMatcher(FilterStateMatcher(matcher), true, conn, header, info);
 }
 
+TEST(UriTemplateMatcher, UriTemplateMatcherFactory) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.match.uri_template.uri_template_matcher
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+        path_template: "/bar/{lang}/{country}"
+)EOF";
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/bar/lang/country");
+
+  envoy::config::core::v3::TypedExtensionConfig config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  const auto& factory =
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
+
+  EXPECT_NE(nullptr, factory);
+  EXPECT_EQ(factory->name(), "envoy.path.match.uri_template.uri_template_matcher");
+  EXPECT_EQ(factory->category(), "envoy.path.match");
+
+  auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
+
+  const auto uri_template_matcher = UriTemplateMatcher(factory->createPathMatcher(*message));
+
+  checkMatcher(uri_template_matcher, true, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(UriTemplateMatcher, NoPathInHeader) {
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig
+      uri_template_match_config;
+  const std::string path_template = "/{foo}";
+  uri_template_match_config.set_path_template(path_template);
+  Router::PathMatcherSharedPtr matcher =
+      std::make_shared<Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher>(
+          uri_template_match_config);
+
+  headers.setPath("/foo");
+  checkMatcher(UriTemplateMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.removePath();
+  checkMatcher(UriTemplateMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common

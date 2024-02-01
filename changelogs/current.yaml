@@ -69,5 +69,10 @@ new_features:
     Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is
     disabled by default, it can be enabled by runtime feature flag ``envoy.restart_features.enable_execution_context``. For more details,
     please see https://github.com/envoyproxy/envoy/issues/32012.
+- area: rbac
+  change: |
+    Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
+    :ref:`UriTemplateMatchConfig<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>`
+    to allow use of glob patterns for URI path matching in RBAC.
 
 deprecated:
