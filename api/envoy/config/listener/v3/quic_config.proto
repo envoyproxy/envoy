@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -77,4 +77,8 @@ message QuicProtocolOptions {
   // [#extension-category: envoy.quic.server_preferred_address]
   core.v3.TypedExtensionConfig server_preferred_address_config = 9
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Configure the server to send transport parameter `disable_active_migration <https://www.rfc-editor.org/rfc/rfc9000#section-18.2-4.30.1>`_.
+  // Defaults to false (do not send this transport parameter).
+  google.protobuf.BoolValue send_disable_active_migration = 10;
 }

@@ -7,8 +7,42 @@
 #include "envoy/http/codes.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "absl/container/node_hash_map.h"
+
 namespace Envoy {
 namespace StreamInfo {
+
+class CustomResponseFlag {
+public:
+  CustomResponseFlag(absl::string_view flag, absl::string_view flag_long);
+  ExtendedResponseFlag flag() const { return flag_; }
+
+private:
+  ExtendedResponseFlag flag_;
+};
+
+// Register a custom response flag by specifying the flag and the long name of the flag.
+// This macro should only be used in source files to register a flag.
+#define REGISTER_CUSTOM_RESPONSE_FLAG(short, long)                                                 \
+  static CustomResponseFlag /* NOLINT(fuchsia-statically-constructed-objects) */                   \
+      registered_##short{#short, #long};
+
+// Get the registered flag value. This macro should only be used when calling the
+// 'setResponseFlag' method in the StreamInfo class.
+// NOTE: Never use this macro to initialize another static variable.
+// Basically, this macro should only be used in the same source file where the flag is
+// registered.
+// If you want to use one flag in multiple files, you can declare a static function in
+// the header file and define it in the source file to return the flag value. Here is an
+// example (NOTE: this function should obey the same rule as the CUSTOM_RESPONSE_FLAG
+// macro and cannot be used to initialize another static variable):
+//
+// // header.h
+// ExtendedResponseFlag getRegisteredFlag();
+// // source.cc
+// REGISTER_CUSTOM_RESPONSE_FLAG(short, long);
+// ExtendedResponseFlag getRegisteredFlag() { return CUSTOM_RESPONSE_FLAG(short); }
+#define CUSTOM_RESPONSE_FLAG(short) registered_##short.flag()
 
 /**
  * Util class for ResponseFlags.
@@ -17,17 +51,30 @@ class ResponseFlagUtils {
 public:
   static const std::string toString(const StreamInfo& stream_info);
   static const std::string toShortString(const StreamInfo& stream_info);
-  static absl::optional<ResponseFlag> toResponseFlag(absl::string_view response_flag);
+  static absl::optional<ExtendedResponseFlag> toResponseFlag(absl::string_view response_flag);
 
   struct FlagStrings {
-    const absl::string_view short_string_;
-    const absl::string_view long_string_; // PascalCase string
+    absl::string_view short_string_;
+    absl::string_view long_string_; // PascalCase string
   };
+
+  struct FlagLongString {
+    ExtendedResponseFlag flag_;
+    std::string long_string_; // PascalCase string
+  };
+
+  using ResponseFlagsVecType = std::vector<FlagStrings>;
+  // Node hash map is used to avoid the key/value pair pointer change of the string_view when the
+  // map is resized. And the performance is not a concern here because the map is only used when
+  // loading the config.
+  using ResponseFlagsMapType = absl::node_hash_map<std::string, FlagLongString>;
+  static const ResponseFlagsVecType& responseFlagsVec();
+  static const ResponseFlagsMapType& responseFlagsMap();
 
   using FlagStringsAndEnum = std::pair<const FlagStrings, ResponseFlag>;
 
   // When adding a new flag, it's required to update the access log docs and the string
-  // mapping below - ``ALL_RESPONSE_STRINGS_FLAGS``.
+  // mapping below - ``CORE_RESPONSE_FLAGS``.
   constexpr static absl::string_view NONE = "-";
   constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION = "DC";
   constexpr static absl::string_view FAILED_LOCAL_HEALTH_CHECK = "LH";
@@ -93,7 +140,7 @@ public:
   constexpr static absl::string_view DNS_FAIL_LONG = "DnsResolutionFailed";
   constexpr static absl::string_view DROP_OVERLOAD_LONG = "DropOverload";
 
-  static constexpr std::array ALL_RESPONSE_STRINGS_FLAGS{
+  static constexpr std::array CORE_RESPONSE_FLAGS{
       FlagStringsAndEnum{{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_LONG},
                          ResponseFlag::FailedLocalHealthCheck},
       FlagStringsAndEnum{{NO_HEALTHY_UPSTREAM, NO_HEALTHY_UPSTREAM_LONG},
@@ -145,9 +192,21 @@ public:
   };
 
 private:
-  ResponseFlagUtils();
+  friend class CustomResponseFlag;
+
   static const std::string toString(const StreamInfo& stream_info, bool use_long_name);
-  static absl::flat_hash_map<std::string, ResponseFlag> getFlagMap();
+
+  /**
+   * Register a custom response flag.
+   * @param flag supplies the flag to register. It should be an all upper case string with only
+   * multiple characters.
+   * @param flag_long supplies the long name of the flag to register. It should be PascalCase
+   * string.
+   * @return uint16_t the flag value.
+   */
+  static ExtendedResponseFlag registerCustomFlag(absl::string_view flag,
+                                                 absl::string_view flag_long);
+  static ResponseFlagsMapType& mutableResponseFlagsMap();
 };
 
 class TimingUtility {
