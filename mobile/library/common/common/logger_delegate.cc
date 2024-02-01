@@ -24,6 +24,8 @@ envoy_log_level toEnvoyLogLevel(spdlog::level::level_enum spd_log_level) {
     return envoy_log_level::ENVOY_LOG_LEVEL_ERROR;
   case spdlog::level::critical:
     return envoy_log_level::ENVOY_LOG_LEVEL_CRITICAL;
+  case spdlog::level::off:
+    return envoy_log_level::ENVOY_LOG_LEVEL_OFF;
   default:
     PANIC("not implemented");
   }
