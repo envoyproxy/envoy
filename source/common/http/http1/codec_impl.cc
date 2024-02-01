@@ -977,7 +977,7 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 }
 
 ExecutionContext* ConnectionImpl::executionContext() const {
-  return getConnectionExecutionContextMutable(connection_);
+  return getConnectionExecutionContext(connection_);
 }
 
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {

@@ -43,7 +43,7 @@ void ConnectionImplBase::setDelayedCloseTimeout(std::chrono::milliseconds timeou
 }
 
 ExecutionContext* ConnectionImplBase::executionContext() const {
-  return getConnectionExecutionContextMutable(*this);
+  return getConnectionExecutionContext(*this);
 }
 
 void ConnectionImplBase::initializeDelayedCloseTimer() {
