@@ -194,7 +194,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -270,6 +270,10 @@ message Permission {
     // Extension for configuring custom matchers for RBAC.
     // [#extension-category: envoy.rbac.matchers]
     core.v3.TypedExtensionConfig matcher = 12;
+
+    // URI template path matching.
+    // [#extension-category: envoy.path.match]
+    core.v3.TypedExtensionConfig uri_template = 13;
   }
 }
 

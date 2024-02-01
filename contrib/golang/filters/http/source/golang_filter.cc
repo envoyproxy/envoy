@@ -1458,6 +1458,7 @@ void Filter::initRequest(ProcessorState& state) {
   req_->configId = getMergedConfigId(state);
   req_->plugin_name.data = config_->pluginName().data();
   req_->plugin_name.len = config_->pluginName().length();
+  req_->worker_id = worker_id_;
 }
 
 /* ConfigId */
@@ -1491,6 +1492,7 @@ FilterConfig::FilterConfig(
     Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
+      concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
       metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
 
@@ -1508,6 +1510,7 @@ void FilterConfig::newGoPluginConfig() {
   config_->config_ptr = buf_ptr;
   config_->config_len = buf.length();
   config_->is_route_config = 0;
+  config_->concurrency = concurrency_;
 
   config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 

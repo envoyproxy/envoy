@@ -2252,37 +2252,26 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       // If there's an existing host with the same health checker, the
       // active health-status is kept.
       if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update")) {
-          if (existing_host_found && !health_check_address_changed &&
-              !active_health_check_flag_changed) {
-            // If there's an existing host, use the same active health-status.
-            // The existing host can be marked PENDING_ACTIVE_HC or
-            // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
-            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
-                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+        if (existing_host_found && !health_check_address_changed &&
+            !active_health_check_flag_changed) {
+          // If there's an existing host, use the same active health-status.
+          // The existing host can be marked PENDING_ACTIVE_HC or
+          // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
+          ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+                 existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+          ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
+                 existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-            constexpr uint32_t active_hc_statuses_mask =
-                enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
-                enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
-                enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
-                enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+          constexpr uint32_t active_hc_statuses_mask =
+              enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
+              enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+              enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
+              enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
 
-            const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
-            host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
-          } else {
-            // No previous known host, mark it as failed active HC.
-            host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-
-            // If we want to exclude hosts until they have been health checked, mark them with
-            // a flag to indicate that they have not been health checked yet.
-            if (info_->warmHosts()) {
-              host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
-            }
-          }
+          const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
+          host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
         } else {
+          // No previous known host, mark it as failed active HC.
           host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
 
           // If we want to exclude hosts until they have been health checked, mark them with

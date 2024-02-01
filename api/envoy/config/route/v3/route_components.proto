@@ -1211,7 +1211,6 @@ message RouteAction {
   // :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
   // causes the original value of the host header, if any, to be appended to the
   // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header if it is different to the last value appended.
-  // This can be disabled by setting the runtime guard ``envoy_reloadable_features_append_xfh_idempotent`` to false.
   bool append_x_forwarded_host = 38;
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This

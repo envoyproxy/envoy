@@ -1,12 +1,12 @@
 #include "engine.h"
 
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Platform {
 
-Engine::Engine(::Envoy::Engine* engine) : engine_(engine) {}
+Engine::Engine(::Envoy::InternalEngine* engine) : engine_(engine) {}
 
 Engine::~Engine() {
   if (!engine_->isTerminated()) {

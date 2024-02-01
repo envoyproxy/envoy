@@ -121,3 +121,15 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "access_log_test",
+    srcs = [
+        "access_log_test.cc",
+    ],
+    deps = [
+        ":fake_codec_lib",
+        "//contrib/generic_proxy/filters/network/source:access_log_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
