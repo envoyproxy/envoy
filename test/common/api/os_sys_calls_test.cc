@@ -13,7 +13,6 @@ namespace Envoy {
 
 // Test happy path for `open`, `pwrite`, `pread`, `fstat`, `close`, `stat` and `unlink`.
 TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
-  // Touch.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   std::string path{TestEnvironment::temporaryPath("envoy_test")};
   TestEnvironment::createPath(path);
