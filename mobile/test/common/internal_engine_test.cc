@@ -1,7 +1,7 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 
 namespace Envoy {
 
@@ -10,10 +10,10 @@ namespace Envoy {
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
 struct TestEngine {
-  std::unique_ptr<Engine> engine_;
+  std::unique_ptr<InternalEngine> engine_;
   envoy_engine_t handle() { return reinterpret_cast<envoy_engine_t>(engine_.get()); }
   TestEngine(envoy_engine_callbacks callbacks, const std::string& level) {
-    engine_.reset(new Envoy::Engine(callbacks, {}, {}));
+    engine_.reset(new Envoy::InternalEngine(callbacks, {}, {}));
     Platform::EngineBuilder builder;
     auto bootstrap = builder.generateBootstrap();
     std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
@@ -21,8 +21,13 @@ struct TestEngine {
   }
 
   envoy_status_t terminate() { return engine_->terminate(); }
+  bool isTerminated() const { return engine_->isTerminated(); }
 
-  ~TestEngine() { engine_->terminate(); }
+  ~TestEngine() {
+    if (!engine_->isTerminated()) {
+      engine_->terminate();
+    }
+  }
 };
 
 class EngineTest : public testing::Test {
@@ -54,6 +59,7 @@ TEST_F(EngineTest, EarlyExit) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   ASSERT_EQ(engine_->terminate(), ENVOY_SUCCESS);
+  ASSERT_TRUE(engine_->isTerminated());
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   engine_->engine_->startStream(0, {}, false);
@@ -77,15 +83,14 @@ TEST_F(EngineTest, AccessEngineAfterInitialization) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification getClusterManagerInvoked;
-  envoy_data stats_data;
   // Running engine functions should work because the engine is running
-  EXPECT_EQ(ENVOY_SUCCESS, engine_->engine_->dumpStats(&stats_data));
-  release_envoy_data(stats_data);
+  EXPECT_EQ("runtime.load_success: 1\n", engine_->engine_->dumpStats());
 
   engine_->terminate();
+  ASSERT_TRUE(engine_->isTerminated());
 
   // Now that the engine has been shut down, we no longer expect scheduling to work.
-  EXPECT_EQ(ENVOY_FAILURE, engine_->engine_->dumpStats(&stats_data));
+  EXPECT_EQ("", engine_->engine_->dumpStats());
 
   engine_.reset();
 }

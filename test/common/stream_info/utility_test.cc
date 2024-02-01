@@ -22,18 +22,68 @@ namespace {
 
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
+REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
+REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
+
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     NiceMock<MockStreamInfo> stream_info;
-    ON_CALL(stream_info, hasResponseFlag(flag_enum)).WillByDefault(Return(true));
+    stream_info.response_flags_.clear();
+    stream_info.response_flags_.push_back(flag_enum);
     EXPECT_EQ(flag_strings.short_string_, ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ(flag_strings.long_string_, ResponseFlagUtils::toString(stream_info));
+  }
+
+  // Custom flag.
+  {
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec().size(),
+              ResponseFlagUtils::responseFlagsMap().size());
+
+    // There are two custom flags are registered.
+    EXPECT_EQ(ResponseFlagUtils::CORE_RESPONSE_FLAGS.size() + 2,
+              ResponseFlagUtils::responseFlagsMap().size());
+
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF).value(), ResponseFlag::LastFlag + 1);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2).value(), ResponseFlag::LastFlag + 2);
+
+    // Verify the custom flags are registered correctly.
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF), ResponseFlagUtils::responseFlagsMap().at("CF").flag_);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2), ResponseFlagUtils::responseFlagsMap().at("CF2").flag_);
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF).value()].short_string_,
+              "CF");
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF).value()].long_string_,
+              "CustomFlag");
+    EXPECT_EQ(
+        ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2).value()].short_string_,
+        "CF2");
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[CUSTOM_RESPONSE_FLAG(CF2).value()].long_string_,
+              "CustomFlag2");
+
+    // Verify the custom flag could work as expected.
+
+    NiceMock<MockStreamInfo> stream_info;
+    stream_info.response_flags_.clear();
+
+    stream_info.setResponseFlag(CUSTOM_RESPONSE_FLAG(CF));
+    EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+    EXPECT_TRUE(stream_info.hasResponseFlag(CUSTOM_RESPONSE_FLAG(CF)));
+
+    EXPECT_EQ("CF", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("CustomFlag", ResponseFlagUtils::toString(stream_info));
+
+    stream_info.response_flags_.push_back(CUSTOM_RESPONSE_FLAG(CF2));
+
+    EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+    EXPECT_TRUE(stream_info.hasResponseFlag(CUSTOM_RESPONSE_FLAG(CF)));
+    EXPECT_TRUE(stream_info.hasResponseFlag(CUSTOM_RESPONSE_FLAG(CF2)));
+
+    EXPECT_EQ("CF,CF2", ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ("CustomFlag,CustomFlag2", ResponseFlagUtils::toString(stream_info));
   }
 
   // No flag is set.
   {
     NiceMock<MockStreamInfo> stream_info;
-    ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(false));
     EXPECT_EQ("-", ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ("-", ResponseFlagUtils::toString(stream_info));
   }
@@ -42,10 +92,11 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   // These are not real use cases, but are used to cover multiple response flags case.
   {
     NiceMock<MockStreamInfo> stream_info;
-    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
-    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
-    ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
-        .WillByDefault(Return(true));
+    stream_info.response_flags_.clear();
+    stream_info.response_flags_.push_back(ResponseFlag::UpstreamRequestTimeout);
+    stream_info.response_flags_.push_back(ResponseFlag::DelayInjected);
+    stream_info.response_flags_.push_back(ResponseFlag::FaultInjected);
+
     EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ("UpstreamRequestTimeout,DelayInjected,FaultInjected",
               ResponseFlagUtils::toString(stream_info));
@@ -55,11 +106,10 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 
-  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
-    absl::optional<ResponseFlag> response_flag =
-        ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
+  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
+    auto response_flag = ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
     EXPECT_TRUE(response_flag.has_value());
-    EXPECT_EQ(flag_enum, response_flag.value());
+    EXPECT_EQ(flag_enum, response_flag.value().value());
   }
 }
 
@@ -90,8 +140,7 @@ protected:
   void SetUp() override {
     proxy_status_config_.set_remove_details(false);
 
-    ON_CALL(stream_info_, hasAnyResponseFlag()).WillByDefault(Return(true));
-    ON_CALL(stream_info_, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
+    stream_info_.response_flags_.push_back(ResponseFlag::DelayInjected);
   }
 
   HttpConnectionManager::ProxyStatusConfig proxy_status_config_;
@@ -320,7 +369,7 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   for (const auto& [response_flag, proxy_status_error] :
-       std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
+       std::vector<std::pair<ExtendedResponseFlag, ProxyStatusError>>{
            {ResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
            {ResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
            {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
@@ -352,7 +401,7 @@ TEST(ProxyStatusFromStreamInfo, TestUpstreamRequestTimeout) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "false"}});
   NiceMock<MockStreamInfo> stream_info;
-  ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+  ON_CALL(stream_info, hasResponseFlag(ExtendedResponseFlag(ResponseFlag::UpstreamRequestTimeout)))
       .WillByDefault(Return(true));
   EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), ProxyStatusError::ConnectionTimeout);
 }

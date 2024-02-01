@@ -7,7 +7,7 @@
 
 #include "absl/base/call_once.h"
 #include "extension_registry.h"
-#include "library/common/common/lambda_logger_delegate.h"
+#include "library/common/common/logger_delegate.h"
 #include "library/common/engine_common.h"
 #include "library/common/http/client.h"
 #include "library/common/network/connectivity_manager.h"
@@ -15,7 +15,7 @@
 
 namespace Envoy {
 
-class Engine : public Logger::Loggable<Logger::Id::main> {
+class InternalEngine : public Logger::Loggable<Logger::Id::main> {
 public:
   /**
    * Constructor for a new engine instance.
@@ -23,12 +23,13 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    */
-  Engine(envoy_engine_callbacks callbacks, envoy_logger logger, envoy_event_tracker event_tracker);
+  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                 envoy_event_tracker event_tracker);
 
   /**
-   * Engine destructor.
+   * InternalEngine destructor.
    */
-  ~Engine();
+  InternalEngine();
 
   /**
    * Run the engine with the provided configuration.
@@ -39,9 +40,13 @@ public:
   envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
 
   /**
-   * Immediately terminate the engine, if running.
+   * Immediately terminate the engine, if running. Calling this function when
+   * the engine has been terminated will result in `ENVOY_FAILURE`.
    */
   envoy_status_t terminate();
+
+  /** Returns true if the Engine has been terminated; false otherwise. */
+  bool isTerminated() const;
 
   /**
    * Accessor for the provisional event dispatcher.
@@ -98,13 +103,9 @@ public:
                                   uint64_t count);
 
   /**
-   * Dump Envoy stats into the provided envoy_data
-   * @params envoy_data which will be filed with referenced stats dumped in Envoy's standard text
-   * format.
-   * @return failure status if the engine is no longer running.
-   * This can be called from any thread, but will block on engine-thread processing.
+   * Dumps Envoy stats into string. Returns an empty string when an error occurred.
    */
-  envoy_status_t dumpStats(envoy_data* out);
+  std::string dumpStats();
 
   /**
    * Get cluster manager from the Engine.
@@ -142,9 +143,10 @@ private:
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   std::thread main_thread_{}; // Empty placeholder to be populated later.
+  bool terminated_{false};
 };
 
-using EngineSharedPtr = std::shared_ptr<Engine>;
-using EngineWeakPtr = std::weak_ptr<Engine>;
+using InternalEngineSharedPtr = std::shared_ptr<InternalEngine>;
+using InternalEngineWeakPtr = std::weak_ptr<InternalEngine>;
 
 } // namespace Envoy

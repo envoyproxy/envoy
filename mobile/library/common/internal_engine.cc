@@ -1,4 +1,4 @@
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
@@ -13,10 +13,10 @@ namespace Envoy {
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
-envoy_stream_t Engine::initStream() { return current_stream_handle_++; }
+envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
-Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
-               envoy_event_tracker event_tracker)
+InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                               envoy_event_tracker event_tracker)
     : callbacks_(callbacks), logger_(logger), event_tracker_(event_tracker),
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   ExtensionRegistry::registerFactories();
@@ -32,7 +32,7 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-envoy_status_t Engine::run(const std::string& config, const std::string& log_level) {
+envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
@@ -46,12 +46,12 @@ envoy_status_t Engine::run(const std::string& config, const std::string& log_lev
   return run(std::move(options));
 }
 
-envoy_status_t Engine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
-  main_thread_ = std::thread(&Engine::main, this, std::move(options));
+envoy_status_t InternalEngine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
+  main_thread_ = std::thread(&InternalEngine::main, this, std::move(options));
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
+envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
@@ -145,7 +145,11 @@ envoy_status_t Engine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
   return run_success ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
-envoy_status_t Engine::terminate() {
+envoy_status_t InternalEngine::terminate() {
+  if (terminated_) {
+    IS_ENVOY_BUG("attempted to double terminate engine");
+    return ENVOY_FAILURE;
+  }
   // If main_thread_ has finished (or hasn't started), there's nothing more to do.
   if (!main_thread_.joinable()) {
     return ENVOY_FAILURE;
@@ -177,23 +181,29 @@ envoy_status_t Engine::terminate() {
   if (std::this_thread::get_id() != main_thread_.get_id()) {
     main_thread_.join();
   }
-
+  terminated_ = true;
   return ENVOY_SUCCESS;
 }
 
-Engine::~Engine() { terminate(); }
+bool InternalEngine::isTerminated() const { return terminated_; }
 
-envoy_status_t Engine::setProxySettings(const char* hostname, const uint16_t port) {
+InternalEngine::InternalEngine() {
+  if (!terminated_) {
+    terminate();
+  }
+}
+
+envoy_status_t InternalEngine::setProxySettings(const char* hostname, const uint16_t port) {
   return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
     connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
   });
 }
 
-envoy_status_t Engine::resetConnectivityState() {
+envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-envoy_status_t Engine::setPreferredNetwork(envoy_network_t network) {
+envoy_status_t InternalEngine::setPreferredNetwork(envoy_network_t network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
         Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
@@ -201,8 +211,8 @@ envoy_status_t Engine::setPreferredNetwork(envoy_network_t network) {
   });
 }
 
-envoy_status_t Engine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
-                                        uint64_t count) {
+envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
+                                                uint64_t count) {
   return dispatcher_->post(
       [&, name = Stats::Utility::sanitizeStatsName(elements), tags, count]() -> void {
         ENVOY_LOG(trace, "[pulse.{}] recordCounterInc", name);
@@ -213,7 +223,7 @@ envoy_status_t Engine::recordCounterInc(absl::string_view elements, envoy_stats_
       });
 }
 
-Event::ProvisionalDispatcher& Engine::dispatcher() { return *dispatcher_; }
+Event::ProvisionalDispatcher& InternalEngine::dispatcher() { return *dispatcher_; }
 
 void statsAsText(const std::map<std::string, uint64_t>& all_stats,
                  const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
@@ -254,38 +264,38 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
   statsAsText(all_stats, histograms, response);
 }
 
-envoy_status_t Engine::dumpStats(envoy_data* out) {
-  // If the engine isn't running, fail.
+std::string InternalEngine::dumpStats() {
   if (!main_thread_.joinable()) {
-    return ENVOY_FAILURE;
+    return "";
   }
 
+  std::string stats;
   absl::Notification stats_received;
   if (dispatcher_->post([&]() -> void {
         Envoy::Buffer::OwnedImpl instance;
         handlerStats(server_->stats(), instance);
-        *out = Envoy::Data::Utility::toBridgeData(instance, 1024 * 1024 * 100);
+        stats = instance.toString();
         stats_received.Notify();
       }) == ENVOY_SUCCESS) {
     stats_received.WaitForNotification();
-    return ENVOY_SUCCESS;
+    return stats;
   }
-  return ENVOY_FAILURE;
+  return stats;
 }
 
-Upstream::ClusterManager& Engine::getClusterManager() {
+Upstream::ClusterManager& InternalEngine::getClusterManager() {
   ASSERT(dispatcher_->isThreadSafe(),
          "getClusterManager must be called from the dispatcher's context");
   return server_->clusterManager();
 }
 
-Stats::Store& Engine::getStatsStore() {
+Stats::Store& InternalEngine::getStatsStore() {
   ASSERT(dispatcher_->isThreadSafe(), "getStatsStore must be called from the dispatcher's context");
   return server_->stats();
 }
 
-void Engine::logInterfaces(absl::string_view event,
-                           std::vector<Network::InterfacePair>& interfaces) {
+void InternalEngine::logInterfaces(absl::string_view event,
+                                   std::vector<Network::InterfacePair>& interfaces) {
   std::vector<std::string> names;
   names.resize(interfaces.size());
   std::transform(interfaces.begin(), interfaces.end(), names.begin(),

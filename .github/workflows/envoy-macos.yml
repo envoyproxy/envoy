@@ -48,7 +48,7 @@ jobs:
       command:
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12-xl
+      runs-on: macos-14-xlarge
       steps-post:
       steps-pre: ${{ matrix.steps-pre }}
       target: ${{ matrix.target }}

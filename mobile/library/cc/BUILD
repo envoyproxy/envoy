@@ -107,7 +107,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        "//library/common:engine_lib_no_stamp",
+        "//library/common:internal_engine_lib_no_stamp",
         "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/key_value/platform:config",
