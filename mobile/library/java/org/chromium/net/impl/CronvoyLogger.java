@@ -22,7 +22,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
  * the desired file until CronvoyUrlRequestContext.stopNetLog disables Envoy logging.
  *
  */
-final class CronvoyLogger implements EnvoyLogger {
+public class CronvoyLogger implements EnvoyLogger {
   private int mFilesize = 0;
   private String mFileName = null;
   private FileWriter mWriter = null;
