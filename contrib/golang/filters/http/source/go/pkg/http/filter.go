@@ -281,6 +281,10 @@ func (s *streamInfo) VirtualClusterName() (string, bool) {
 	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueVirtualClusterName)
 }
 
+func (s *streamInfo) WorkerID() uint32 {
+	return uint32(s.request.req.worker_id)
+}
+
 type filterState struct {
 	request *httpRequest
 }

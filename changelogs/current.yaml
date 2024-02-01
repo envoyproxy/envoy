@@ -67,5 +67,10 @@ new_features:
 - area: ext_proc
   change: |
     made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` work as an upstream filter.
-    
+- area: rbac
+  change: |
+    Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
+    :ref:`UriTemplateMatchConfig<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>`
+    to allow use of glob patterns for URI path matching in RBAC.
+
 deprecated:

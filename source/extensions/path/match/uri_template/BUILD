@@ -17,7 +17,9 @@ envoy_cc_library(
     hdrs = ["uri_template_match.h"],
     visibility = [
         "//source/common/router:__subpackages__",
+        "//source/extensions/filters/common/rbac:__subpackages__",
         "//source/extensions/path/rewrite/uri_template:__subpackages__",
+        "//test/extensions/filters/common/rbac:__subpackages__",
         "//test/extensions/path/match/uri_template:__subpackages__",
         "//test/extensions/path/rewrite/uri_template:__subpackages__",
     ],
