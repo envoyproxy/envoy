@@ -14,8 +14,8 @@ android_artifacts(
     archive_name = "envoy",
     manifest = "EnvoyManifest.xml",
     native_deps = select({
-        "@envoy//bazel:opt_build": ["//library/common/jni:libenvoy_jni.so.debug_info"],
-        "//conditions:default": ["//library/common/jni:libenvoy_jni.so"],
+        "@envoy//bazel:opt_build": ["//library/jni:libenvoy_jni.so.debug_info"],
+        "//conditions:default": ["//library/jni:libenvoy_jni.so"],
     }),
     proguard_rules = "//library:proguard_rules",
     substitutions = {
@@ -31,8 +31,8 @@ android_artifacts(
     archive_name = "envoy_xds",
     manifest = "EnvoyManifest.xml",
     native_deps = select({
-        "@envoy//bazel:opt_build": ["//library/common/jni:libenvoy_jni.so.debug_info"],
-        "//conditions:default": ["//library/common/jni:libenvoy_jni.so"],
+        "@envoy//bazel:opt_build": ["//library/jni:libenvoy_jni.so.debug_info"],
+        "//conditions:default": ["//library/jni:libenvoy_jni.so"],
     }),
     proguard_rules = "//library:proguard_rules",
     substitutions = {
