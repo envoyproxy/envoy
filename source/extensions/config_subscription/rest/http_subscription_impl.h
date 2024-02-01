@@ -67,13 +67,29 @@ private:
 class HttpSubscriptionFactory : public ConfigSubscriptionFactory {
 public:
   std::string name() const override { return "envoy.config_subscription.rest"; }
+
+  /**
+   * Extract refresh_delay as a std::chrono::milliseconds from
+   * envoy::config::core::v3::ApiConfigSource.
+   */
+  static std::chrono::milliseconds
+  apiConfigSourceRefreshDelay(const envoy::config::core::v3::ApiConfigSource& api_config_source);
+
+  /**
+   * Extract request_timeout as a std::chrono::milliseconds from
+   * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
+   * default value of 1s will be returned.
+   */
+  static std::chrono::milliseconds
+  apiConfigSourceRequestTimeout(const envoy::config::core::v3::ApiConfigSource& api_config_source);
+
   SubscriptionPtr create(SubscriptionData& data) override {
     const envoy::config::core::v3::ApiConfigSource& api_config_source =
         data.config_.api_config_source();
     return std::make_unique<HttpSubscriptionImpl>(
         data.local_info_, data.cm_, api_config_source.cluster_names()[0], data.dispatcher_,
-        data.api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
-        Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(data.type_url_),
+        data.api_.randomGenerator(), apiConfigSourceRefreshDelay(api_config_source),
+        apiConfigSourceRequestTimeout(api_config_source), restMethod(data.type_url_),
         data.type_url_, data.callbacks_, data.resource_decoder_, data.stats_,
         Utility::configSourceInitialFetchTimeout(data.config_), data.validation_visitor_);
   }

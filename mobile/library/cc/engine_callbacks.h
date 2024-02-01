@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "engine.h"
+#include "library/cc/engine.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {

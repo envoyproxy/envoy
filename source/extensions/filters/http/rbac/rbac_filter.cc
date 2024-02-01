@@ -8,6 +8,7 @@
 #include "source/common/ssl/matching/inputs.h"
 
 #include "absl/strings/str_join.h"
+#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,7 +46,9 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
               ->full_name())},
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::ssl::v3::SubjectInput::descriptor()
-              ->full_name())}};
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name())}};
   if (allowed_inputs_set.contains(type_url)) {
     return absl::OkStatus();
   }

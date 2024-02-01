@@ -823,6 +823,8 @@ HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   if (mutable_cross_priority_host_map_ != nullptr) {
     const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);
     ASSERT(mutable_cross_priority_host_map_ == nullptr);
+    ENVOY_LOG(debug, "cross_priority host map, moving mutable to const, len: {}",
+              const_cross_priority_host_map_->size());
   }
   return const_cross_priority_host_map_;
 }
@@ -839,14 +841,18 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   if (mutable_cross_priority_host_map_ == nullptr) {
     // Copy old read only host map to mutable host map.
     mutable_cross_priority_host_map_ = std::make_shared<HostMap>(*const_cross_priority_host_map_);
+    ENVOY_LOG(debug, "cross_priority host map, copying from const, len: {}",
+              const_cross_priority_host_map_->size());
   }
 
   for (const auto& host : hosts_removed) {
     mutable_cross_priority_host_map_->erase(addressToString(host->address()));
+    ENVOY_LOG(debug, "cross_priority host map, removing: {}", addressToString(host->address()));
   }
 
   for (const auto& host : hosts_added) {
     mutable_cross_priority_host_map_->insert({addressToString(host->address()), host});
+    ENVOY_LOG(debug, "cross_priority host map, adding: {}", addressToString(host->address()));
   }
 }
 
@@ -1665,7 +1671,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   if (!cluster_load_assignment.has_policy()) {
     return absl::OkStatus();
   }
-  auto policy = cluster_load_assignment.policy();
+  const auto& policy = cluster_load_assignment.policy();
   if (policy.drop_overloads().size() == 0) {
     return absl::OkStatus();
   }
@@ -1675,7 +1681,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
                     policy.drop_overloads().size()));
   }
 
-  const auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+  const auto& drop_percentage = policy.drop_overloads(0).drop_percentage();
   float denominator = 100;
   switch (drop_percentage.denominator()) {
   case envoy::type::v3::FractionalPercent::HUNDRED:
