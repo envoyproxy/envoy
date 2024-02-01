@@ -1,13 +1,13 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-#import "library/common/main_interface.h"
+#import "library/common/engine.h"
 
 #import <Foundation/Foundation.h>
 #import <Network/Network.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 
 @implementation EnvoyNetworkMonitor {
-  envoy_engine_t _engineHandle;
+  Envoy::Engine *_engine;
   nw_path_monitor_t _path_monitor;
   SCNetworkReachabilityRef _reachability_ref;
 }
@@ -18,7 +18,7 @@
     return nil;
   }
 
-  _engineHandle = engineHandle;
+  _engine = reinterpret_cast<Envoy::Engine *>(engineHandle);
   return self;
 }
 
@@ -43,7 +43,7 @@
   nw_path_monitor_set_queue(_path_monitor, queue);
 
   __block envoy_network_t previousNetworkType = (envoy_network_t)-1;
-  envoy_engine_t engineHandle = _engineHandle;
+  Envoy::Engine *engine = _engine;
   nw_path_monitor_set_update_handler(_path_monitor, ^(nw_path_t _Nonnull path) {
     BOOL isSatisfied = nw_path_get_status(path) == nw_path_status_satisfied;
     if (!isSatisfied) {
@@ -66,7 +66,7 @@
 
     if (network != previousNetworkType) {
       NSLog(@"[Envoy] setting preferred network to %d", network);
-      set_preferred_network(engineHandle, network);
+      engine->setPreferredNetwork(network);
       previousNetworkType = network;
     }
 
@@ -135,7 +135,7 @@ static void _reachability_callback(SCNetworkReachabilityRef target,
 
   NSLog(@"[Envoy] setting preferred network to %@", isUsingWWAN ? @"WWAN" : @"WLAN");
   EnvoyNetworkMonitor *monitor = (__bridge EnvoyNetworkMonitor *)info;
-  set_preferred_network(monitor->_engineHandle, isUsingWWAN ? ENVOY_NET_WWAN : ENVOY_NET_WLAN);
+  monitor->_engine->setPreferredNetwork(isUsingWWAN ? ENVOY_NET_WWAN : ENVOY_NET_WLAN);
 }
 
 @end
