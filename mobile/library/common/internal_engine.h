@@ -27,7 +27,7 @@ public:
                  envoy_event_tracker event_tracker);
 
   /**
-   * EngineImpl destructor.
+   * InternalEngine destructor.
    */
   InternalEngine();
 
