@@ -5,21 +5,21 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_library(
-    name = "engine_lib",
+    name = "internal_engine_lib",
     repository = "@envoy",
     deps = [
         ":engine_common_lib_stamped",
-        ":engine_lib_no_stamp",
+        ":internal_engine_lib_no_stamp",
     ],
 )
 
 envoy_cc_library(
-    name = "engine_lib_no_stamp",
+    name = "internal_engine_lib_no_stamp",
     srcs = [
-        "engine.cc",
+        "internal_engine.cc",
     ],
     hdrs = [
-        "engine.h",
+        "internal_engine.h",
     ],
     repository = "@envoy",
     deps = [
