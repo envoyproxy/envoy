@@ -203,7 +203,6 @@ message HttpHeaders {
   // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap headers = 1;
 
-  // [#not-implemented-hide:]
   // The values of properties selected by the ``request_attributes``
   // or ``response_attributes`` list in the configuration. Each entry
   // in the list is populated
