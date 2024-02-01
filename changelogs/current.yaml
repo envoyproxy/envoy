@@ -11,7 +11,8 @@ minor_behavior_changes:
 - area: quic
   change: |
     :ref:`Server preferred address <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.server_preferred_address_config>` is
-    now sent to non-quiche quic clients when configured.
+    now sent to non-quiche quic clients when configured. This behavior can be disabled with runtime flag
+    ``envoy.restart_features.quic_send_server_preferred_address_to_all_clients``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
