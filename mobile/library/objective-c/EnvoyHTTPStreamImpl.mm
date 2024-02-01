@@ -2,7 +2,7 @@
 #import "library/objective-c/EnvoyBridgeUtility.h"
 
 #import "library/common/types/c_types.h"
-#import "library/common/engine.h"
+#import "library/common/internal_engine.h"
 
 #import <stdatomic.h>
 
@@ -138,7 +138,7 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
   EnvoyHTTPCallbacks *_platformCallbacks;
   envoy_http_callbacks _nativeCallbacks;
   envoy_stream_t _streamHandle;
-  Envoy::Engine *_engine;
+  Envoy::InternalEngine *_engine;
 }
 
 - (instancetype)initWithHandle:(envoy_stream_t)handle
@@ -168,7 +168,7 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
       context};
   _nativeCallbacks = native_callbacks;
 
-  _engine = reinterpret_cast<Envoy::Engine *>(engine);
+  _engine = reinterpret_cast<Envoy::InternalEngine *>(engine);
 
   // We need create the native-held strong ref on this stream before we call start_stream because
   // start_stream could result in a reset that would release the native ref.

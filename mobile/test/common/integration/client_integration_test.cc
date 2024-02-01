@@ -14,7 +14,7 @@
 
 #include "extension_registry.h"
 #include "library/common/data/utility.h"
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
