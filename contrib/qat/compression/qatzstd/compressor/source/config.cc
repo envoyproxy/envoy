@@ -51,9 +51,9 @@ void* QatzstdCompressorFactory::QatzstdThreadLocal::GetQATSession() {
 
     int status = QZSTD_startQatDevice();
     // RELEASE_ASSERT(status == QZSTD_OK, "failed to initialize hardware");
-    if(status != QZSTD_OK){
+    if (status != QZSTD_OK) {
       ENVOY_LOG(warn, "Failed to initialize qat hardware");
-    }else{
+    } else {
       ENVOY_LOG(debug, "Initialize qat hardware successful");
     }
     sequenceProducerState_ = QZSTD_createSeqProdState();
@@ -79,8 +79,9 @@ Envoy::Compression::Compressor::CompressorFactoryPtr
 QatzstdCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::qatzstd::compressor::v3alpha::Qatzstd& proto_config,
     Server::Configuration::FactoryContext& context) {
-  return std::make_unique<QatzstdCompressorFactory>(proto_config, context.serverFactoryContext().mainThreadDispatcher(),
-                                                    context.serverFactoryContext().api(), context.serverFactoryContext().threadLocal());
+  return std::make_unique<QatzstdCompressorFactory>(
+      proto_config, context.serverFactoryContext().mainThreadDispatcher(),
+      context.serverFactoryContext().api(), context.serverFactoryContext().threadLocal());
 }
 
 /**

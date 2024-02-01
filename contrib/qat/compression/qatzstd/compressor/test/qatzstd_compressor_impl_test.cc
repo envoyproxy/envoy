@@ -1,11 +1,11 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "contrib/qat/compression/qatzstd/compressor/source/config.h"
 #include "source/extensions/compression/zstd/decompressor/zstd_decompressor_impl.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/qat/compression/qatzstd/compressor/source/config.h"
 #include "gtest/gtest.h"
 #include "qatseqprod.h"
 
@@ -57,7 +57,7 @@ protected:
     TestUtility::loadFromJson(json, qatzstd_config);
 
     return qatzstd_compressor_library_factory_.createCompressorFactoryFromProto(qatzstd_config,
-                                                                               context_);
+                                                                                context_);
   }
 
   static constexpr uint32_t default_compression_level_{6};
@@ -73,26 +73,21 @@ protected:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
-class QatzstdConfigTest
-    : public QatzstdCompressorImplTest,
-      public ::testing::WithParamInterface<std::tuple<int, int, bool, int>> {};
+class QatzstdConfigTest : public QatzstdCompressorImplTest,
+                          public ::testing::WithParamInterface<std::tuple<int, int, bool, int>> {};
 
-// These tests should pass even if required hardware or setup steps required for qatzstd are missing.
-// Qatzstd uses a sofware fallback in this case.
-INSTANTIATE_TEST_SUITE_P(QatzstdConfigTestInstantiation, QatzstdConfigTest,
-                         // First tuple has all default values.
-                         ::testing::Values(std::make_tuple(1, 4096, true, 4096),
-                                           std::make_tuple(2, 4096, true, 4096),
-                                           std::make_tuple(3, 65536, true, 4096),
-                                           std::make_tuple(4, 4096, true, 4096),
-                                           std::make_tuple(5, 8192, true, 1024),
-                                           std::make_tuple(6, 4096, false, 1024),
-                                           std::make_tuple(7, 4096, true, 1024),
-                                           std::make_tuple(8, 8192, true, 4096),
-                                           std::make_tuple(9, 8192, true, 1024),
-                                           std::make_tuple(10, 16384, true, 1024),
-                                           std::make_tuple(11, 8192, true, 8192),
-                                           std::make_tuple(12, 4096, true, 1024)));
+// These tests should pass even if required hardware or setup steps required for qatzstd are
+// missing. Qatzstd uses a sofware fallback in this case.
+INSTANTIATE_TEST_SUITE_P(
+    QatzstdConfigTestInstantiation, QatzstdConfigTest,
+    // First tuple has all default values.
+    ::testing::Values(std::make_tuple(1, 4096, true, 4096), std::make_tuple(2, 4096, true, 4096),
+                      std::make_tuple(3, 65536, true, 4096), std::make_tuple(4, 4096, true, 4096),
+                      std::make_tuple(5, 8192, true, 1024), std::make_tuple(6, 4096, false, 1024),
+                      std::make_tuple(7, 4096, true, 1024), std::make_tuple(8, 8192, true, 4096),
+                      std::make_tuple(9, 8192, true, 1024), std::make_tuple(10, 16384, true, 1024),
+                      std::make_tuple(11, 8192, true, 8192),
+                      std::make_tuple(12, 4096, true, 1024)));
 
 TEST_P(QatzstdConfigTest, LoadConfigAndVerifyWithDecompressor) {
   std::tuple<int, int, bool, int> config_value_tuple = GetParam();

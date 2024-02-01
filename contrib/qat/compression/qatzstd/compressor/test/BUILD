@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_contrib_package",
     "envoy_cc_test",
+    "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2

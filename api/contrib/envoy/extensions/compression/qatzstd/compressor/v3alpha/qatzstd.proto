@@ -16,6 +16,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extens
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Qatzstd Compressor]
+// Qatzstd :ref:`configuration overview <config_qatzstd>`.
 // [#extension: envoy.compression.qatzstd.compressor]
 
 // [#next-free-field: 8]
