@@ -45,6 +45,23 @@ var ErrDupRequestKey = errors.New("dup request key")
 
 var Requests = &requestMap{}
 
+var (
+	initialized      = false
+	envoyConcurrency uint32
+)
+
+// EnvoyConcurrency returns the concurrency Envoy was set to run at. This can be used to optimize HTTP filters that need
+// memory per worker thread to avoid locks.
+//
+// Note: Do not use inside of an `init()` function, the value will not be populated yet. Use within the filters
+// `StreamFilterConfigFactory` or `StreamFilterConfigParser`
+func EnvoyConcurrency() uint32 {
+	if !initialized {
+		panic("concurrency has not yet been initialized, do not access within an init()")
+	}
+	return envoyConcurrency
+}
+
 type requestMap struct {
 	initOnce sync.Once
 	requests []map[*C.httpRequest]*httpRequest
@@ -52,6 +69,8 @@ type requestMap struct {
 
 func (f *requestMap) initialize(concurrency uint32) {
 	f.initOnce.Do(func() {
+		initialized = true
+		envoyConcurrency = concurrency
 		f.requests = make([]map[*C.httpRequest]*httpRequest, concurrency)
 		for i := uint32(0); i < concurrency; i++ {
 			f.requests[i] = map[*C.httpRequest]*httpRequest{}
