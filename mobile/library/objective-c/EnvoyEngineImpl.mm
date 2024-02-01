@@ -8,7 +8,7 @@
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
 #import "library/cc/engine_builder.h"
-#import "library/common/engine_impl.h"
+#import "library/common/internal_engine.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -398,7 +398,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
-  Envoy::EngineImpl *_engine;
+  Envoy::InternalEngine *_engine;
   EnvoyNetworkMonitor *_networkMonitor;
 }
 
@@ -433,7 +433,7 @@ static void ios_track_event(envoy_map map, const void *context) {
     native_event_tracker.context = CFBridgingRetain(objcEventTracker);
   }
 
-  _engine = new Envoy::EngineImpl(native_callbacks, native_logger, native_event_tracker);
+  _engine = new Envoy::InternalEngine(native_callbacks, native_logger, native_event_tracker);
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
   if (networkMonitoringMode == 1) {

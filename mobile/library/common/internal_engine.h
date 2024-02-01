@@ -15,7 +15,7 @@
 
 namespace Envoy {
 
-class EngineImpl : public Logger::Loggable<Logger::Id::main> {
+class InternalEngine : public Logger::Loggable<Logger::Id::main> {
 public:
   /**
    * Constructor for a new engine instance.
@@ -23,13 +23,13 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    */
-  EngineImpl(envoy_engine_callbacks callbacks, envoy_logger logger,
-             envoy_event_tracker event_tracker);
+  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                 envoy_event_tracker event_tracker);
 
   /**
    * EngineImpl destructor.
    */
-  ~EngineImpl();
+  InternalEngine();
 
   /**
    * Run the engine with the provided configuration.
@@ -146,7 +146,7 @@ private:
   bool terminated_{false};
 };
 
-using EngineSharedPtr = std::shared_ptr<EngineImpl>;
-using EngineWeakPtr = std::weak_ptr<EngineImpl>;
+using InternalEngineSharedPtr = std::shared_ptr<InternalEngine>;
+using InternalEngineWeakPtr = std::weak_ptr<InternalEngine>;
 
 } // namespace Envoy

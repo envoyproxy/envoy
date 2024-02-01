@@ -1,13 +1,13 @@
 #include "stream.h"
 
 #include "library/cc/bridge_utility.h"
-#include "library/common/engine_impl.h"
+#include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Platform {
 
-Stream::Stream(Envoy::EngineImpl* engine, envoy_stream_t handle)
+Stream::Stream(Envoy::InternalEngine* engine, envoy_stream_t handle)
     : engine_(engine), handle_(handle) {}
 
 Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {

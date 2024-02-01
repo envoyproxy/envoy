@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Platform {
 
 class Engine;
-using EngineSharedPtr = std::shared_ptr<Engine>;
+using InternalEngineSharedPtr = std::shared_ptr<Engine>;
 
 class StreamPrototype {
 public:
