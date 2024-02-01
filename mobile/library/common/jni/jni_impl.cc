@@ -53,7 +53,7 @@ static void jvm_on_engine_running(void* context) {
   jni_helper.getEnv()->DeleteGlobalRef(j_context);
 }
 
-static void jvm_on_log(envoy_data data, const void* context) {
+static void jvm_on_log(envoy_log_level log_level, envoy_data data, const void* context) {
   if (context == nullptr) {
     return;
   }
@@ -65,8 +65,8 @@ static void jvm_on_log(envoy_data data, const void* context) {
   Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmLoggerContext =
       jni_helper.getObjectClass(j_context);
   jmethodID jmid_onLog =
-      jni_helper.getMethodId(jcls_JvmLoggerContext.get(), "log", "(Ljava/lang/String;)V");
-  jni_helper.callVoidMethod(j_context, jmid_onLog, str.get());
+      jni_helper.getMethodId(jcls_JvmLoggerContext.get(), "log", "(ILjava/lang/String;)V");
+  jni_helper.callVoidMethod(j_context, jmid_onLog, log_level, str.get());
 
   release_envoy_data(data);
 }
