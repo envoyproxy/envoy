@@ -4,6 +4,12 @@
 
 # api
 /api/ @envoyproxy/api-shepherds
+
+# docs/examples
+/docs/ @envoyproxy/docs-shepherds
+/examples/ @envoyproxy/docs-shepherds
+/changelogs/ @envoyproxy/docs-shepherds
+
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
