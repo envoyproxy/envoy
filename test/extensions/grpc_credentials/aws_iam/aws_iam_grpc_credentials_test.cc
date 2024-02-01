@@ -18,9 +18,6 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-using testing::An;
-using testing::Throw;
-
 // AWS IAM credential validation tests.
 class GrpcAwsIamClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
@@ -167,11 +164,12 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials
 class MockSigner : public Envoy::Extensions::Common::Aws::Signer {
 public:
   ~MockSigner() override = default;
-  MOCK_METHOD(void, sign, (Http::RequestMessage&, bool));
-  MOCK_METHOD(void, sign, (Http::RequestMessage&, bool, absl::string_view));
-  MOCK_METHOD(void, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
-  MOCK_METHOD(void, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
-  MOCK_METHOD(void, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
+  void sign(Http::RequestMessage&, bool, absl::string_view) override {
+    throw(EnvoyException("test"));
+  }
+  void signEmptyPayload(Http::RequestHeaderMap&, const absl::string_view = "") override{};
+  void signUnsignedPayload(Http::RequestHeaderMap&, const absl::string_view = "") override{};
+  void sign(Http::RequestHeaderMap&, const std::string&, const absl::string_view = "") override{};
 };
 
 class MockAuthContext : public ::grpc::AuthContext {
@@ -191,14 +189,9 @@ public:
 
 TEST(GrpcAwsIamClientTest, AwsIamGrpcAuth_SignerThrows) {
 
-  auto mockSign = std::make_unique<MockSigner>();
-  testing::Mock::AllowLeak(mockSign.get());
-
-  ON_CALL(*mockSign, sign(_, An<bool>(), _)).WillByDefault(Throw(EnvoyException("test")));
-  std::unique_ptr<Envoy::Extensions::Common::Aws::Signer> signer = std::move(mockSign);
-
   auto testAwsIamHeaderAuthenticator =
-      new Extensions::GrpcCredentials::AwsIam::AwsIamHeaderAuthenticator(std::move(signer));
+      Extensions::GrpcCredentials::AwsIam::AwsIamHeaderAuthenticator(
+          std::make_unique<MockSigner>());
 
   std::string url = "https://a.example.org/test";
   grpc::string_ref urlGs(url.data(), url.size());
@@ -206,7 +199,7 @@ TEST(GrpcAwsIamClientTest, AwsIamGrpcAuth_SignerThrows) {
   grpc::string_ref methodGs(method.data(), method.size());
   MockAuthContext context;
   std::multimap<grpc::string, grpc::string> metadata;
-  auto status = testAwsIamHeaderAuthenticator->GetMetadata(urlGs, methodGs, context, &metadata);
+  auto status = testAwsIamHeaderAuthenticator.GetMetadata(urlGs, methodGs, context, &metadata);
   EXPECT_EQ(status.error_code(), grpc::StatusCode::INTERNAL);
 }
 
