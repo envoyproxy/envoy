@@ -7,7 +7,7 @@
 
 #include "absl/base/call_once.h"
 #include "extension_registry.h"
-#include "library/common/common/lambda_logger_delegate.h"
+#include "library/common/common/logger_delegate.h"
 #include "library/common/engine_common.h"
 #include "library/common/http/client.h"
 #include "library/common/network/connectivity_manager.h"
@@ -15,7 +15,7 @@
 
 namespace Envoy {
 
-class Engine : public Logger::Loggable<Logger::Id::main> {
+class InternalEngine : public Logger::Loggable<Logger::Id::main> {
 public:
   /**
    * Constructor for a new engine instance.
@@ -23,12 +23,13 @@ public:
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
    */
-  Engine(envoy_engine_callbacks callbacks, envoy_logger logger, envoy_event_tracker event_tracker);
+  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                 envoy_event_tracker event_tracker);
 
   /**
-   * Engine destructor.
+   * InternalEngine destructor.
    */
-  ~Engine();
+  InternalEngine();
 
   /**
    * Run the engine with the provided configuration.
@@ -145,7 +146,7 @@ private:
   bool terminated_{false};
 };
 
-using EngineSharedPtr = std::shared_ptr<Engine>;
-using EngineWeakPtr = std::weak_ptr<Engine>;
+using InternalEngineSharedPtr = std::shared_ptr<InternalEngine>;
+using InternalEngineWeakPtr = std::weak_ptr<InternalEngine>;
 
 } // namespace Envoy
