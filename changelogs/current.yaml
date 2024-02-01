@@ -32,6 +32,10 @@ new_features:
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: aws_lambda
+  change: |
+    Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter

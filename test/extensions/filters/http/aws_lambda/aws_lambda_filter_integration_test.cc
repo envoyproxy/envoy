@@ -79,112 +79,111 @@ public:
         )EOF";
     config_helper_.addClusterFilterMetadata(metadata_yaml);
   }
-}
 
-template <typename TMap>
-ABSL_MUST_USE_RESULT testing::AssertionResult compareMaps(const TMap& m1, const TMap& m2) {
-  for (auto&& kvp : m1) {
-    auto it = m2.find(kvp.first);
-    if (it == m2.end()) {
-      return AssertionFailure() << "Failed to find value: " << kvp.first;
-      ;
-    }
-    if (it->second != kvp.second) {
-      return AssertionFailure() << "Values of key: " << kvp.first
-                                << " are different. expected: " << kvp.second
-                                << " actual: " << it->second;
-    }
-  }
-  return AssertionSuccess();
-}
-
-void runTest(const Http::RequestHeaderMap& request_headers, const std::string& request_body,
-             const std::string& expected_json_request,
-             const Http::ResponseHeaderMap& lambda_response_headers,
-             const std::string& lambda_response_body,
-             const Http::ResponseHeaderMap& expected_response_headers,
-             const std::vector<std::string>& expected_response_cookies,
-             const std::string& expected_response_body) {
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  IntegrationStreamDecoderPtr response;
-  if (request_body.empty()) {
-    response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  } else {
-    auto encoder_decoder = codec_client_->startRequest(request_headers);
-    request_encoder_ = &encoder_decoder.first;
-    response = std::move(encoder_decoder.second);
-    // Chunk the data to simulate a real request.
-    const size_t chunk_size = 5;
-    size_t i = 0;
-    for (; i < request_body.length() / chunk_size; i++) {
-      Buffer::OwnedImpl buffer(request_body.substr(i * chunk_size, chunk_size));
-      codec_client_->sendData(*request_encoder_, buffer, false);
-    }
-    // Send the last chunk flagged as end_stream.
-    Buffer::OwnedImpl buffer(
-        request_body.substr(i * chunk_size, request_body.length() % chunk_size));
-    codec_client_->sendData(*request_encoder_, buffer, true);
-  }
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  Request transformed_request;
-  Request expected_request;
-  TestUtility::loadFromJson(upstream_request_->body().toString(), transformed_request);
-  TestUtility::loadFromJson(expected_json_request, expected_request);
-
-  EXPECT_EQ(expected_request.raw_path(), transformed_request.raw_path());
-  EXPECT_EQ(expected_request.method(), transformed_request.method());
-  EXPECT_EQ(expected_request.body(), transformed_request.body());
-  EXPECT_EQ(expected_request.is_base64_encoded(), transformed_request.is_base64_encoded());
-  EXPECT_TRUE(compareMaps(expected_request.headers(), transformed_request.headers()));
-  EXPECT_TRUE(compareMaps(expected_request.query_string_parameters(),
-                          transformed_request.query_string_parameters()));
-
-  if (lambda_response_body.empty()) {
-    upstream_request_->encodeHeaders(lambda_response_headers, true /*end_stream*/);
-  } else {
-    upstream_request_->encodeHeaders(lambda_response_headers, false /*end_stream*/);
-    Buffer::OwnedImpl buffer(lambda_response_body);
-    upstream_request_->encodeData(buffer, true);
-  }
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-
-  // verify headers
-  expected_response_headers.iterate(
-      [actual_headers = &response->headers()](const Http::HeaderEntry& expected_entry) {
-        const auto actual_entry = actual_headers->get(
-            Http::LowerCaseString(std::string(expected_entry.key().getStringView())));
-        EXPECT_EQ(actual_entry[0]->value().getStringView(), expected_entry.value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      });
-
-  // verify cookies if we have any
-  if (!expected_response_cookies.empty()) {
-    std::vector<std::string> actual_cookies;
-    response->headers().iterate([&actual_cookies](const Http::HeaderEntry& entry) {
-      if (entry.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-        actual_cookies.emplace_back(entry.value().getStringView());
+  template <typename TMap>
+  ABSL_MUST_USE_RESULT testing::AssertionResult compareMaps(const TMap& m1, const TMap& m2) {
+    for (auto&& kvp : m1) {
+      auto it = m2.find(kvp.first);
+      if (it == m2.end()) {
+        return AssertionFailure() << "Failed to find value: " << kvp.first;
+        ;
       }
+      if (it->second != kvp.second) {
+        return AssertionFailure() << "Values of key: " << kvp.first
+                                  << " are different. expected: " << kvp.second
+                                  << " actual: " << it->second;
+      }
+    }
+    return AssertionSuccess();
+  }
+
+  void runTest(const Http::RequestHeaderMap& request_headers, const std::string& request_body,
+               const std::string& expected_json_request,
+               const Http::ResponseHeaderMap& lambda_response_headers,
+               const std::string& lambda_response_body,
+               const Http::ResponseHeaderMap& expected_response_headers,
+               const std::vector<std::string>& expected_response_cookies,
+               const std::string& expected_response_body) {
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    IntegrationStreamDecoderPtr response;
+    if (request_body.empty()) {
+      response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    } else {
+      auto encoder_decoder = codec_client_->startRequest(request_headers);
+      request_encoder_ = &encoder_decoder.first;
+      response = std::move(encoder_decoder.second);
+      // Chunk the data to simulate a real request.
+      const size_t chunk_size = 5;
+      size_t i = 0;
+      for (; i < request_body.length() / chunk_size; i++) {
+        Buffer::OwnedImpl buffer(request_body.substr(i * chunk_size, chunk_size));
+        codec_client_->sendData(*request_encoder_, buffer, false);
+      }
+      // Send the last chunk flagged as end_stream.
+      Buffer::OwnedImpl buffer(
+          request_body.substr(i * chunk_size, request_body.length() % chunk_size));
+      codec_client_->sendData(*request_encoder_, buffer, true);
+    }
+
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+    Request transformed_request;
+    Request expected_request;
+    TestUtility::loadFromJson(upstream_request_->body().toString(), transformed_request);
+    TestUtility::loadFromJson(expected_json_request, expected_request);
+
+    EXPECT_EQ(expected_request.raw_path(), transformed_request.raw_path());
+    EXPECT_EQ(expected_request.method(), transformed_request.method());
+    EXPECT_EQ(expected_request.body(), transformed_request.body());
+    EXPECT_EQ(expected_request.is_base64_encoded(), transformed_request.is_base64_encoded());
+    EXPECT_TRUE(compareMaps(expected_request.headers(), transformed_request.headers()));
+    EXPECT_TRUE(compareMaps(expected_request.query_string_parameters(),
+                            transformed_request.query_string_parameters()));
+
+    if (lambda_response_body.empty()) {
+      upstream_request_->encodeHeaders(lambda_response_headers, true /*end_stream*/);
+    } else {
+      upstream_request_->encodeHeaders(lambda_response_headers, false /*end_stream*/);
+      Buffer::OwnedImpl buffer(lambda_response_body);
+      upstream_request_->encodeData(buffer, true);
+    }
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    // verify headers
+    expected_response_headers.iterate([actual_headers = &response->headers()](
+                                          const Http::HeaderEntry& expected_entry) {
+      const auto actual_entry = actual_headers->get(
+          Http::LowerCaseString(std::string(expected_entry.key().getStringView())));
+      EXPECT_EQ(actual_entry[0]->value().getStringView(), expected_entry.value().getStringView());
       return Http::HeaderMap::Iterate::Continue;
     });
 
-    EXPECT_EQ(expected_response_cookies, actual_cookies);
+    // verify cookies if we have any
+    if (!expected_response_cookies.empty()) {
+      std::vector<std::string> actual_cookies;
+      response->headers().iterate([&actual_cookies](const Http::HeaderEntry& entry) {
+        if (entry.key().getStringView() == Http::Headers::get().SetCookie.get()) {
+          actual_cookies.emplace_back(entry.value().getStringView());
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      });
+
+      EXPECT_EQ(expected_response_cookies, actual_cookies);
+    }
+
+    // verify body
+    EXPECT_STREQ(expected_response_body.c_str(), response->body().c_str());
+
+    // cleanup
+    codec_client_->close();
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
-
-  // verify body
-  EXPECT_STREQ(expected_response_body.c_str(), response->body().c_str());
-
-  // cleanup
-  codec_client_->close();
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-}
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AwsLambdaFilterIntegrationTest,
