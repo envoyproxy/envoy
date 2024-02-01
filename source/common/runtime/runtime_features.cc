@@ -95,6 +95,8 @@ RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
+// Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
+// @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_restart_features_quic_send_server_preferred_address_to_all_clients);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
