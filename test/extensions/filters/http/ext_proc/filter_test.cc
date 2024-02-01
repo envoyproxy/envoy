@@ -89,7 +89,7 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 
 class HttpFilterTest : public testing::Test {
 protected:
-  void initialize(std::string&& yaml) {
+  void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
@@ -133,7 +133,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_ = std::make_shared<FilterConfig>(
-        proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
+        proto_config, 200ms, 10000, *stats_store_.rootScope(), "", is_upstream_filter,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         local_info_);
@@ -3651,6 +3651,54 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
                        .string_value());
 
   filter_->onDestroy();
+}
+
+// Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server
+// sends back response with clear_route_cache set to true, it is ignored.
+TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF", true);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("foo");
+  Buffer::OwnedImpl buffered_response_data;
+  setUpEncodingBuffering(buffered_response_data);
+
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+  processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  filter_->onDestroy();
+
+  // The clear_router_cahce from response is ignored.
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 1);
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
 class HttpFilter2Test : public HttpFilterTest,

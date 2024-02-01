@@ -13,8 +13,9 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 class ExternalProcessingFilterFactory
-    : public Common::DualFactoryBase<envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor,
-                                     envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute> {
+    : public Common::DualFactoryBase<
+          envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor,
+          envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute> {
 
 public:
   ExternalProcessingFilterFactory() : DualFactoryBase("envoy.filters.http.ext_proc") {}

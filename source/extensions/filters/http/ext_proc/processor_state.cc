@@ -425,6 +425,8 @@ void DecodingProcessorState::clearRouteCache(const CommonResponse& common_respon
     return;
   }
   if (filter_.config().isUpstreamFilter()) {
+    filter_.stats().clear_route_cache_upstream_ignored_.inc();
+    ENVOY_LOG(debug, "NOT clearing route cache. The filter is in upstream filter chain.");
     return;
   }
   // Only clear the route cache if there is a mutation to the header and clearing is allowed.

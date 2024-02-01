@@ -45,7 +45,8 @@ namespace ExternalProcessing {
   COUNTER(override_message_timeout_received)                                                       \
   COUNTER(override_message_timeout_ignored)                                                        \
   COUNTER(clear_route_cache_ignored)                                                               \
-  COUNTER(clear_route_cache_disabled)
+  COUNTER(clear_route_cache_disabled)                                                              \
+  COUNTER(clear_route_cache_upstream_ignored)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)

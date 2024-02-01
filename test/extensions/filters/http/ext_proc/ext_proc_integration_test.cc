@@ -116,7 +116,8 @@ protected:
       if (downstream_filter_) {
         // Construct a configuration proto for our filter and then re-write it
         // to JSON so that we can add it to the overall config
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
+            ext_proc_filter;
         ext_proc_filter.set_name(ext_proc_filter_name);
         ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
@@ -3480,8 +3481,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
   downstream_filter_ = false;
   initializeConfig();
   // Add ext_proc as upstream filter.
-  config_helper_.addConfigModifier([this](
-                                  envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     // Retrieve cluster_0.
     auto* cluster = static_resources->mutable_clusters(0);

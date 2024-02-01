@@ -9,7 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-absl::StatusOr<Http::FilterFactoryCb> ExternalProcessingFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+ExternalProcessingFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
@@ -20,11 +21,10 @@ absl::StatusOr<Http::FilterFactoryCb> ExternalProcessingFilterFactory::createFil
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       context.scope(), stats_prefix, dual_info.is_upstream_filter,
-      Envoy::Extensions::Filters::Common::Expr::getBuilder(context),
-      context.localInfo());
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context.localInfo());
 
-  return [filter_config, grpc_service = proto_config.grpc_service(),
-          &context, dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
+  return [filter_config, grpc_service = proto_config.grpc_service(), &context,
+          dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
     auto client = std::make_unique<ExternalProcessorClientImpl>(
         context.clusterManager().grpcAsyncClientManager(), dual_info.scope);
 
