@@ -197,8 +197,10 @@ envoy.filters.http.alternate_protocols_cache:
 envoy.filters.http.aws_lambda:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_lambda.v3.Config
   - envoy.extensions.filters.http.aws_lambda.v3.PerRouteConfig
