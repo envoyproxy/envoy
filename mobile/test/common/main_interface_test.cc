@@ -324,7 +324,7 @@ TEST(EngineTest, Logger) {
                                     } /*on_exit*/,
                                     &test_context /*context*/};
 
-  envoy_logger logger{[](envoy_data data, const void* context) -> void {
+  envoy_logger logger{[](envoy_log_level, envoy_data data, const void* context) -> void {
                         auto* test_context =
                             static_cast<engine_test_context*>(const_cast<void*>(context));
                         release_envoy_data(data);
