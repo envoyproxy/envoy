@@ -35,7 +35,6 @@ import (
 	"errors"
 	"runtime"
 	"strings"
-	"sync/atomic"
 	"unsafe"
 
 	"google.golang.org/protobuf/proto"
@@ -321,17 +320,16 @@ func (c *httpCApiImpl) HttpGetDynamicMetadata(rr unsafe.Pointer, filterName stri
 	r := (*httpRequest)(rr)
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.sema.Add(1)
+	r.markMayWaitingCallback()
 
 	var valueData C.uint64_t
 	var valueLen C.int
 	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(r.req),
 		unsafe.Pointer(unsafe.StringData(filterName)), C.int(len(filterName)), &valueData, &valueLen)
 	if res == C.CAPIYield {
-		atomic.AddInt32(&r.waitingOnEnvoy, 1)
-		r.sema.Wait()
+		r.checkOrWaitCallback()
 	} else {
-		r.sema.Done()
+		r.markNoWaitingCallback()
 		handleCApiStatus(res)
 	}
 	buf := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
@@ -394,14 +392,13 @@ func (c *httpCApiImpl) HttpGetStringFilterState(rr unsafe.Pointer, key string) s
 	var valueLen C.int
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.sema.Add(1)
+	r.markMayWaitingCallback()
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(r.req),
 		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
 	if res == C.CAPIYield {
-		atomic.AddInt32(&r.waitingOnEnvoy, 1)
-		r.sema.Wait()
+		r.checkOrWaitCallback()
 	} else {
-		r.sema.Done()
+		r.markNoWaitingCallback()
 		handleCApiStatus(res)
 	}
 
@@ -416,15 +413,14 @@ func (c *httpCApiImpl) HttpGetStringProperty(rr unsafe.Pointer, key string) (str
 	var rc C.int
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.sema.Add(1)
+	r.markMayWaitingCallback()
 	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(r.req),
 		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen, &rc)
 	if res == C.CAPIYield {
-		atomic.AddInt32(&r.waitingOnEnvoy, 1)
-		r.sema.Wait()
+		r.checkOrWaitCallback()
 		res = C.CAPIStatus(rc)
 	} else {
-		r.sema.Done()
+		r.markNoWaitingCallback()
 		handleCApiStatus(res)
 	}
 

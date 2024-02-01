@@ -1397,7 +1397,10 @@ Status ConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint
                  connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
                  static_cast<uint64_t>(length), padding_length);
 
-  result = protocol_constraints_.trackInboundFrames(length, type, flags, padding_length);
+  const bool end_stream =
+      (type == NGHTTP2_DATA || type == NGHTTP2_HEADERS) && (flags & NGHTTP2_FLAG_END_STREAM);
+  const bool is_empty = (length - padding_length) == 0;
+  result = protocol_constraints_.trackInboundFrame(type, end_stream, is_empty);
   if (!result.ok()) {
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());

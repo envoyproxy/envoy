@@ -34,7 +34,7 @@ public:
     return std::make_unique<ProtocolOptionsProto>();
   }
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsConfig(
       const Protobuf::Message& proto_config,
       Server::Configuration::ProtocolOptionsFactoryContext& factory_context) override {
     return createProtocolOptionsTyped(MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(
