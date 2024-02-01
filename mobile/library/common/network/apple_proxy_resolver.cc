@@ -52,7 +52,7 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
   ASSERT(!pac_file_url.empty(), "PAC file URL must not be empty if PAC is enabled.");
   pac_proxy_resolver_->resolveProxies(
       pac_file_url, target_url_string,
-      [&proxy_resolution_completed](const std::vector<ProxySettings>& proxies) {
+      [proxy_resolution_completed](const std::vector<ProxySettings>& proxies) {
   std::cerr << "==> AAB AppleProxyResolver::resolveProxy lambda calling proxy_resolution_completed" << std::endl;
         proxy_resolution_completed(proxies);
   std::cerr << "==> AAB AppleProxyResolver::resolveProxy lambda finished calling proxy_resolution_completed" << std::endl;
