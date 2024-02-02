@@ -1,6 +1,6 @@
 #pragma once
 
-#include "library/common/jni/import/jni_import.h"
+#include "library/jni/import/jni_import.h"
 
 namespace Envoy {
 namespace JNI {

@@ -1,4 +1,4 @@
-#include "library/common/jni/jni_support.h"
+#include "library/jni/jni_support.h"
 
 // NOLINT(namespace-envoy)
 

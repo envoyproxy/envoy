@@ -1,6 +1,6 @@
 #include <jni.h>
 
-#include "library/common/jni/jni_helper.h"
+#include "library/jni/jni_helper.h"
 
 // NOLINT(namespace-envoy)
 

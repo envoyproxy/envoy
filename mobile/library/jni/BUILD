@@ -20,7 +20,7 @@ envoy_cc_library(
     }),
     repository = "@envoy",
     deps = [
-        "//library/common/jni/import:jni_import_lib",
+        "//library/jni/import:jni_import_lib",
     ],
 )
 
@@ -37,12 +37,12 @@ envoy_cc_library(
     deps = [
         ":jni_helper_lib",
         ":jni_support_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/jni/types:jni_env_lib",
-        "//library/common/jni/types:jni_exception_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
         "//library/common/types:matcher_data_lib",
+        "//library/jni/import:jni_import_lib",
+        "//library/jni/types:jni_env_lib",
+        "//library/jni/types:jni_exception_lib",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/protobuf",
     ],
@@ -58,7 +58,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/common/jni/import:jni_import_lib",
+        "//library/jni/import:jni_import_lib",
         "@envoy//source/common/common:assert_lib",
     ],
 )
@@ -79,9 +79,9 @@ envoy_cc_library(
         "//library/common/api:c_types",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
-        "//library/common/jni/types:jni_exception_lib",
-        "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:managed_types_lib",
+        "//library/jni/types:jni_exception_lib",
+        "//library/jni/types:jni_javavm_lib",
         "@envoy//source/common/protobuf",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -103,10 +103,10 @@ envoy_cc_library(
         "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/jni/types:jni_exception_lib",
-        "//library/common/jni/types:jni_javavm_lib",
         "//library/common/types:c_types_lib",
+        "//library/jni/import:jni_import_lib",
+        "//library/jni/types:jni_exception_lib",
+        "//library/jni/types:jni_javavm_lib",
         "@envoy//bazel:boringssl",
     ],
 )
@@ -124,7 +124,7 @@ envoy_cc_library(
         ":jni_support_lib",
         ":jni_utility_lib",
         "//library/common:internal_engine_lib",
-        "//library/common/jni/import:jni_import_lib",
+        "//library/jni/import:jni_import_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -202,7 +202,7 @@ envoy_cc_library(
             ":jni_support_lib",
             ":jni_utility_lib",
             "//library/common/data:utility_lib",
-            "//library/common/jni/import:jni_import_lib",
+            "//library/jni/import:jni_import_lib",
         ],
         "//conditions:default": [],
     }),

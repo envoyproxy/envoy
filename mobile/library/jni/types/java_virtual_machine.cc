@@ -1,8 +1,8 @@
-#include "library/common/jni/types/java_virtual_machine.h"
+#include "library/jni/types/java_virtual_machine.h"
 
 #include "source/common/common/assert.h"
 
-#include "library/common/jni/jni_support.h"
+#include "library/jni/jni_support.h"
 
 namespace Envoy {
 namespace JNI {

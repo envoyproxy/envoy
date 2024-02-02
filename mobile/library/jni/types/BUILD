@@ -14,8 +14,8 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/jni/types:jni_string_lib",
+        "//library/jni/import:jni_import_lib",
+        "//library/jni/types:jni_string_lib",
         "@envoy//source/common/common:assert_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -29,8 +29,8 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/jni/types:jni_env_lib",
+        "//library/jni/import:jni_import_lib",
+        "//library/jni/types:jni_env_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -46,9 +46,9 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/common/jni:jni_support_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/jni/types:jni_javavm_lib",
+        "//library/jni:jni_support_lib",
+        "//library/jni/import:jni_import_lib",
+        "//library/jni/types:jni_javavm_lib",
         "@envoy//source/common/common:assert_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -65,8 +65,8 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "//library/common/jni:jni_support_lib",
-        "//library/common/jni/import:jni_import_lib",
+        "//library/jni:jni_support_lib",
+        "//library/jni/import:jni_import_lib",
         "@envoy//source/common/common:assert_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
