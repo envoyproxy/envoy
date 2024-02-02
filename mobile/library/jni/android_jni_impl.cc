@@ -1,5 +1,5 @@
-#include "library/common/jni/import/jni_import.h"
-#include "library/common/jni/jni_utility.h"
+#include "library/jni/import/jni_import.h"
+#include "library/jni/jni_utility.h"
 
 // NOLINT(namespace-envoy)
 

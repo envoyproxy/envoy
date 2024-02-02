@@ -1,4 +1,4 @@
-#include "library/common/jni/jni_helper.h"
+#include "library/jni/jni_helper.h"
 
 #include "source/common/common/assert.h"
 

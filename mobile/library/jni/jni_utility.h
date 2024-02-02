@@ -5,11 +5,11 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "library/common/jni/import/jni_import.h"
-#include "library/common/jni/jni_helper.h"
 #include "library/common/types/c_types.h"
 #include "library/common/types/managed_envoy_headers.h"
 #include "library/common/types/matcher_data.h"
+#include "library/jni/import/jni_import.h"
+#include "library/jni/jni_helper.h"
 
 namespace Envoy {
 namespace JNI {

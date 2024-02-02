@@ -1,13 +1,13 @@
-#include "library/common/jni/jni_utility.h"
+#include "library/jni/jni_utility.h"
 
 #include <cstdlib>
 #include <cstring>
 
 #include "source/common/common/assert.h"
 
-#include "library/common/jni/jni_support.h"
-#include "library/common/jni/types/env.h"
-#include "library/common/jni/types/exception.h"
+#include "library/jni/jni_support.h"
+#include "library/jni/types/env.h"
+#include "library/jni/types/exception.h"
 
 namespace Envoy {
 namespace JNI {
