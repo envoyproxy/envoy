@@ -43,10 +43,16 @@ inline std::string QuicheGetCommonSourcePathImpl() {
 
 class QuicheScopedDisableExitOnDFatalImpl {
 public:
- QuicheScopedDisableExitOnDFatalImpl() {
+ explicit QuicheScopedDisableExitOnDFatalImpl() {
     original_value_ = isDFatalExitDisabled();
     setDFatalExitDisabled(true);
  }
+
+  // This type is neither copyable nor movable.
+  QuicheScopedDisableExitOnDFatalImpl(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
+  QuicheScopedDisableExitOnDFatalImpl&
+  operator=(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
+
  ~QuicheScopedDisableExitOnDFatalImpl(){
    setDFatalExitDisabled(original_value_);
  }

@@ -272,7 +272,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->max_response_headers_count_ = 200;
   if (!http2_options.has_value()) {
     http2_options = Http2::Utility::initializeAndValidateOptions(
-        envoy::config::core::v3::Http2ProtocolOptions());
+                        envoy::config::core::v3::Http2ProtocolOptions())
+                        .value();
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
 #ifdef ENVOY_ENABLE_QUIC

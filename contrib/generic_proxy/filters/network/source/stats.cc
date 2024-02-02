@@ -18,7 +18,7 @@ CodeOrFlags::CodeOrFlags(Server::Configuration::ServerFactoryContext& context)
     code_stat_names_.push_back(pool_.add(std::to_string(i)));
   }
 
-  for (const auto& flag : StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+  for (const auto& flag : StreamInfo::ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     flag_stat_names_.emplace(flag.second, pool_.add(flag.first.short_string_));
   }
 
@@ -42,13 +42,13 @@ Stats::StatName CodeOrFlags::statNameFromFlag(StreamInfo::ResponseFlag flag) con
 
 absl::InlinedVector<StreamInfo::ResponseFlag, 2>
 getResponseFlags(const StreamInfo::StreamInfo& info) {
-  if (info.responseFlags() == 0) {
+  if (!info.hasAnyResponseFlag()) {
     return {};
   }
 
   absl::InlinedVector<StreamInfo::ResponseFlag, 2> flags;
 
-  for (const auto& flag : StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRINGS_FLAGS) {
+  for (const auto& flag : StreamInfo::ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
     if (info.hasResponseFlag(flag.second)) {
       flags.push_back(flag.second);
     }

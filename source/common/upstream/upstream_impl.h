@@ -1053,6 +1053,11 @@ public:
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
+  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  happyEyeballsConfig() const override {
+    return happy_eyeballs_config_;
+  }
+
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
@@ -1127,10 +1132,11 @@ private:
       common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   // TODO(ohadvano): http_filter_config_provider_manager_ and
-  // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as a
-  // singleton. This is currently not possible due to circular dependency (filter config provider
-  // manager depends on the ClusterManager object). The circular dependency can be resolved when the
-  // following issue is resolved: https://github.com/envoyproxy/envoy/issues/26653.
+  // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as
+  // a singleton. This is currently not possible due to circular dependency (filter config
+  // provider manager depends on the ClusterManager object). The circular dependency can be
+  // resolved when the following issue is resolved:
+  // https://github.com/envoyproxy/envoy/issues/26653.
   std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
   std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
       network_filter_config_provider_manager_;
@@ -1155,6 +1161,8 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
+  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      happy_eyeballs_config_;
 };
 
 /**
@@ -1204,8 +1212,8 @@ public:
                     ExcludedHostVectorConstSharedPtr>
   partitionHostList(const HostVector& hosts);
 
-  // Partitions the provided list of hosts per locality into three new lists containing the healthy,
-  // degraded and excluded hosts respectively.
+  // Partitions the provided list of hosts per locality into three new lists containing the
+  // healthy, degraded and excluded hosts respectively.
   static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
@@ -1227,8 +1235,8 @@ protected:
                   ClusterFactoryContext& cluster_context);
 
   /**
-   * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
-   * query DNS, contact EDS, etc.
+   * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed.
+   * E.g., query DNS, contact EDS, etc.
    */
   virtual void startPreInit() PURE;
 
@@ -1241,8 +1249,8 @@ protected:
 
   /**
    * Called by every concrete cluster after all targets registered at init manager are
-   * initialized. At this point, shared init takes over and determines if there is an initial health
-   * check pass needed, etc.
+   * initialized. At this point, shared init takes over and determines if there is an initial
+   * health check pass needed, etc.
    */
   void onInitDone();
 
@@ -1251,13 +1259,13 @@ protected:
   absl::Status parseDropOverloadConfig(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
-  // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
-  // register with this init manager are expected to be for implementations of SdsApi (see
+  // This init manager is shared via TransportSocketFactoryContext. The initialization targets
+  // that register with this init manager are expected to be for implementations of SdsApi (see
   // SdsApi::init_target_).
   Init::ManagerImpl init_manager_;
 
-  // Once all targets are initialized (i.e. once all dynamic secrets are loaded), this watcher calls
-  // onInitDone() above.
+  // Once all targets are initialized (i.e. once all dynamic secrets are loaded), this watcher
+  // calls onInitDone() above.
   Init::WatcherImpl init_watcher_;
 
   Runtime::Loader& runtime_;
@@ -1308,8 +1316,8 @@ public:
   void initializePriorityFor(
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint);
 
-  // Registers a host based on its address to the PriorityState based on the specified priority (the
-  // priority is specified by locality_lb_endpoint.priority()).
+  // Registers a host based on its address to the PriorityState based on the specified priority
+  // (the priority is specified by locality_lb_endpoint.priority()).
   //
   // The specified health_checker_flag is used to set the registered-host's health-flag when the
   // lb_endpoint health status is unhealthy, draining or timeout.
@@ -1355,8 +1363,8 @@ protected:
    * with existing hosts.
    *
    * @param new_hosts the full lists of hosts in the new configuration.
-   * @param current_priority_hosts the full lists of hosts for the priority to be updated. The list
-   * will be modified to contain the updated list of hosts.
+   * @param current_priority_hosts the full lists of hosts for the priority to be updated. The
+   * list will be modified to contain the updated list of hosts.
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
