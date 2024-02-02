@@ -29,15 +29,12 @@ removed_config_or_runtime:
 - area: overload manager
   change: |
     removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
-<<<<<<< HEAD
-- area: resource_monitors
-  change: |
-    removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` and legacy code paths.
-=======
 - area: http
   change: |
     Removed ``envoy_reloadable_features_append_xfh_idempotent`` runtime flag and legacy code paths.
->>>>>>> upstream/main
+- area: resource_monitors
+  change: |
+    removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` runtime flag  and legacy code paths.
 
 new_features:
 - area: aws_request_signing
