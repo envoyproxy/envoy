@@ -1,7 +1,7 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 
 namespace Envoy {
 
@@ -10,10 +10,10 @@ namespace Envoy {
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
 struct TestEngine {
-  std::unique_ptr<Engine> engine_;
+  std::unique_ptr<InternalEngine> engine_;
   envoy_engine_t handle() { return reinterpret_cast<envoy_engine_t>(engine_.get()); }
   TestEngine(envoy_engine_callbacks callbacks, const std::string& level) {
-    engine_.reset(new Envoy::Engine(callbacks, {}, {}));
+    engine_.reset(new Envoy::InternalEngine(callbacks, {}, {}));
     Platform::EngineBuilder builder;
     auto bootstrap = builder.generateBootstrap();
     std::string yaml = Envoy::MessageUtil::getYamlStringFromMessage(*bootstrap);
