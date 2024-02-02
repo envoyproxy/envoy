@@ -667,7 +667,7 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   }
   filter_state->setData(
       TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseTrailers(
