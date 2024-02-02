@@ -135,6 +135,7 @@ envoy_cc_library(
         ":connection_lib",
         ":multi_connection_base_impl_lib",
         "//envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
