@@ -71,13 +71,13 @@ public:
     if (!downstream) {
       addUpstreamProtocolOptions();
       replaceRoute();
-    }
-
-    constexpr auto metadata_yaml = R"EOF(
+    } else {
+      constexpr auto metadata_yaml = R"EOF(
         com.amazonaws.lambda:
           egress_gateway: true
         )EOF";
-    config_helper_.addClusterFilterMetadata(metadata_yaml);
+      config_helper_.addClusterFilterMetadata(metadata_yaml);
+    }
   }
 
   template <typename TMap>

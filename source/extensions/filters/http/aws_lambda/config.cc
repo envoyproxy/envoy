@@ -61,8 +61,8 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
                                  proto_config.payload_passthrough()};
 
   FilterStats stats = generateStats(stats_prefix, dual_info.scope);
-  return [stats, signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
-    auto filter = std::make_shared<Filter>(filter_settings, stats, signer);
+  return [stats, signer, filter_settings, dual_info](Http::FilterChainFactoryCallbacks& cb) {
+    auto filter = std::make_shared<Filter>(filter_settings, stats, signer, dual_info.is_upstream);
     cb.addStreamFilter(filter);
   };
 }

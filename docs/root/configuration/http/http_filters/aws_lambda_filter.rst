@@ -94,6 +94,7 @@ If you use the per-filter configuration, the target cluster *must* have the foll
         com.amazonaws.lambda:
           egress_gateway: true
 
+If you use the upstream filter configuration, this metadata is not required.
 
 Below are some examples that show how the filter can be used in different deployment scenarios.
 

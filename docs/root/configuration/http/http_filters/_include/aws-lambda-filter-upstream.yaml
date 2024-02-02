@@ -34,10 +34,6 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 10001
-    metadata:
-      filter_metadata:
-        com.amazonaws.lambda:
-          egress_gateway: true
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions

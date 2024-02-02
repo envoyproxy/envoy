@@ -35,7 +35,7 @@ public:
 
   void setupFilter(const FilterSettings& settings) {
     signer_ = std::make_shared<NiceMock<MockSigner>>();
-    filter_ = std::make_unique<Filter>(settings, stats_, signer_);
+    filter_ = std::make_unique<Filter>(settings, stats_, signer_, false);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     setupClusterMetadata();
@@ -74,6 +74,28 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
  */
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
+  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+  Http::TestRequestHeaderMapImpl input_headers;
+  const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
+  EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
+            input_headers.getPathValue());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  const auto encode_result = filter_->encodeHeaders(response_headers, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, encode_result);
+}
+
+/**
+ * Cluster Metadata is not needed if the filter is loaded as upstream filter
+ */
+TEST_F(AwsLambdaFilterTest, ClusterMetadataIsNotNeededInUpstreamMode) {
+  signer_ = std::make_shared<NiceMock<MockSigner>>();
+  auto settings = FilterSettings{arn_, InvocationMode::Synchronous, true};
+  filter_ = std::make_unique<Filter>(settings, stats_, signer_, true);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  // setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
@@ -164,7 +186,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataRecordsPayloadSize) {
 
   FilterStats stats(generateStats("test", *store.rootScope()));
   signer_ = std::make_shared<NiceMock<MockSigner>>();
-  filter_ = std::make_unique<Filter>(settings, stats, signer_);
+  filter_ = std::make_unique<Filter>(settings, stats, signer_, false);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
   // Payload
