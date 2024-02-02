@@ -98,8 +98,9 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       tracing_config_(Tracing::EgressConfig::get()),
       retry_policy_(createRetryPolicy(parent, options)),
       route_(std::make_shared<NullRouteImpl>(
-          parent_.cluster_->name(), options.timeout, options.hash_policy,
-          retry_policy_ != nullptr ? retry_policy_.get() : options.parsed_retry_policy)),
+          parent_.cluster_->name(),
+          retry_policy_ != nullptr ? *retry_policy_.get() : *options.parsed_retry_policy,
+          options.timeout, options.hash_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);

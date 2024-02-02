@@ -1880,9 +1880,8 @@ class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
   Router::RetryPolicyImpl retry_policy_;
   std::unique_ptr<NullRouteImpl> route_impl_{new NullRouteImpl(
-      client_.cluster_->name(), absl::nullopt,
-      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
-      &retry_policy_)};
+      client_.cluster_->name(), retry_policy_, absl::nullopt,
+      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>())};
   std::unique_ptr<Http::AsyncStreamImpl> stream_{
       new Http::AsyncStreamImpl(client_, stream_callbacks_, AsyncClient::StreamOptions())};
   NullVirtualHost vhost_;
