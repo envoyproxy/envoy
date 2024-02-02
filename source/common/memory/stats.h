@@ -79,7 +79,9 @@ public:
   };
 
   ~AllocatorManager() {
-    tcmalloc_routine_dispatcher_->exit();
+    if (tcmalloc_routine_dispatcher_) {
+      tcmalloc_routine_dispatcher_->exit();
+    }
     if (tcmalloc_thread_) {
       tcmalloc_thread_->join();
       tcmalloc_thread_.reset();
