@@ -261,7 +261,7 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
                                100);
 }
 
-// TODO(32151): Deflake and re-enable.
+// TODO(32151): Figure out why it's flaky and re-enable.
 TEST_P(FilterIntegrationTest, DISABLED_AltSvcCachedH2Slow) {
 #ifdef WIN32
   // TODO: sort out what race only happens on windows and GCC.
