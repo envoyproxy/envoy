@@ -3653,6 +3653,115 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
   filter_->onDestroy();
 }
 
+// When side stream server receives on chunk, it sends back multiple chunks.
+TEST_F(HttpFilterTest, SendMultipleChunkResponseForOnetreamingBody) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+  // Test content-length header is removed in request in streamed mode.
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
+
+  bool decoding_watermarked = false;
+  setUpDecodingWatermarking(decoding_watermarked);
+
+  Buffer::OwnedImpl want_request_body;
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
+      .WillRepeatedly(Invoke(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
+
+  Buffer::OwnedImpl req_chunk_1;
+  TestUtility::feedBufferWithRandomCharacters(req_chunk_1, 100);
+  want_request_body.add(req_chunk_1.toString());
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk_1, true));
+  got_request_body.move(req_chunk_1);
+  processRequestBody(absl::nullopt);
+  EXPECT_EQ(want_request_body.toString(), got_request_body.toString());
+  EXPECT_FALSE(decoding_watermarked);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "100");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+  // Test content-length header is removed in response in streamed mode.
+  EXPECT_EQ(response_headers_.ContentLength(), nullptr);
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    // want_response_body.add(resp_chunk.toString());
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    got_response_body.move(resp_chunk);
+    processResponseBody(
+          [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(body.body());
+            body_mut->set_more_chunks(true);
+            want_response_body.add(body.body());
+          },
+          false);
+    processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" AAA ");
+            body_mut->set_more_chunks(true);
+            want_response_body.add(" AAA ");
+          },
+          false);
+    processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" BBB ");
+            body_mut->set_more_chunks(false);
+            want_response_body.add(" BBB ");
+          },
+          false);
+  }
+
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
+
+  // At this point, since we injected the data from each chunk after the "encodeData"
+  // callback, and since we also injected any chunks inserted using "injectEncodedData,"
+  // the two buffers should match!
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(19, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 class HttpFilter2Test : public HttpFilterTest,
                         public ::Envoy::Http::HttpConnectionManagerImplMixin {};
 

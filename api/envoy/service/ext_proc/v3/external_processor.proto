@@ -374,4 +374,19 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
+
+  // In STREAMED mode, sometimes, when the side stream server receives a body
+  // chunk(received_chunk), it may send multiple chunks back to Envoy(response_chunk).
+  // This ``more_chunks`` field tells Envoy whether there will be more response_chunk
+  // coming back for that received_chunk. When Envoy receives this response message, if
+  // ``more_chunks`` is false, which is the default case, it does normal body
+  // mutation processing. When it is true, which indicates there are response_chunk
+  // for this received_chunk coming, Envoy ext_proc filter will not pop up that
+  // received_chunk from the queue. It just inject the body in the response to
+  // the filter chain. The side stream server must set ``multiple_chunks`` to false
+  // when the last response_chunk for this received_chunk is heading back. And with that,
+  // Envoy ext_proc filter will now pop up that received_chunk from the queue, and
+  // inject the mutated body to the filter chain.
+  // ``more_chunks`` is only meaningful to handle body response in STREAMED mode.
+  bool more_chunks = 3;
 }

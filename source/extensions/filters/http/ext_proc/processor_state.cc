@@ -263,26 +263,30 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      Buffer::OwnedImpl chunk_data;
-      auto chunk = dequeueStreamingChunk(chunk_data);
-      ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
-      if (common_response.has_body_mutation()) {
-        ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
-        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
-      }
-      should_continue = chunk->end_stream;
-      if (chunk_data.length() > 0) {
-        ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
-        injectDataToFilterChain(chunk_data, chunk->end_stream);
-      }
-
-      if (queueBelowLowLimit()) {
-        clearWatermark();
-      }
-      if (chunk_queue_.empty()) {
-        onFinishProcessorCall(Grpc::Status::Ok);
+      if (common_response.has_body_mutation() && common_response.body_mutation().more_chunks()) {
+        handleMutipleChunksInBodyResponse(common_response);
       } else {
-        onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+        Buffer::OwnedImpl chunk_data;
+        auto chunk = dequeueStreamingChunk(chunk_data);
+        ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
+        if (common_response.has_body_mutation()) {
+          ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
+          MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+        }
+        should_continue = chunk->end_stream;
+        if (chunk_data.length() > 0) {
+          ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
+          injectDataToFilterChain(chunk_data, chunk->end_stream);
+        }
+
+        if (queueBelowLowLimit()) {
+          clearWatermark();
+        }
+        if (chunk_queue_.empty()) {
+          onFinishProcessorCall(Grpc::Status::Ok);
+        } else {
+          onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+        }
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
@@ -392,6 +396,21 @@ void ProcessorState::continueIfNecessary() {
     ENVOY_LOG(debug, "Continuing processing");
     paused_ = false;
     continueProcessing();
+  }
+}
+
+void ProcessorState::handleMutipleChunksInBodyResponse(const CommonResponse& common_response) {
+  Buffer::OwnedImpl buffer;
+  auto body = common_response.body_mutation().body();
+  if (body.size() > 0 ) {
+    buffer.add(body);
+    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream with more data coming",
+              buffer.length());
+    injectDataToFilterChain(buffer, false);
+    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+    // Need to start a new gRPC call timer.
+    onStartProcessorCall(std::bind(&Filter::onMessageTimeout, &(this->filter_)),
+                         filter_.config().messageTimeout(), callback_state_);
   }
 }
 
