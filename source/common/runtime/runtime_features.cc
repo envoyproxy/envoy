@@ -97,7 +97,11 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
-// Begin false flags. These should come with a TODO to flip true.
+// Begin false flags. Most of them should come with a TODO to flip true.
+
+// Execution context is optional and must be enabled explicitly.
+// See https://github.com/envoyproxy/envoy/issues/32012.
+FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(paul-r-gall) Make this enabled by default after additional soak time.
