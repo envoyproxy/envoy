@@ -9,13 +9,13 @@
 #include <string>
 
 #include "source/common/common/assert.h"
+#include "source/common/quic/platform/quiche_logging_impl.h"
 
 #include "absl/flags/reflection.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_flags.h"
-#include "source/common/quic/platform/quiche_logging_impl.h"
 
 using QuicheFlagSaverImpl = absl::FlagSaver;
 
@@ -43,19 +43,17 @@ inline std::string QuicheGetCommonSourcePathImpl() {
 
 class QuicheScopedDisableExitOnDFatalImpl {
 public:
- explicit QuicheScopedDisableExitOnDFatalImpl() {
+  explicit QuicheScopedDisableExitOnDFatalImpl() {
     original_value_ = isDFatalExitDisabled();
     setDFatalExitDisabled(true);
- }
+  }
 
   // This type is neither copyable nor movable.
   QuicheScopedDisableExitOnDFatalImpl(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
   QuicheScopedDisableExitOnDFatalImpl&
   operator=(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
 
- ~QuicheScopedDisableExitOnDFatalImpl(){
-   setDFatalExitDisabled(original_value_);
- }
+  ~QuicheScopedDisableExitOnDFatalImpl() { setDFatalExitDisabled(original_value_); }
 
 private:
   bool original_value_;
