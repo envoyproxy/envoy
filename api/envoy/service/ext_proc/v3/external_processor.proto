@@ -56,7 +56,7 @@ service ExternalProcessor {
 
 // This represents the different types of messages that Envoy can send
 // to an external processing server.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ProcessingRequest {
   // Specify whether the filter that sent this request is running in synchronous
   // or asynchronous mode. The choice of synchronous or asynchronous mode
@@ -110,8 +110,19 @@ message ProcessingRequest {
     HttpTrailers response_trailers = 7;
   }
 
+  // [#not-implemented-hide:]
+  // TODO(jbohanon) reserve field as part of rework detailed in https://github.com/envoyproxy/envoy/issues/32125
   // Dynamic metadata associated with the request.
   config.core.v3.Metadata metadata_context = 8;
+
+  // [#not-implemented-hide:]
+  // The values of properties selected by the ``request_attributes``
+  // or ``response_attributes`` list in the configuration. Each entry
+  // in the list is populated from the standard
+  // :ref:`attributes <arch_overview_attributes>` supported across Envoy.
+  // This field also contains dynamic metadata from forwarding namespaces
+  // specified in configuration.
+  map<string, google.protobuf.Struct> attributes = 9;
 }
 
 // For every ProcessingRequest received by the server with the ``async_mode`` field
@@ -204,6 +215,7 @@ message HttpHeaders {
   config.core.v3.HeaderMap headers = 1;
 
   // [#not-implemented-hide:]
+  // TODO(jbohanon) reserve field as part of rework detailed in https://github.com/envoyproxy/envoy/issues/32125
   // The values of properties selected by the ``request_attributes``
   // or ``response_attributes`` list in the configuration. Each entry
   // in the list is populated
