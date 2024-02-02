@@ -47,7 +47,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
   private final Object mLock = new Object();
   private final ConditionVariable mInitCompleted = new ConditionVariable(false);
   private final AtomicInteger mActiveRequestCount = new AtomicInteger(0);
-  private EnvoyEngine.LogLevel mLogLevel = EnvoyEngine.LogLevel.OFF;
+  private EnvoyEngine.LogLevel mLogLevel;
 
   @GuardedBy("mLock") private EnvoyEngine mEngine;
   /**
@@ -61,7 +61,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
 
   private final String mUserAgent;
   private final AtomicReference<Runnable> mInitializationCompleter = new AtomicReference<>();
-  private final CronvoyLogger mCronvoyLogger = new CronvoyLogger();
+  private final CronvoyLogger mCronvoyLogger;
 
   /**
    * Locks operations on the list of RequestFinishedInfo.Listeners, because operations can happen
@@ -84,8 +84,9 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
     final int threadPriority =
         builder.threadPriority(THREAD_PRIORITY_BACKGROUND + THREAD_PRIORITY_MORE_FAVORABLE);
     mUserAgent = builder.getUserAgent();
+    mLogLevel = builder.getLogLevel();
+    mCronvoyLogger = builder.getLogger();
     synchronized (mLock) {
-
       mEngine = builder.createEngine(() -> {
         mNetworkThread = Thread.currentThread();
         android.os.Process.setThreadPriority(threadPriority);
