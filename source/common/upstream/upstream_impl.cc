@@ -506,9 +506,23 @@ Host::CreateConnectionData HostImpl::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list.size() > 1) {
+    absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+        happy_eyeballs_config;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
+      ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
+      if (cluster.happyEyeballsConfig().has_value()) {
+        happy_eyeballs_config = cluster.happyEyeballsConfig();
+      } else {
+        envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
+        default_config.set_first_address_family_version(
+            envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT);
+        default_config.mutable_first_address_family_count()->set_value(1);
+        happy_eyeballs_config = absl::make_optional(default_config);
+      }
+    }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, address_list, source_address_selector, socket_factory, transport_socket_options,
-        host, options);
+        host, options, happy_eyeballs_config);
   } else {
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
@@ -1107,7 +1121,13 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       added_via_api_(added_via_api), has_configured_http_filters_(false),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
-                          config.track_cluster_stats().per_endpoint_stats()) {
+                          config.track_cluster_stats().per_endpoint_stats()),
+      happy_eyeballs_config_(
+          config.upstream_connection_options().has_happy_eyeballs_config()
+              ? absl::make_optional<
+                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
+                    config.upstream_connection_options().happy_eyeballs_config())
+              : absl::nullopt) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(
