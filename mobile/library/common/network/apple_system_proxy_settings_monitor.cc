@@ -1,6 +1,7 @@
 #include "library/common/network/apple_system_proxy_settings_monitor.h"
 
 #include <CFNetwork/CFNetwork.h>
+#include <CFNetwork/CFProxySupport.h>
 #include <dispatch/dispatch.h>
 
 #include "library/common/apple/utility.h"
