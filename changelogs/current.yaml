@@ -67,6 +67,9 @@ new_features:
     metadata may be sent to the server. If
     :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
     is defined, returned metadata may be written to the specified allowed namespaces.
+- area: ext_proc
+  change: |
+    made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` work as an upstream filter.
 - area: rbac
   change: |
     Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
