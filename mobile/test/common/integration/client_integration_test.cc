@@ -14,7 +14,7 @@
 
 #include "extension_registry.h"
 #include "library/common/data/utility.h"
-#include "library/common/main_interface.h"
+#include "library/common/internal_engine.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
@@ -914,6 +914,8 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
 TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
   explicit_flow_control_ = true;
   autonomous_upstream_ = false;
+  // TODO(32024) remove trace logging.
+  builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
   ConditionalInitializer headers_callback;
 
@@ -954,12 +956,12 @@ TEST_P(ClientIntegrationTest, Proxying) {
   if (getCodecType() != Http::CodecType::HTTP1) {
     return;
   }
-  builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
-
-  set_proxy_settings(rawEngine(), fake_upstreams_[0]->localAddress()->asString().c_str(),
-                     fake_upstreams_[0]->localAddress()->ip()->port());
-
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_->engine()->setProxySettings(fake_upstreams_[0]->localAddress()->asString().c_str(),
+                                        fake_upstreams_[0]->localAddress()->ip()->port());
+  }
   // The initial request will do the DNS lookup.
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
   terminal_callback_.waitReady();

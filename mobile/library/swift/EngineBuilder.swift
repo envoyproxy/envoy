@@ -167,7 +167,7 @@ open class EngineBuilder: NSObject {
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
   private var onEngineRunning: (() -> Void)?
-  private var logger: ((String) -> Void)?
+  private var logger: ((LogLevel, String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
   private(set) var monitoringMode: NetworkMonitoringMode = .pathMonitor
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
@@ -592,7 +592,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setLogger(closure: @escaping (String) -> Void) -> Self {
+  public func setLogger(closure: @escaping (LogLevel, String) -> Void) -> Self {
     self.logger = closure
     return self
   }
@@ -707,7 +707,14 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: The built `Engine`.
   public func build() -> Engine {
-    let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
+    let engine = self.engineType.init(runningCallback: self.onEngineRunning,
+                                      logger: { level, message in
+                                        if let log = self.logger {
+                                          if let lvl = LogLevel(rawValue: level) {
+                                            log(lvl, message)
+                                          }
+                                        }
+                                      },
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue),
                                       enableProxying: self.enableProxying)

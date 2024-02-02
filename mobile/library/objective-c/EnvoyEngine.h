@@ -36,7 +36,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param enableProxying Whether to respect system proxy settings when performing network requests.
  */
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
-                                 logger:(nullable void (^)(NSString *))logger
+                                 logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode
                          enableProxying:(BOOL)enableProxying;

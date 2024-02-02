@@ -80,7 +80,7 @@ parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
-ProtocolOptionsConfigConstSharedPtr
+absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
@@ -121,9 +121,10 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
 
   for (const auto& it : config.typed_extension_protocol_options()) {
     auto& name = it.first;
-    auto object = createProtocolOptionsConfig(name, it.second, factory_context);
-    if (object != nullptr) {
-      options[name] = std::move(object);
+    auto object_or_error = createProtocolOptionsConfig(name, it.second, factory_context);
+    THROW_IF_STATUS_NOT_OK(object_or_error, throw);
+    if (object_or_error.value() != nullptr) {
+      options[name] = std::move(object_or_error.value());
     }
   }
 
@@ -505,9 +506,23 @@ Host::CreateConnectionData HostImpl::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list.size() > 1) {
+    absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+        happy_eyeballs_config;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
+      ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
+      if (cluster.happyEyeballsConfig().has_value()) {
+        happy_eyeballs_config = cluster.happyEyeballsConfig();
+      } else {
+        envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
+        default_config.set_first_address_family_version(
+            envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT);
+        default_config.mutable_first_address_family_count()->set_value(1);
+        happy_eyeballs_config = absl::make_optional(default_config);
+      }
+    }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, address_list, source_address_selector, socket_factory, transport_socket_options,
-        host, options);
+        host, options, happy_eyeballs_config);
   } else {
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
@@ -897,15 +912,19 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
     }
   }
 
-  return std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
-      config.http_protocol_options(), config.http2_protocol_options(),
-      config.common_http_protocol_options(),
-      (config.has_upstream_http_protocol_options()
-           ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
-                 config.upstream_http_protocol_options())
-           : absl::nullopt),
-      config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-      config.has_http2_protocol_options(), validation_visitor);
+  auto options_or_error =
+      ClusterInfoImpl::HttpProtocolOptionsConfigImpl::createProtocolOptionsConfig(
+          config.http_protocol_options(), config.http2_protocol_options(),
+          config.common_http_protocol_options(),
+          (config.has_upstream_http_protocol_options()
+               ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
+                     config.upstream_http_protocol_options())
+               : absl::nullopt),
+          config.protocol_selection() ==
+              envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
+          config.has_http2_protocol_options(), validation_visitor);
+  THROW_IF_STATUS_NOT_OK(options_or_error, throw);
+  return options_or_error.value();
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
@@ -1102,7 +1121,13 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       added_via_api_(added_via_api), has_configured_http_filters_(false),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
-                          config.track_cluster_stats().per_endpoint_stats()) {
+                          config.track_cluster_stats().per_endpoint_stats()),
+      happy_eyeballs_config_(
+          config.upstream_connection_options().has_happy_eyeballs_config()
+              ? absl::make_optional<
+                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
+                    config.upstream_connection_options().happy_eyeballs_config())
+              : absl::nullopt) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(
@@ -1671,7 +1696,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   if (!cluster_load_assignment.has_policy()) {
     return absl::OkStatus();
   }
-  auto policy = cluster_load_assignment.policy();
+  const auto& policy = cluster_load_assignment.policy();
   if (policy.drop_overloads().size() == 0) {
     return absl::OkStatus();
   }
@@ -1681,7 +1706,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
                     policy.drop_overloads().size()));
   }
 
-  const auto drop_percentage = policy.drop_overloads(0).drop_percentage();
+  const auto& drop_percentage = policy.drop_overloads(0).drop_percentage();
   float denominator = 100;
   switch (drop_percentage.denominator()) {
   case envoy::type::v3::FractionalPercent::HUNDRED:
@@ -2247,37 +2272,26 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       // If there's an existing host with the same health checker, the
       // active health-status is kept.
       if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update")) {
-          if (existing_host_found && !health_check_address_changed &&
-              !active_health_check_flag_changed) {
-            // If there's an existing host, use the same active health-status.
-            // The existing host can be marked PENDING_ACTIVE_HC or
-            // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
-            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-            ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
-                   existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+        if (existing_host_found && !health_check_address_changed &&
+            !active_health_check_flag_changed) {
+          // If there's an existing host, use the same active health-status.
+          // The existing host can be marked PENDING_ACTIVE_HC or
+          // ACTIVE_HC_TIMEOUT if it is also marked with FAILED_ACTIVE_HC.
+          ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+                 existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+          ASSERT(!existing_host->second->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT) ||
+                 existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-            constexpr uint32_t active_hc_statuses_mask =
-                enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
-                enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
-                enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
-                enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+          constexpr uint32_t active_hc_statuses_mask =
+              enumToInt(Host::HealthFlag::FAILED_ACTIVE_HC) |
+              enumToInt(Host::HealthFlag::DEGRADED_ACTIVE_HC) |
+              enumToInt(Host::HealthFlag::PENDING_ACTIVE_HC) |
+              enumToInt(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
 
-            const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
-            host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
-          } else {
-            // No previous known host, mark it as failed active HC.
-            host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-
-            // If we want to exclude hosts until they have been health checked, mark them with
-            // a flag to indicate that they have not been health checked yet.
-            if (info_->warmHosts()) {
-              host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
-            }
-          }
+          const uint32_t existing_host_statuses = existing_host->second->healthFlagsGetAll();
+          host->healthFlagsSetAll(existing_host_statuses & active_hc_statuses_mask);
         } else {
+          // No previous known host, mark it as failed active HC.
           host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
 
           // If we want to exclude hosts until they have been health checked, mark them with
