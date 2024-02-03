@@ -587,7 +587,7 @@ private:
    */
   void doEndStream(ActiveStream& stream, bool check_for_deferred_close = true);
 
-  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
+  void resetAllStreams(absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                        absl::string_view details);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
@@ -595,11 +595,11 @@ private:
   void startDrainSequence();
   Tracing::Tracer& tracer() { return *config_.tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
-                            StreamInfo::ResponseFlag response_flag);
+                            StreamInfo::CoreResponseFlag response_flag);
   void handleCodecError(absl::string_view error);
   void handleCodecOverloadError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
-                         absl::optional<StreamInfo::ResponseFlag> response_flag,
+                         absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than

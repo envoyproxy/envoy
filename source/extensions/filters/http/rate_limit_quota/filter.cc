@@ -194,7 +194,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
         // configured.
         callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt,
                                    "");
-        callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+        callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
         return Envoy::Http::FilterHeadersStatus::StopIteration;
       }
     }

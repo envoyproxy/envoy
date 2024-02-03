@@ -2101,7 +2101,7 @@ int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 }
 
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
-  connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  connection_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
 
   return StreamResetReason::ProtocolError;
 }
