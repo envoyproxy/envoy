@@ -149,7 +149,9 @@ public:
   /* is not meant to be routed to. */                                            \
   m(EXCLUDED_VIA_IMMEDIATE_HC_FAIL, 0x80)                                        \
   /* The host failed active HC due to timeout. */                                \
-  m(ACTIVE_HC_TIMEOUT, 0x100)
+  m(ACTIVE_HC_TIMEOUT, 0x100)                                                    \
+  /* The host is currently marked as draining by EDS */                          \
+  m(EDS_STATUS_DRAINING, 0x200)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,

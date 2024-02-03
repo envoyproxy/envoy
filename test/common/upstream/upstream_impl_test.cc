@@ -1783,7 +1783,7 @@ TEST_F(HostImplTest, HealthStatus) {
   EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
   EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
   // Old EDS flags should be cleared and new flag will be set.
-  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH));
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING));
 
   // Setting an active unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -5821,6 +5821,7 @@ TEST(HostPartitionTest, PartitionHosts) {
                    makeTestHost(info, "tcp://127.0.0.1:81", *time_source, zone_a),
                    makeTestHost(info, "tcp://127.0.0.1:82", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:83", *time_source, zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b)};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -5829,24 +5830,26 @@ TEST(HostPartitionTest, PartitionHosts) {
   hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
   hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[5]->healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   auto hosts_per_locality =
-      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
+      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4], hosts[5]}});
 
   auto update_hosts_params =
       HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
 
-  EXPECT_EQ(5, update_hosts_params.hosts->size());
+  EXPECT_EQ(6, update_hosts_params.hosts->size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
   EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
   EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
-  EXPECT_EQ(2, update_hosts_params.excluded_hosts->get().size());
+  EXPECT_EQ(3, update_hosts_params.excluded_hosts->get().size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts->get()[1]);
+  EXPECT_EQ(hosts[5], update_hosts_params.excluded_hosts->get()[2]);
 
   EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
-  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
+  EXPECT_EQ(4, update_hosts_params.hosts_per_locality->get()[1].size());
 
   EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
@@ -5857,9 +5860,10 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
 
   EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(2, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(3, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
+  EXPECT_EQ(hosts[5], update_hosts_params.excluded_hosts_per_locality->get()[1][2]);
 }
 
 TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {

@@ -8,6 +8,11 @@ minor_behavior_changes:
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+- area: upstream
+  change: |
+    Upstream now excludes hosts set to ``DRAINING`` state via EDS from load balancing and panic routing
+    threshold calculation. This feature can be disabled by setting
+    ``envoy.reloadable_features.exclude_host_in_eds_status_draining`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
