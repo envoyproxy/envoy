@@ -172,7 +172,7 @@ http_filters:
   Http::TestRequestHeaderMapImpl headers;
   missing_config_filter->setDecoderFilterCallbacks(decoder_callbacks);
   missing_config_filter->decodeHeaders(headers, false);
-  EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound));
+  EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoFilterConfigFound));
 }
 
 // Tests where upgrades are configured on via the HCM.

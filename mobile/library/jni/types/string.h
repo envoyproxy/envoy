@@ -1,8 +1,8 @@
 #pragma once
 
 #include "absl/strings/string_view.h"
-#include "library/common/jni/import/jni_import.h"
-#include "library/common/jni/types/env.h"
+#include "library/jni/import/jni_import.h"
+#include "library/jni/types/env.h"
 
 namespace Envoy {
 namespace JNI {

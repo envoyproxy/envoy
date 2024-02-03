@@ -4,7 +4,7 @@
 #include "test/common/integration/xds_test_server_interface.h"
 #include "test/test_common/utility.h"
 
-#include "library/common/jni/jni_support.h"
+#include "library/jni/jni_support.h"
 
 // NOLINT(namespace-envoy)
 

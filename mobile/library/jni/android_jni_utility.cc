@@ -1,12 +1,12 @@
-#include "library/common/jni/android_jni_utility.h"
+#include "library/jni/android_jni_utility.h"
 
 #include "source/common/common/assert.h"
 
 #if defined(__ANDROID_API__)
 #include "library/common/data/utility.h"
-#include "library/common/jni/import/jni_import.h"
-#include "library/common/jni/jni_support.h"
-#include "library/common/jni/jni_utility.h"
+#include "library/jni/import/jni_import.h"
+#include "library/jni/jni_support.h"
+#include "library/jni/jni_utility.h"
 #endif
 
 namespace Envoy {
