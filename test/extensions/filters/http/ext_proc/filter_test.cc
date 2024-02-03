@@ -3719,29 +3719,29 @@ TEST_F(HttpFilterTest, SendMultipleChunkResponseForOnetreamingBody) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
     got_response_body.move(resp_chunk);
     processResponseBody(
-          [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_body(body.body());
-            body_mut->set_more_chunks(true);
-            want_response_body.add(body.body());
-          },
-          false);
+        [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(body.body());
+          body_mut->set_more_chunks(true);
+          want_response_body.add(body.body());
+        },
+        false);
     processResponseBody(
-          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_body(" AAA ");
-            body_mut->set_more_chunks(true);
-            want_response_body.add(" AAA ");
-          },
-          false);
+        [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(" AAA ");
+          body_mut->set_more_chunks(true);
+          want_response_body.add(" AAA ");
+        },
+        false);
     processResponseBody(
-          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_body(" BBB ");
-            body_mut->set_more_chunks(false);
-            want_response_body.add(" BBB ");
-          },
-          false);
+        [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(" BBB ");
+          body_mut->set_more_chunks(false);
+          want_response_body.add(" BBB ");
+        },
+        false);
   }
 
   Buffer::OwnedImpl last_resp_chunk;

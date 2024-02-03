@@ -402,16 +402,16 @@ void ProcessorState::continueIfNecessary() {
 void ProcessorState::handleMutipleChunksInBodyResponse(const CommonResponse& common_response) {
   Buffer::OwnedImpl buffer;
   auto body = common_response.body_mutation().body();
-  if (body.size() > 0 ) {
+  if (body.size() > 0) {
     buffer.add(body);
     ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream with more data coming",
               buffer.length());
     injectDataToFilterChain(buffer, false);
-    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
-    // Need to start a new gRPC call timer.
-    onStartProcessorCall(std::bind(&Filter::onMessageTimeout, &(this->filter_)),
-                         filter_.config().messageTimeout(), callback_state_);
   }
+  onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+  // Need to start a new gRPC call timer.
+  onStartProcessorCall(std::bind(&Filter::onMessageTimeout, &(this->filter_)),
+                         filter_.config().messageTimeout(), callback_state_);
 }
 
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
