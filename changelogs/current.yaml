@@ -13,6 +13,9 @@ minor_behavior_changes:
     Upstream now excludes hosts set to ``DRAINING`` state via EDS from load balancing and panic routing
     threshold calculation. This feature can be disabled by setting
     ``envoy.reloadable_features.exclude_host_in_eds_status_draining`` to false.
+- area: golang
+  change: |
+    Change ``RegisterHttpFilterConfigFactoryAndParser`` to ``RegisterHttpFilterFactoryAndConfigParser``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
