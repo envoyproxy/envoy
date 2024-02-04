@@ -1,9 +1,6 @@
 package org.chromium.net.impl;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assert.assertEquals;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
@@ -12,11 +9,12 @@ import org.chromium.net.testing.Feature;
 import org.junit.runner.RunWith;
 import org.junit.Rule;
 import org.junit.Test;
-import org.chromium.net.impl.CronvoyLogger;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+
+import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 
 /**
  * Tests that ConvoyLogger works as expected.
@@ -32,7 +30,7 @@ public class CronvoyLoggerTest {
   public void logWithLoggerUnconfigured() throws Exception {
     CronvoyLogger logger = new CronvoyLogger();
     // Should be a no-op.
-    logger.log("hello");
+    logger.log(EnvoyLogger.Level.INFO, "hello");
   }
 
   @Test
@@ -44,9 +42,8 @@ public class CronvoyLoggerTest {
     String filename = file.getAbsolutePath() + "foo"; // Pick a path that doesn't exist.
     CronvoyLogger logger = new CronvoyLogger();
     logger.setNetLogToFile(filename);
-    logger.log("hello");
+    logger.log(EnvoyLogger.Level.INFO, "hello");
     logger.stopLogging();
-    char[] buffer = new char[5000];
     byte[] bytes = Files.readAllBytes(Paths.get(filename));
     String fileContent = new String(bytes);
     assertEquals(fileContent, "hello");
@@ -61,9 +58,8 @@ public class CronvoyLoggerTest {
     String filename = file.getAbsolutePath() + "bar/foo"; // Pick a directory that doesn't exist.
     CronvoyLogger logger = new CronvoyLogger();
     logger.setNetLogToDisk(filename, 5000);
-    logger.log("hello");
+    logger.log(EnvoyLogger.Level.INFO, "hello");
     logger.stopLogging();
-    char[] buffer = new char[5000];
     byte[] bytes = Files.readAllBytes(Paths.get(filename + "/netlog.json"));
     String fileContent = new String(bytes);
     assertEquals(fileContent, "hello");
@@ -78,10 +74,9 @@ public class CronvoyLoggerTest {
     String filename = file.getAbsolutePath() + "bar";
     CronvoyLogger logger = new CronvoyLogger();
     logger.setNetLogToDisk(filename, 5);
-    logger.log("hello!");
-    logger.log("goodbye");
+    logger.log(EnvoyLogger.Level.INFO, "hello!");
+    logger.log(EnvoyLogger.Level.INFO, "goodbye");
     logger.stopLogging();
-    char[] buffer = new char[5000];
     byte[] bytes = Files.readAllBytes(Paths.get(filename + "/netlog.json"));
     String fileContent = new String(bytes);
     assertEquals("goodbye", fileContent);

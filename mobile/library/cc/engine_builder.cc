@@ -24,7 +24,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
@@ -829,8 +829,8 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  Envoy::Engine* envoy_engine =
-      new Envoy::Engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+  Envoy::InternalEngine* envoy_engine =
+      new Envoy::InternalEngine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

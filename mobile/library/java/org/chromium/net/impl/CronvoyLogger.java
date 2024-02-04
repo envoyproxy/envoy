@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 
 /*
@@ -42,7 +43,7 @@ final class CronvoyLogger implements EnvoyLogger {
   }
 
   @Override
-  public void log(String str) {
+  public void log(int logLevel, String str) {
     if (mWriter != null) {
       try {
         Path path = Paths.get(mFileName);

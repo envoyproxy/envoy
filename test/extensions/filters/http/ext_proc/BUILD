@@ -58,6 +58,7 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
@@ -136,7 +137,11 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    extension_names = ["envoy.filters.http.ext_proc"],
+    extension_names = [
+        "envoy.filters.http.ext_proc",
+        # TODO(jbohanon) use a test filter here instead of production filter
+        "envoy.filters.http.set_metadata",
+    ],
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -146,11 +151,15 @@ envoy_extension_cc_test(
         ":logging_test_filter_lib",
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/filters/http/set_metadata:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
