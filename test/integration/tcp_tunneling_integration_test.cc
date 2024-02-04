@@ -1243,6 +1243,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeadersWithRetry) {
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   }
 
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, true);

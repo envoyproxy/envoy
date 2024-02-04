@@ -457,6 +457,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::ConnectFailed);
     return Network::FilterStatus::StopIteration;
+  } else if (connect_attempts_ >= 1) {
+    cluster->trafficStats()->upstream_rq_retry_.inc();
   }
 
   auto& downstream_connection = read_callbacks_->connection();
