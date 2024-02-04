@@ -510,7 +510,7 @@ void UpstreamRequest::setupPerTryTimeout() {
 
 void UpstreamRequest::onPerTryIdleTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream per try idle timeout", *parent_.callbacks());
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   parent_.onPerTryIdleTimeout(*this);
 }
 
@@ -520,7 +520,7 @@ void UpstreamRequest::onPerTryTimeout() {
   if (!parent_.downstreamResponseStarted()) {
     ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks());
 
-    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
+    stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout);
     parent_.onPerTryTimeout(*this);
   } else {
     ENVOY_STREAM_LOG(debug,

@@ -1,4 +1,4 @@
-#include "redis_cluster.h"
+#include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include <cstdint>
 #include <memory>

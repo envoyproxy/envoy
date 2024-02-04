@@ -112,7 +112,9 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  Configuration::InitialImpl initial_config(bootstrap_);
+  absl::Status creation_status = absl::OkStatus();
+  Configuration::InitialImpl initial_config(bootstrap_, creation_status);
+  THROW_IF_NOT_OK(creation_status);
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
@@ -134,7 +136,7 @@ void ValidationInstance::initialize(const Options& options,
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
       sslContextManager(), *secret_manager_, quic_stat_names_, *this);
-  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
