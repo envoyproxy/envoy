@@ -26,7 +26,7 @@ If enabled, the Qatzstd compressor will:
 - create Threadlocal Qatzstd context for each worker thread
 
 When new http package come, one worker thread will process it using its Qatzstd context and send the data needed to be compressed to
-Qat hardware using standard zstd api. 
+Qat hardware using standard zstd api.
 
 Installing and using QAT-ZSTD-Plugin
 ------------------------
