@@ -286,12 +286,11 @@ envoy_histogram1_count{} 0
 
 TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
-  HistogramWrapper h1_cumulative;
-  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+  HistogramWrapper h1_interval;
+  Stats::HistogramStatisticsImpl h1_interval_statistics(h1_interval.getHistogram());
 
   auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
+  ON_CALL(*histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statistics));
 
   addHistogram(histogram);
   StatsParams params = StatsParams();
@@ -302,16 +301,16 @@ TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 summary
-envoy_histogram1{quantile="0"} 0
-envoy_histogram1{quantile="0.25"} 0
-envoy_histogram1{quantile="0.5"} 0
-envoy_histogram1{quantile="0.75"} 0
-envoy_histogram1{quantile="0.9"} 0
-envoy_histogram1{quantile="0.95"} 0
-envoy_histogram1{quantile="0.99"} 0
-envoy_histogram1{quantile="0.995"} 0
-envoy_histogram1{quantile="0.999"} 0
-envoy_histogram1{quantile="1"} 0
+envoy_histogram1{quantile="0"} nan
+envoy_histogram1{quantile="0.25"} nan
+envoy_histogram1{quantile="0.5"} nan
+envoy_histogram1{quantile="0.75"} nan
+envoy_histogram1{quantile="0.9"} nan
+envoy_histogram1{quantile="0.95"} nan
+envoy_histogram1{quantile="0.99"} nan
+envoy_histogram1{quantile="0.995"} nan
+envoy_histogram1{quantile="0.999"} nan
+envoy_histogram1{quantile="1"} nan
 envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
 )EOF";
