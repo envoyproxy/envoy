@@ -54,8 +54,13 @@ bool AsyncTcpClientImpl::connect() {
   return true;
 }
 
-void AsyncTcpClientImpl::onConnectTimeout() {
-  ENVOY_CONN_LOG(debug, "async tcp connection timed out", *connection_);
+void AsyncTcpClientImpl::onConnectTimeout() 
+  if (connection_) {
+    ENVOY_CONN_LOG(debug, "async tcp connection timed out", *connection_);
+  } else {
+    ENVOY_LOG(debug, "async tcp client timed out before creating a connection");
+  }
+
   cluster_info_->trafficStats()->upstream_cx_connect_timeout_.inc();
   close(Network::ConnectionCloseType::NoFlush);
 }
