@@ -9,13 +9,13 @@
 #include <string>
 
 #include "source/common/common/assert.h"
-#include "source/common/quic/platform/quiche_logging_impl.h"
 
 #include "absl/flags/reflection.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_flags.h"
+#include "quiche/common/platform/api/quiche_logging.h"
 
 using QuicheFlagSaverImpl = absl::FlagSaver;
 
