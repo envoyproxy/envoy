@@ -5,8 +5,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-
-#include "end_stream_response.h"
+#include "source/extensions/filters/http/connect_grpc_bridge/end_stream_response.h"
 
 namespace Envoy {
 namespace Extensions {

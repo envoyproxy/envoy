@@ -20,6 +20,8 @@ import org.chromium.net.CronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
 import org.chromium.net.impl.Annotations.HttpCacheType;
 
+import io.envoyproxy.envoymobile.engine.EnvoyEngine;
+
 /** Implementation of {@link ICronetEngineBuilder} that builds Envoy-Mobile based Cronet engine. */
 public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
 
@@ -66,6 +68,8 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mExperimentalOptions;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
+  private EnvoyEngine.LogLevel mLogLevel = EnvoyEngine.LogLevel.OFF;
+  private CronvoyLogger mCronvoyLogger = new CronvoyLogger();
 
   /**
    * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
@@ -357,4 +361,22 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
    * @return {@link Context} for builder.
    */
   Context getContext() { return mApplicationContext; }
+
+  /** Sets the log level. */
+  public CronvoyEngineBuilderImpl setLogLevel(EnvoyEngine.LogLevel logLevel) {
+    this.mLogLevel = logLevel;
+    return this;
+  }
+
+  /** Gets the log level. It defaults to `OFF` when not set. */
+  public EnvoyEngine.LogLevel getLogLevel() { return mLogLevel; }
+
+  /** Sets the {@link io.envoyproxy.envoymobile.engine.types.EnvoyLogger}. */
+  public CronvoyEngineBuilderImpl setLogger(CronvoyLogger cronvoyLogger) {
+    this.mCronvoyLogger = cronvoyLogger;
+    return this;
+  }
+
+  /** Gets the {@link org.chromium.net.impl.CronvoyLogger} implementation. */
+  public CronvoyLogger getLogger() { return mCronvoyLogger; }
 }
