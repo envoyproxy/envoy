@@ -893,6 +893,63 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeaders) {
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("404"));
 }
 
+TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeadersWithRetry) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%FILTER_STATE(envoy.udp_proxy.propagate_response_headers:TYPED)%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          2,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          "",
+                          true,
+                          false};
+  setup(config);
+
+  client_->write("hello", *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // Since retry is enabled, a new request is expected to be sent by the UDP proxy.
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  // Verify response header value is in the access log.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("404"));
+}
+
 TEST_P(UdpTunnelingIntegrationTest, PropagateResponseTrailers) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());

@@ -165,7 +165,8 @@ Http2Frame pbToH2Frame(nghttp2_hd_deflater* deflater,
 envoy::config::core::v3::Http2ProtocolOptions http2Settings() {
   envoy::config::core::v3::Http2ProtocolOptions options(
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions()));
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value());
 
   options.mutable_hpack_table_size()->set_value(MAX_HD_TABLE_BUF_SIZE);
   options.set_allow_metadata(true);
