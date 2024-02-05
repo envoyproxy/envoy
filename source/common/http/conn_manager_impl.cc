@@ -254,13 +254,13 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
     // communicated via CONNECT_ERROR
     if (requestWasConnect(stream.request_headers_, codec_->protocol()) &&
         (stream.filter_manager_.streamInfo().hasResponseFlag(
-             StreamInfo::ResponseFlag::UpstreamConnectionFailure) ||
+             StreamInfo::CoreResponseFlag::UpstreamConnectionFailure) ||
          stream.filter_manager_.streamInfo().hasResponseFlag(
-             StreamInfo::ResponseFlag::UpstreamConnectionTermination))) {
+             StreamInfo::CoreResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
-              StreamInfo::ResponseFlag::UpstreamProtocolError)) {
+              StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -435,7 +435,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 }
 
 void ConnectionManagerImpl::handleCodecErrorImpl(absl::string_view error, absl::string_view details,
-                                                 StreamInfo::ResponseFlag response_flag) {
+                                                 StreamInfo::CoreResponseFlag response_flag) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
   read_callbacks_->connection().streamInfo().setResponseFlag(response_flag);
 
@@ -446,13 +446,13 @@ void ConnectionManagerImpl::handleCodecErrorImpl(absl::string_view error, absl::
 
 void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   handleCodecErrorImpl(error, absl::StrCat("codec_error:", StringUtil::replaceAllEmptySpace(error)),
-                       StreamInfo::ResponseFlag::DownstreamProtocolError);
+                       StreamInfo::CoreResponseFlag::DownstreamProtocolError);
 }
 
 void ConnectionManagerImpl::handleCodecOverloadError(absl::string_view error) {
   handleCodecErrorImpl(error,
                        absl::StrCat("overload_error:", StringUtil::replaceAllEmptySpace(error)),
-                       StreamInfo::ResponseFlag::OverloadManager);
+                       StreamInfo::CoreResponseFlag::OverloadManager);
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -542,8 +542,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManagerImpl::resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
-                                            absl::string_view details) {
+void ConnectionManagerImpl::resetAllStreams(
+    absl::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
     // about to close the connection and will disable further reads, it is possible that flushing
@@ -604,7 +604,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
 void ConnectionManagerImpl::doConnectionClose(
     absl::optional<Network::ConnectionCloseType> close_type,
-    absl::optional<StreamInfo::ResponseFlag> response_flag, absl::string_view details) {
+    absl::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
     connection_idle_timer_.reset();
@@ -723,7 +723,7 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
   if (!codec_) {
     // Attempt to write out buffered data one last time and issue a local close if successful.
     doConnectionClose(Network::ConnectionCloseType::FlushWrite,
-                      StreamInfo::ResponseFlag::DurationTimeout,
+                      StreamInfo::CoreResponseFlag::DurationTimeout,
                       StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
@@ -951,7 +951,7 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
     filter_manager_.streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+        StreamInfo::CoreResponseFlag::DownstreamConnectionTermination);
   }
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
@@ -980,7 +980,7 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
-  filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  filter_manager_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
                  "stream timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
@@ -1942,7 +1942,8 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
   if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    filter_manager_.streamInfo().setResponseFlag(
+        StreamInfo::CoreResponseFlag::DownstreamProtocolError);
   }
   if (!encoder_details.empty()) {
     filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
@@ -1951,7 +1952,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   // Check if we're in the overload manager reset case.
   // encoder_details should be empty in this case as we don't have a codec error.
   if (encoder_details.empty() && reset_reason == StreamResetReason::OverloadManager) {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::OverloadManager);
+    filter_manager_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager);
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().Overload);
   }

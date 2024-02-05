@@ -139,7 +139,8 @@ type StreamInfo interface {
 	FilterState() FilterState
 	// VirtualClusterName returns the name of the virtual cluster which got matched
 	VirtualClusterName() (string, bool)
-
+	// WorkerID returns the ID of the Envoy worker thread
+	WorkerID() uint32
 	// Some fields in stream info can be fetched via GetProperty
 	// For example, startTime() is equal to GetProperty("request.time")
 }

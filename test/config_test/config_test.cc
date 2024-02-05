@@ -99,7 +99,9 @@ public:
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap);
+    absl::Status creation_status;
+    Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
+    THROW_IF_NOT_OK(creation_status);
     Server::Configuration::MainImpl main_config;
 
     // Emulate main implementation of initializing bootstrap extensions.
@@ -156,7 +158,7 @@ public:
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
-      main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
+      THROW_IF_NOT_OK(main_config.initialize(bootstrap, server_, *cluster_manager_factory_));
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
                                    ex.what());

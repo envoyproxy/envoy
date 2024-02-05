@@ -31,7 +31,7 @@ public:
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_mixed_scheme")) {
       return std::string(host);
     }
-    if (Http::HeaderUtility::hostHasPort(host)) {
+    if (Envoy::Http::HeaderUtility::hostHasPort(host)) {
       return std::string(host);
     }
     return absl::StrCat(host, ":", default_port);

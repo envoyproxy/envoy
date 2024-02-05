@@ -5,6 +5,7 @@
 #include "test/extensions/filters/http/ext_proc/unit_test_fuzz/mocks.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 
 using testing::Return;
@@ -45,7 +46,8 @@ public:
   NiceMock<Http::TestRequestTrailerMapImpl> request_trailers_;
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
   NiceMock<Buffer::OwnedImpl> buffer_;
-  testing::NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 DEFINE_PROTO_FUZZER(
@@ -56,6 +58,17 @@ DEFINE_PROTO_FUZZER(
     ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
     return;
   }
+
+  // ASAN fuzz testing is producing an error on CEL parsing that is believed to be a false positive.
+  // It is determined that the error is unrelated to the implementation of request and response
+  // attributes as demonstrated here
+  // https://github.com/envoyproxy/envoy/compare/main...jbohanon:envoy:bug/cel-parser-antlr-exception-use-after-free.
+  // Discussion on this is located at https://github.com/envoyproxy/envoy/pull/31017
+  if (!input.config().request_attributes().empty() ||
+      !input.config().response_attributes().empty()) {
+    return;
+  }
+
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
 
@@ -71,8 +84,10 @@ DEFINE_PROTO_FUZZER(
 
   try {
     config = std::make_shared<ExternalProcessing::FilterConfig>(
-        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(),
-        "ext_proc_prefix");
+        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
+        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+        mocks.local_info_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during ext_proc filter config validation: {}", e.what());
     return;

@@ -3,8 +3,7 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/event/dispatcher_impl.h"
-
-#include "dns.h"
+#include "source/server/config_validation/dns.h"
 
 namespace Envoy {
 namespace Event {
