@@ -36,7 +36,7 @@ private:
   void compressPreprocess(Buffer::Instance& buffer,
                           Envoy::Compression::Compressor::State state) override;
 
-  void compressProcess(const Buffer::Instance& buffer, const Buffer::RawSlice& input_slice,
+  void compressProcess(const Buffer::Instance& buffer, const Buffer::RawSlice& slice,
                        Buffer::Instance& accumulation_buffer) override;
 
   void compressPostprocess(Buffer::Instance& accumulation_buffer) override;

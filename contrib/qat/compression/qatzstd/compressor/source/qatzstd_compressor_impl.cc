@@ -50,19 +50,18 @@ void QatzstdCompressorImpl::setInput(const uint8_t* input, size_t size) {
 }
 
 void QatzstdCompressorImpl::compressProcess(const Buffer::Instance& buffer,
-                                            const Buffer::RawSlice& input_slice,
+                                            const Buffer::RawSlice& slice,
                                             Buffer::Instance& accumulation_buffer) {
-  if (input_slice.len_ == buffer.length()) {
-    setInput(static_cast<uint8_t*>(input_slice.mem_), input_slice.len_);
+  if (slice.len_ == buffer.length()) {
+    setInput(static_cast<uint8_t*>(slice.mem_), slice.len_);
     process(accumulation_buffer, ZSTD_e_continue);
   } else {
-    if (input_len_ + input_slice.len_ > chunk_size_) {
+    if (input_len_ + slice.len_ > chunk_size_) {
       setInput(input_ptr_.get(), input_len_);
       process(accumulation_buffer, ZSTD_e_continue);
     }
-    memcpy(input_ptr_.get() + input_len_, input_slice.mem_,
-           input_slice.len_); // NOLINT(safe-memcpy)
-    input_len_ += input_slice.len_;
+    memcpy(input_ptr_.get() + input_len_, slice.mem_, slice.len_); // NOLINT(safe-memcpy)
+    input_len_ += slice.len_;
   }
 }
 

@@ -64,10 +64,10 @@ message Qatzstd {
   google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
 
 
-  // Enable QAT to accelerate zstd compresstion or not. If not set, defaults to false.
+  // Enable QAT to accelerate zstd compression or not. If not set, defaults to false.
   bool enable_qat_zstd = 6;
 
-  // Fall back to software for QAT-zstd when input size is less than this value.
+  // Fallback to software for qatzstd when input size is less than this value.
   // Valid only enable_qat_zstd is true. 0 means no fallback at all. If not set, defaults to 4000.
   google.protobuf.UInt32Value qat_zstd_fallback_threshold = 7 [(validate.rules).uint32 = {lte: 65536 gte: 0}];
 }
