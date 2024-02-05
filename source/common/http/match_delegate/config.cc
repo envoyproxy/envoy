@@ -1,4 +1,3 @@
-#include "config.h"
 #include "source/common/http/match_delegate/config.h"
 
 #include <memory>

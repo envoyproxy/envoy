@@ -1617,6 +1617,115 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   EXPECT_EQ(connection, connection_data.connection_.get());
 }
 
+TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_config_in_happy_eyeballs", "true"}});
+  MockClusterMockPrioritySet cluster;
+
+  // pass in custom happy_eyeballs_config
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig config;
+  config.set_first_address_family_version(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
+  config.mutable_first_address_family_count()->set_value(2);
+  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig())
+      .WillRepeatedly(Return(absl::make_optional(config)));
+
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::MockTransportSocketFactory socket_factory;
+
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
+  host->setAddressList(address_list);
+  auto connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  // Happy eyeballs config specifies the first address family is V4
+  // The underlying connection should be created with the second address(V4) in the
+  // list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[1], _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createTimer_(_));
+
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
+  EXPECT_NE(connection, connection_data.connection_.get());
+}
+
+TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_config_in_happy_eyeballs", "true"}});
+  MockClusterMockPrioritySet cluster;
+
+  // pass in empty happy_eyeballs_config
+  // a default config will be created when flag turned on
+  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(absl::nullopt));
+
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::MockTransportSocketFactory socket_factory;
+
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
+  host->setAddressList(address_list);
+  auto connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  // Happy eyeballs config is empty, the default behavior is respecting the
+  // native order of returned destination addresses.
+  // The underlying connection should be created with the first address in the
+  // list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createTimer_(_));
+
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
+  EXPECT_NE(connection, connection_data.connection_.get());
+}
+
 TEST_F(HostImplTest, HealthFlags) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
@@ -1674,7 +1783,7 @@ TEST_F(HostImplTest, HealthStatus) {
   EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
   EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
   // Old EDS flags should be cleared and new flag will be set.
-  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH));
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING));
 
   // Setting an active unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -3462,6 +3571,35 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
                              ->getUpstreamLocalAddressSelector()
                              ->getUpstreamLocalAddress(remote_address, nullptr)
                              .address_->asString());
+}
+
+TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    upstream_connection_options:
+      happy_eyeballs_config:
+        first_address_family_version: V4
+        first_address_family_count: 1
+  )EOF";
+  auto cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+  cluster->initialize([] {});
+  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig expected_config;
+  expected_config.set_first_address_family_version(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
+  uint32_t expected_count(1);
+  expected_config.mutable_first_address_family_count()->set_value(expected_count);
+  EXPECT_TRUE(cluster->info()->happyEyeballsConfig().has_value());
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_version(),
+            envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_count().value(),
+            expected_count);
 }
 
 class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -5756,6 +5894,7 @@ TEST(HostPartitionTest, PartitionHosts) {
                    makeTestHost(info, "tcp://127.0.0.1:81", *time_source, zone_a),
                    makeTestHost(info, "tcp://127.0.0.1:82", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:83", *time_source, zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b)};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -5764,24 +5903,26 @@ TEST(HostPartitionTest, PartitionHosts) {
   hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
   hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[5]->healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   auto hosts_per_locality =
-      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
+      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4], hosts[5]}});
 
   auto update_hosts_params =
       HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
 
-  EXPECT_EQ(5, update_hosts_params.hosts->size());
+  EXPECT_EQ(6, update_hosts_params.hosts->size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
   EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
   EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
-  EXPECT_EQ(2, update_hosts_params.excluded_hosts->get().size());
+  EXPECT_EQ(3, update_hosts_params.excluded_hosts->get().size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts->get()[1]);
+  EXPECT_EQ(hosts[5], update_hosts_params.excluded_hosts->get()[2]);
 
   EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
-  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
+  EXPECT_EQ(4, update_hosts_params.hosts_per_locality->get()[1].size());
 
   EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
@@ -5792,9 +5933,10 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
 
   EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(2, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(3, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
+  EXPECT_EQ(hosts[5], update_hosts_params.excluded_hosts_per_locality->get()[1][2]);
 }
 
 TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {

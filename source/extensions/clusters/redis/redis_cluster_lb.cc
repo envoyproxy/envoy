@@ -1,4 +1,4 @@
-#include "redis_cluster_lb.h"
+#include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
 namespace Envoy {
 namespace Extensions {

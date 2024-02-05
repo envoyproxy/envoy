@@ -56,7 +56,7 @@ service ExternalProcessor {
 
 // This represents the different types of messages that Envoy can send
 // to an external processing server.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ProcessingRequest {
   // Specify whether the filter that sent this request is running in synchronous
   // or asynchronous mode. The choice of synchronous or asynchronous mode
@@ -109,6 +109,9 @@ message ProcessingRequest {
     // the original upstream response has trailers.
     HttpTrailers response_trailers = 7;
   }
+
+  // Dynamic metadata associated with the request.
+  config.core.v3.Metadata metadata_context = 8;
 }
 
 // For every ProcessingRequest received by the server with the ``async_mode`` field
@@ -152,9 +155,9 @@ message ProcessingResponse {
     ImmediateResponse immediate_response = 7;
   }
 
-  // [#not-implemented-hide:]
-  // Optional metadata that will be emitted as dynamic metadata to be consumed by the next
-  // filter. This metadata will be placed in the namespace ``envoy.filters.http.ext_proc``.
+  // Optional metadata that will be emitted as dynamic metadata to be consumed by
+  // following filters. This metadata will be placed in the namespace(s) specified by the top-level
+  // field name(s) of the struct.
   google.protobuf.Struct dynamic_metadata = 8;
 
   // Override how parts of the HTTP request and response are processed
