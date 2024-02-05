@@ -110,8 +110,6 @@ message ProcessingRequest {
     HttpTrailers response_trailers = 7;
   }
 
-  // [#not-implemented-hide:]
-  // TODO(jbohanon) reserve field as part of rework detailed in https://github.com/envoyproxy/envoy/issues/32125
   // Dynamic metadata associated with the request.
   config.core.v3.Metadata metadata_context = 8;
 
@@ -120,8 +118,6 @@ message ProcessingRequest {
   // or ``response_attributes`` list in the configuration. Each entry
   // in the list is populated from the standard
   // :ref:`attributes <arch_overview_attributes>` supported across Envoy.
-  // This field also contains dynamic metadata from forwarding namespaces
-  // specified in configuration.
   map<string, google.protobuf.Struct> attributes = 9;
 }
 
