@@ -128,7 +128,7 @@ public:
   }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
-  bool skipOverloadAppend() const override { return false; }
+  bool skipLocalOverloadAppend() const override { return true; }
   const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {

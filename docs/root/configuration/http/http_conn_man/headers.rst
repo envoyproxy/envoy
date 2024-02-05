@@ -435,10 +435,10 @@ The ``x-forwarded-proto`` header will be used by Envoy over ``:scheme`` where th
 encryption is wanted, for example clearing default ports based on ``x-forwarded-proto``. See
 :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
 
-.. _config_http_conn_man_headers_x-envoy-overloaded:
+.. _config_http_conn_man_headers_x-envoy-local-overloaded:
 
-x-envoy-overloaded
-------------------
+x-envoy-local-overloaded
+------------------------
 
 Envoy will set this header on the downstream response
 if a request was dropped due to :ref:`overload manager<arch_overview_overload_manager>`.

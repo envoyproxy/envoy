@@ -333,7 +333,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()),
-      skip_overload_append_(config.skip_overload_append()), via_(config.via()),
+      skip_local_overload_append_(config.skip_local_overload_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),

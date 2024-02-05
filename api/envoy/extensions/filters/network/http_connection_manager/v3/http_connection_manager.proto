@@ -665,10 +665,10 @@ message HttpConnectionManager {
   // information about internal/external addresses.
   InternalAddressConfig internal_address_config = 25;
 
-  // If set, Envoy will not append the remote address to the
-  // :ref:`config_http_conn_man_headers_x-envoy-overloaded` HTTP header in the scenario where
+  // If set, Envoy will not append the
+  // :ref:`config_http_conn_man_headers_x-envoy-local-overloaded` HTTP header in the scenario where
   // the Overload Manager has been triggered
-  bool skip_overload_append = 57;
+  bool skip_local_overload_append = 57;
 
   // If set, Envoy will not append the remote address to the
   // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header. This may be used in
