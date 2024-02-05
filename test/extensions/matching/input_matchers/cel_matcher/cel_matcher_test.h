@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
@@ -543,6 +545,174 @@ inline constexpr char RequestAndResponseCelString[] = R"pb(
     positions {
       key: 20
       value: 82
+    }
+  }
+)pb";
+
+// xds.cluster_metadata.filter_metadata['cel_matcher']['service_name'] == 'test_service'
+inline constexpr absl::string_view UpstreamClusterMetadataCelString = R"pb(
+  expr {
+    id: 8
+    call_expr {
+      function: "_==_"
+      args {
+        id: 6
+        call_expr {
+          function: "_[_]"
+          args {
+            id: 4
+            call_expr {
+              function: "_[_]"
+              args {
+                id: 3
+                select_expr {
+                  operand {
+                    id: 2
+                    select_expr {
+                      operand {
+                        id: 1
+                        ident_expr {
+                          name: "xds"
+                        }
+                      }
+                      field: "cluster_metadata"
+                    }
+                  }
+                  field: "filter_metadata"
+                }
+              }
+              args {
+                id: 5
+                const_expr {
+                  string_value: "%s"
+                }
+              }
+            }
+          }
+          args {
+            id: 7
+            const_expr {
+              string_value: "%s"
+            }
+          }
+        }
+      }
+      args {
+        id: 9
+        const_expr {
+          string_value: "%s"
+        }
+      }
+    }
+  }
+)pb";
+
+// xds.route_metadata.filter_metadata['cel_matcher']['service_name'] == 'test_service'
+inline constexpr absl::string_view UpstreamRouteMetadataCelString = R"pb(
+  expr {
+    id: 8
+    call_expr {
+      function: "_==_"
+      args {
+        id: 6
+        call_expr {
+          function: "_[_]"
+          args {
+            id: 4
+            call_expr {
+              function: "_[_]"
+              args {
+                id: 3
+                select_expr {
+                  operand {
+                    id: 2
+                    select_expr {
+                      operand {
+                        id: 1
+                        ident_expr {
+                          name: "xds"
+                        }
+                      }
+                      field: "route_metadata"
+                    }
+                  }
+                  field: "filter_metadata"
+                }
+              }
+              args {
+                id: 5
+                const_expr {
+                  string_value: "%s"
+                }
+              }
+            }
+          }
+          args {
+            id: 7
+            const_expr {
+              string_value: "%s"
+            }
+          }
+        }
+      }
+      args {
+        id: 9
+        const_expr {
+          string_value: "%s"
+        }
+      }
+    }
+  }
+)pb";
+
+// metadata.filter_metadata['kFilterNamespace']['kMetadataKey'] == 'kMetadataValue'
+inline constexpr absl::string_view DynamicMetadataCelString = R"pb(
+  expr {
+    id: 7
+    call_expr {
+      function: "_==_"
+      args {
+        id: 5
+        call_expr {
+          function: "_[_]"
+          args {
+            id: 3
+            call_expr {
+              function: "_[_]"
+              args {
+                id: 2
+                select_expr {
+                  operand {
+                    id: 1
+                    ident_expr {
+                      name: "metadata"
+                    }
+                  }
+                  field: "filter_metadata"
+                }
+              }
+              args {
+                id: 4
+                const_expr {
+                  string_value: "%s"
+                }
+              }
+            }
+          }
+          args {
+            id: 6
+            const_expr {
+              string_value: "%s"
+            }
+          }
+        }
+      }
+      args {
+        id: 8
+        const_expr {
+          string_value: "%s"
+        }
+      }
     }
   }
 )pb";

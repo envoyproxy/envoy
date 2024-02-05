@@ -53,6 +53,7 @@ public:
                             const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
   virtual const Envoy::Router::FilterConfig& routerFilterConfig() const PURE;
   virtual uint64_t streamId() const PURE;
+  virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;

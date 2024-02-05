@@ -11,7 +11,6 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -57,7 +56,7 @@ public:
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Event::MockTimer* cache_timer_{};
   Event::MockDispatcher dispatcher_;
   HealthCheckCacheManagerSharedPtr cache_manager_;
@@ -242,7 +241,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
       }));
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -312,7 +311,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
       }));
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
@@ -352,7 +351,7 @@ TEST_F(HealthCheckFilterCachingTest, All) {
   // Verify that the next request uses the cached value without setting the degraded header.
   prepareFilter(true);
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
@@ -386,7 +385,7 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
   // Verify that the next request uses the cached value and that the x-envoy-degraded header is set.
   prepareFilter(true);
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {

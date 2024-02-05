@@ -34,9 +34,8 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
-                                     long minDeliverySize) {
-    return envoyEngine.startStream(callbacks, explicitFlowControl, minDeliverySize);
+  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
+    return envoyEngine.startStream(callbacks, explicitFlowControl);
   }
 
   @Override
@@ -57,11 +56,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
   @Override
   public void terminate() {
     envoyEngine.terminate();
-  }
-
-  @Override
-  public void flushStats() {
-    envoyEngine.flushStats();
   }
 
   @Override
@@ -90,4 +84,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   public void setProxySettings(String host, int port) { envoyEngine.setProxySettings(host, port); }
+
+  public void setLogLevel(LogLevel log_level) { envoyEngine.setLogLevel(log_level); }
 }

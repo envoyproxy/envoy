@@ -171,6 +171,7 @@ private:
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
   std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
@@ -215,7 +216,7 @@ private:
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
   ServerNamesMap server_names_map_;
-  bool has_rsa_;
+  bool has_rsa_{false};
   bool full_scan_certs_on_sni_mismatch_;
 };
 

@@ -19,11 +19,15 @@ std::string expandRegex(const std::string& regex) {
               // Cipher names can contain alphanumerics with dashes and
               // underscores.
               {"<CIPHER>", R"([\w-]+)"},
+              // TLS version strings are always of the form "TLSv1.3".
+              {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
               // A generic name can contain any character except dots.
               {"<TAG_VALUE>", TAG_VALUE_REGEX},
               // Route names may contain dots in addition to alphanumerics and
               // dashes with underscores.
-              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"}});
+              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
+              // Match a prefix that is either a listener plus name or cluster plus name
+              {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"}});
 }
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
@@ -102,8 +106,22 @@ TagNameValues::TagNameValues() {
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
   addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**");
 
-  // listener.[<address>.]ssl.cipher.(<cipher>)
-  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.(<CIPHER>))$)");
+  // listener.[<address>.]ssl.ciphers.(<cipher>)
+  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
+
+  // Curves and ciphers have the same pattern so they use the same regex.
+  // listener.[<address>.]ssl.curves.(<curve>)
+  addRe2(SSL_CURVE, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.curves(\.(<CIPHER>))$)",
+         ".ssl.curves.");
+
+  // Signing algorithms and ciphers have the same pattern so they use the same regex.
+  // listener.[<address>.]ssl.sigalgs.(<algorithm>)
+  addRe2(SSL_SIGALG, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.sigalgs(\.(<CIPHER>))$)",
+         ".ssl.sigalgs.");
+
+  // listener.[<address>.]ssl.versions.(<version>)
+  addRe2(SSL_VERSION, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.versions(\.(<TLS_VERSION>))$)",
+         ".ssl.versions.");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
   addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<TAG_VALUE>\.ssl\.ciphers(\.(<CIPHER>))$)",
@@ -180,6 +198,15 @@ TagNameValues::TagNameValues() {
 
   // listener_local_rate_limit.(<stat_prefix>.)
   addTokenized(LOCAL_LISTENER_RATELIMIT_PREFIX, "listener_local_ratelimit.$.**");
+
+  // dns_filter.(<stat_prefix>.).**
+  addTokenized(DNS_FILTER_PREFIX, "dns_filter.$.**");
+
+  // connection_limit.(<stat_prefix>.)*
+  addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
+
+  // (<stat_prefix>.).rbac.**
+  addTokenized(RBAC_PREFIX, "$.rbac.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

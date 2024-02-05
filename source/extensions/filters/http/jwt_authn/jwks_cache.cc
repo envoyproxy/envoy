@@ -29,8 +29,8 @@ class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger:
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, Server::Configuration::FactoryContext& context,
                CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
-      : jwt_provider_(jwt_provider), time_source_(context.timeSource()),
-        tls_(context.threadLocal()) {
+      : jwt_provider_(jwt_provider), time_source_(context.serverFactoryContext().timeSource()),
+        tls_(context.serverFactoryContext().threadLocal()) {
 
     if (jwt_provider_.has_remote_jwks()) {
       // remote_jwks.retry_policy has an invalid case that could not be validated by the
@@ -62,8 +62,8 @@ public:
       return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
     });
 
-    const auto inline_jwks =
-        Config::DataSource::read(jwt_provider_.local_jwks(), true, context.api());
+    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true,
+                                                      context.serverFactoryContext().api());
     if (!inline_jwks.empty()) {
       auto jwks =
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);

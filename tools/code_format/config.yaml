@@ -86,133 +86,87 @@ paths:
     # Header files that can throw exceptions. These should be limited; the only
     # valid situation identified so far is template functions used for config
     # processing.
+    - envoy/common/exception.h
+    - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/map_matcher.h
     - source/common/matcher/field_matcher.h
     - source/common/protobuf/visitor_helper.h
     - source/extensions/common/matcher/trie_matcher.h
+    - envoy/common/exception.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
-    - source/common/upstream/wrsq_scheduler.h
-    - source/common/upstream/cds_api_helper.cc
+    - source/common/listener_manager/listener_impl.cc
+    - source/common/listener_manager/listener_manager_impl.cc
+    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/upstream/thread_aware_lb_impl.cc
-    - source/common/upstream/load_balancer_impl.cc
-    - source/common/upstream/health_checker_impl.cc
+    - source/common/upstream/subset_lb_config.cc
     - source/common/upstream/cluster_manager_impl.cc
-    - source/common/upstream/od_cds_api_impl.cc
-    - source/common/upstream/cds_api_impl.cc
-    - source/common/upstream/outlier_detection_impl.cc
     - source/common/upstream/upstream_impl.cc
-    - source/common/network/connection_impl.cc
+    - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
-    - source/common/network/io_socket_handle_impl.cc
+    - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
-    - source/common/network/address_impl.h
-    - source/common/network/cidr_range.cc
     - source/common/network/utility.cc
     - source/common/network/dns_resolver/dns_factory_util.cc
-    - source/common/network/dns_resolver/dns_factory_util.h
-    - source/common/network/resolver_impl.cc
-    - source/common/network/utility.h
-    - source/common/network/lc_trie.h
-    - source/common/network/socket_impl.cc
     - source/common/ssl/tls_certificate_config_impl.cc
-    - source/common/ssl/certificate_validation_context_config_impl.cc
-    - source/common/formatter/substitution_formatter.cc
-    - source/common/formatter/substitution_format_string.cc
+    - source/common/formatter/http_specific_formatter.cc
+    - source/common/formatter/stream_info_formatter.h
+    - source/common/formatter/stream_info_formatter.cc
+    - source/common/formatter/substitution_formatter.h
+    - source/common/formatter/substitution_format_utility.cc
+    - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/stats/tag_producer_impl.cc
     - source/common/http/http2/codec_impl.cc
-    - source/common/http/filter_chain_helper.cc
-    - source/common/http/request_id_extension_impl.cc
     - source/common/http/utility.cc
     - source/common/http/hash_policy.cc
-    - source/common/http/utility.h
-    - source/common/http/filter_chain_helper.h
     - source/common/http/conn_manager_utility.cc
     - source/common/http/match_delegate/config.cc
-    - source/common/http/http_server_properties_cache_manager_impl.cc
     - source/common/protobuf/yaml_utility.cc
-    - source/common/protobuf/visitor_helper.h
     - source/common/protobuf/visitor.cc
     - source/common/protobuf/utility.cc
-    - source/common/protobuf/utility.h
     - source/common/protobuf/message_validator_impl.cc
-    - source/common/access_log/access_log_impl.h
+    - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/access_log/access_log_manager_impl.cc
     - source/common/secret/secret_manager_impl.cc
-    - source/common/secret/sds_api.h
-    - source/common/secret/sds_api.cc
     - source/common/grpc/async_client_manager_impl.cc
-    - source/common/grpc/common.cc
     - source/common/grpc/google_grpc_utils.cc
-    - source/common/grpc/common.h
     - source/common/tcp_proxy/tcp_proxy.cc
-    - source/common/config/xds_resource.h
     - source/common/config/subscription_factory_impl.cc
     - source/common/config/xds_resource.cc
     - source/common/config/datasource.cc
-    - source/common/config/xds_mux/delta_subscription_state.cc
-    - source/common/config/xds_mux/sotw_subscription_state.cc
-    - source/common/config/xds_mux/grpc_mux_impl.cc
-    - source/common/config/utility.cc
-    - source/common/config/watch_map.h
-    - source/common/config/datasource.h
-    - source/common/config/null_grpc_mux_impl.h
-    - source/common/config/utility.h
-    - source/common/config/custom_config_validators_impl.h
-    - source/common/config/xds_context_params.cc
-    - source/common/config/custom_config_validators_impl.cc
     - source/common/runtime/runtime_impl.cc
-    - source/common/quic/quic_transport_socket_factory.cc
     - source/common/filter/config_discovery_impl.cc
-    - source/common/event/timer_impl.h
-    - source/common/matcher/map_matcher.h
-    - source/common/matcher/field_matcher.h
     - source/common/json/json_internal.cc
-    - source/common/json/json_internal.h
-    - source/common/json/json_sanitizer.cc
-    - source/common/router/header_formatter.cc
     - source/common/router/scoped_rds.cc
-    - source/common/router/rds_impl.cc
     - source/common/router/config_impl.cc
-    - source/common/router/config_impl.h
     - source/common/router/scoped_config_impl.cc
     - source/common/router/router_ratelimit.cc
-    - source/common/router/vhds.cc
-    - source/common/router/config_utility.cc
-    - source/common/router/scoped_rds.h
     - source/common/router/header_parser.cc
-    - source/common/router/config_utility.h
-    - source/common/rds/rds_route_config_subscription.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
-    - source/common/filesystem/posix/filesystem_impl.cc
     - source/common/filesystem/kqueue/watcher_impl.cc
     - source/common/filesystem/win32/directory_iterator_impl.cc
-    - source/common/filesystem/win32/filesystem_impl.cc
     - source/common/filesystem/win32/watcher_impl.cc
     - source/common/common/utility.cc
     - source/common/common/regex.cc
-    - source/common/common/logger.h
-    - source/common/common/thread.h
-    - source/common/common/utility.h
-    - source/common/common/matchers.h
     - source/common/common/matchers.cc
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc
-    - source/server/options_impl.h
-    - source/server/server.h
     - source/server/overload_manager_impl.cc
-    - source/server/config_validation/cluster_manager.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
     - source/server/server.cc
-    - source/server/configuration_impl.h
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
     - source/server/ssl_context_manager.cc
-    - source/server/configuration_impl.cc
+    - source/server/config_validation/cluster_manager.cc
+    - source/common/upstream/health_discovery_service.cc
+    - source/common/secret/sds_api.h
+    - source/common/secret/sds_api.cc
+    - source/common/router/router.cc
+    - source/common/config/config_provider_impl.h
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
@@ -223,6 +177,7 @@ paths:
   json_string_to_message:
     include:
     - source/common/protobuf/utility.cc
+    - source/common/protobuf/protobuf.h
     - source/common/protobuf/yaml_utility.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
@@ -241,16 +196,17 @@ paths:
   protobuf:
     include:
     - api/test
+    - api/bazel/cc_proto_descriptor_library
     - ci/prebuilt
     - source/common/protobuf
+    - source/extensions/filters/http/grpc_field_extraction
     - test/extensions/bootstrap/wasm/test_data
 
   # Files that are allowed to use try without main thread assertion.
   raw_try:
     include:
-    - source/common/common/regex.cc
     - source/common/common/thread.h
-    - source/common/network/utility.cc
+    - source/exe/terminate_handler.cc
 
   # Files matching these exact names can reference real-world time. These include the class
   # definitions for real-world time, the construction of them in main(), and perf annotation.
@@ -291,7 +247,9 @@ paths:
   # Files in these paths can use MessageLite::SerializeAsString
   serialize_as_string:
     include:
+    - api/bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
     - contrib/config/source/kv_store_xds_delegate.cc
+    - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
     - source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
@@ -312,6 +270,9 @@ paths:
     - source/common/common/regex.h
     - source/common/common/regex.cc
     - source/common/common/utility.cc
+    - source/common/formatter/http_specific_formatter.cc
+    - source/common/formatter/stream_info_formatter.cc
+    - source/common/formatter/substitution_formatter.h
     - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
@@ -445,3 +406,7 @@ visibility_excludes:
 - source/extensions/config_subscription/grpc/BUILD
 - source/extensions/load_balancing_policies/subset/BUILD
 - source/extensions/load_balancing_policies/ring_hash/BUILD
+- source/extensions/load_balancing_policies/round_robin/
+- source/extensions/load_balancing_policies/least_request/
+- source/extensions/load_balancing_policies/random/
+- source/extensions/load_balancing_policies/cluster_provided/

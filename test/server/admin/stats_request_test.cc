@@ -7,6 +7,8 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/stats_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -35,7 +37,16 @@ protected:
     params.used_only_ = used_only;
     params.type_ = type;
     params.format_ = format;
-    return std::make_unique<StatsRequest>(store_, params);
+    return std::make_unique<StatsRequest>(store_, params, endpoints_helper_.cm_);
+  }
+
+  std::unique_ptr<StatsRequest> makeHiddenRequest(HiddenFlag hidden, StatsFormat format,
+                                                  StatsType type) {
+    StatsParams params;
+    params.hidden_ = hidden;
+    params.type_ = type;
+    params.format_ = format;
+    return std::make_unique<StatsRequest>(store_, params, endpoints_helper_.cm_);
   }
 
   // Executes a request, counting the chunks that were generated.
@@ -83,6 +94,7 @@ protected:
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::ThreadLocalStoreImpl store_;
+  Upstream::PerEndpointMetricsTestHelper endpoints_helper_;
   Buffer::OwnedImpl response_;
 };
 
@@ -119,6 +131,27 @@ TEST_F(StatsRequestTest, OneTextReadout) {
   EXPECT_EQ(0, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::Counters)));
 }
 
+TEST_F(StatsRequestTest, OneHostCounter) {
+  auto& cluster = endpoints_helper_.makeCluster("mycluster", 0);
+  endpoints_helper_.addHostSingleCounter(cluster);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::All)));
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::Counters)));
+
+  // There's always a gauge due to the synthetic healthy gauge.
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::Gauges)));
+
+  EXPECT_EQ(0, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::TextReadouts)));
+}
+
+TEST_F(StatsRequestTest, OneHostGauge) {
+  auto& cluster = endpoints_helper_.makeCluster("mycluster", 0);
+  endpoints_helper_.addHostSingleGauge(cluster);
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::All)));
+  EXPECT_EQ(0, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::Counters)));
+  EXPECT_EQ(1, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::Gauges)));
+  EXPECT_EQ(0, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::TextReadouts)));
+}
+
 TEST_F(StatsRequestTest, OneScope) {
   Stats::ScopeSharedPtr scope = store_.createScope("foo");
   EXPECT_EQ(0, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::All)));
@@ -145,6 +178,27 @@ TEST_F(StatsRequestTest, ManyStatsSmallChunkSizeNoDrain) {
 TEST_F(StatsRequestTest, OneStatUsedOnly) {
   store_.rootScope()->counterFromStatName(makeStatName("foo"));
   EXPECT_EQ(0, iterateChunks(*makeRequest(true, StatsFormat::Text, StatsType::All)));
+}
+
+TEST_F(StatsRequestTest, OneStatHiddenExclude) {
+  store_.rootScope()->gaugeFromStatName(makeStatName("foo"),
+                                        Stats::Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(
+      0, iterateChunks(*makeHiddenRequest(HiddenFlag::Exclude, StatsFormat::Text, StatsType::All)));
+}
+
+TEST_F(StatsRequestTest, OneStatHiddenShowOnly) {
+  store_.rootScope()->gaugeFromStatName(makeStatName("foo"),
+                                        Stats::Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(1, iterateChunks(
+                   *makeHiddenRequest(HiddenFlag::ShowOnly, StatsFormat::Text, StatsType::All)));
+}
+
+TEST_F(StatsRequestTest, OneStatHiddenInclude) {
+  store_.rootScope()->gaugeFromStatName(makeStatName("foo"),
+                                        Stats::Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(
+      1, iterateChunks(*makeHiddenRequest(HiddenFlag::Include, StatsFormat::Text, StatsType::All)));
 }
 
 TEST_F(StatsRequestTest, OneStatJson) {

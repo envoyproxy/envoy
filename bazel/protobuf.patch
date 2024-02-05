@@ -2,30 +2,21 @@ diff --git a/BUILD.bazel b/BUILD.bazel
 index 0f6e41e3a..c0d2bbccf 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -138,7 +138,7 @@ cc_library(
-     visibility = ["//visibility:public"],
-     deps = [":protobuf_lite"] + select({
-         "//build_defs:config_msvc": [],
--        "//conditions:default": ["@zlib//:zlib"],
-+        "//conditions:default": ["//external:zlib"],
-     }),
- )
- 
 @@ -454,14 +454,79 @@ cc_library(
-     deps = [":protobuf"],
+     visibility = ["//visibility:public"],
  )
- 
+
 +# Envoy: Patch
 +
  cc_binary(
 -    name = "protoc",
 +    name = "compiled_protoc",
-     srcs = ["src/google/protobuf/compiler/main.cc"],
-     linkopts = LINK_OPTS + PROTOC_LINK_OPTS,
+     copts = COPTS,
+     linkopts = LINK_OPTS,
      visibility = ["//visibility:public"],
-     deps = [":protoc_lib"],
+     deps = ["//src/google/protobuf/compiler:protoc_lib"],
  )
- 
+
 +# Lifted from `rules_proto`
 +config_setting(
 +    name = "linux-aarch_64",
@@ -83,32 +74,23 @@ index 0f6e41e3a..c0d2bbccf 100644
 +
 +alias(
 +    name = "protobuf_python_genproto",
-+    actual = "well_known_types_py_pb2_genproto",
++    actual = "//python:well_known_types_py_pb2_genproto",
 +    visibility = ["//visibility:public"],
 +)
 +
 +# /Envoy: Patch
 +
- ################################################################################
- # Tests
- ################################################################################
-@@ -755,7 +820,7 @@ cc_test(
-         "@com_google_googletest//:gtest_main",
-     ] + select({
-         "//build_defs:config_msvc": [],
--        "//conditions:default": ["@zlib//:zlib"],
-+        "//conditions:default": ["//external:zlib"],
-     }),
- )
- 
+ cc_binary(
+     name = "protoc_static",
+     copts = COPTS,
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
 index e7555ee10..a93beb1c5 100644
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
 @@ -31,3 +31,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
- 
- __version__ = '4.21.12'
+
+ __version__ = '4.23.4'
 +
 +
 +if __name__ != '__main__':
@@ -116,19 +98,78 @@ index e7555ee10..a93beb1c5 100644
 +        __import__('pkg_resources').declare_namespace(__name__)
 +    except ImportError:
 +        __path__ = __import__('pkgutil').extend_path(__path__, __name__)
-diff --git a/src/google/protobuf/generated_message_tctable_lite.cc b/src/google/protobuf/generated_message_tctable_lite.cc
-index 9993811dc..d80006af7 100644
---- a/src/google/protobuf/generated_message_tctable_lite.cc
-+++ b/src/google/protobuf/generated_message_tctable_lite.cc
-@@ -343,11 +343,6 @@ const char* TcParser::MiniParse(PROTOBUF_TC_PARAM_DECL) {
- 
- namespace {
- 
--// Offset returns the address `offset` bytes after `base`.
--inline void* Offset(void* base, uint32_t offset) {
--  return static_cast<uint8_t*>(base) + offset;
--}
--
- // InvertPacked changes tag bits from the given wire type to length
- // delimited. This is the difference expected between packed and non-packed
- // repeated fields.
+diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.bazel
+--- a/src/google/protobuf/io/BUILD.bazel
++++ b/src/google/protobuf/io/BUILD.bazel
+@@ -138,7 +138,7 @@ cc_library(
+         "@com_google_absl//absl/log:absl_log",
+     ] + select({
+         "//build_defs:config_msvc": [],
+-        "//conditions:default": ["@zlib//:zlib"],
++        "//conditions:default": ["//external:zlib"],
+     }),
+ )
+
+diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
+--- a/src/google/protobuf/port_def.inc	2023-06-27 01:17:34.917105764 +0000
++++ b/src/google/protobuf/port_def.inc	2023-06-27 01:18:12.069060142 +0000
+@@ -1004,7 +1004,7 @@
+ #pragma clang diagnostic ignored "-Wshorten-64-to-32"
+ // Turn on -Wdeprecated-enum-enum-conversion. This deprecation comes in C++20
+ // via http://wg21.link/p1120r0.
+-#pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
++// #pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
+ // This error has been generally flaky, but we need to disable it specifically
+ // to fix https://github.com/protocolbuffers/protobuf/issues/12313
+ #pragma clang diagnostic ignored "-Wunused-parameter"
+diff --git a/src/google/protobuf/map.h b/src/google/protobuf/map.h
+--- a/src/google/protobuf/map.h	2023-06-30 14:32:34.892148233 +0000
++++ b/src/google/protobuf/map.h	2023-06-30 14:35:37.447992493 +0000
+@@ -883,7 +883,7 @@
+         TreeConvert(b);
+       }
+       ABSL_DCHECK(TableEntryIsTree(b))
+-          << (void*)table_[b] << " " << (uintptr_t)table_[b];
++          << reinterpret_cast<void*>(table_[b]) << " " << static_cast<uintptr_t>(table_[b]);
+       InsertUniqueInTree(b, node);
+       index_of_first_non_null_ = (std::min)(index_of_first_non_null_, b);
+     }
+diff --git a/src/google/protobuf/map_field.h b/src/google/protobuf/map_field.h
+--- a/src/google/protobuf/map_field.h	2023-06-30 17:14:18.934528580 +0000
++++ b/src/google/protobuf/map_field.h	2023-06-30 17:14:52.098500807 +0000
+@@ -345,7 +345,7 @@
+
+  protected:
+   // "protected" stops users from deleting a `MapFieldBase *`
+-  ~MapFieldBase();
++  virtual ~MapFieldBase();
+
+  public:
+   // Returns reference to internal repeated field. Data written using
+diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
+--- a/src/google/protobuf/compiler/BUILD.bazel
++++ b/src/google/protobuf/compiler/BUILD.bazel
+@@ -306,7 +306,7 @@
+     srcs = ["retention.cc"],
+     hdrs = ["retention.h"],
+     include_prefix = "google/protobuf/compiler",
+-    visibility = ["//src/google/protobuf:__subpackages__"],
++    visibility = ["//visibility:public"],
+     deps = [
+         "//src/google/protobuf:protobuf_nowkt",
+         "@com_google_absl//absl/types:span",
+
+diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
+index 1c6a24945..c27d0bf2a 100644
+--- a/src/google/protobuf/port_def.inc
++++ b/src/google/protobuf/port_def.inc
+@@ -1062,6 +1062,9 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
+ #pragma warning(disable: 4125)
+ #endif
+
++#if defined(__GNUC__)
++#pragma GCC diagnostic ignored "-Wundef"
++#endif
+ #if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
+ #define PROTOBUF_DEBUG true
+ #else

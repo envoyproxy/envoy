@@ -265,39 +265,41 @@ void setNumberValue(Envoy::Runtime::Snapshot::Entry& entry, double value) {
 }
 
 // Handle corner cases in parsing: negatives and decimals aren't always parsed as doubles.
-void parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
+bool parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
   double converted_double;
   if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {
     setNumberValue(entry, converted_double);
+    return true;
   }
+  return false;
 }
 
 // Handle an awful corner case where we explicitly shove a yaml percent in a proto string
 // value. Basically due to prior parsing logic we have to handle any combination
 // of numerator: #### [denominator Y] with quotes braces etc that could possibly be valid json.
 // E.g. "final_value": "{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}",
-void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
+bool parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
   if (!absl::StrContains(entry.raw_string_value_, "numerator")) {
-    return;
+    return false;
   }
 
   const re2::RE2 numerator_re(".*numerator[^\\d]+(\\d+)[^\\d]*");
 
   std::string match_string;
   if (!re2::RE2::FullMatch(entry.raw_string_value_.c_str(), numerator_re, &match_string)) {
-    return;
+    return false;
   }
 
   uint32_t numerator;
   if (!absl::SimpleAtoi(match_string, &numerator)) {
-    return;
+    return false;
   }
   envoy::type::v3::FractionalPercent converted_fractional_percent;
   converted_fractional_percent.set_numerator(numerator);
   entry.fractional_percent_value_ = converted_fractional_percent;
 
   if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
-    return;
+    return true;
   }
   if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
     entry.fractional_percent_value_->set_denominator(
@@ -306,42 +308,79 @@ void parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
   if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
     entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
   }
+  return true;
 }
 
 // Handle corner cases in non-yaml parsing: mixed case strings aren't parsed as booleans.
-void parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
+bool parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
 
   if (absl::EqualsIgnoreCase(stripped, "true")) {
     entry.bool_value_ = true;
+    return true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {
     entry.bool_value_ = false;
+    return true;
+  }
+  return false;
+}
+
+void SnapshotImpl::addEntry(Snapshot::EntryMap& values, const std::string& key,
+                            const ProtobufWkt::Value& value, absl::string_view raw_string) {
+  const char* error_message = nullptr;
+  values.emplace(key, SnapshotImpl::createEntry(value, raw_string, error_message));
+  if (error_message != nullptr) {
+    IS_ENVOY_BUG(
+        absl::StrCat(error_message, "\n[ key:", key, ", value: ", value.DebugString(), "]"));
   }
 }
 
+static const char* kBoolError =
+    "Runtime YAML appears to be setting booleans as strings. Support for this is planned "
+    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
+    "working "
+    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
+static const char* kFractionError =
+    "Runtime YAML appears to be setting fractions as strings. Support for this is planned "
+    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
+    "working "
+    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
+
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
-                                              absl::string_view raw_string) {
+                                              absl::string_view raw_string,
+                                              const char*& error_message) {
   Entry entry;
+  entry.raw_string_value_ = value.string_value();
+  if (!raw_string.empty()) {
+    entry.raw_string_value_ = raw_string;
+  }
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.number_value());
+    }
     break;
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+    }
     break;
   case ProtobufWkt::Value::kStructValue:
+    if (entry.raw_string_value_.empty()) {
+      entry.raw_string_value_ = value.struct_value().DebugString();
+    }
     parseFractionValue(entry, value.struct_value());
     break;
   case ProtobufWkt::Value::kStringValue:
-    entry.raw_string_value_ = value.string_value();
     parseEntryDoubleValue(entry);
-    // TODO(alyssawilk) after this PR lands and sticks, ENVOY_BUG these
-    // functions and see if we can remove the special casing.
-    parseEntryBooleanValue(entry);
-    parseEntryFractionalPercentValue(entry);
-    if (!raw_string.empty()) {
-      entry.raw_string_value_ = raw_string;
+    if (parseEntryBooleanValue(entry)) {
+      error_message = kBoolError;
+    }
+    if (parseEntryFractionalPercentValue(entry)) {
+      error_message = kFractionError;
     }
   default:
     break;
@@ -355,8 +394,7 @@ void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
-      values_.emplace(kv.first,
-                      SnapshotImpl::createEntry(ValueUtil::loadFromYaml(kv.second), kv.second));
+      SnapshotImpl::addEntry(values_, kv.first, ValueUtil::loadFromYaml(kv.second), kv.second);
     }
   }
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
@@ -379,15 +417,19 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
-    throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid path: ", path));
   }
 
   Filesystem::Directory directory(path);
-  for (const Filesystem::DirectoryEntry& entry : directory) {
+  Filesystem::DirectoryIteratorImpl it = directory.begin();
+  THROW_IF_NOT_OK_REF(it.status());
+  for (; it != directory.end(); ++it) {
+    THROW_IF_NOT_OK_REF(it.status());
+    Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
     if (prefix.empty()) {
@@ -408,7 +450,10 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
-      const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
+      auto file_or_error = api.fileSystem().fileReadToEnd(full_path);
+      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      const std::string text_file{file_or_error.value()};
+
       const auto lines = StringUtil::splitToken(text_file, "\n");
       for (const auto& line : lines) {
         if (!line.empty() && line.front() == '#') {
@@ -425,8 +470,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
 #ifdef ENVOY_ENABLE_YAML
-      values_.insert(
-          {full_prefix, SnapshotImpl::createEntry(ValueUtil::loadFromYaml(value), value)});
+      SnapshotImpl::addEntry(values_, full_prefix, ValueUtil::loadFromYaml(value), value);
 #else
       IS_ENVOY_BUG("Runtime admin reload requires YAML support");
       UNREFERENCED_PARAMETER(value);
@@ -434,6 +478,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 #endif
     }
   }
+  THROW_IF_NOT_OK_REF(it.status());
 }
 
 ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
@@ -448,10 +493,10 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
   case ProtobufWkt::Value::KIND_NOT_SET:
   case ProtobufWkt::Value::kListValue:
   case ProtobufWkt::Value::kNullValue:
-    throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
+    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
-    values_.emplace(prefix, SnapshotImpl::createEntry(v));
+    SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
@@ -460,13 +505,13 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
           "Using a removed guard ", prefix,
           ". In future version of Envoy this will be treated as invalid configuration"));
     }
-    values_.emplace(prefix, SnapshotImpl::createEntry(v));
+    SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
   case ProtobufWkt::Value::kStructValue: {
     const ProtobufWkt::Struct& s = v.struct_value();
     if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
         s.fields().find("denominator") != s.fields().end()) {
-      values_.emplace(prefix, SnapshotImpl::createEntry(v));
+      SnapshotImpl::addEntry(values_, prefix, v, "");
       break;
     }
     for (const auto& f : s.fields()) {
@@ -489,7 +534,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
     if (!ret.second) {
-      throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
+      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
@@ -497,7 +542,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       if (admin_layer_ != nullptr) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
       }
       admin_layer_ = std::make_unique<AdminLayer>(layer.name(), stats_);
@@ -515,7 +560,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       init_manager_.add(subscriptions_.back()->init_target_);
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
-      throw EnvoyException("layer specifier not set");
+      throwEnvoyExceptionOrPanic("layer specifier not set");
     }
   }
 
@@ -556,32 +601,41 @@ void RtdsSubscription::createSubscription() {
       {});
 }
 
-void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                      const std::string&) {
-  validateUpdateSize(resources.size(), 0);
+absl::Status
+RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                 const std::string&) {
+  absl::Status valid = validateUpdateSize(resources.size(), 0);
+  if (!valid.ok()) {
+    return valid;
+  }
   const auto& runtime =
       dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
   if (runtime.name() != resource_name_) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
   }
   ENVOY_LOG(debug, "Reloading RTDS snapshot for onConfigUpdate");
   proto_.CopyFrom(runtime.layer());
   parent_.loadNewSnapshot();
   init_target_.ready();
+  return absl::OkStatus();
 }
 
-void RtdsSubscription::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
-  validateUpdateSize(added_resources.size(), removed_resources.size());
+absl::Status
+RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                 const std::string&) {
+  absl::Status valid = validateUpdateSize(added_resources.size(), removed_resources.size());
+  if (!valid.ok()) {
+    return valid;
+  }
 
   // This is a singleton subscription, so we can only have the subscribed resource added or removed,
   // but not both.
   if (!added_resources.empty()) {
-    onConfigUpdate(added_resources, added_resources[0].get().version());
+    return onConfigUpdate(added_resources, added_resources[0].get().version());
   } else {
-    onConfigRemoved(removed_resources);
+    return onConfigRemoved(removed_resources);
   }
 }
 
@@ -595,20 +649,22 @@ void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 
 void RtdsSubscription::start() { subscription_->start({resource_name_}); }
 
-void RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
-                                          uint32_t removed_resources_num) {
+absl::Status RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
+                                                  uint32_t removed_resources_num) {
   if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
-    throw EnvoyException(fmt::format("Unexpected RTDS resource length, number of added recources "
-                                     "{}, number of removed recources {}",
-                                     added_resources_num, removed_resources_num));
+    return absl::InvalidArgumentError(
+        fmt::format("Unexpected RTDS resource length, number of added recources "
+                    "{}, number of removed recources {}",
+                    added_resources_num, removed_resources_num));
   }
+  return absl::OkStatus();
 }
 
-void RtdsSubscription::onConfigRemoved(
+absl::Status RtdsSubscription::onConfigRemoved(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   if (removed_resources[0] != resource_name_) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Unexpected removal of unknown RTDS runtime layer {}, expected {}",
                     removed_resources[0], resource_name_));
   }
@@ -616,6 +672,7 @@ void RtdsSubscription::onConfigRemoved(
   proto_.Clear();
   parent_.loadNewSnapshot();
   init_target_.ready();
+  return absl::OkStatus();
 }
 
 void LoaderImpl::loadNewSnapshot() {
@@ -651,7 +708,7 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
 
 void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
-    throw EnvoyException("No admin layer specified");
+    throwEnvoyExceptionOrPanic("No admin layer specified");
   }
   admin_layer_->mergeValues(values);
   loadNewSnapshot();
@@ -682,7 +739,7 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
       std::string path =
           layer.disk_layer().symlink_root() + "/" + layer.disk_layer().subdirectory();
       if (layer.disk_layer().append_service_cluster()) {
-        path += "/" + service_cluster_;
+        absl::StrAppend(&path, "/", service_cluster_);
       }
       if (api_.fileSystem().directoryExists(path)) {
         TRY_ASSERT_MAIN_THREAD {
@@ -690,13 +747,13 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
           ++disk_layers;
         }
         END_TRY
-        catch (EnvoyException& e) {
+        CATCH(EnvoyException & e, {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
                     layer.DebugString(), e.what());
-        }
+        });
       }
       break;
     }

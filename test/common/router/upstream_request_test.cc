@@ -82,6 +82,34 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
 
 // UpstreamRequest is responsible for adding proper gRPC annotations to spans.
 TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
+  envoy::extensions::filters::http::router::v3::Router router_proto;
+  router_config_ = std::make_unique<Router::FilterConfig>(
+      pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
+  EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
+
+  // Enable tracing in config.
+  router_filter_interface_.callbacks_.tracing_config_.spawn_upstream_span_ = true;
+
+  // Set expectations on span.
+  auto* child_span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(router_filter_interface_.callbacks_.active_span_, spawnChild_)
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span, setTag).Times(AnyNumber());
+  EXPECT_CALL(*child_span, setTag(Eq("grpc.status_code"), Eq("1")));
+  EXPECT_CALL(*child_span, setTag(Eq("grpc.message"), Eq("failure")));
+
+  // System under test.
+  initialize();
+  auto upgrade_headers =
+      std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
+          {{":status", "200"}, {"grpc-status", "1"}, {"grpc-message", "failure"}}));
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(_, _, _, _));
+  upstream_request_->decodeHeaders(std::move(upgrade_headers), false);
+}
+
+// UpstreamRequest is responsible for adding proper gRPC annotations to spans.
+TEST_F(UpstreamRequestTest,
+       DEPRECATED_FEATURE_TEST(DecodeHeadersGrpcSpanAnnotationsWithStartChildSpan)) {
   // Enable tracing in config.
   envoy::extensions::filters::http::router::v3::Router router_proto;
   router_proto.set_start_child_span(true);
@@ -114,20 +142,20 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
       .Times(2)
-      .WillRepeatedly(
-          Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
-            if (only_create_if_configured) {
-              return false;
-            }
-            auto factory = createDecoderFilterFactoryCb(filter);
-            manager.applyFilterFactoryCb({}, factory);
-            Http::FilterFactoryCb factory_cb =
-                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-              callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-            };
-            manager.applyFilterFactoryCb({}, factory_cb);
-            return true;
-          }));
+      .WillRepeatedly(Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured,
+                                 const Http::FilterChainOptions&) -> bool {
+        if (only_create_if_configured) {
+          return false;
+        }
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        Http::FilterFactoryCb factory_cb =
+            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        };
+        manager.applyFilterFactoryCb({}, factory_cb);
+        return true;
+      }));
 
   initialize();
   ASSERT_TRUE(filter->callbacks_ != nullptr);

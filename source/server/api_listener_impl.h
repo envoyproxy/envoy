@@ -49,7 +49,8 @@ public:
   }
 
 protected:
-  ApiListenerImplBase(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+  ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,
+                      const envoy::config::listener::v3::Listener& config, Server::Instance& server,
                       const std::string& name);
 
   // Synthetic class that acts as a stub Network::ReadFilterCallbacks.
@@ -85,7 +86,8 @@ protected:
           : parent_(parent), dispatcher_(dispatcher),
             connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
                 parent.parent_.address_, parent.parent_.address_)),
-            stream_info_(parent_.parent_.factory_context_.timeSource(), connection_info_provider_),
+            stream_info_(parent_.parent_.factory_context_.serverFactoryContext().timeSource(),
+                         connection_info_provider_),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       void raiseConnectionEvent(Network::ConnectionEvent event);
@@ -122,12 +124,15 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
-      Event::Dispatcher& dispatcher() override { return dispatcher_; }
+      Network::DetectedCloseType detectedCloseType() const override {
+        return Network::DetectedCloseType::Normal;
+      };
+      Event::Dispatcher& dispatcher() const override { return dispatcher_; }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
       std::string nextProtocol() const override { return EMPTY_STRING; }
       void noDelay(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
-      void readDisable(bool) override {}
+      ReadDisableStatus readDisable(bool) override { return ReadDisableStatus::NoTransition; }
       void detectEarlyCloseWhenReadDisabled(bool) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
@@ -187,8 +192,6 @@ protected:
   const envoy::config::listener::v3::Listener& config_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
-  Stats::ScopeSharedPtr global_scope_;
-  Stats::ScopeSharedPtr listener_scope_;
   FactoryContextImpl factory_context_;
 };
 
@@ -209,8 +212,8 @@ public:
           http_connection_manager_(parent.http_connection_manager_factory_(read_callbacks_)) {}
     ~ApiListenerWrapper() override;
 
-    Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
-                                    bool is_internally_created = false) override;
+    Http::RequestDecoderHandlePtr newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                  bool is_internally_created = false) override;
 
     SyntheticReadCallbacks& readCallbacks() { return read_callbacks_; }
 
@@ -219,14 +222,18 @@ public:
     Http::ApiListenerPtr http_connection_manager_;
   };
 
-  HttpApiListener(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
-                  const std::string& name);
-
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
   Http::ApiListenerPtr createHttpApiListener(Event::Dispatcher& dispatcher) override;
+  static absl::StatusOr<std::unique_ptr<HttpApiListener>>
+  create(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+         const std::string& name);
 
 private:
+  HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
+                  const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+                  const std::string& name);
+
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
   // route config manager, scoped route config manager.
   std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>

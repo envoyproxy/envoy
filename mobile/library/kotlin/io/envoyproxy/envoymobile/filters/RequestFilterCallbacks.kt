@@ -9,8 +9,7 @@ interface RequestFilterCallbacks {
    *
    * This will result in an `onResumeRequest()` callback on the RequestFilter.
    *
-   * If the request is not complete, the filter may receive further `onData()`/`onTrailers()`
-   * calls.
+   * If the request is not complete, the filter may receive further `onData()`/`onTrailers()` calls.
    */
   fun resumeRequest()
 

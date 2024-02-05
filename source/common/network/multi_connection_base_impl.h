@@ -89,7 +89,7 @@ public:
   // Methods which are applied to each connection attempt.
   void enableHalfClose(bool enabled) override;
   void noDelay(bool enable) override;
-  void readDisable(bool disable) override;
+  ReadDisableStatus readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
@@ -124,9 +124,10 @@ public:
 
   // Methods implemented largely by this class itself.
   uint64_t id() const override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& dispatcher() const override;
   void close(ConnectionCloseType type) override { close(type, ""); }
   void close(ConnectionCloseType type, absl::string_view details) override;
+  DetectedCloseType detectedCloseType() const override;
   bool readEnabled() const override;
   bool aboveHighWatermark() const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;

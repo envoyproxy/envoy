@@ -91,7 +91,7 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
   test: a
   )EOF";
 
-  handleInvalidConfiguration(yaml_string, "test: Cannot find field");
+  handleInvalidConfiguration(yaml_string, "test");
 }
 
 TEST(MongoFilterConfigTest, EmptyConfig) {
@@ -145,7 +145,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
       fixed_delay: 1s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string, R"(invalid value -1 for type TYPE_UINT32)");
+    handleInvalidConfiguration(yaml_string, "percentage");
   }
 }
 
@@ -160,7 +160,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       fixed_delay: 1s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string, R"(invalid value "df" for type TYPE_UINT32)");
+    handleInvalidConfiguration(yaml_string, "numerator");
   }
 
   {
@@ -173,7 +173,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       fixed_delay: ab
     )EOF";
 
-    handleInvalidConfiguration(yaml_string, "Illegal duration format; duration must end with 's'");
+    handleInvalidConfiguration(yaml_string, "fixed_delay");
   }
 
   {

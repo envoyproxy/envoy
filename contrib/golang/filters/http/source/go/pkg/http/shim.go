@@ -20,7 +20,7 @@ package http
 /*
 // ref https://github.com/golang/go/issues/25832
 
-#cgo CFLAGS: -I../api
+#cgo CFLAGS: -I../../../../../../common/go/api -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 
@@ -38,40 +38,67 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 var ErrDupRequestKey = errors.New("dup request key")
 
 var Requests = &requestMap{}
 
+var (
+	initialized      = false
+	envoyConcurrency uint32
+)
+
+// EnvoyConcurrency returns the concurrency Envoy was set to run at. This can be used to optimize HTTP filters that need
+// memory per worker thread to avoid locks.
+//
+// Note: Do not use inside of an `init()` function, the value will not be populated yet. Use within the filters
+// `StreamFilterConfigFactory` or `StreamFilterConfigParser`
+func EnvoyConcurrency() uint32 {
+	if !initialized {
+		panic("concurrency has not yet been initialized, do not access within an init()")
+	}
+	return envoyConcurrency
+}
+
 type requestMap struct {
-	m sync.Map // *C.httpRequest -> *httpRequest
+	initOnce sync.Once
+	requests []map[*C.httpRequest]*httpRequest
+}
+
+func (f *requestMap) initialize(concurrency uint32) {
+	f.initOnce.Do(func() {
+		initialized = true
+		envoyConcurrency = concurrency
+		f.requests = make([]map[*C.httpRequest]*httpRequest, concurrency)
+		for i := uint32(0); i < concurrency; i++ {
+			f.requests[i] = map[*C.httpRequest]*httpRequest{}
+		}
+	})
 }
 
 func (f *requestMap) StoreReq(key *C.httpRequest, req *httpRequest) error {
-	if _, loaded := f.m.LoadOrStore(key, req); loaded {
+	m := f.requests[key.worker_id]
+	if _, ok := m[key]; ok {
 		return ErrDupRequestKey
 	}
+	m[key] = req
 	return nil
 }
 
 func (f *requestMap) GetReq(key *C.httpRequest) *httpRequest {
-	if v, ok := f.m.Load(key); ok {
-		return v.(*httpRequest)
-	}
-	return nil
+	return f.requests[key.worker_id][key]
 }
 
 func (f *requestMap) DeleteReq(key *C.httpRequest) {
-	f.m.Delete(key)
+	delete(f.requests[key.worker_id], key)
 }
 
 func (f *requestMap) Clear() {
-	f.m.Range(func(key, _ interface{}) bool {
-		f.m.Delete(key)
-		return true
-	})
+	for idx := range f.requests {
+		f.requests[idx] = map[*C.httpRequest]*httpRequest{}
+	}
 }
 
 func requestFinalize(r *httpRequest) {
@@ -82,6 +109,7 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	req := &httpRequest{
 		req: r,
 	}
+	req.cond.L = &req.waitingLock
 	// NP: make sure filter will be deleted.
 	runtime.SetFinalizer(req, requestFinalize)
 
@@ -106,15 +134,12 @@ func getRequest(r *C.httpRequest) *httpRequest {
 func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
 	var req *httpRequest
 	phase := api.EnvoyRequestPhase(r.phase)
-	if phase == api.DecodeHeaderPhase {
+	// early SendLocalReply or OnLogDownstreamStart may run before the header handling
+	req = getRequest(r)
+	if req == nil {
 		req = createRequest(r)
-	} else {
-		req = getRequest(r)
-		// early sendLocalReply may skip the whole decode phase
-		if req == nil {
-			req = createRequest(r)
-		}
 	}
+
 	if req.pInfo.paniced {
 		// goroutine panic in the previous state that could not sendLocalReply, delay terminating the request here,
 		// to prevent error from spreading.
@@ -171,6 +196,11 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 		}
 		status = f.EncodeTrailers(header)
 	}
+
+	if endStream == 1 && (status == api.StopAndBuffer || status == api.StopAndBufferWatermark) {
+		panic("received wait data status when there is no data, please fix the returned status")
+	}
+
 	return uint64(status)
 }
 
@@ -203,16 +233,54 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 	return uint64(status)
 }
 
+//export envoyGoFilterOnHttpLog
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
+	req := getRequest(r)
+	if req == nil {
+		req = createRequest(r)
+	}
+
+	defer req.RecoverPanic()
+
+	v := api.AccessLogType(logType)
+
+	f := req.httpFilter
+	switch v {
+	case api.AccessLogDownstreamStart:
+		f.OnLogDownstreamStart()
+	case api.AccessLogDownstreamPeriodic:
+		f.OnLogDownstreamPeriodic()
+	case api.AccessLogDownstreamEnd:
+		f.OnLog()
+	default:
+		api.LogErrorf("access log type %d is not supported yet", logType)
+	}
+}
+
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.RecoverPanic()
 
+	req.resumeWaitCallback()
+
 	v := api.DestroyReason(reason)
 
 	f := req.httpFilter
 	f.OnDestroy(v)
 
+	// Break circular references between httpRequest and StreamFilter,
+	// since Finalizers don't work with circular references,
+	// otherwise, it will leads to memory leaking.
+	req.httpFilter = nil
+
 	Requests.DeleteReq(r)
+}
+
+//export envoyGoRequestSemaDec
+func envoyGoRequestSemaDec(r *C.httpRequest) {
+	req := getRequest(r)
+	defer req.RecoverPanic()
+	req.resumeWaitCallback()
 }

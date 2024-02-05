@@ -72,7 +72,7 @@ public:
   MOCK_METHOD(Network::Listener*, listener, ());
   MOCK_METHOD(void, pauseListening, ());
   MOCK_METHOD(void, resumeListening, ());
-  MOCK_METHOD(void, shutdownListener, ());
+  MOCK_METHOD(void, shutdownListener, (const Network::ExtraShutdownListenerOptions&));
   MOCK_METHOD(void, updateListenerConfig, (Network::ListenerConfig&));
   MOCK_METHOD(void, onFilterChainDraining, (const std::list<const Network::FilterChain*>&));
   MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr &&));

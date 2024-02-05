@@ -93,7 +93,7 @@ token_bucket:
   // Second connection should be rate limited.
   ActiveFilter active_filter2(config_);
   EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded));
   EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::NoFlush, "local_ratelimit_close_over_limit"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
@@ -227,7 +227,7 @@ TEST_F(LocalRateLimitSharedTokenBucketTest, Shared) {
 // Test that the Key from SharedRateLimitSingleton::get() is valid/stable even if
 // many entries are added and the hash table is rehashed.
 TEST_F(LocalRateLimitSharedTokenBucketTest, RehashPointerStability) {
-  const char* yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 stat_prefix: local_rate_limit_stats
 share_key: key_{}
 token_bucket:

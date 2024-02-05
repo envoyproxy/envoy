@@ -59,21 +59,24 @@ public:
     auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
 
+    GrpcMuxContext grpc_mux_context{
+        /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*dispatcher_=*/dispatcher_,
+        /*service_method_=*/*method_descriptor_,
+        /*local_info_=*/local_info_,
+        /*rate_limit_settings_=*/rate_limit_settings_,
+        /*scope_=*/*stats_store_.rootScope(),
+        /*config_validators_=*/std::move(config_validators_),
+        /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+        /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+        /*backoff_strategy_=*/std::move(backoff_strategy),
+        /*target_xds_authority_=*/"",
+        /*eds_resources_cache_=*/nullptr};
+
     if (should_use_unified_) {
-      mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
-          std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-          *stats_store_.rootScope(), rate_limit_settings_, local_info_, true,
-          std::move(config_validators_), std::move(backoff_strategy),
-          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+      mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
     } else {
-      mux_ = std::make_shared<Config::GrpcMuxImpl>(
-          local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-          *method_descriptor_, *stats_store_.rootScope(), rate_limit_settings_, true,
-          std::move(config_validators_), std::move(backoff_strategy),
-          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
-          /*xds_resources_delegate=*/
-          XdsResourcesDelegateOptRef(),
-          /*target_xds_authority=*/"");
+      mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,

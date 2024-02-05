@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <bitset>
 #include <cstdint>
 #include <functional>
@@ -9,8 +10,11 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/macros.h"
@@ -25,21 +29,115 @@
 namespace Envoy {
 namespace Upstream {
 
-using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
-
-class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
+class ChildLoadBalancerCreator {
 public:
-  SubsetLoadBalancer(
-      LoadBalancerType lb_type, const PrioritySet& priority_set,
-      const PrioritySet* local_priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const LoadBalancerSubsetInfo& subsets,
+  virtual ~ChildLoadBalancerCreator() = default;
+
+  virtual std::pair<ThreadAwareLoadBalancerPtr, LoadBalancerPtr>
+  createLoadBalancer(const PrioritySet& child_priority_set, const PrioritySet* local_priority_set,
+                     ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random, TimeSource& time_source) PURE;
+};
+using ChildLoadBalancerCreatorPtr = std::unique_ptr<ChildLoadBalancerCreator>;
+
+class LegacyChildLoadBalancerCreatorImpl : public Upstream::ChildLoadBalancerCreator {
+public:
+  LegacyChildLoadBalancerCreatorImpl(
+      LoadBalancerType lb_type,
       OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config,
       OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config,
       OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
       OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      TimeSource& time_source);
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+
+  std::pair<Upstream::ThreadAwareLoadBalancerPtr, Upstream::LoadBalancerPtr>
+  createLoadBalancer(const Upstream::PrioritySet& child_priority_set,
+                     const Upstream::PrioritySet* local_priority_set, ClusterLbStats& stats,
+                     Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     TimeSource& time_source) override;
+
+  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
+    if (round_robin_config_ != nullptr) {
+      return *round_robin_config_;
+    }
+    return absl::nullopt;
+  }
+
+  LoadBalancerType lbType() const { return lb_type_; }
+
+  OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
+  lbLeastRequestConfig() const {
+    if (least_request_config_ != nullptr) {
+      return *least_request_config_;
+    }
+    return absl::nullopt;
+  }
+
+  OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lbMaglevConfig() const {
+    if (lb_maglev_config_ != nullptr) {
+      return *lb_maglev_config_;
+    }
+    return absl::nullopt;
+  }
+
+  OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lbRingHashConfig() const {
+    if (lb_ring_hash_config_ != nullptr) {
+      return *lb_ring_hash_config_;
+    }
+    return absl::nullopt;
+  }
+
+private:
+  const LoadBalancerType lb_type_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
+      lb_ring_hash_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
+      lb_maglev_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
+      round_robin_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
+      least_request_config_;
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
+};
+
+using HostHashSet = absl::flat_hash_set<HostSharedPtr>;
+
+class SubsetLoadBalancerConfig : public Upstream::LoadBalancerConfig {
+public:
+  SubsetLoadBalancerConfig(const SubsetLoadbalancingPolicyProto& subset_config,
+                           ProtobufMessage::ValidationVisitor& visitor);
+
+  SubsetLoadBalancerConfig(const LegacySubsetLoadbalancingPolicyProto& subset_config,
+                           Upstream::LoadBalancerConfigPtr sub_load_balancer_config,
+                           Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory)
+      : subset_info_(subset_config), sub_load_balancer_config_(std::move(sub_load_balancer_config)),
+        sub_load_balancer_factory_(sub_load_balancer_factory) {
+    ASSERT(sub_load_balancer_factory_ != nullptr, "sub_load_balancer_factory_ must not be nullptr");
+  }
+
+  Upstream::ThreadAwareLoadBalancerPtr
+  createLoadBalancer(const Upstream::ClusterInfo& cluster_info,
+                     const Upstream::PrioritySet& child_priority_set, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random, TimeSource& time_source) const {
+    return sub_load_balancer_factory_->create(*sub_load_balancer_config_, cluster_info,
+                                              child_priority_set, runtime, random, time_source);
+  }
+
+  const Upstream::LoadBalancerSubsetInfo& subsetInfo() const { return subset_info_; }
+
+private:
+  LoadBalancerSubsetInfoImpl subset_info_;
+
+  Upstream::LoadBalancerConfigPtr sub_load_balancer_config_;
+  Upstream::TypedLoadBalancerFactory* sub_load_balancer_factory_{};
+};
+
+class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
+public:
+  SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets, ChildLoadBalancerCreatorPtr child_lb,
+                     const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                     ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random, TimeSource& time_source);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
@@ -77,7 +175,8 @@ private:
   public:
     HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware,
                    bool scale_locality_weight)
-        : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioningFactor()),
+        : HostSetImpl(original_host_set.priority(), original_host_set.weightedPriorityHealth(),
+                      original_host_set.overprovisioningFactor()),
           original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware),
           scale_locality_weight_(scale_locality_weight) {}
 
@@ -113,7 +212,6 @@ private:
                       const HostVector& hosts_added, const HostVector& hosts_removed) {
       reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
           ->update(matching_hosts, hosts_added, hosts_removed);
-
       runUpdateCallbacks(hosts_added, hosts_removed);
     }
 
@@ -123,11 +221,12 @@ private:
     LoadBalancerPtr lb_;
 
   protected:
-    HostSetImplPtr createHostSet(uint32_t priority,
+    HostSetImplPtr createHostSet(uint32_t priority, absl::optional<bool> weighted_priority_health,
                                  absl::optional<uint32_t> overprovisioning_factor) override;
 
   private:
     const PrioritySet& original_priority_set_;
+    const PrioritySet* original_local_priority_set_{};
     const bool locality_weight_aware_;
     const bool scale_locality_weight_;
     bool empty_ = true;
@@ -148,10 +247,15 @@ private:
   using SubsetSelectorFallbackParamsRef = std::reference_wrapper<SubsetSelectorFallbackParams>;
   using MetadataFallbacks = ProtobufWkt::RepeatedPtrField<ProtobufWkt::Value>;
 
+public:
   class LoadBalancerContextWrapper : public LoadBalancerContext {
   public:
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
                                const std::set<std::string>& filtered_metadata_match_criteria_names);
+
+    LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
+                               Router::MetadataMatchCriteriaConstPtr metadata_match_criteria)
+        : wrapped_(wrapped), metadata_match_(std::move(metadata_match_criteria)) {}
 
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
                                const ProtobufWkt::Struct& metadata_match_criteria_override);
@@ -162,6 +266,9 @@ private:
     }
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
+    }
+    const StreamInfo::StreamInfo* requestStreamInfo() const override {
+      return wrapped_->requestStreamInfo();
     }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
       return wrapped_->downstreamHeaders();
@@ -194,6 +301,7 @@ private:
     Router::MetadataMatchCriteriaConstPtr metadata_match_;
   };
 
+private:
   struct SubsetSelectorFallbackParams {
     envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
         LbSubsetSelectorFallbackPolicy fallback_policy_;
@@ -332,9 +440,6 @@ private:
   void processSubsets(uint32_t priority, const HostVector& all_hosts);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
-  HostConstSharedPtr
-  tryChooseHostFromMetadataMatchCriteriaSingle(const Router::MetadataMatchCriteria& match_criteria,
-                                               bool& host_chosen);
 
   absl::optional<SubsetSelectorFallbackParamsRef>
   tryFindSelectorFallbackParams(LoadBalancerContext* context);
@@ -357,48 +462,11 @@ private:
   const ProtobufWkt::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
   LoadBalancerContextWrapper removeMetadataFallbackList(LoadBalancerContext* context);
 
-  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
-    if (round_robin_config_ != nullptr) {
-      return *round_robin_config_;
-    }
-    return absl::nullopt;
-  }
-
-  OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-  lbLeastRequestConfig() const {
-    if (least_request_config_ != nullptr) {
-      return *least_request_config_;
-    }
-    return absl::nullopt;
-  }
-
-  OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lbMaglevConfig() const {
-    if (lb_maglev_config_ != nullptr) {
-      return *lb_maglev_config_;
-    }
-    return absl::nullopt;
-  }
-
-  OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lbRingHashConfig() const {
-    if (lb_ring_hash_config_ != nullptr) {
-      return *lb_ring_hash_config_;
-    }
-    return absl::nullopt;
-  }
-
-  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
-      lb_ring_hash_config_;
-  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
-      lb_maglev_config_;
-  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
-      round_robin_config_;
-  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-      least_request_config_;
-  const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   ClusterLbStats& stats_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
+  TimeSource& time_source_;
 
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
@@ -410,6 +478,8 @@ private:
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
   Common::CallbackHandlePtr original_priority_set_callback_handle_;
+
+  ChildLoadBalancerCreatorPtr child_lb_creator_;
 
   LbSubsetEntryPtr subset_any_;
   LbSubsetEntryPtr subset_default_;
@@ -426,13 +496,11 @@ private:
 
   Stats::Gauge* single_duplicate_stat_{};
 
-  TimeSource& time_source_;
-
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  const LoadBalancerType lb_type_;
   const bool locality_weight_aware_ : 1;
   const bool scale_locality_weight_ : 1;
   const bool list_as_any_ : 1;
+  const bool allow_redundant_keys_{};
 
   friend class SubsetLoadBalancerInternalStateTester;
 };

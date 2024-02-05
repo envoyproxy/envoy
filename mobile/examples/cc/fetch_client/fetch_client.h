@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 #include <vector>
 
@@ -13,6 +15,8 @@
 #include "source/exe/platform_impl.h"
 #include "source/exe/process_wide.h"
 
+#include "absl/base/thread_annotations.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 #include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
@@ -44,7 +48,9 @@ private:
   Api::ApiPtr api_;
 
   Event::DispatcherPtr dispatcher_;
-  Platform::EngineSharedPtr engine_;
+
+  absl::Mutex engine_mutex_;
+  Platform::EngineSharedPtr engine_ ABSL_GUARDED_BY(engine_mutex_);
 };
 
 } // namespace Envoy

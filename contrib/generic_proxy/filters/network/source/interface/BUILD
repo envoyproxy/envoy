@@ -95,6 +95,7 @@ envoy_cc_library(
         ":codec_interface",
         ":filter_interface",
         ":route_interface",
+        "//contrib/generic_proxy/filters/network/source:access_log_lib",
         "//envoy/tracing:trace_config_interface",
         "//envoy/tracing:tracer_interface",
     ],

@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/http/conn_manager_impl.h"
+#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
@@ -12,17 +13,13 @@
 namespace Envoy {
 namespace Server {
 
-bool isQuic(const envoy::config::listener::v3::Listener& config) {
-  return config.has_udp_listener_config() && config.udp_listener_config().has_quic_options();
-}
-
-ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
+ApiListenerImplBase::ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,
+                                         const envoy::config::listener::v3::Listener& config,
                                          Server::Instance& server, const std::string& name)
-    : config_(config), name_(name),
-      address_(Network::Address::resolveProtoAddress(config.address())),
-      global_scope_(server.stats().createScope("")),
-      listener_scope_(server.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      factory_context_(server, config_, *this, *global_scope_, *listener_scope_, isQuic(config)) {}
+    : config_(config), name_(name), address_(std::move(address)),
+      factory_context_(server, *this, server.stats().createScope(""),
+                       server.stats().createScope(fmt::format("listener.api.{}.", name_)),
+                       std::make_shared<ListenerInfoImpl>(config)) {}
 
 void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConnectionEvent(
     Network::ConnectionEvent event) {
@@ -38,20 +35,32 @@ HttpApiListener::ApiListenerWrapper::~ApiListenerWrapper() {
   read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-Http::RequestDecoder&
-HttpApiListener::ApiListenerWrapper::newStream(Http::ResponseEncoder& response_encoder,
-                                               bool is_internally_created) {
-  return http_connection_manager_->newStream(response_encoder, is_internally_created);
+Http::RequestDecoderHandlePtr
+HttpApiListener::ApiListenerWrapper::newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                     bool is_internally_created) {
+  return http_connection_manager_->newStreamHandle(response_encoder, is_internally_created);
 }
 
-HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
+absl::StatusOr<std::unique_ptr<HttpApiListener>>
+HttpApiListener::create(const envoy::config::listener::v3::Listener& config,
+                        Server::Instance& server, const std::string& name) {
+  auto address_or_error = Network::Address::resolveProtoAddress(config.address());
+  RETURN_IF_STATUS_NOT_OK(address_or_error);
+  return std::unique_ptr<HttpApiListener>(
+      new HttpApiListener(std::move(address_or_error.value()), config, server, name));
+}
+
+HttpApiListener::HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
+                                 const envoy::config::listener::v3::Listener& config,
                                  Server::Instance& server, const std::string& name)
-    : ApiListenerImplBase(config, server, name) {
+    : ApiListenerImplBase(std::move(address), config, server, name) {
   if (config.api_listener().api_listener().type_url() ==
-      absl::StrCat("type.googleapis.com/",
-                   envoy::extensions::filters::network::http_connection_manager::v3::
-                       EnvoyMobileHttpConnectionManager::descriptor()
-                           ->full_name())) {
+      absl::StrCat(
+          "type.googleapis.com/",
+          createReflectableMessage(envoy::extensions::filters::network::http_connection_manager::
+                                       v3::EnvoyMobileHttpConnectionManager::default_instance())
+              ->GetDescriptor()
+              ->full_name())) {
     auto typed_config = MessageUtil::anyConvertAndValidate<
         envoy::extensions::filters::network::http_connection_manager::v3::
             EnvoyMobileHttpConnectionManager>(config.api_listener().api_listener(),

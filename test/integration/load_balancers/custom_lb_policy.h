@@ -46,8 +46,9 @@ private:
   public:
     LbFactory(const Upstream::HostSharedPtr& host) : host_(host) {}
 
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(host_); }
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LbImpl>(host_);
+    }
 
     const Upstream::HostSharedPtr host_;
   };
@@ -58,12 +59,23 @@ private:
 class CustomLbFactory : public Upstream::TypedLoadBalancerFactoryBase<
                             ::test::integration::custom_lb::CustomLbConfig> {
 public:
+  class EmptyLoadBalancerConfig : public Upstream::LoadBalancerConfig {
+  public:
+    EmptyLoadBalancerConfig() = default;
+  };
+
   CustomLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancers.custom_lb") {}
 
-  Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo&,
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig>,
+                                              const Upstream::ClusterInfo&,
                                               const Upstream::PrioritySet&, Runtime::Loader&,
                                               Random::RandomGenerator&, TimeSource&) override {
     return std::make_unique<ThreadAwareLbImpl>();
+  }
+
+  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_unique<EmptyLoadBalancerConfig>();
   }
 };
 

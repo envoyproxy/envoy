@@ -42,6 +42,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+  weighted_priority_health_ = load_assignment_.policy().weighted_priority_health();
 }
 
 void StrictDnsClusterImpl::startPreInit() {
@@ -77,7 +78,8 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
   // TODO(dio): Add assertion in here.
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-      hosts_added, hosts_removed, absl::nullopt, overprovisioning_factor_);
+      hosts_added, hosts_removed, absl::nullopt, weighted_priority_health_,
+      overprovisioning_factor_);
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
@@ -191,7 +193,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
       });
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                            ClusterFactoryContext& context) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);

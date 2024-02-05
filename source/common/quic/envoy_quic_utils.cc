@@ -250,6 +250,9 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
   quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
   configQuicInitialFlowControlWindow(config, quic_config);
+  quic_config.SetConnectionOptionsToSend(quic::ParseQuicTagVector(config.connection_options()));
+  quic_config.SetClientConnectionOptions(
+      quic::ParseQuicTagVector(config.client_connection_options()));
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
@@ -282,9 +285,8 @@ void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
                                      const quic::QuicConnectionId& old_connection_id) {
   char* new_connection_id_data = new_connection_id.mutable_data();
   const char* old_connection_id_ptr = old_connection_id.data();
-  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(old_connection_id_ptr);
   // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
+  memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
 }
 
 } // namespace Quic

@@ -24,6 +24,9 @@ public:
     std::string yaml = R"EOF(
 stat_prefix: test_prefix
 max_packet_bytes: 1048576
+enable_per_opcode_request_bytes_metrics: true
+enable_per_opcode_response_bytes_metrics: true
+enable_per_opcode_decoder_error_metrics: true
 enable_latency_threshold_metrics: true
 default_latency_threshold: "0.1s"
 latency_threshold_overrides:)EOF";
@@ -73,10 +76,8 @@ stat_prefix: test_prefix
 max_packet_bytes: -1
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
-      "Unable to parse JSON as proto \\(INVALID_ARGUMENT:\\(max_packet_bytes.value\\): invalid "
-      "value -1 for type TYPE_UINT32\\)");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
+                          "max_packet_bytes");
 }
 
 TEST_F(ZookeeperFilterConfigTest, UndefinedOpcode) {
@@ -88,15 +89,8 @@ latency_threshold_overrides:
       nanos: 150000000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      TestUtility::loadFromYamlAndValidate(yaml, proto_config_),
-      ProtobufMessage::UnknownProtoFieldException,
-      "Protobuf message (type envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy "
-      "reason INVALID_ARGUMENT:(latency_threshold_overrides[0].opcode): invalid value "
-      "\"Undefined\" for type "
-      "type.googleapis.com/"
-      "envoy.extensions.filters.network.zookeeper_proxy.v3.LatencyThresholdOverride.Opcode) has "
-      "unknown fields");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_),
+                          ProtobufMessage::UnknownProtoFieldException, "Undefined");
 }
 
 TEST_F(ZookeeperFilterConfigTest, NegativeLatencyThreshold) {
@@ -188,6 +182,9 @@ stat_prefix: test_prefix
   TestUtility::loadFromYamlAndValidate(yaml, proto_config_);
   EXPECT_EQ(proto_config_.stat_prefix(), "test_prefix");
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 0);
+  EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::SecondsToDuration(0));
@@ -207,6 +204,9 @@ default_latency_threshold: "0.15s"
   TestUtility::loadFromYamlAndValidate(yaml, proto_config_);
   EXPECT_EQ(proto_config_.stat_prefix(), "test_prefix");
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 0);
+  EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::MillisecondsToDuration(150));
@@ -228,6 +228,9 @@ latency_threshold_overrides:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config_);
   EXPECT_EQ(proto_config_.stat_prefix(), "test_prefix");
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 0);
+  EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), false);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), false);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), false);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::SecondsToDuration(0));
@@ -250,10 +253,13 @@ TEST_F(ZookeeperFilterConfigTest, FullConfig) {
 
   EXPECT_EQ(proto_config_.stat_prefix(), "test_prefix");
   EXPECT_EQ(proto_config_.max_packet_bytes().value(), 1048576);
+  EXPECT_EQ(proto_config_.enable_per_opcode_request_bytes_metrics(), true);
+  EXPECT_EQ(proto_config_.enable_per_opcode_response_bytes_metrics(), true);
+  EXPECT_EQ(proto_config_.enable_per_opcode_decoder_error_metrics(), true);
   EXPECT_EQ(proto_config_.enable_latency_threshold_metrics(), true);
   EXPECT_EQ(proto_config_.default_latency_threshold(),
             ProtobufWkt::util::TimeUtil::MillisecondsToDuration(100));
-  EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 26);
+  EXPECT_EQ(proto_config_.latency_threshold_overrides_size(), 27);
 
   for (int i = 0; i < opcode_descriptor->value_count(); i++) {
     LatencyThresholdOverride threshold_override = proto_config_.latency_threshold_overrides().at(i);

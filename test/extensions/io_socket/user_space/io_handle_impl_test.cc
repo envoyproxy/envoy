@@ -412,6 +412,26 @@ TEST_F(IoHandleImplTest, ShutDownOptionsNotSupported) {
   ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
 }
 
+// This test is ensure the memory created by BufferFragment won't be released
+// after the write.
+TEST_F(IoHandleImplTest, WriteBufferFragement) {
+  Buffer::OwnedImpl buf("a");
+  bool released = false;
+  auto buf_frag = Buffer::OwnedBufferFragmentImpl::create(
+      std::string(255, 'b'), [&released](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        released = true;
+        delete fragment;
+      });
+  buf.addBufferFragment(*buf_frag.release());
+
+  auto result = io_handle_->write(buf);
+  EXPECT_FALSE(released);
+  EXPECT_EQ(0, buf.length());
+  io_handle_peer_->read(buf, absl::nullopt);
+  buf.drain(buf.length());
+  EXPECT_TRUE(released);
+}
+
 TEST_F(IoHandleImplTest, WriteByMove) {
   Buffer::OwnedImpl buf("0123456789");
   auto result = io_handle_peer_->write(buf);
@@ -493,7 +513,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterShutdown) {
   // Write after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
   EXPECT_EQ(10, buf.length());
 }
 
@@ -502,7 +522,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 // Test writev return error code. Ignoring the side effect of event scheduling.
@@ -558,7 +578,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterShutdown) {
   // Writev after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
@@ -567,7 +587,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevToPeer) {

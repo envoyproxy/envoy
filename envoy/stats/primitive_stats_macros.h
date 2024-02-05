@@ -17,8 +17,8 @@ namespace Envoy {
  *
  * By convention, starting with #7083, we sort the lines of this macro block, so
  * all the counters are grouped together, then all the gauges, etc. We do not
- * use clang-format-on/off etc. "./tools/code_format/check_format.py fix" will take care of
- * lining up the backslashes.
+ * use clang-format-on/off etc. "bazel run //tools/code_format:check_format -- fix" will take
+ * care of lining up the backslashes.
  *
  * Now actually put these stats somewhere, usually as a member of a struct:
  *   struct MyCoolStats {

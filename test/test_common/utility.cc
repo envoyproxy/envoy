@@ -19,6 +19,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "source/common/api/api_impl.h"
@@ -228,6 +229,27 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   return AssertionSuccess();
 }
 
+AssertionResult TestUtility::waitForProactiveOverloadResourceUsageEq(
+    Server::ThreadLocalOverloadState& overload_state,
+    const Server::OverloadProactiveResourceName resource_name, int64_t expected_value,
+    Event::TestTimeSystem& time_system, Event::Dispatcher& dispatcher,
+    std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  const auto& monitor = overload_state.getProactiveResourceMonitorForTest(resource_name);
+  while (monitor->currentResourceUsage() != expected_value) {
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      uint64_t current_value;
+      current_value = monitor->currentResourceUsage();
+      return AssertionFailure() << fmt::format(
+                 "timed out waiting for proactive resource to be {}, current value {}",
+                 expected_value, current_value);
+    }
+    dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  return AssertionSuccess();
+}
+
 AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
                                                    Event::TestTimeSystem& time_system) {
   while (findGauge(store, name) != nullptr) {
@@ -283,6 +305,21 @@ uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
   notification.WaitForNotification();
 
   return sample_count;
+}
+
+double TestUtility::readSampleSum(Event::Dispatcher& main_dispatcher,
+                                  const Stats::ParentHistogram& histogram) {
+  // Note: we need to read the sample count from the main thread, to avoid data races.
+  double sample_sum = 0;
+  absl::Notification notification;
+
+  main_dispatcher.post([&] {
+    sample_sum = histogram.cumulativeStatistics().sampleSum();
+    notification.Notify();
+  });
+  notification.WaitForNotification();
+
+  return sample_sum;
 }
 
 std::list<Network::DnsResponse>

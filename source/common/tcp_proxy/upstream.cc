@@ -8,27 +8,11 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/http/null_route_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace TcpProxy {
-
-const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
-    HttpConnPool::NullRateLimitPolicy::rate_limit_policy_entry_;
-const HttpConnPool::NullHedgePolicy HttpConnPool::RouteEntryImpl::hedge_policy_;
-const HttpConnPool::NullRateLimitPolicy HttpConnPool::RouteEntryImpl::rate_limit_policy_;
-const Router::InternalRedirectPolicyImpl HttpConnPool::RouteEntryImpl::internal_redirect_policy_;
-const Router::PathMatcherSharedPtr HttpConnPool::RouteEntryImpl::path_matcher_;
-const Router::PathRewriterSharedPtr HttpConnPool::RouteEntryImpl::path_rewriter_;
-const std::vector<Router::ShadowPolicyPtr> HttpConnPool::RouteEntryImpl::shadow_policies_;
-const HttpConnPool::NullVirtualHost HttpConnPool::RouteEntryImpl::virtual_host_;
-const HttpConnPool::NullRateLimitPolicy HttpConnPool::NullVirtualHost::rate_limit_policy_;
-const HttpConnPool::NullConfig HttpConnPool::NullVirtualHost::route_configuration_;
-const std::multimap<std::string, std::string> HttpConnPool::RouteEntryImpl::opaque_config_;
-const HttpConnPool::NullPathMatchCriterion HttpConnPool::RouteEntryImpl::path_match_criterion_;
-const HttpConnPool::RouteEntryImpl::ConnectConfigOptRef
-    HttpConnPool::RouteEntryImpl::connect_config_nullopt_;
-const std::list<Http::LowerCaseString> HttpConnPool::NullConfig::internal_only_headers_;
 
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
@@ -77,6 +61,7 @@ Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
 
 Tcp::ConnectionPool::ConnectionData*
 TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
+  // TODO(botengyao): propagate RST back to upstream connection if RST is received from downstream.
   if (event == Network::ConnectionEvent::RemoteClose) {
     // The close call may result in this object being deleted. Latch the
     // connection locally so it can be returned for potential draining.
@@ -93,16 +78,54 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   return nullptr;
 }
 
-HttpUpstream::HttpUpstream(HttpConnPool& http_conn_pool,
-                           Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                           Router::Route& route, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfigHelper& config,
-                           StreamInfo::StreamInfo& downstream_info)
-    : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
-      decoder_filter_callbacks_(decoder_callbacks), route_(&route), response_decoder_(*this),
-      upstream_callbacks_(callbacks) {}
+                           StreamInfo::StreamInfo& downstream_info, Http::CodecType type)
+    : config_(config), downstream_info_(downstream_info), response_decoder_(*this),
+      upstream_callbacks_(callbacks), type_(type) {}
 
 HttpUpstream::~HttpUpstream() = default;
+
+bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
+  if (type_ == Http::CodecType::HTTP1) {
+    //  According to RFC7231 any 2xx response indicates that the connection is
+    //  established.
+    //  Any 'Content-Length' or 'Transfer-Encoding' header fields MUST be ignored.
+    //  https://tools.ietf.org/html/rfc7231#section-4.3.6
+    return Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers));
+  }
+  return Http::Utility::getResponseStatus(headers) == 200;
+}
+
+void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
+  request_encoder_ = &request_encoder;
+  request_encoder_->getStream().addCallbacks(*this);
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
+      {Http::Headers::get().Host, config_.host(downstream_info_)},
+  });
+  if (config_.usePost()) {
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
+  }
+
+  if (type_ == Http::CodecType::HTTP1) {
+    request_encoder_->enableTcpTunneling();
+    ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
+  } else {
+    const std::string& scheme =
+        is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+
+    if (config_.usePost()) {
+      headers->addReference(Http::Headers::get().Scheme, scheme);
+    }
+  }
+
+  config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
+                                            downstream_info_);
+  const auto status = request_encoder_->encodeHeaders(*headers, false);
+  // Encoding can only fail on missing required request headers.
+  ASSERT(status.ok());
+}
 
 bool HttpUpstream::readDisable(bool disable) {
   if (!request_encoder_) {
@@ -116,8 +139,15 @@ void HttpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!request_encoder_) {
     return;
   }
+  auto codec = type_;
   request_encoder_->encodeData(data, end_stream);
-  if (end_stream) {
+
+  // doneWriting() is being skipped for H1 codec to avoid resetEncoder() call.
+  // This is because H1 codec does not support half-closed stream. Calling resetEncoder()
+  // will fully close the upstream connection without flushing any pending data, rather than a http
+  // stream reset.
+  // More details can be found on https://github.com/envoyproxy/envoy/pull/13293
+  if ((codec != Http::CodecType::HTTP1) && (end_stream)) {
     doneWriting();
   }
 }
@@ -136,10 +166,6 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;
-}
-
-void HttpUpstream::onUpstreamReset(Http::StreamResetReason, absl::string_view, UpstreamRequest&) {
-  upstream_callbacks_.onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 void HttpUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
@@ -165,10 +191,6 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
   request_encoder_ = nullptr;
-  onResetEncoder(event, inform_downstream);
-}
-
-void HttpUpstream::onResetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   // If we did not receive a valid CONNECT response yet we treat this as a pool
   // failure, otherwise we forward the event downstream.
   if (conn_pool_callbacks_ != nullptr) {
@@ -194,32 +216,12 @@ void HttpUpstream::doneWriting() {
     resetEncoder(Network::ConnectionEvent::LocalClose);
   }
 }
-void HttpUpstream::cleanUp() { resetEncoder(Network::ConnectionEvent::LocalClose, false); }
-
-// Router::RouterFilterInterface
-void HttpUpstream::onUpstreamHeaders([[maybe_unused]] uint64_t response_code,
-                                     Http::ResponseHeaderMapPtr&& headers,
-                                     [[maybe_unused]] UpstreamRequest& upstream_request,
-                                     bool end_stream) {
-  responseDecoder().decodeHeaders(std::move(headers), end_stream);
-}
-
-void HttpUpstream::onUpstreamData(Buffer::Instance& data,
-                                  [[maybe_unused]] UpstreamRequest& upstream_request,
-                                  bool end_stream) {
-  responseDecoder().decodeData(data, end_stream);
-}
-
-void HttpUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers, UpstreamRequest&) {
-  responseDecoder().decodeTrailers(std::move(trailers));
-}
-
-Http::RequestHeaderMap* HttpUpstream::downstreamHeaders() { return downstream_headers_.get(); }
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
-                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
-    : upstream_callbacks_(upstream_callbacks) {
+                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                         StreamInfo::StreamInfo& downstream_info)
+    : upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info) {
   conn_pool_data_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
 }
 
@@ -251,6 +253,12 @@ void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                               Upstream::HostDescriptionConstSharedPtr host) {
+  if (downstream_info_.downstreamAddressProvider().connectionID()) {
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              conn_data->connection().id(),
+              downstream_info_.downstreamAddressProvider().connectionID().value());
+  }
+
   upstream_handle_ = nullptr;
   Tcp::ConnectionPool::ConnectionData* latched_data = conn_data.get();
   Network::Connection& connection = conn_data->connection();
@@ -270,7 +278,8 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), decoder_filter_callbacks_(&stream_decoder_callbacks),
       upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info),
-      route_(std::make_shared<RouteImpl>(thread_local_cluster, context)) {
+      route_(std::make_shared<Http::NullRouteImpl>(
+          thread_local_cluster.info()->name(), config.serverFactoryContext().singletonManager())) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
@@ -299,8 +308,10 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
     return nullptr;
   }
 
-  return factory->createGenericConnPool(cluster, false /*should_tcp_proxy*/, route_->route_entry_,
-                                        protocol, context);
+  return factory->createGenericConnPool(
+      cluster,
+      Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP /*should_tcp_proxy*/ /*,*/,
+      route_->route_entry_.priority(), protocol, context);
 }
 
 HttpConnPool::~HttpConnPool() {
@@ -309,35 +320,33 @@ HttpConnPool::~HttpConnPool() {
     // before going idle, they are closed with Default rather than CloseExcess.
     upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
   }
-  if (upstream_ != nullptr) {
-    upstream_->cleanUp();
-  }
 }
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
-    upstream_ =
+    combined_upstream_ =
         std::make_unique<CombinedUpstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
                                            *(route_), config_, downstream_info_);
     RouterUpstreamRequestPtr upstream_request = std::make_unique<RouterUpstreamRequest>(
-        *upstream_, std::move(generic_conn_pool_), /*can_send_early_data_=*/false,
+        *combined_upstream_, std::move(generic_conn_pool_), /*can_send_early_data_=*/false,
         /*can_use_http3_=*/true, true /*enable_tcp_tunneling*/);
-    upstream_->setRouterUpstreamRequest(std::move(upstream_request));
-    upstream_->newStream(callbacks);
+    combined_upstream_->setRouterUpstreamRequest(std::move(upstream_request));
+    combined_upstream_->newStream(callbacks);
     return;
   }
-  if (type_ == Http::CodecType::HTTP1) {
-    upstream_ =
-        std::make_unique<Http1Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-                                        *(route_), config_, downstream_info_);
-  } else {
-    upstream_ =
-        std::make_unique<Http2Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-                                        *(route_), config_, downstream_info_);
-  }
+  // if (type_ == Http::CodecType::HTTP1) {
+  //   upstream_ =
+  //       std::make_unique<Http1Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
+  //                                       *(route_), config_, downstream_info_);
+  // } else {
+  //   upstream_ =
+  //       std::make_unique<Http2Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
+  //                                       *(route_), config_, downstream_info_);
+  // }
 
+  upstream_ = std::make_unique<HttpUpstream>(upstream_callbacks_, config_, downstream_info_, type_);
   Tcp::ConnectionPool::Cancellable* handle =
       conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this,
                                         {/*can_send_early_data_=*/false,
@@ -354,19 +363,38 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   callbacks_->onGenericPoolFailure(reason, failure_reason, host);
 }
 
-void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
-  upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
+void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
+                                          bool pool_success) {
+  if (!pool_success) {
+    return;
+  }
+  combined_upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
       *this, host, downstream_info_.downstreamAddressProvider().sslConnection()));
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
+  if (info.downstreamAddressProvider().connectionID() &&
+      downstream_info_.downstreamAddressProvider().connectionID()) {
+    // info.downstreamAddressProvider() is being called to get the upstream connection ID,
+    // because the StreamInfo object here is of the upstream connection.
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              info.downstreamAddressProvider().connectionID().value(),
+              downstream_info_.downstreamAddressProvider().connectionID().value());
+  }
+
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
   upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
       *this, host, info.downstreamAddressProvider().sslConnection()));
+  // } else if (combined_upstream_ != nullptr) {
+  //   combined_upstream_->setRequestEncoder(
+  //       request_encoder, host->transportSocketFactory().implementsSecureTransport());
+  //   combined_upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
+  //       *this, host, info.downstreamAddressProvider().sslConnection()));
+  // }
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
@@ -380,10 +408,12 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                                    Router::Route& route, const TunnelingConfigHelper& config,
                                    StreamInfo::StreamInfo& downstream_info)
-    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
-CombinedUpstream::~CombinedUpstream() = default;
+    : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
+      decoder_filter_callbacks_(decoder_callbacks), route_(&route), response_decoder_(*this),
+      upstream_callbacks_(callbacks) {}
 
-void CombinedUpstream::setRouterUpstreamRequest(UpstreamRequestPtr router_upstream_request) {
+void CombinedUpstream::setRouterUpstreamRequest(
+    Router::UpstreamRequestPtr router_upstream_request) {
   LinkedList::moveIntoList(std::move(router_upstream_request), upstream_requests_);
 }
 
@@ -401,12 +431,8 @@ void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
     downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
 
-  config_.headerEvaluator().evaluateHeaders(*downstream_headers_,
-                                            downstream_info_.getRequestHeaders() == nullptr
-                                                ? *Http::StaticEmptyHeaders::get().request_headers
-                                                : *downstream_info_.getRequestHeaders(),
-                                            *Http::StaticEmptyHeaders::get().response_headers,
-                                            downstream_info_);
+  config_.headerEvaluator().evaluateHeaders(
+      *downstream_headers_, {downstream_info_.getRequestHeaders()}, downstream_info_);
   upstream_requests_.front()->acceptHeadersFromRouter(false);
 }
 
@@ -462,108 +488,110 @@ bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   }
 }
 
-void CombinedUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
+void CombinedUpstream::onResetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     if (!upstream_requests_.empty()) {
       upstream_requests_.front()->resetStream();
     }
   }
-  onResetEncoder(event, inform_downstream);
-}
 
-Http2Upstream::Http2Upstream(HttpConnPool& http_conn_pool,
-                             Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                             Router::Route& route, const TunnelingConfigHelper& config,
-                             StreamInfo::StreamInfo& downstream_info)
-    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
-
-Http2Upstream::~Http2Upstream() = default;
-bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
-  if (Http::Utility::getResponseStatus(headers) != 200) {
-    return false;
-  }
-
-  return true;
-}
-
-void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
-  request_encoder_ = &request_encoder;
-  request_encoder_->getStream().addCallbacks(*this);
-
-  const std::string& scheme =
-      is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.host(downstream_info_)},
-  });
-
-  if (config_.usePost()) {
-    headers->addReference(Http::Headers::get().Path, config_.postPath());
-    headers->addReference(Http::Headers::get().Scheme, scheme);
-  }
-
-  config_.headerEvaluator().evaluateHeaders(*headers,
-                                            downstream_info_.getRequestHeaders() == nullptr
-                                                ? *Http::StaticEmptyHeaders::get().request_headers
-                                                : *downstream_info_.getRequestHeaders(),
-                                            *Http::StaticEmptyHeaders::get().response_headers,
-                                            downstream_info_);
-  const auto status = request_encoder_->encodeHeaders(*headers, false);
-  // Encoding can only fail on missing required request headers.
-  ASSERT(status.ok());
-}
-
-Http1Upstream::Http1Upstream(HttpConnPool& http_conn_pool,
-                             Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                             Router::Route& route, const TunnelingConfigHelper& config,
-                             StreamInfo::StreamInfo& downstream_info)
-    : HttpUpstream(http_conn_pool, decoder_callbacks, route, callbacks, config, downstream_info) {}
-
-Http1Upstream::~Http1Upstream() = default;
-void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
-  request_encoder_ = &request_encoder;
-  request_encoder_->getStream().addCallbacks(*this);
-  request_encoder_->enableTcpTunneling();
-  ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
-
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-      {Http::Headers::get().Host, config_.host(downstream_info_)},
-  });
-
-  if (config_.usePost()) {
-    // Path is required for POST requests.
-    headers->addReference(Http::Headers::get().Path, config_.postPath());
-  }
-
-  config_.headerEvaluator().evaluateHeaders(*headers,
-                                            downstream_info_.getRequestHeaders() == nullptr
-                                                ? *Http::StaticEmptyHeaders::get().request_headers
-                                                : *downstream_info_.getRequestHeaders(),
-                                            *Http::StaticEmptyHeaders::get().response_headers,
-                                            downstream_info_);
-  const auto status = request_encoder_->encodeHeaders(*headers, false);
-  // Encoding can only fail on missing required request headers.
-  ASSERT(status.ok());
-}
-
-bool Http1Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
-  // According to RFC7231 any 2xx response indicates that the connection is
-  // established.
-  // Any 'Content-Length' or 'Transfer-Encoding' header fields MUST be ignored.
-  // https://tools.ietf.org/html/rfc7231#section-4.3.6
-  return Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers));
-}
-
-void Http1Upstream::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (!request_encoder_) {
+  // If we did not receive a valid CONNECT response yet we treat this as a pool
+  // failure, otherwise we forward the event downstream.
+  if (conn_pool_callbacks_ != nullptr) {
+    conn_pool_callbacks_->onFailure();
     return;
   }
-  request_encoder_->encodeData(data, end_stream);
+
+  if (inform_downstream) {
+    upstream_callbacks_.onEvent(event);
+  }
 }
+
+// Router::RouterFilterInterface
+void CombinedUpstream::onUpstreamHeaders([[maybe_unused]] uint64_t response_code,
+                                         Http::ResponseHeaderMapPtr&& headers,
+                                         [[maybe_unused]] UpstreamRequest& upstream_request,
+                                         bool end_stream) {
+  responseDecoder().decodeHeaders(std::move(headers), end_stream);
+}
+
+void CombinedUpstream::onUpstreamData(Buffer::Instance& data,
+                                      [[maybe_unused]] UpstreamRequest& upstream_request,
+                                      bool end_stream) {
+  responseDecoder().decodeData(data, end_stream);
+}
+
+void CombinedUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                                          UpstreamRequest&) {
+  responseDecoder().decodeTrailers(std::move(trailers));
+}
+
+Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() { return downstream_headers_.get(); }
+
+void CombinedUpstream::doneReading() {
+  read_half_closed_ = true;
+  if (write_half_closed_) {
+    onResetEncoder(Network::ConnectionEvent::LocalClose);
+  }
+}
+
+void CombinedUpstream::onUpstreamReset(Http::StreamResetReason, absl::string_view,
+                                       UpstreamRequest&) {
+  upstream_callbacks_.onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+void CombinedUpstream::doneWriting() {
+  write_half_closed_ = true;
+  if (read_half_closed_) {
+    onResetEncoder(Network::ConnectionEvent::LocalClose);
+  }
+}
+
+void CombinedUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
+  read_half_closed_ = true;
+  write_half_closed_ = true;
+  onResetEncoder(Network::ConnectionEvent::LocalClose);
+}
+
+void CombinedUpstream::onAboveWriteBufferHighWatermark() {
+  upstream_callbacks_.onAboveWriteBufferHighWatermark();
+}
+
+void CombinedUpstream::onBelowWriteBufferLowWatermark() {
+  upstream_callbacks_.onBelowWriteBufferLowWatermark();
+}
+
+// void CombinedUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
+//   request_encoder_ = &request_encoder;
+//   request_encoder_->getStream().addCallbacks(*this);
+//   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+//       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
+//       {Http::Headers::get().Host, config_.host(downstream_info_)},
+//   });
+//   if (config_.usePost()) {
+//     headers->addReference(Http::Headers::get().Path, config_.postPath());
+//   }
+
+//   if (type_ == Http::CodecType::HTTP1) {
+//     request_encoder_->enableTcpTunneling();
+//     ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
+//   } else {
+//     const std::string& scheme =
+//         is_ssl ? Http::Headers::get().SchemeValues.Https :
+//         Http::Headers::get().SchemeValues.Http;
+
+//     if (config_.usePost()) {
+//       headers->addReference(Http::Headers::get().Scheme, scheme);
+//     }
+//   }
+
+//   config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
+//                                             downstream_info_);
+//   const auto status = request_encoder_->encodeHeaders(*headers, false);
+//   // Encoding can only fail on missing required request headers.
+//   ASSERT(status.ok());
+// }
 
 } // namespace TcpProxy
 } // namespace Envoy

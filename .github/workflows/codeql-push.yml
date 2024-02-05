@@ -1,56 +1,79 @@
-name: CodeQL
+name: CodeQL/push
+
+permissions:
+  contents: read
 
 on:
   push:
     paths:
-    - 'source/common/**'
+    - include/**
+    - source/common/**
     branches-ignore:
-    - 'dependabot/**'
+    - dependabot/**
   pull_request:
 
 concurrency:
   group: ${{ github.head_ref-github.workflow || github.run_id }}
   cancel-in-progress: true
 
+env:
+  SEARCH_FOLDER: //source/common/...
+
+
 jobs:
   CodeQL-Build:
-
     permissions:
-      security-events: write  # for github/codeql-action/analyze to upload SARIF results
-    strategy:
-      fail-fast: false
-
-    # CodeQL runs on ubuntu-20.04
+      actions: read
+      contents: read
+      # for github/codeql-action/analyze to upload SARIF results
+      security-events: write
+      pull-requests: read
     runs-on: ubuntu-20.04
     if: github.repository == 'envoyproxy/envoy'
-
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
       with:
-        # We must fetch at least the immediate parents so that if this is
-        # a pull request then we can checkout the head.
         fetch-depth: 2
 
     - name: Get build targets
       run: |
-       . .github/workflows/get_build_targets.sh
-       echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
-       echo $BUILD_TARGETS_LOCAL >> $GITHUB_ENV
-       echo 'EOF' >> $GITHUB_ENV
-    # If this run was triggered by a pull request event, then checkout
-    # the head of the pull request instead of the merge commit.
-    - run: git checkout HEAD^2
-      if: ${{ github.event_name == 'pull_request' }}
+        # TODO(phlax): Shift this to an action
+        compare_head () {
+            while IFS= read -r line; do
+                if [[ -n "$line" ]]; then
+                    bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
+                fi
+            done < <(git diff --name-only HEAD "${1}" -- source/* include/*)
+        }
+        if [[ "$GIT_EVENT" == "pull_request" ]]; then
+            git fetch "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2> /dev/null
+            TO_OTHER=FETCH_HEAD
+        else
+            TO_OTHER=HEAD^1
+        fi
+        BUILD_TARGETS="$(compare_head "$TO_OTHER" | grep -v '\.cc\|\.h' | sort -u | head -n 3)"
+        echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
+        echo "$BUILD_TARGETS" >> $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      env:
+        GIT_EVENT: ${{ github.event_name }}
 
-    # Initializes the CodeQL tools for scanning.
+    - name: Free disk space
+      if: ${{ env.BUILD_TARGETS != '' }}
+      uses: envoyproxy/toolshed/gh-actions/diskspace@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+      with:
+        to_remove: |
+          /usr/local/lib/android
+
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@0225834cc549ee0ca93cb085b92954821a145866
-      # Override language selection by uncommenting this and choosing your languages
+      if: ${{ env.BUILD_TARGETS != '' }}
+      uses: github/codeql-action/init@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4
       with:
         languages: cpp
 
     - name: Install deps
+      if: ${{ env.BUILD_TARGETS != '' }}
       shell: bash
       run: |
        sudo apt-get update --error-on=any
@@ -66,16 +89,25 @@ jobs:
        export PATH=bin/clang14/bin:$PATH
 
     - name: Build
+      if: ${{ env.BUILD_TARGETS != '' }}
       run: |
        bazel/setup_clang.sh bin/clang14
-       bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
+       bazel shutdown
+       bazel build \
+           -c fastbuild \
+           --spawn_strategy=local \
+           --discard_analysis_cache \
+           --nouse_action_cache \
+           --config clang \
+           --config libc++ \
+           $BUILD_TARGETS
        echo -e "Built targets...\n$BUILD_TARGETS"
 
     - name: Clean Artifacts
+      if: ${{ env.BUILD_TARGETS != '' }}
       run: |
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      if: env.BUILD_TARGETS != ''
-      uses: github/codeql-action/analyze@0225834cc549ee0ca93cb085b92954821a145866
+      if: ${{ env.BUILD_TARGETS != '' }}
+      uses: github/codeql-action/analyze@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4

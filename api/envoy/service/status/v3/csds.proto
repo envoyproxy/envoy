@@ -85,6 +85,11 @@ message ClientStatusRequest {
 
   // The node making the csds request.
   config.core.v3.Node node = 2;
+
+  // If true, the server will not include the resource contents in the response
+  // (i.e., the generic_xds_configs.xds_config field will not be populated).
+  // [#not-implemented-hide:]
+  bool exclude_resource_contents = 3;
 }
 
 // Detailed config (per xDS) with status.
@@ -180,6 +185,11 @@ message ClientConfig {
   // Represents generic xDS config and the exact config structure depends on
   // the type URL (like Cluster if it is CDS)
   repeated GenericXdsConfig generic_xds_configs = 3;
+
+  // For xDS clients, the scope in which the data is used.
+  // For example, gRPC indicates the data plane target or that the data is
+  // associated with gRPC server(s).
+  string client_scope = 4;
 }
 
 message ClientStatusResponse {

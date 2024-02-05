@@ -198,7 +198,7 @@ TEST_P(GuardDogDeathTest, MultiKillDeathTest) {
     time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
     guard_dog_->forceCheckForTest();
   };
-  EXPECT_DEATH(die_function(), "");
+  EXPECT_DEATH(die_function(), "Watchdog MULTIKILL as 2 threads are stuck");
 }
 
 TEST_P(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {

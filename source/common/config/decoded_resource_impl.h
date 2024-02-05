@@ -58,7 +58,7 @@ public:
             resource.has_ttl() ? absl::make_optional(std::chrono::milliseconds(
                                      DurationUtil::durationToMilliseconds(resource.ttl())))
                                : absl::nullopt,
-            resource.has_metadata() ? makeOptRef(resource.metadata()) : absl::nullopt) {}
+            resource.has_metadata() ? absl::make_optional(resource.metadata()) : absl::nullopt) {}
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const xds::core::v3::CollectionEntry::InlineEntry& inline_entry)
       : DecodedResourceImpl(resource_decoder, inline_entry.name(),
@@ -77,7 +77,7 @@ public:
   bool hasResource() const override { return has_resource_; }
   absl::optional<std::chrono::milliseconds> ttl() const override { return ttl_; }
   const OptRef<const envoy::config::core::v3::Metadata> metadata() const override {
-    return metadata_;
+    return metadata_.has_value() ? makeOptRef(metadata_.value()) : absl::nullopt;
   }
 
 private:
@@ -85,7 +85,7 @@ private:
                       const Protobuf::RepeatedPtrField<std::string>& aliases,
                       const ProtobufWkt::Any& resource, bool has_resource,
                       const std::string& version, absl::optional<std::chrono::milliseconds> ttl,
-                      const OptRef<const envoy::config::core::v3::Metadata> metadata)
+                      const absl::optional<envoy::config::core::v3::Metadata>& metadata)
       : resource_(resource_decoder.decodeResource(resource)), has_resource_(has_resource),
         name_(name ? *name : resource_decoder.resourceName(*resource_)),
         aliases_(repeatedPtrFieldToVector(aliases)), version_(version), ttl_(ttl),
@@ -101,7 +101,7 @@ private:
 
   // This is the metadata info under the Resource wrapper.
   // It is intended to be consumed in the xds_config_tracker extension.
-  const OptRef<const envoy::config::core::v3::Metadata> metadata_;
+  const absl::optional<envoy::config::core::v3::Metadata> metadata_;
 };
 
 struct DecodedResourcesWrapper {

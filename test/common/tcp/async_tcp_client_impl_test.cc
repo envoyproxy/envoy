@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 
@@ -19,31 +20,43 @@ namespace Tcp {
 
 class AsyncTcpClientImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AsyncTcpClientImplTest() {
+  AsyncTcpClientImplTest() = default;
+
+  void setUpClient() {
     cluster_manager_.initializeClusters({"fake_cluster"}, {});
     cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     client_ = std::make_unique<AsyncTcpClientImpl>(
         dispatcher_, cluster_manager_.thread_local_cluster_, nullptr, false);
     client_->setAsyncTcpClientCallbacks(callbacks_);
   }
 
-  void expectCreateConnection() {
+  void expectCreateConnection(bool trigger_connected = true) {
     connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
+    connection_->streamInfo().setAttemptCount(1);
     conn_info.connection_ = connection_;
+
     conn_info.host_description_ = Upstream::makeTestHost(
         std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80", simTime());
 
     EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, addReadFilter(_));
-    EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::Connected));
+    if (trigger_connected) {
+      EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::Connected));
+    }
+
     ASSERT_TRUE(client_->connect());
-    connection_->raiseEvent(Network::ConnectionEvent::Connected);
-    ASSERT_TRUE(client_->connected());
+
+    if (trigger_connected) {
+      connection_->raiseEvent(Network::ConnectionEvent::Connected);
+      ASSERT_TRUE(client_->connected());
+    }
   }
 
   std::unique_ptr<AsyncTcpClientImpl> client_;
+  NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Network::MockClientConnection* connection_{};
@@ -52,6 +65,7 @@ public:
 };
 
 TEST_F(AsyncTcpClientImplTest, BasicWrite) {
+  setUpClient();
   expectCreateConnection();
 
   EXPECT_CALL(*connection_, write(BufferStringEqual("test data"), _));
@@ -64,7 +78,23 @@ TEST_F(AsyncTcpClientImplTest, BasicWrite) {
   ASSERT_FALSE(client_->connected());
 }
 
+TEST_F(AsyncTcpClientImplTest, RstClose) {
+  setUpClient();
+  expectCreateConnection();
+
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
+      }));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
+  }));
+  client_->close(Network::ConnectionCloseType::AbortReset);
+  ASSERT_FALSE(client_->connected());
+}
+
 TEST_F(AsyncTcpClientImplTest, WaterMark) {
+  setUpClient();
   expectCreateConnection();
 
   EXPECT_CALL(callbacks_, onAboveWriteBufferHighWatermark());
@@ -79,6 +109,7 @@ TEST_F(AsyncTcpClientImplTest, WaterMark) {
 }
 
 TEST_F(AsyncTcpClientImplTest, NoAvaiableConnection) {
+  setUpClient();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = nullptr;
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
@@ -86,6 +117,7 @@ TEST_F(AsyncTcpClientImplTest, NoAvaiableConnection) {
 }
 
 TEST_F(AsyncTcpClientImplTest, TestReadDisable) {
+  setUpClient();
   expectCreateConnection();
   EXPECT_CALL(*connection_, readDisable(true));
   client_->readDisable(true);
@@ -100,12 +132,109 @@ TEST_F(AsyncTcpClientImplTest, TestReadDisable) {
 }
 
 TEST_F(AsyncTcpClientImplTest, TestCloseType) {
+  setUpClient();
   expectCreateConnection();
-  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+      }));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+  }));
   client_->close(Network::ConnectionCloseType::Abort);
   ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestGetDispatcher) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(&dispatcher_, &client_->dispatcher());
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestGetStreamInfo) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_TRUE(client_->getStreamInfo().has_value());
+  EXPECT_EQ(1, client_->getStreamInfo()->attemptCount());
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestGetStreamInfoNullOpt) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_TRUE(client_->getStreamInfo().has_value());
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_FALSE(client_->connected());
+  ASSERT_FALSE(client_->getStreamInfo().has_value());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestTimingStats) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(
+      cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
+      deliverHistogramToSinks(testing::Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestCounterStats) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  Buffer::OwnedImpl buff("test data");
+  client_->write(buff, false);
+  EXPECT_EQ(buff.length(), cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                               ->upstream_cx_tx_bytes_total_.value());
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_total_.value());
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_destroy_.value());
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_destroy_local_.value());
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestFailStats) {
+  setUpClient();
+  expectCreateConnection(false);
+  connect_timer_->invokeCallback();
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_connect_fail_.value());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestCxDestroyRemoteClose) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_destroy_.value());
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_destroy_remote_.value());
+  ASSERT_FALSE(client_->connected());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestActiveCx) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_active_.value());
+  client_.reset();
+  EXPECT_EQ(0UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_active_.value());
 }
 
 } // namespace Tcp

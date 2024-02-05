@@ -2,6 +2,7 @@ services:
 
   envoy-stats:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
       service:

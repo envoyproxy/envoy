@@ -16,22 +16,17 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+  weighted_priority_health_ = cluster_load_assignment.policy().weighted_priority_health();
 
   Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
-    // TODO(adisuissa): Implement LEDS support for STATIC clusters.
-    if (locality_lb_endpoint.has_leds_cluster_locality_config()) {
-      throw EnvoyException(
-          fmt::format("LEDS is only supported when EDS is used. Static cluster {} cannot use LEDS.",
-                      cluster.name()));
-    }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),
-          locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
+          {}, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }
 }
@@ -51,17 +46,28 @@ void StaticClusterImpl::startPreInit() {
     }
     priority_state_manager_->updateClusterPrioritySet(
         i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag,
-        overprovisioning_factor_);
+        weighted_priority_health_, overprovisioning_factor_);
   }
   priority_state_manager_.reset();
 
   onPreInitComplete();
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 StaticClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                         ClusterFactoryContext& context) {
-  return std::make_pair(std::make_shared<StaticClusterImpl>(cluster, context), nullptr);
+  const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
+      cluster.load_assignment();
+  for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    // TODO(adisuissa): Implement LEDS support for STATIC clusters.
+    if (locality_lb_endpoint.has_leds_cluster_locality_config()) {
+      return absl::InvalidArgumentError(
+          fmt::format("LEDS is only supported when EDS is used. Static cluster {} cannot use LEDS.",
+                      cluster.name()));
+    }
+  }
+  return std::make_pair(std::shared_ptr<StaticClusterImpl>(new StaticClusterImpl(cluster, context)),
+                        nullptr);
 }
 
 /**

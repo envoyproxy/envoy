@@ -93,54 +93,25 @@ private:
 struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
          Server::Configuration::FactoryContext& context)
-      : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
+      : context_(context.serverFactoryContext().grpcContext()),
+        emit_filter_state_(proto_config.emit_filter_state()),
         enable_upstream_stats_(proto_config.enable_upstream_stats()),
-        replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()) {
+        replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()),
+        stats_for_all_methods_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, stats_for_all_methods, false)) {
 
-    switch (proto_config.per_method_stat_specifier_case()) {
-    case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
-        PER_METHOD_STAT_SPECIFIER_NOT_SET:
-    case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::kStatsForAllMethods:
-      if (proto_config.has_stats_for_all_methods()) {
-        stats_for_all_methods_ = proto_config.stats_for_all_methods().value();
-      } else {
-        // Default for when "grpc_stats_filter_enable_stats_for_all_methods_by_default" isn't
-        // set.
-        //
-        // This will flip to false after one release.
-        const bool runtime_feature_default = false;
-
-        const char* runtime_key = "envoy.deprecated_features.grpc_stats_filter_enable_"
-                                  "stats_for_all_methods_by_default";
-
-        stats_for_all_methods_ = context.runtime().snapshot().deprecatedFeatureEnabled(
-            runtime_key, runtime_feature_default);
-
-        if (stats_for_all_methods_) {
-          ENVOY_LOG_MISC(warn,
-                         "Using deprecated default value for "
-                         "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
-                         "methods'. The default for this field will become false in a future "
-                         "release. To retain this behavior, set this field to true in your "
-                         "configuration. A short-term workaround of setting runtime configuration "
-                         "{} to true can be used if the configuration cannot be changed.",
-                         runtime_key);
-        }
-      }
-      break;
-
-    case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
-        kIndividualMethodStatsAllowlist:
+    if (proto_config.per_method_stat_specifier_case() ==
+        envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
+            kIndividualMethodStatsAllowlist) {
       allowlist_.emplace(context.scope().symbolTable(),
                          proto_config.individual_method_stats_allowlist());
-      break;
     }
   }
   Grpc::Context& context_;
   const bool emit_filter_state_;
   const bool enable_upstream_stats_;
   const bool replace_dots_in_grpc_service_name_;
-  bool stats_for_all_methods_{false};
+  const bool stats_for_all_methods_;
   absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
 };
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

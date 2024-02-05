@@ -75,12 +75,24 @@ public:
 
   void updateListenerConfig(Network::ListenerConfig& new_listener_config);
 
+  // Similar to quic::QuicDispatcher's ProcessPacket, but returns a bool.
+  // @return false if the packet failed to dispatch, true if it succeeded.
+  bool processPacket(const quic::QuicSocketAddress& self_address,
+                     const quic::QuicSocketAddress& peer_address,
+                     const quic::QuicReceivedPacket& packet);
+
 protected:
   // quic::QuicDispatcher
   std::unique_ptr<quic::QuicSession> CreateQuicSession(
       quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
-      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
+      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo,
+      quic::ConnectionIdGeneratorInterface& connection_id_generator) override;
+
+  // quic::QuicDispatcher
+  // Sets current_packet_dispatch_success_ to false for processPacket's return value,
+  // then calls the parent class implementation.
+  bool OnFailedToDispatchPacket(const quic::ReceivedPacketInfo& received_packet_info) override;
 
 private:
   Network::ConnectionHandler& connection_handler_;
@@ -94,6 +106,7 @@ private:
   FilterChainToConnectionMap connections_by_filter_chain_;
   QuicDispatcherStats quic_stats_;
   QuicConnectionStats connection_stats_;
+  bool current_packet_dispatch_success_;
 };
 
 } // namespace Quic

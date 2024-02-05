@@ -35,16 +35,14 @@ public:
     StatsTextRender::generate(response, name, value);
   }
 
-  // generate() call directly calls parent method, which is needed to allow gcc
-  // to compile, otherwise it warns about hidden overrides.
-  void generate(Buffer::Instance& response, const std::string& name,
-                const Stats::ParentHistogram& histogram) override {
-    StatsTextRender::generate(response, name, histogram);
-  }
+  void generate(Buffer::Instance&, const std::string& name,
+                const Stats::ParentHistogram& histogram) override;
   void finalize(Buffer::Instance&) override;
 
 private:
   const bool active_{false};
+  bool json_histograms_{false};
+  bool first_histogram_{true};
 };
 
 } // namespace Server

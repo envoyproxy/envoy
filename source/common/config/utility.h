@@ -85,108 +85,62 @@ public:
   }
 
   /**
-   * Extract refresh_delay as a std::chrono::milliseconds from
-   * envoy::config::core::v3::ApiConfigSource.
-   */
-  static std::chrono::milliseconds
-  apiConfigSourceRefreshDelay(const envoy::config::core::v3::ApiConfigSource& api_config_source);
-
-  /**
-   * Extract request_timeout as a std::chrono::milliseconds from
-   * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
-   * default value of 1s will be returned.
-   */
-  static std::chrono::milliseconds
-  apiConfigSourceRequestTimeout(const envoy::config::core::v3::ApiConfigSource& api_config_source);
-
-  /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
    * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
-   * default value of 0s will be returned.
+   * default value of 15s will be returned.
    */
   static std::chrono::milliseconds
   configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);
 
   /**
-   * Populate an envoy::config::core::v3::ApiConfigSource.
-   * @param cluster supplies the cluster name for the ApiConfigSource.
-   * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
-   * @param api_type supplies the type of subscription to use for the ApiConfigSource.
-   * @param api_config_source a reference to the envoy::config::core::v3::ApiConfigSource object to
-   * populate.
-   */
-  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       const std::string& api_type,
-                                       envoy::config::core::v3::ApiConfigSource& api_config_source);
-
-  /**
-   * Check cluster info for API config sanity. Throws on error.
+   * Check cluster info for API config sanity.
    * @param error_prefix supplies the prefix to use in error messages.
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
    * @param allow_added_via_api indicates whether a cluster is allowed to be added via api
    *                            rather than be a static resource from the bootstrap config.
-   * @return the main thread cluster if it exists.
+   * @return the main thread cluster if it exists, or an error status if problematic.
    */
-  static Upstream::ClusterConstOptRef checkCluster(absl::string_view error_prefix,
-                                                   absl::string_view cluster_name,
-                                                   Upstream::ClusterManager& cm,
-                                                   bool allow_added_via_api = false);
+  static absl::StatusOr<Upstream::ClusterConstOptRef>
+  checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
+               Upstream::ClusterManager& cm, bool allow_added_via_api = false);
 
   /**
-   * Check cluster/local info for API config sanity. Throws on error.
-   * @param error_prefix supplies the prefix to use in error messages.
-   * @param cluster_name supplies the cluster name to check.
-   * @param cm supplies the cluster manager.
-   * @param local_info supplies the local info.
-   * @return the main thread cluster if it exists.
-   */
-  static Upstream::ClusterConstOptRef
-  checkClusterAndLocalInfo(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
-
-  /**
-   * Check local info for API config sanity. Throws on error.
+   * Check local info for API config sanity.
    * @param error_prefix supplies the prefix to use in error messages.
    * @param local_info supplies the local info.
+   * @return a status indicating if the config is sane.
    */
-  static void checkLocalInfo(absl::string_view error_prefix,
-                             const LocalInfo::LocalInfo& local_info);
+  static absl::Status checkLocalInfo(absl::string_view error_prefix,
+                                     const LocalInfo::LocalInfo& local_info);
 
   /**
-   * Check the existence of a path for a filesystem subscription. Throws on error.
+   * Check the existence of a path for a filesystem subscription.
    * @param path the path to validate.
    * @param api reference to the Api object
+   * @return a status indicating if the path exists.
    */
-  static void checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api);
-
-  /**
-   * Check the grpc_services and cluster_names for API config sanity. Throws on error.
-   * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config has the wrong number of gRPC
-   * services or cluster names, depending on expectations set by its API type.
-   */
-  static void
-  checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source);
+  static absl::Status checkFilesystemSubscriptionBackingPath(const std::string& path,
+                                                             Api::Api& api);
 
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param primary_clusters the API config source eligible clusters.
    * @param cluster_name the cluster name to validate.
    * @param config_source the config source typed name.
-   * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
+   * @returns failure when an API config doesn't have a statically defined non-EDS cluster.
    */
-  static void validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
-                                  const std::string& cluster_name,
-                                  const std::string& config_source);
+  static absl::Status
+  validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
+                      const std::string& cluster_name, const std::string& config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
    * @param primary_clusters the API config source eligible clusters.
    * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
+   * @return a status indicating if config is valid.
    */
-  static void checkApiConfigSourceSubscriptionBackingCluster(
+  static absl::Status checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterSet& primary_clusters,
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
@@ -202,9 +156,9 @@ public:
   /**
    * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
-   * @throws DeprecatedMajorVersionException when the transport version is disabled.
+   * @returns a failure status when the transport version is disabled.
    */
-  template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
+  template <class Proto> static absl::Status checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
@@ -215,8 +169,9 @@ public:
           "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      throw DeprecatedMajorVersionException(warning);
+      return absl::InvalidArgumentError(warning);
     }
+    return absl::OkStatus();
   }
 
   /**
@@ -350,9 +305,9 @@ public:
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
     static const std::string& typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+        xds::type::v3::TypedStruct::default_instance().GetTypeName();
     static const std::string& legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+        udpa::type::v1::TypedStruct::default_instance().GetTypeName();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
@@ -401,7 +356,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
     return config;
@@ -425,7 +380,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+    RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
     translateOpaqueConfig(typed_config, validation_visitor, *config);
     return config;
@@ -448,26 +403,13 @@ public:
                     const Stats::TagVector& cli_tags);
 
   /**
-   * Create StatsMatcher instance.
-   */
-  static Stats::StatsMatcherPtr
-  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                     Stats::SymbolTable& symbol_table);
-
-  /**
-   * Create HistogramSettings instance.
-   */
-  static Stats::HistogramSettingsConstPtr
-  createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
-
-  /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
    * @param skip_cluster_check whether to skip cluster validation.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
-  static Grpc::AsyncClientFactoryPtr
+  static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope, bool skip_cluster_check);
@@ -543,7 +485,8 @@ public:
    * found in the config or 2. default base interval and default maximum interval is specified or 3.
    * max interval is set to 10*default base interval
    */
-  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+  static absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
+  prepareJitteredExponentialBackOffStrategy(
       const envoy::config::core::v3::ApiConfigSource& api_config_source,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
       absl::optional<const uint32_t> default_max_interval_ms) {
@@ -568,7 +511,8 @@ public:
    * default max interval is set to 10*default base interval
    */
   template <typename T>
-  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+  static absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
+  prepareJitteredExponentialBackOffStrategy(
       const T& config, Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
       absl::optional<const uint32_t> default_max_interval_ms) {
     // If RetryPolicy containing backoff values is found in config
@@ -593,7 +537,8 @@ private:
    * specified or 2. default base interval and default maximum interval is specified or 3.
    * max interval is set to 10*default base interval
    */
-  static JitteredExponentialBackOffStrategyPtr buildJitteredExponentialBackOffStrategy(
+  static absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
+  buildJitteredExponentialBackOffStrategy(
       absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
       absl::optional<const uint32_t> default_max_interval_ms);

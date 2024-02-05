@@ -6,9 +6,20 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/context.h"
 
+// CEL-CPP does not enforce unused parameter checks consistently, so we relax it here.
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -26,11 +37,13 @@ using ExpressionPtr = std::unique_ptr<Expression>;
 // Base class for the context used by the CEL evaluator to look up attributes.
 class StreamActivation : public google::api::expr::runtime::BaseActivation {
 public:
-  StreamActivation(const StreamInfo::StreamInfo& info,
+  StreamActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
+                   const StreamInfo::StreamInfo& info,
                    const ::Envoy::Http::RequestHeaderMap* request_headers,
                    const ::Envoy::Http::ResponseHeaderMap* response_headers,
                    const ::Envoy::Http::ResponseTrailerMap* response_trailers)
-      : activation_info_(&info), activation_request_headers_(request_headers),
+      : local_info_(local_info), activation_info_(&info),
+        activation_request_headers_(request_headers),
         activation_response_headers_(response_headers),
         activation_response_trailers_(response_trailers) {}
 
@@ -44,6 +57,7 @@ public:
 
 protected:
   void resetActivation() const;
+  mutable const ::Envoy::LocalInfo::LocalInfo* local_info_{nullptr};
   mutable const StreamInfo::StreamInfo* activation_info_{nullptr};
   mutable const ::Envoy::Http::RequestHeaderMap* activation_request_headers_{nullptr};
   mutable const ::Envoy::Http::ResponseHeaderMap* activation_response_headers_{nullptr};
@@ -52,15 +66,31 @@ protected:
 
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.
-ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
+ActivationPtr createActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
+                               const StreamInfo::StreamInfo& info,
                                const ::Envoy::Http::RequestHeaderMap* request_headers,
                                const ::Envoy::Http::ResponseHeaderMap* response_headers,
                                const ::Envoy::Http::ResponseTrailerMap* response_trailers);
+
+// Shared expression builder instance.
+class BuilderInstance : public Singleton::Instance {
+public:
+  explicit BuilderInstance(BuilderPtr builder) : builder_(std::move(builder)) {}
+  Builder& builder() { return *builder_; }
+
+private:
+  BuilderPtr builder_;
+};
+
+using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
 
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
 BuilderPtr createBuilder(Protobuf::Arena* arena);
+
+// Gets the singleton expression builder. Must be called on the main thread.
+BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context);
 
 // Creates an interpretable expression from a protobuf representation.
 // Throws an exception if fails to construct a runtime expression.
@@ -69,6 +99,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 // Evaluates an expression for a request. The arena is used to hold intermediate computational
 // results and potentially the final value.
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
+                                  const ::Envoy::LocalInfo::LocalInfo* local_info,
                                   const StreamInfo::StreamInfo& info,
                                   const ::Envoy::Http::RequestHeaderMap* request_headers,
                                   const ::Envoy::Http::ResponseHeaderMap* response_headers,

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/config/typed_config.h"
 #include "envoy/server/health_checker_config.h"
 

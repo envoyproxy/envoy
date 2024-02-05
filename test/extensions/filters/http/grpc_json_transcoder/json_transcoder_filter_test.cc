@@ -25,10 +25,10 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
+using absl::StatusCode;
 using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::util::MessageDifferencer;
-using Envoy::ProtobufUtil::StatusCode;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
@@ -69,8 +69,10 @@ protected:
 
   std::string makeProtoDescriptor(std::function<void(FileDescriptorSet&)> process) {
     FileDescriptorSet descriptor_set;
-    descriptor_set.ParseFromString(api_->fileSystem().fileReadToEnd(
-        TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+    descriptor_set.ParseFromString(
+        api_->fileSystem()
+            .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
+            .value());
 
     process(descriptor_set);
 
@@ -131,8 +133,10 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseConfigSkipRecalculating) {
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
-  proto_config.set_proto_descriptor_bin(api_->fileSystem().fileReadToEnd(
-      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  proto_config.set_proto_descriptor_bin(
+      api_->fileSystem()
+          .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
+          .value());
   proto_config.add_services("bookstore.Bookstore");
   EXPECT_NO_THROW(JsonTranscoderConfig config(proto_config, *api_));
 }
@@ -1453,17 +1457,6 @@ TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingOKWithNotDeepProtoMess
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-}
-
-TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingFailedWithTooDeepProtoMessage) {
-  // If more than 64 deep, grpc response transcoder will fail.
-  auto response_message = createDeepStruct(65);
-  auto response_data = Grpc::Common::serializeToGrpcFrame(response_message);
-
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadGateway, _, _, _, _));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
-            filter_.encodeData(*response_data, false));
 }
 
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {

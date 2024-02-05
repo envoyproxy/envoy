@@ -37,27 +37,27 @@ An example configuration of the filter may look like the following:
 
 By *default* decompression will be *skipped* when:
 
-- A request/response does NOT contain *content-encoding* header.
-- A request/response includes *content-encoding* header, but it does not contain the configured
-  decompressor's content-encoding.
-- A request/response contains a *cache-control* header whose value includes "no-transform",
+- A request/response does **not** contain ``content-encoding`` header.
+- A request/response contains a ``content-encoding`` header, but it does not contain the configured
+  decompressor's ``content-encoding``.
+- A request/response contains a ``cache-control`` header whose value includes ``no-transform``,
   unless :ref:`ignore_no_transform_header <envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig.ignore_no_transform_header>`
-  is set to *true*.
+  is set to ``true``.
 
-When decompression is *applied*:
+Decompression is *applied* when:
 
-- The *content-length* is removed from headers.
+- The ``content-length`` is removed from headers.
 
   .. note::
 
-    If an updated *content-length* header is desired, the buffer filter can be installed as part
+    If an updated ``content-length`` header is desired, the :ref: `buffer filter <_config_http_filters_buffer>` can be installed as part
     of the filter chain to buffer decompressed frames, and ultimately update the header. Due to
     :ref:`filter ordering <arch_overview_http_filters_ordering>` a buffer filter needs to be
     installed after the decompressor for requests and prior to the decompressor for responses.
 
-- The *content-encoding* header is modified to remove the decompression that was applied.
+- The ``content-encoding`` header is modified to remove the decompression that was applied.
 
-- *x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes* trailers are added to
+- ``x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes`` trailers are added to
   the request/response to relay information about decompression.
 
 Using different decompressors for requests and responses
@@ -106,7 +106,7 @@ Statistics
 ----------
 
 Every configured Deompressor filter has statistics rooted at
-<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.<request/response>*
+``<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.<request/response>*``
 with the following:
 
 .. csv-table::
@@ -119,4 +119,4 @@ with the following:
   total_compressed_bytes, Counter, The total compressed bytes of all the request/responses that were marked for decompression.
 
 Additional stats for the decompressor library are rooted at
-<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.decompressor_library.
+``<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.decompressor_library``.

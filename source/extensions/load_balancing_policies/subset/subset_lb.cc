@@ -20,20 +20,42 @@
 namespace Envoy {
 namespace Upstream {
 
+namespace {
+
+/**
+ * Iterates all the selectors and finds the first one that match_criteria contains all the keys
+ * of the selector. Returns nullptr if no selector matches, otherwise returns sub match criteria
+ * that contains only the keys of the selector.
+ */
+Router::MetadataMatchCriteriaConstPtr
+filterCriteriaBySelectors(const std::vector<SubsetSelectorPtr>& subset_selectors,
+                          const Router::MetadataMatchCriteria* match_criteria) {
+  if (match_criteria != nullptr) {
+    for (const auto& selector : subset_selectors) {
+      const auto& selector_keys = selector->selectorKeys();
+      auto sub_match_criteria = match_criteria->filterMatchCriteria(selector_keys);
+      if (sub_match_criteria != nullptr &&
+          sub_match_criteria->metadataMatchCriteria().size() == selector_keys.size()) {
+        return sub_match_criteria;
+      }
+    }
+  }
+  return nullptr;
+}
+
+} // namespace
+
 using HostPredicate = std::function<bool(const Host&)>;
 
-SubsetLoadBalancer::SubsetLoadBalancer(
-    LoadBalancerType lb_type, const PrioritySet& priority_set,
-    const PrioritySet* local_priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const LoadBalancerSubsetInfo& subsets,
+LegacyChildLoadBalancerCreatorImpl::LegacyChildLoadBalancerCreatorImpl(
+    LoadBalancerType lb_type,
     OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config,
     OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config,
     OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
     OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-    TimeSource& time_source)
-    : lb_ring_hash_config_(
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+    : lb_type_(lb_type),
+      lb_ring_hash_config_(
           lb_ring_hash_config.has_value()
               ? std::make_unique<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
                     lb_ring_hash_config.ref())
@@ -53,15 +75,105 @@ SubsetLoadBalancer::SubsetLoadBalancer(
               ? std::make_unique<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
                     least_request_config.ref())
               : nullptr),
-      common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
-      random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      common_config_(common_config) {}
+
+std::pair<Upstream::ThreadAwareLoadBalancerPtr, Upstream::LoadBalancerPtr>
+LegacyChildLoadBalancerCreatorImpl::createLoadBalancer(
+    const Upstream::PrioritySet& child_priority_set,
+    const Upstream::PrioritySet* local_priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+    Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source) {
+  switch (lb_type_) {
+  case Upstream::LoadBalancerType::LeastRequest: {
+    Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::LeastRequestLoadBalancer>(
+        child_priority_set, local_priority_set, stats, runtime, random, common_config_,
+        lbLeastRequestConfig(), time_source);
+    return {nullptr, std::move(lb)};
+  }
+  case Upstream::LoadBalancerType::Random: {
+    Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::RandomLoadBalancer>(
+        child_priority_set, local_priority_set, stats, runtime, random, common_config_);
+    return {nullptr, std::move(lb)};
+  }
+  case Upstream::LoadBalancerType::RoundRobin: {
+    Upstream::LoadBalancerPtr lb = std::make_unique<Upstream::RoundRobinLoadBalancer>(
+        child_priority_set, local_priority_set, stats, runtime, random, common_config_,
+        lbRoundRobinConfig(), time_source);
+    return {nullptr, std::move(lb)};
+  }
+  case Upstream::LoadBalancerType::RingHash: {
+    // TODO(mattklein123): The ring hash LB is thread aware, but currently the subset LB is not.
+    // We should make the subset LB thread aware since the calculations are costly, and then we
+    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
+    Upstream::ThreadAwareLoadBalancerPtr lb = std::make_unique<Upstream::RingHashLoadBalancer>(
+        child_priority_set, stats, scope, runtime, random, lbRingHashConfig(), common_config_);
+    return {std::move(lb), nullptr};
+  }
+  case Upstream::LoadBalancerType::Maglev: {
+    // TODO(mattklein123): The Maglev LB is thread aware, but currently the subset LB is not.
+    // We should make the subset LB thread aware since the calculations are costly, and then we
+    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
+
+    Upstream::ThreadAwareLoadBalancerPtr lb = std::make_unique<Upstream::MaglevLoadBalancer>(
+        child_priority_set, stats, scope, runtime, random, lbMaglevConfig(), common_config_);
+    return {std::move(lb), nullptr};
+  }
+  case Upstream::LoadBalancerType::OriginalDst:
+  case Upstream::LoadBalancerType::ClusterProvided:
+  case Upstream::LoadBalancerType::LoadBalancingPolicyConfig:
+    // These load balancer types can only be created when there is no subset configuration.
+    PANIC("not implemented");
+  }
+  return {nullptr, nullptr};
+}
+
+SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
+    const SubsetLoadbalancingPolicyProto& subset_config,
+    ProtobufMessage::ValidationVisitor& visitor)
+    : subset_info_(subset_config) {
+
+  absl::InlinedVector<absl::string_view, 4> missing_policies;
+
+  for (const auto& policy : subset_config.subset_lb_policy().policies()) {
+    auto* factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
+        policy.typed_extension_config(), /*is_optional=*/true);
+
+    if (factory != nullptr) {
+      // Load and validate the configuration.
+      auto sub_lb_proto_message = factory->createEmptyConfigProto();
+      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
+                                             visitor, *sub_lb_proto_message);
+
+      sub_load_balancer_config_ = factory->loadConfig(*sub_lb_proto_message, visitor);
+      sub_load_balancer_factory_ = factory;
+      break;
+    }
+
+    missing_policies.push_back(policy.typed_extension_config().name());
+  }
+
+  if (sub_load_balancer_factory_ == nullptr) {
+    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
+                                     "implementation for subset lb with names from [{}]",
+                                     absl::StrJoin(missing_policies, ", ")));
+  }
+}
+
+SubsetLoadBalancer::SubsetLoadBalancer(const LoadBalancerSubsetInfo& subsets,
+                                       ChildLoadBalancerCreatorPtr child_lb,
+                                       const PrioritySet& priority_set,
+                                       const PrioritySet* local_priority_set, ClusterLbStats& stats,
+                                       Stats::Scope& scope, Runtime::Loader& runtime,
+                                       Random::RandomGenerator& random, TimeSource& time_source)
+    : stats_(stats), scope_(scope), runtime_(runtime), random_(random), time_source_(time_source),
+      fallback_policy_(subsets.fallbackPolicy()),
       metadata_fallback_policy_(subsets.metadataFallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
-      original_local_priority_set_(local_priority_set), time_source_(time_source),
-      lb_type_(lb_type), locality_weight_aware_(subsets.localityWeightAware()),
-      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
+      original_local_priority_set_(local_priority_set), child_lb_creator_(std::move(child_lb)),
+      locality_weight_aware_(subsets.localityWeightAware()),
+      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
+      allow_redundant_keys_(subsets.allowRedundantKeys()) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -250,20 +362,35 @@ SubsetLoadBalancer::getMetadataFallbackList(LoadBalancerContext* context) const 
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* context) {
   if (context) {
+    LoadBalancerContext* actual_used_context = context;
+    std::unique_ptr<LoadBalancerContextWrapper> actual_used_context_wrapper;
+
+    if (allow_redundant_keys_) {
+      // If redundant keys are allowed then we can filter the metadata match criteria by the
+      // selectors first to reduce the redundant keys.
+      auto actual_used_criteria =
+          filterCriteriaBySelectors(subset_selectors_, context->metadataMatchCriteria());
+      if (actual_used_criteria != nullptr) {
+        actual_used_context_wrapper =
+            std::make_unique<LoadBalancerContextWrapper>(context, std::move(actual_used_criteria));
+        actual_used_context = actual_used_context_wrapper.get();
+      }
+    }
+
     bool host_chosen;
-    HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
+    HostConstSharedPtr host = tryChooseHostFromContext(actual_used_context, host_chosen);
     if (host_chosen) {
       // Subset lookup succeeded, return this result even if it's nullptr.
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
     absl::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
-        tryFindSelectorFallbackParams(context);
+        tryFindSelectorFallbackParams(actual_used_context);
     if (selector_fallback_params &&
         selector_fallback_params->get().fallback_policy_ !=
             envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       // return result according to configured fallback policy
-      return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, context);
+      return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, actual_used_context);
     }
   }
 
@@ -342,8 +469,8 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
 
 // Find a host from the subsets. Sets host_chosen to false and returns nullptr if the context has
 // no metadata match criteria, if there is no matching subset, or if the matching subset contains
-// no hosts (ignoring health). Otherwise, host_chosen is true and the returns HostConstSharedPtr is
-// from the subset's load balancer (technically, it may still be nullptr).
+// no hosts (ignoring health). Otherwise, host_chosen is true and the returns HostConstSharedPtr
+// is from the subset's load balancer (technically, it may still be nullptr).
 HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerContext* context,
                                                                 bool& host_chosen) {
   host_chosen = false;
@@ -364,8 +491,8 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
   return entry->lb_subset_->chooseHost(context);
 }
 
-// Iterates over the given metadata match criteria (which must be lexically sorted by key) and find
-// a matching LbSubsetEntryPtr, if any.
+// Iterates over the given metadata match criteria (which must be lexically sorted by key) and
+// find a matching LbSubsetEntryPtr, if any.
 SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
     const std::vector<Router::MetadataMatchCriterionConstSharedPtr>& match_criteria) {
   const LbSubsetMap* subsets = &subsets_;
@@ -374,8 +501,8 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
   // same order, we can iterate over the criteria and perform a lookup for each key and value,
   // starting with the root LbSubsetMap and using the previous iteration's LbSubsetMap thereafter
   // (tracked in subsets). If ever a criterion's key or value is not found, there is no subset for
-  // this criteria. If we reach the last criterion, we've found the LbSubsetEntry for the criteria,
-  // which may or may not have a subset attached to it.
+  // this criteria. If we reach the last criterion, we've found the LbSubsetEntry for the
+  // criteria, which may or may not have a subset attached to it.
   for (uint32_t i = 0; i < match_criteria.size(); i++) {
     const Router::MetadataMatchCriterion& match_criterion = *match_criteria[i];
     const auto& subset_it = subsets->find(match_criterion.name());
@@ -483,8 +610,8 @@ void SubsetLoadBalancer::processSubsets(uint32_t priority, const HostVector& all
   }
 
   // This stat isn't added to `ClusterTrafficStats` because it wouldn't be used for nearly all
-  // clusters, and is only set during configuration updates, not in the data path, so performance of
-  // looking up the stat isn't critical.
+  // clusters, and is only set during configuration updates, not in the data path, so performance
+  // of looking up the stat isn't critical.
   if (single_duplicate_stat_ == nullptr) {
     Stats::StatNameManagedStorage name_storage("lb_subsets_single_host_per_subset_duplicate",
                                                scope_.symbolTable());
@@ -692,58 +819,21 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
                                                            bool locality_weight_aware,
                                                            bool scale_locality_weight)
     : original_priority_set_(subset_lb.original_priority_set_),
+      original_local_priority_set_(subset_lb.original_local_priority_set_),
       locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight) {
   // Create at least one host set.
   getOrCreateHostSet(0);
 
-  switch (subset_lb.lb_type_) {
-  case LoadBalancerType::LeastRequest:
-    lb_ = std::make_unique<LeastRequestLoadBalancer>(
-        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
-        subset_lb.random_, subset_lb.common_config_, subset_lb.lbLeastRequestConfig(),
-        subset_lb.time_source_);
-    break;
+  auto lb_pair = subset_lb.child_lb_creator_->createLoadBalancer(
+      *this, original_local_priority_set_, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_,
+      subset_lb.random_, subset_lb.time_source_);
 
-  case LoadBalancerType::Random:
-    lb_ = std::make_unique<RandomLoadBalancer>(*this, subset_lb.original_local_priority_set_,
-                                               subset_lb.stats_, subset_lb.runtime_,
-                                               subset_lb.random_, subset_lb.common_config_);
-    break;
-
-  case LoadBalancerType::RoundRobin:
-    lb_ = std::make_unique<RoundRobinLoadBalancer>(
-        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
-        subset_lb.random_, subset_lb.common_config_, subset_lb.lbRoundRobinConfig(),
-        subset_lb.time_source_);
-    break;
-
-  case LoadBalancerType::RingHash:
-    // TODO(mattklein123): The ring hash LB is thread aware, but currently the subset LB is not.
-    // We should make the subset LB thread aware since the calculations are costly, and then we
-    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-    thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
-        subset_lb.lbRingHashConfig(), subset_lb.common_config_);
+  if (lb_pair.first != nullptr) {
+    thread_aware_lb_ = std::move(lb_pair.first);
     thread_aware_lb_->initialize();
-    lb_ = thread_aware_lb_->factory()->create();
-    break;
-
-  case LoadBalancerType::Maglev:
-    // TODO(mattklein123): The Maglev LB is thread aware, but currently the subset LB is not.
-    // We should make the subset LB thread aware since the calculations are costly, and then we
-    // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
-    thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
-        subset_lb.lbMaglevConfig(), subset_lb.common_config_);
-    thread_aware_lb_->initialize();
-    lb_ = thread_aware_lb_->factory()->create();
-    break;
-
-  case LoadBalancerType::OriginalDst:
-  case LoadBalancerType::ClusterProvided:
-  case LoadBalancerType::LoadBalancingPolicyConfig:
-    // These load balancer types can only be created when there is no subset configuration.
-    PANIC("not implemented");
+    lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
+  } else {
+    lb_ = std::move(lb_pair.second);
   }
 
   triggerCallbacks();
@@ -815,7 +905,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_host
       HostSetImpl::updateHostsParams(
           hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality, degraded_hosts,
           degraded_hosts_per_locality, excluded_hosts, excluded_hosts_per_locality),
-      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed, absl::nullopt);
+      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed,
+      original_host_set_.weightedPriorityHealth(), original_host_set_.overprovisioningFactor());
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(
@@ -853,7 +944,8 @@ LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocal
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
-    uint32_t priority, absl::optional<uint32_t> overprovisioning_factor) {
+    uint32_t priority, absl::optional<bool> weighted_priority_health,
+    absl::optional<uint32_t> overprovisioning_factor) {
   // Use original hostset's overprovisioning_factor.
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
 
@@ -861,6 +953,8 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 
   ASSERT(!overprovisioning_factor.has_value() ||
          overprovisioning_factor.value() == host_set->overprovisioningFactor());
+  ASSERT(!weighted_priority_health.has_value() ||
+         weighted_priority_health.value() == host_set->weightedPriorityHealth());
   return HostSetImplPtr{
       new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_)};
 }
@@ -882,8 +976,8 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   // Create a new worker local LB if needed.
   // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
   // we can do better here.
-  if (thread_aware_lb_ != nullptr) {
-    lb_ = thread_aware_lb_->factory()->create();
+  if (thread_aware_lb_ != nullptr && thread_aware_lb_->factory()->recreateOnHostChange()) {
+    lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
   }
 }
 

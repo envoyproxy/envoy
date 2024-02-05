@@ -41,10 +41,9 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
     Network::Address::InstanceConstSharedPtr& address)
     : address_(address) {
-  ON_CALL(*this, getUpstreamLocalAddress(_, _))
+  ON_CALL(*this, getUpstreamLocalAddressImpl(_))
       .WillByDefault(
-          Invoke([&](const Network::Address::InstanceConstSharedPtr&,
-                     const Network::ConnectionSocket::OptionsSharedPtr&) -> UpstreamLocalAddress {
+          Invoke([&](const Network::Address::InstanceConstSharedPtr&) -> UpstreamLocalAddress {
             UpstreamLocalAddress ret;
             ret.address_ = address_;
             ret.socket_options_ = nullptr;
@@ -54,7 +53,8 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
 
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions())),
+                         envoy::config::core::v3::Http2ProtocolOptions())
+                         .value()),
       traffic_stat_names_(stats_store_.symbolTable()),
       config_update_stats_names_(stats_store_.symbolTable()),
       lb_stat_names_(stats_store_.symbolTable()), endpoint_stat_names_(stats_store_.symbolTable()),
@@ -63,7 +63,7 @@ MockClusterInfo::MockClusterInfo()
       cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
       cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
       traffic_stats_(
-          std::make_unique<ClusterTrafficStats>(traffic_stat_names_, *stats_store_.rootScope())),
+          ClusterInfoImpl::generateStats(stats_store_.rootScope(), traffic_stat_names_, false)),
       config_update_stats_(config_update_stats_names_, *stats_store_.rootScope()),
       lb_stats_(lb_stat_names_, *stats_store_.rootScope()),
       endpoint_stats_(endpoint_stat_names_, *stats_store_.rootScope()),
@@ -185,20 +185,21 @@ MockClusterInfo::MockClusterInfo()
           }));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
-  ON_CALL(*this, createFilterChain(_, _))
-      .WillByDefault(
-          Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
-            if (only_create_if_configured) {
-              return false;
-            }
-            Http::FilterFactoryCb factory_cb =
-                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-              callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-            };
-            manager.applyFilterFactoryCb({}, factory_cb);
-            return true;
-          }));
-  ON_CALL(*this, loadBalancingPolicy).WillByDefault(ReturnRef(load_balancing_policy_));
+  ON_CALL(*this, createFilterChain(_, _, _))
+      .WillByDefault(Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured,
+                                const Http::FilterChainOptions&) -> bool {
+        if (only_create_if_configured) {
+          return false;
+        }
+        Http::FilterFactoryCb factory_cb =
+            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+        };
+        manager.applyFilterFactoryCb({}, factory_cb);
+        return true;
+      }));
+  ON_CALL(*this, loadBalancerConfig())
+      .WillByDefault(Return(makeOptRefFromPtr<const LoadBalancerConfig>(nullptr)));
   ON_CALL(*this, makeHeaderValidator(_)).WillByDefault(Invoke([&](Http::Protocol protocol) {
     return header_validator_factory_ ? header_validator_factory_->createClientHeaderValidator(
                                            protocol, codecStats(protocol))

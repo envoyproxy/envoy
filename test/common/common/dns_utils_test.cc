@@ -1,7 +1,6 @@
 #include "source/common/common/dns_utils.h"
 #include "source/common/network/utility.h"
 
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

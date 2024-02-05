@@ -68,7 +68,7 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
     deferred_reset_ = false;
     // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
     // erroneously remove required headers.
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError);
     const std::string details =
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
                      "{", StringUtil::replaceAllEmptySpace(status.message()), "}");
@@ -147,7 +147,9 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
 
   if (filter_.callbacks_->upstreamCallbacks()->pausedForConnect() &&
       ((Http::Utility::getResponseStatus(*headers) == 200) ||
-       (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers))))) {
+       ((Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.upstream_allow_connect_with_2xx")) &&
+        (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers)))))) {
     filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);
     filter_.callbacks_->continueDecoding();
   }

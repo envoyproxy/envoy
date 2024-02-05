@@ -17,6 +17,7 @@
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
+#include "utf8_validity.h"
 #include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
@@ -131,9 +132,8 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   }
 }
 
-Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
-                                                        Protobuf::Message& message,
-                                                        bool& has_unknown_fileld) {
+absl::Status MessageUtil::loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+                                              bool& has_unknown_fileld) {
   has_unknown_fileld = false;
   Protobuf::util::JsonParseOptions options;
   options.case_insensitive_enum_parsing = true;
@@ -183,7 +183,9 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
                                Api::Api& api) {
-  const std::string contents = api.fileSystem().fileReadToEnd(path);
+  auto file_or_error = api.fileSystem().fileReadToEnd(path);
+  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
@@ -238,7 +240,7 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
   return out.c_str();
 }
 
-ProtobufUtil::StatusOr<std::string>
+absl::StatusOr<std::string>
 MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bool pretty_print,
                                       const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
@@ -323,33 +325,31 @@ ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
   }
 }
 
-std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.service_sanitize_non_utf8_strings")) {
-    return std::string(input);
-  }
+namespace {
 
-  // This returns the original string if it was already valid, and returns a pointer to
-  // `result.data()` if it needed to coerce. The coerced string is always
-  // the same length as the source string.
-  //
-  // Initializing `result` to `input` ensures that `result` is correctly sized to receive the
-  // modified string, or in the case where no modification is needed it already contains the correct
-  // value, so `result` can be returned in both cases.
-  //
+// This is a modified copy of the UTF8CoerceToStructurallyValid from the protobuf code.
+// A copy was needed after if was removed from the protobuf.
+std::string utf8CoerceToStructurallyValid(absl::string_view str, const char replace_char) {
+  std::string result(str);
+  auto replace_pos = result.begin();
+  while (!str.empty()) {
+    size_t n_valid_bytes = utf8_range::SpanStructurallyValid(str);
+    if (n_valid_bytes == str.size()) {
+      break;
+    }
+    replace_pos += n_valid_bytes;
+    *replace_pos++ = replace_char; // replace one bad byte
+    str.remove_prefix(n_valid_bytes + 1);
+  }
+  return result;
+}
+
+} // namespace
+
+std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
   // The choice of '!' is somewhat arbitrary, but we wanted to avoid any character that has
   // special semantic meaning in URLs or similar.
-  std::string result(input);
-  const char* sanitized = google::protobuf::internal::UTF8CoerceToStructurallyValid(
-      google::protobuf::StringPiece(input.data(), input.length()), result.data(), '!');
-  ASSERT(sanitized == result.data() || sanitized == input.data());
-
-  // Validate requirement that if the input string is returned from
-  // `UTF8CoerceToStructurallyValid`, no modification was made to result so it still contains the
-  // correct return value.
-  ASSERT(sanitized == result.data() || result == input);
-
-  return result;
+  return utf8CoerceToStructurallyValid(input, '!');
 }
 
 } // namespace Envoy

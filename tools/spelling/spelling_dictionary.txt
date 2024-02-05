@@ -26,15 +26,24 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+NID
+NIST
+bm
 BSON
 BPF
 Bdecoded
 Bencoded
+CIO
+deadcode
 DFP
+Dynatrace
 DOM
+Gasd
 GiB
 IPTOS
+OTEL
 Repick
+Reserializer
 SION
 TRA
 Websockets
@@ -70,7 +79,9 @@ FIXME
 HEXDIG
 HEXDIGIT
 HPE
+Kwasi
 LRU
+Mensah
 NAK
 OWS
 Preconnecting
@@ -164,6 +175,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+curr
 eslint
 freeifaddrs
 FUZZER
@@ -175,6 +187,7 @@ dnsresolvers
 endpos
 eps
 fo
+gb
 ghi
 golang
 guarddog
@@ -246,10 +259,13 @@ LF
 LHS
 hls
 iframe
+ilp
 ingressed
 integrations
+iouring
 jkl
 lang
+libcurl
 libsxg
 LLVM
 LPT
@@ -296,6 +312,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+na
 oghttp
 OID
 OK
@@ -334,6 +351,8 @@ QDCOUNT
 QPACK
 QUIC
 QoS
+qat
+qatzip
 RAII
 RANLUX
 RBAC
@@ -632,6 +651,7 @@ cryptographic
 cryptographically
 cstate
 cstring
+ctad
 ctor
 ctrl
 customizations
@@ -764,6 +784,7 @@ gateway
 gcov
 genrule
 geolocation
+geo
 geoip
 Geoip
 getaddrinfo
@@ -808,6 +829,7 @@ hostnames
 hostset
 hotrestart
 hrefs
+htpasswd
 huffman
 hystrix
 idempotency
@@ -815,6 +837,7 @@ idx
 ifdef
 iff
 ified
+ifndef
 impl
 implementors
 impls
@@ -847,6 +870,7 @@ iovecs
 ips
 iptables
 ish
+isp
 istio
 istream
 istringstream
@@ -909,6 +933,8 @@ matcher
 matchers
 maxage
 maxbuffer
+Maxmind
+maxmind
 megamiss
 mem
 memcmp
@@ -924,11 +950,13 @@ metatable
 microbenchmarks
 midp
 milli
+mimics
 misconfiguration
 misconfigured
 mixin
 mkdir
 mmap
+mmdb
 mmsg
 mmsghdr
 mongo
@@ -1160,6 +1188,7 @@ responder
 restarter
 resync
 ret
+retransmissions
 retransmitted
 retransmitting
 retriable
@@ -1205,15 +1234,20 @@ serv
 servercert
 setenv
 setsockopt
+sfixed
 sig
 sigaction
 sigactions
 sigaltstack
 siginfo
 signalstack
+sigv
+sigv4
+sigv4a
 siloed
 sim
 sinked
+sint
 sizeof
 smatch
 snapshotted
@@ -1283,6 +1317,7 @@ subtypes
 subzone
 suf
 superclass
+superroot
 superset
 svc
 symlink
@@ -1333,6 +1368,7 @@ transcoder
 transcoding
 transferral
 trds
+tri
 triaged
 trie
 tuple
@@ -1391,6 +1427,7 @@ versa
 versioned
 vhost
 viewable
+viewport
 vip
 virtualhost
 virtualize
@@ -1449,3 +1486,4 @@ SSLKEYLOGFILE
 DLB
 PCIE
 EDNS
+CNAME

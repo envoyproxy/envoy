@@ -180,9 +180,6 @@ TEST_F(DiskLoaderImplTest, All) {
   // Lower-case boolean specification.
   EXPECT_EQ(true, snapshot->getBoolean("file11", false));
   EXPECT_EQ(true, snapshot->getBoolean("file11", true));
-  // Mixed-case boolean specification.
-  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
-  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
   // Lower-case boolean specification with leading whitespace.
   EXPECT_EQ(true, snapshot->getBoolean("file13", true));
   EXPECT_EQ(true, snapshot->getBoolean("file13", false));
@@ -262,7 +259,7 @@ TEST_F(DiskLoaderImplTest, All) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(25, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(24, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
@@ -604,7 +601,6 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
       denominator: NONSENSE
     file10: 52
     file11: true
-    file12: FaLSe
     file13: false
     subdir:
       file: "hello"
@@ -647,9 +643,6 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(true, snapshot->getBoolean("file11", true));
   EXPECT_EQ(true, snapshot->getBoolean("file11", false));
-
-  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
-  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
 
   EXPECT_EQ(false, snapshot->getBoolean("file13", true));
   EXPECT_EQ(false, snapshot->getBoolean("file13", false));
@@ -733,19 +726,20 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(23, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(22, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 
+  const char* error = nullptr;
   // While null values are generally filtered out by walkProtoValue, test manually.
   ProtobufWkt::Value empty_value;
   const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-      .createEntry(empty_value);
+      .createEntry(empty_value, "", error);
 
   // Make sure the hacky fractional percent function works.
   ProtobufWkt::Value fractional_value;
   fractional_value.set_string_value(" numerator:  11 ");
   auto entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-                   .createEntry(fractional_value);
+                   .createEntry(fractional_value, "", error);
   ASSERT_TRUE(entry.fractional_percent_value_.has_value());
   EXPECT_EQ(entry.fractional_percent_value_->denominator(),
             envoy::type::v3::FractionalPercent::HUNDRED);
@@ -754,7 +748,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Make sure the hacky percent function works with numerator and denominator
   fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}");
   entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-              .createEntry(fractional_value);
+              .createEntry(fractional_value, "", error);
   ASSERT_TRUE(entry.fractional_percent_value_.has_value());
   EXPECT_EQ(entry.fractional_percent_value_->denominator(),
             envoy::type::v3::FractionalPercent::TEN_THOUSAND);
@@ -763,7 +757,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Make sure the hacky fractional percent function works with million
   fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"MILLION\"}");
   entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-              .createEntry(fractional_value);
+              .createEntry(fractional_value, "", error);
   ASSERT_TRUE(entry.fractional_percent_value_.has_value());
   EXPECT_EQ(entry.fractional_percent_value_->denominator(),
             envoy::type::v3::FractionalPercent::MILLION);
@@ -772,8 +766,16 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Test atoi failure for the hacky fractional percent value function.
   fractional_value.set_string_value(" numerator:  1.1 ");
   entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-              .createEntry(fractional_value);
+              .createEntry(fractional_value, "", error);
   ASSERT_FALSE(entry.fractional_percent_value_.has_value());
+
+  // Test legacy malformed boolean support
+  ProtobufWkt::Value boolean_value;
+  boolean_value.set_string_value("FaLsE");
+  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+              .createEntry(boolean_value, "", error);
+  ASSERT_TRUE(entry.bool_value_.has_value());
+  ASSERT_FALSE(entry.bool_value_.value());
 }
 
 TEST_F(StaticLoaderImplTest, InvalidNumerator) {
@@ -887,19 +889,13 @@ TEST_F(DiskLayerTest, Loop) {
 }
 
 TEST(NoRuntime, FeatureEnabled) {
-  // Make sure the registry is not set up.
-  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
-
-  // Feature defaults should still work.
+  // Feature defaults work with no runtime setup.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
 TEST(NoRuntime, DefaultIntValues) {
-  // Make sure the registry is not set up.
-  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
-
-  // Feature defaults should still work.
+  // Feature defaults work with no runtime setup.
   EXPECT_ENVOY_BUG(
       EXPECT_EQ(0x1230000ABCDULL,
                 getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL)),
@@ -964,19 +960,19 @@ public:
   void doOnConfigUpdateVerifyNoThrow(const envoy::service::runtime::v3::Runtime& runtime,
                                      uint32_t callback_index = 0) {
     const auto decoded_resources = TestUtility::decodeResources({runtime});
-    VERBOSE_EXPECT_NO_THROW(
-        rtds_callbacks_[callback_index]->onConfigUpdate(decoded_resources.refvec_, ""));
+    EXPECT_TRUE(
+        rtds_callbacks_[callback_index]->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
 
   void doDeltaOnConfigUpdateVerifyNoThrow(const envoy::service::runtime::v3::Runtime& runtime) {
     const auto decoded_resources = TestUtility::decodeResources({runtime});
-    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, {}, ""));
+    EXPECT_TRUE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
   }
 
   void doDeltaOnConfigRemovalVerifyNoThrow(const std::string& resource_name) {
     Protobuf::RepeatedPtrField<std::string> removed_resources;
     *removed_resources.Add() = resource_name;
-    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""));
+    EXPECT_TRUE(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, "").ok());
   }
 
   std::vector<std::string> layers_{"some_resource"};
@@ -990,9 +986,9 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
   setup();
 
   EXPECT_CALL(rtds_init_callback_, Call());
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, ""), EnvoyException,
-                            "Unexpected RTDS resource length, number of added recources 0, number "
-                            "of removed recources 0");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate({}, "").message(),
+            "Unexpected RTDS resource length, number of added recources 0, number "
+            "of removed recources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -1008,10 +1004,9 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
   const auto decoded_resources = TestUtility::decodeResources({runtime, runtime});
 
   EXPECT_CALL(rtds_init_callback_, Call());
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "Unexpected RTDS resource length, number of added recources 2, number "
-                            "of removed recources 0");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Unexpected RTDS resource length, number of added recources 2, number "
+            "of removed recources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -1045,9 +1040,8 @@ TEST_F(RtdsLoaderImplTest, WrongResourceName) {
       baz: meh
   )EOF");
   const auto decoded_resources = TestUtility::decodeResources({runtime});
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "Unexpected RTDS runtime (expecting some_resource): other_resource");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Unexpected RTDS runtime (expecting some_resource): other_resource");
 
   EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
   EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
@@ -1196,10 +1190,9 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalFailure) {
 
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   *removed_resources.Add() = "some_wrong_resource_name";
-  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""),
-                            EnvoyException,
-                            "Unexpected removal of unknown RTDS runtime layer "
-                            "some_wrong_resource_name, expected some_resource");
+  EXPECT_EQ(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, "").message(),
+            "Unexpected removal of unknown RTDS runtime layer "
+            "some_wrong_resource_name, expected some_resource");
 
   // Removal failed, the keys point to the same value before the removal call.
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());

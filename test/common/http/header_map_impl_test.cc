@@ -46,6 +46,14 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ("goodbye", hello_string.get());
   }
 
+  // assignment operator with const rhs
+  {
+    LowerCaseString present_value("present_value");
+    const LowerCaseString new_value("new_value");
+    present_value = new_value;
+    EXPECT_EQ("new_value", present_value.get());
+  }
+
   // Move constructor for normal UnionString.
   {
     UnionString to_move;
@@ -1043,65 +1051,39 @@ TEST(HeaderMapImplTest, ValidHeaderString) {
   EXPECT_FALSE(validHeaderString("abc\n"));
 }
 
-TEST(HeaderMapImplTest, HttpTraceContextTest) {
-  {
-    TestRequestHeaderMapImpl request_headers;
+// Test the header map max limits are setup correctly.
+TEST(HeaderMapImplTest, HeaderMapMaxLimits) {
+  auto request_header_default = RequestHeaderMapImpl::create();
+  EXPECT_EQ(request_header_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(request_header_default->maxHeadersCount(), UINT32_MAX);
 
-    // Protocol.
-    EXPECT_EQ(request_headers.protocol(), "");
-    request_headers.addCopy(Http::Headers::get().Protocol, "HTTP/x");
-    EXPECT_EQ(request_headers.protocol(), "HTTP/x");
+  auto request_header = RequestHeaderMapImpl::create(5, 10);
+  EXPECT_EQ(request_header->maxHeadersKb(), 5);
+  EXPECT_EQ(request_header->maxHeadersCount(), 10);
 
-    // Host.
-    EXPECT_EQ(request_headers.host(), "");
-    request_headers.addCopy(Http::Headers::get().Host, "test.com:233");
-    EXPECT_EQ(request_headers.host(), "test.com:233");
+  auto request_trailer_default = RequestTrailerMapImpl::create();
+  EXPECT_EQ(request_trailer_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(request_trailer_default->maxHeadersCount(), UINT32_MAX);
 
-    // Path.
-    EXPECT_EQ(request_headers.path(), "");
-    request_headers.addCopy(Http::Headers::get().Path, "/anything");
-    EXPECT_EQ(request_headers.path(), "/anything");
+  auto request_trailer = RequestTrailerMapImpl::create(10, 20);
+  EXPECT_EQ(request_trailer->maxHeadersKb(), 10);
+  EXPECT_EQ(request_trailer->maxHeadersCount(), 20);
 
-    // Method.
-    EXPECT_EQ(request_headers.method(), "");
-    request_headers.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Options);
-    EXPECT_EQ(request_headers.method(), Http::Headers::get().MethodValues.Options);
-  }
+  auto response_header_default = ResponseHeaderMapImpl::create();
+  EXPECT_EQ(response_header_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(response_header_default->maxHeadersCount(), UINT32_MAX);
 
-  {
-    size_t size = 0;
-    TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
-    request_headers.forEach([&size](absl::string_view key, absl::string_view val) {
-      size += key.size();
-      size += val.size();
-      return true;
-    });
-    // 'host' will be converted to ':authority'.
-    EXPECT_EQ(23, size);
-    EXPECT_EQ(23, request_headers.byteSize());
-  }
+  auto response_header = ResponseHeaderMapImpl::create(50, 100);
+  EXPECT_EQ(response_header->maxHeadersKb(), 50);
+  EXPECT_EQ(response_header->maxHeadersCount(), 100);
 
-  {
-    TestRequestHeaderMapImpl request_headers{{"host", "foo"}};
-    EXPECT_EQ(request_headers.getByKey("host").value(), "foo");
+  auto response_trailer_default = ResponseTrailerMapImpl::create();
+  EXPECT_EQ(response_trailer_default->maxHeadersKb(), UINT32_MAX);
+  EXPECT_EQ(response_trailer_default->maxHeadersCount(), UINT32_MAX);
 
-    request_headers.setByKey("trace_key", "trace_value");
-    EXPECT_EQ(request_headers.getByKey("trace_key").value(), "trace_value");
-
-    std::string trace_ref_key = "trace_ref_key";
-    request_headers.setByReferenceKey(trace_ref_key, "trace_value");
-    auto* header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
-    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
-              reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));
-
-    std::string trace_ref_value = "trace_ref_key";
-    request_headers.setByReference(trace_ref_key, trace_ref_value);
-    header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
-    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
-              reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));
-    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_value.data()),
-              reinterpret_cast<intptr_t>(header_entry->value().getStringView().data()));
-  }
+  auto response_trailer = ResponseTrailerMapImpl::create(2, 3);
+  EXPECT_EQ(response_trailer->maxHeadersKb(), 2);
+  EXPECT_EQ(response_trailer->maxHeadersCount(), 3);
 }
 
 } // namespace Http

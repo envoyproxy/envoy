@@ -43,7 +43,7 @@ AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogMa
 
 void AccessLog::logMessage(const Message& message, bool full,
                            const Upstream::HostDescription* upstream_host) {
-  static const std::string log_format =
+  static constexpr absl::string_view log_format =
       "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
   SystemTime now = time_source_.systemTime();
@@ -335,9 +335,8 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
     decoder_ = createDecoder(*this);
   }
 
-  try {
-    decoder_->onData(buffer);
-  } catch (EnvoyException& e) {
+  TRY_NEEDS_AUDIT { decoder_->onData(buffer); }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(info, "mongo decoding error: {}", e.what());
     stats_.decoding_error_.inc();
     sniffing_ = false;

@@ -71,7 +71,7 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
   Envoy::Http::ResponseHeaderMapPtr headers{
       Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
           {{Envoy::Http::Headers::get().Status, "200"}})};
-  upstream_request_->decodeHeaders(std::move(headers), false);
+  upstream_request_->decodeHeaders(std::move(headers), /*end_stream=*/false);
   return Envoy::Http::okStatus();
 }
 

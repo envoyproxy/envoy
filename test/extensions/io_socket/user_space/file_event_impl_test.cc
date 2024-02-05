@@ -8,7 +8,6 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

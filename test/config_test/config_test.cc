@@ -8,9 +8,9 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/fmt.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -41,11 +41,14 @@ namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
 OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
-  return Envoy::Server::createTestOptionsImpl("", api.fileSystem().fileReadToEnd(src.configPath()),
-                                              src.localAddressIpVersion());
+  return Envoy::Server::createTestOptionsImpl(
+      "", api.fileSystem().fileReadToEnd(src.configPath()).value(), src.localAddressIpVersion());
 }
 
 static std::vector<absl::string_view> unsuported_win32_configs = {
+#if defined(WIN32)
+    "rbac_envoy.yaml",
+#endif
 #if defined(WIN32) && !defined(SO_ORIGINAL_DST)
     "configs_original-dst-cluster_proxy_config.yaml"
 #endif
@@ -65,7 +68,7 @@ public:
       return api_->threadFactory();
     }));
     ON_CALL(file_system_, fileReadToEnd(_))
-        .WillByDefault(Invoke([&](const std::string& file) -> std::string {
+        .WillByDefault(Invoke([&](const std::string& file) -> absl::StatusOr<std::string> {
           return api_->fileSystem().fileReadToEnd(file);
         }));
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
@@ -96,7 +99,9 @@ public:
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap);
+    absl::Status creation_status;
+    Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
+    THROW_IF_NOT_OK(creation_status);
     Server::Configuration::MainImpl main_config;
 
     // Emulate main implementation of initializing bootstrap extensions.
@@ -126,9 +131,9 @@ public:
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context)
-                -> std::vector<Network::FilterFactoryCb> {
+                -> Filter::NetworkFilterFactoriesList {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, context);
+                  filters, context, network_config_provider_manager_);
             }));
     ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(&tcp_listener_config_provider_manager_));
@@ -153,7 +158,7 @@ public:
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
-      main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
+      THROW_IF_NOT_OK(main_config.initialize(bootstrap, server_, *cluster_manager_factory_));
     } catch (const EnvoyException& ex) {
       ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
                                    ex.what());
@@ -181,6 +186,7 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
+  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 

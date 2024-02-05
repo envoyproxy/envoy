@@ -20,7 +20,7 @@ namespace Address {
 class IpResolver : public Resolver {
 
 public:
-  InstanceConstSharedPtr
+  absl::StatusOr<InstanceConstSharedPtr>
   resolve(const envoy::config::core::v3::SocketAddress& socket_address) override {
     switch (socket_address.port_specifier_case()) {
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kPortValue:
@@ -31,8 +31,8 @@ public:
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort:
       break;
     }
-    throw EnvoyException(fmt::format("IP resolver can't handle port specifier type {}",
-                                     socket_address.port_specifier_case()));
+    return absl::InvalidArgumentError(fmt::format("IP resolver can't handle port specifier type {}",
+                                                  socket_address.port_specifier_case()));
   }
 
   std::string name() const override { return Config::AddressResolverNames::get().IP; }
@@ -43,10 +43,11 @@ public:
  */
 REGISTER_FACTORY(IpResolver, Resolver);
 
-InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Address& address) {
+absl::StatusOr<InstanceConstSharedPtr>
+resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   switch (address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
-    throw EnvoyException("Address must be set: " + address.DebugString());
+    return absl::InvalidArgumentError("Address must be set: " + address.DebugString());
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
@@ -63,10 +64,10 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
       break;
     }
   }
-  throw EnvoyException("Failed to resolve address:" + address.DebugString());
+  return absl::InvalidArgumentError("Failed to resolve address:" + address.DebugString());
 }
 
-InstanceConstSharedPtr
+absl::StatusOr<InstanceConstSharedPtr>
 resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& socket_address) {
   Resolver* resolver = nullptr;
   const std::string& resolver_name = socket_address.resolver_name();
@@ -77,9 +78,11 @@ resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& socket_a
     resolver = Registry::FactoryRegistry<Resolver>::getFactory(resolver_name);
   }
   if (resolver == nullptr) {
-    throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
+    return absl::InvalidArgumentError(fmt::format("Unknown address resolver: {}", resolver_name));
   }
-  return resolver->resolve(socket_address);
+  auto instance_or_error = resolver->resolve(socket_address);
+  RETURN_IF_STATUS_NOT_OK(instance_or_error);
+  return std::move(instance_or_error.value());
 }
 
 } // namespace Address

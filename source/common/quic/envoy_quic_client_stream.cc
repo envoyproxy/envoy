@@ -88,6 +88,18 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
     sent_head_request_ = true;
   }
 #endif
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+      (Http::HeaderUtility::isCapsuleProtocol(headers) ||
+       Http::HeaderUtility::isConnectUdpRequest(headers))) {
+    useCapsuleProtocol();
+    if (Http::HeaderUtility::isConnectUdpRequest(headers)) {
+      // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it
+      // bypass the default Datagram queue.
+      session()->SetForceFlushForDefaultQueue(true);
+    }
+  }
+#endif
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
@@ -135,7 +147,19 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
       // TODO(danzh): investigate the cost of allocating one buffer per slice.
       // If it turns out to be expensive, add a new function to free data in the middle in buffer
       // interface and re-design QuicheMemSliceImpl.
-      quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.quiche_use_mem_slice_releasor_api")) {
+        quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
+      } else {
+        auto single_slice_buffer = std::make_unique<Buffer::OwnedImpl>();
+        single_slice_buffer->move(data, slice.len_);
+        quic_slices.emplace_back(
+            reinterpret_cast<char*>(slice.mem_), slice.len_,
+            [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
+              // Free this memory explicitly when the callback is invoked.
+              single_slice_buffer = nullptr;
+            });
+      }
     }
     quic::QuicConsumedData result{0, false};
     absl::Span<quiche::QuicheMemSlice> span(quic_slices);
@@ -191,6 +215,11 @@ void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (http_datagram_handler_) {
+    UnregisterHttp3DatagramVisitor();
+  }
+#endif
   Reset(envoyResetReasonToQuicRstError(reason));
 }
 
@@ -215,6 +244,10 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (read_side_closed()) {
+    return;
+  }
+
   if (!headers_decompressed() || header_list.empty()) {
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
                   quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -227,38 +260,54 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
+  auto client_session = static_cast<EnvoyQuicClientSession*>(session());
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_,
-          transform_rst);
+          header_list, *this, client_session->max_inbound_header_list_size(),
+          filterManagerConnection()->maxIncomingHeadersCount(), details_, transform_rst);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_, transform_rst);
     return;
   }
+
   const absl::optional<uint64_t> optional_status =
       Http::Utility::getResponseStatusOrNullopt(*headers);
+#ifndef ENVOY_ENABLE_UHV
   if (!optional_status.has_value()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
                   quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
-  const uint64_t status = optional_status.value();
-  if (Http::CodeUtility::is1xx(status)) {
-    // These are Informational 1xx headers, not the actual response headers.
-    set_headers_decompressed(false);
-  }
 
-#ifndef ENVOY_ENABLE_UHV
-  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  // In Envoy, both upgrade requests and extended CONNECT requests are
-  // represented as their HTTP/1 forms, regardless of the HTTP version used.
-  // Therefore, these need to be transformed into their HTTP/1 form.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
       !upgrade_protocol_.empty()) {
     Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
   }
+#else
+  // Extended CONNECT to H/1 upgrade transformation has moved to UHV
+  // In Envoy, both upgrade requests and extended CONNECT requests are
+  // represented as their HTTP/1 forms, regardless of the HTTP version used.
+  // Therefore, these need to be transformed into their HTTP/1 form.
+
+  // In UHV mode the :status header at this point can be malformed, as it is validated
+  // later on in the response_decoder_.decodeHeaders() call.
+  // Account for this here.
+  if (!optional_status.has_value()) {
+    // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
+    // request
+    response_decoder_->decodeHeaders(std::move(headers), fin);
+    ConsumeHeaderList();
+    return;
+  }
 #endif
+
+  const uint64_t status = optional_status.value();
+  // TODO(#29071) determine how to handle 101, since it is not supported by HTTP/2
+  if (Http::CodeUtility::is1xx(status)) {
+    // These are Informational 1xx headers, not the actual response headers.
+    set_headers_decompressed(false);
+  }
 
   const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
   if (is_special_1xx && !decoded_1xx_) {
@@ -376,9 +425,10 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
+    auto client_session = static_cast<EnvoyQuicClientSession*>(session());
     auto trailers = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
-        transform_rst);
+        received_trailers(), client_session->max_inbound_header_list_size(),
+        filterManagerConnection()->maxIncomingHeadersCount(), *this, details_, transform_rst);
     if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
@@ -482,8 +532,13 @@ bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   http_datagram_handler_->setStreamDecoder(response_decoder_);
+  RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
+
+void EnvoyQuicClientStream::OnInvalidHeaders() {
+  onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
 
 } // namespace Quic
 } // namespace Envoy

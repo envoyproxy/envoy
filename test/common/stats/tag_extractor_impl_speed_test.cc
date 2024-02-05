@@ -57,10 +57,10 @@ using Params = std::tuple<std::string, uint32_t>;
 const std::vector<Params> params = {
     {"listener.127.0.0.1_3012.http.http_prefix.downstream_rq_5xx", 3},
     {"cluster.ratelimit.upstream_rq_timeout", 1},
-    {"listener.[__1]_0.ssl.cipher.AES256-SHA", 2},
+    {"listener.[__1]_0.ssl.ciphers.AES256-SHA", 2},
     {"cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256", 2},
-    {"listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.cipher.AES256-SHA", 2},
-    {"listener.127.0.0.1_0.ssl.cipher.AES256-SHA", 2},
+    {"listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.ciphers.AES256-SHA", 2},
+    {"listener.127.0.0.1_0.ssl.ciphers.AES256-SHA", 2},
     {"mongo.mongo_filter.op_reply", 1},
     {"mongo.mongo_filter.cmd.foo_cmd.reply_size", 2},
     {"mongo.mongo_filter.collection.bar_collection.query.multi_get", 2},

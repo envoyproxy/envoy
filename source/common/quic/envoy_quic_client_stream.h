@@ -3,8 +3,10 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/quic/envoy_quic_stream.h"
-#include "source/common/quic/http_datagram_handler.h"
 
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+#include "source/common/quic/http_datagram_handler.h"
+#endif
 #include "quiche/common/simple_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
 
@@ -51,12 +53,6 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
-  // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
-  // starts to receive HTTP/3 Datagrams and decode into Capsules.
-  void useCapsuleProtocol();
-#endif
 
 protected:
   // EnvoyQuicStream
@@ -70,6 +66,7 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
+  void OnInvalidHeaders() override;
 
   // Http::MultiplexedStreamImplBase
   bool hasPendingData() override;
@@ -82,6 +79,13 @@ private:
 
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
+  // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
+  // starts to receive HTTP/3 Datagrams and decode into Capsules.
+  void useCapsuleProtocol();
+#endif
 
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};

@@ -39,7 +39,7 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
   }
 
   if (rule.has_on_missing() && rule.on_missing().value().empty()) {
-    throw EnvoyException("Cannot specify on_missing rule without non-empty value");
+    throw EnvoyException("Cannot specify on_missing rule with empty value");
   }
 
   if (rule.has_on_present() && rule.on_present().has_regex_value_rewrite()) {
@@ -72,7 +72,7 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
   return nspace.empty() ? headerToMetadata : nspace;
 }
 
-bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
+bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::string& meta_namespace,
                                          const std::string& key, std::string value, ValueType type,
                                          ValueEncode encode) const {
   ProtobufWkt::Value val;
@@ -122,15 +122,8 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
   }
 
-  // Have we seen this namespace before?
-  auto namespace_iter = map.find(meta_namespace);
-  if (namespace_iter == map.end()) {
-    map[meta_namespace] = ProtobufWkt::Struct();
-    namespace_iter = map.find(meta_namespace);
-  }
-
-  auto& keyval = namespace_iter->second;
-  (*keyval.mutable_fields())[key] = val;
+  auto& keyval = struct_map[meta_namespace];
+  (*keyval.mutable_fields())[key] = std::move(val);
 
   return true;
 }

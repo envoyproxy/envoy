@@ -2,11 +2,11 @@ package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
+import io.envoyproxy.envoymobile.engine.types.EnvoyStatus
 
-/**
- * An implementation of {@link Engine}.
- */
-class EngineImpl constructor(
+/** An implementation of {@link Engine}. */
+class EngineImpl
+constructor(
   internal val envoyEngine: EnvoyEngine,
   internal val envoyConfiguration: EnvoyConfiguration,
   internal val configurationYAML: String?,
@@ -25,11 +25,15 @@ class EngineImpl constructor(
   init {
     streamClient = StreamClientImpl(envoyEngine)
     pulseClient = PulseClientImpl(envoyEngine)
-    if (configurationYAML != null) {
-      envoyEngine.performRegistration(envoyConfiguration)
-      envoyEngine.runWithYaml(configurationYAML, logLevel.level)
-    } else {
-      envoyEngine.runWithConfig(envoyConfiguration, logLevel.level)
+    val envoyStatus =
+      if (configurationYAML != null) {
+        envoyEngine.performRegistration(envoyConfiguration)
+        envoyEngine.runWithYaml(configurationYAML, logLevel.level)
+      } else {
+        envoyEngine.runWithConfig(envoyConfiguration, logLevel.level)
+      }
+    if (envoyStatus == EnvoyStatus.ENVOY_FAILURE) {
+      throw IllegalStateException("Unable to start Envoy.")
     }
   }
 
@@ -43,10 +47,6 @@ class EngineImpl constructor(
 
   override fun terminate() {
     envoyEngine.terminate()
-  }
-
-  override fun flushStats() {
-    envoyEngine.flushStats()
   }
 
   override fun dumpStats(): String {

@@ -92,6 +92,7 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
 class MockScopeTrackedObject : public ScopeTrackedObject {
 public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 };
 
 namespace ConnectionPool {
@@ -141,6 +142,18 @@ public:
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
   std::string category() const override { return "envoy.common.key_value"; }
   std::string name() const override { return "mock_key_value_store_factory"; }
+};
+
+struct MockLogSink : Logger::SinkDelegate {
+  MockLogSink(Logger::DelegatingLogSinkSharedPtr log_sink) : Logger::SinkDelegate(log_sink) {
+    setDelegate();
+  }
+  ~MockLogSink() override { restoreDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  void flush() override {}
 };
 
 } // namespace Envoy

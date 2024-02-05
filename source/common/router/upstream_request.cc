@@ -41,7 +41,7 @@
 namespace Envoy {
 namespace Router {
 
-// The upstream filter manager class.
+// The upstream HTTP filter manager class.
 class UpstreamFilterManager : public Http::FilterManager {
 public:
   UpstreamFilterManager(Http::FilterManagerCallbacks& filter_manager_callbacks,
@@ -60,8 +60,8 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override {
     return upstream_request_.parent_.callbacks()->streamInfo();
   }
-  // Send local replies via the downstream filter manager.
-  // Local replies will not be seen by upstream filters.
+  // Send local replies via the downstream HTTP filter manager.
+  // Local replies will not be seen by upstream HTTP filters.
   void sendLocalReply(Http::Code code, absl::string_view body,
                       const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -96,12 +96,12 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")),
       enable_half_close_(enable_half_close) {
-  if (parent_.config().start_child_span_) {
-    if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+  if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+    if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
           absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),
-          parent.timeSource().systemTime());
+          parent_.callbacks()->dispatcher().timeSource().systemTime());
       if (parent.attemptCount() != 1) {
         // This is a retry request, add this metadata to span.
         span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
@@ -111,33 +111,34 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
+  Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders(), upstream_host);
+    span_->injectContext(trace_context, upstream_host);
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), upstream_host);
+    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_host);
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  stream_info_.route_ = parent.callbacks()->route();
+  stream_info_.route_ = parent_.callbacks()->route();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
+  stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
       parent_.callbacks()->streamInfo().upstreamClusterInfo();
   if (cluster_info.has_value()) {
     stream_info_.setUpstreamClusterInfo(*cluster_info);
   }
 
-  // Set up the upstream filter manager.
+  // Set up the upstream HTTP filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
-      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(),
-      parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
-      parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
-      *parent_.cluster(), *this);
+      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), connection(),
+      parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
+      parent_.callbacks()->decoderBufferLimit(), *parent_.cluster(), *this);
   // Attempt to create custom cluster-specified filter chain
   bool created = parent_.cluster()->createFilterChain(*filter_manager_,
                                                       /*only_create_if_configured=*/true);
@@ -226,16 +227,21 @@ void UpstreamRequest::cleanUp() {
     parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
     --downstream_data_disabled_;
   }
-  // The upstream filter chain callbacks own headers/trailers while they are traversing the filter
-  // chain. Make sure to not delete them immediately when the stream ends, as the stream often
-  // ends during filter chain processing and it causes use-after-free violations.
+  // The upstream HTTP filter chain callbacks own headers/trailers while they are traversing the
+  // filter chain. Make sure to not delete them immediately when the stream ends, as the stream
+  // often ends during filter chain processing and it causes use-after-free violations.
   parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
 }
 
 void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
+  const Formatter::HttpFormatterContext log_context{parent_.downstreamHeaders(),
+                                                    upstream_headers_.get(),
+                                                    upstream_trailers_.get(),
+                                                    {},
+                                                    access_log_type};
+
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), upstream_headers_.get(),
-                      upstream_trailers_.get(), stream_info_, access_log_type);
+    upstream_log->log(log_context, stream_info_);
   }
 }
 
@@ -286,7 +292,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
-  stream_info_.response_code_ = static_cast<uint32_t>(response_code);
+  stream_info_.setResponseCode(static_cast<uint32_t>(response_code));
 
   maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
@@ -341,7 +347,7 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   }
 }
 
-const Route& UpstreamRequest::route() const { return *parent_.route(); }
+const Route& UpstreamRequest::route() const { return *parent_.callbacks()->route(); }
 
 OptRef<const Network::Connection> UpstreamRequest::connection() const {
   return parent_.callbacks()->connection();
@@ -357,11 +363,12 @@ void UpstreamRequest::maybeEndDecode(bool end_stream) {
   }
 }
 
-void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
+                                             bool pool_success) {
   StreamInfo::UpstreamInfo& upstream_info = *streamInfo().upstreamInfo();
   upstream_info.setUpstreamHost(host);
   upstream_host_ = host;
-  parent_.onUpstreamHostSelected(host);
+  parent_.onUpstreamHostSelected(host, pool_success);
 }
 
 void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
@@ -378,7 +385,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   }
 
   // Kick off creation of the upstream connection immediately upon receiving headers.
-  // In future it may be possible for upstream filters to delay this, or influence connection
+  // In future it may be possible for upstream HTTP filters to delay this, or influence connection
   // creation but for now optimize for minimal latency and fetch the connection
   // as soon as possible.
   conn_pool_->newStream(this);
@@ -390,6 +397,18 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
       if (!streamInfo().requestComplete().has_value()) {
         upstreamLog(AccessLog::AccessLogType::UpstreamPeriodic);
         resetUpstreamLogFlushTimer();
+      }
+      // Both downstream and upstream bytes meters may not be initialized when
+      // the timer goes off, e.g. if it takes longer than the interval for a
+      // connection to be initialized; check for nullptr.
+      auto& downstream_bytes_meter = stream_info_.getDownstreamBytesMeter();
+      auto& upstream_bytes_meter = stream_info_.getUpstreamBytesMeter();
+      const SystemTime now = parent_.callbacks()->dispatcher().timeSource().systemTime();
+      if (downstream_bytes_meter) {
+        downstream_bytes_meter->takeUpstreamPeriodicLoggingSnapshot(now);
+      }
+      if (upstream_bytes_meter) {
+        upstream_bytes_meter->takeUpstreamPeriodicLoggingSnapshot(now);
       }
     });
 
@@ -494,7 +513,7 @@ void UpstreamRequest::setupPerTryTimeout() {
 
 void UpstreamRequest::onPerTryIdleTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream per try idle timeout", *parent_.callbacks());
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   parent_.onPerTryIdleTimeout(*this);
 }
 
@@ -504,7 +523,7 @@ void UpstreamRequest::onPerTryTimeout() {
   if (!parent_.downstreamResponseStarted()) {
     ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks());
 
-    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
+    stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout);
     parent_.onPerTryTimeout(*this);
   } else {
     ENVOY_STREAM_LOG(debug,
@@ -539,7 +558,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
 
   // Mimic an upstream reset.
-  onUpstreamHostSelected(host);
+  onUpstreamHostSelected(host, false);
   onResetStream(reset_reason, transport_failure_reason);
 }
 
@@ -560,22 +579,9 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     upstream_->enableHalfClose();
   }
 
-  if (parent_.requestVcluster()) {
-    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
-    // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
-    // here.
-    parent_.requestVcluster()->stats().upstream_rq_total_.inc();
-  }
-  if (parent_.routeStatsContext().has_value()) {
-    // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
-    // callback. Hence, the upstream request increases the route level upstream_rq_total_ stat
-    // here.
-    parent_.routeStatsContext()->stats().upstream_rq_total_.inc();
-  }
-
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  onUpstreamHostSelected(host);
+  onUpstreamHostSelected(host, true);
 
   if (protocol) {
     stream_info_.protocol(protocol.value());
@@ -593,7 +599,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     upstream_info.setUpstreamNumStreams(info.upstreamInfo()->upstreamNumStreams());
   }
 
-  // Upstream filters might have already created/set a filter state.
+  // Upstream HTTP filters might have already created/set a filter state.
   const StreamInfo::FilterStateSharedPtr& filter_state = info.filterState();
   if (!filter_state) {
     upstream_info.setUpstreamFilterState(
@@ -645,7 +651,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
-  const auto* route_entry = parent_.route()->routeEntry();
+  const auto* route_entry = route().routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
                                    route_entry->appendXfh());
@@ -655,6 +661,12 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   if (parent_.config().flush_upstream_log_on_upstream_stream_) {
     upstreamLog(AccessLog::AccessLogType::UpstreamPoolReady);
+  }
+
+  if (address_provider.connectionID() && stream_info_.downstreamAddressProvider().connectionID()) {
+    ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
+              address_provider.connectionID().value(),
+              stream_info_.downstreamAddressProvider().connectionID().value());
   }
 
   for (auto* callback : upstream_callbacks_) {
@@ -721,14 +733,6 @@ void UpstreamRequest::readDisableOrDefer(bool disable) {
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.upstream_);
-
-  // There are two states we should get this callback in: 1) the watermark was
-  // hit due to writes from a different filter instance over a shared
-  // downstream connection, or 2) the watermark was hit due to THIS filter
-  // instance writing back the "winning" upstream request. In either case we
-  // can disable reads from upstream.
-  ASSERT(!parent_.parent_.finalUpstreamRequest() ||
-         &parent_ == parent_.parent_.finalUpstreamRequest());
   parent_.readDisableOrDefer(true);
 }
 
@@ -738,32 +742,12 @@ void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark
 }
 
 void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
-  // If there is only one upstream request, we can be assured that
-  // disabling reads will not slow down other upstream requests. If we've
-  // already seen the full downstream request (downstream_end_stream_) then
-  // disabling reads is a noop.
-  // This assert condition must be true because
-  // parent_.upstreamRequests().size() can only be greater than 1 in the
-  // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
-  // the per try timeout timer is started only after downstream_end_stream_
-  // is true.
-  ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->trafficStats()->upstream_flow_control_backed_up_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
   ++downstream_data_disabled_;
 }
 
 void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
-  // If there is only one upstream request, we can be assured that
-  // disabling reads will not overflow any write buffers in other upstream
-  // requests. If we've already seen the full downstream request
-  // (downstream_end_stream_) then enabling reads is a noop.
-  // This assert condition must be true because
-  // parent_.upstreamRequests().size() can only be greater than 1 in the
-  // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
-  // the per try timeout timer is started only after downstream_end_stream_
-  // is true.
-  ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
   parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
   ASSERT(downstream_data_disabled_ != 0);

@@ -14,18 +14,19 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
-absl::optional<std::reference_wrapper<ShadowRouterHandle>>
-ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
-                         TransportType original_transport, ProtocolType original_protocol) {
+OptRef<ShadowRouterHandle> ShadowWriterImpl::submit(const std::string& cluster_name,
+                                                    MessageMetadataSharedPtr metadata,
+                                                    TransportType original_transport,
+                                                    ProtocolType original_protocol) {
   auto shadow_router = std::make_unique<ShadowRouterImpl>(*this, cluster_name, metadata,
                                                           original_transport, original_protocol);
   const bool created = shadow_router->createUpstreamRequest();
-  if (!created) {
+  if (!created || !tls_.get().has_value()) {
     stats_.named_.shadow_request_submit_failure_.inc();
     return absl::nullopt;
   }
 
-  auto& active_routers = tls_->getTyped<ActiveRouters>().activeRouters();
+  auto& active_routers = tls_->activeRouters();
 
   LinkedList::moveIntoList(std::move(shadow_router), active_routers);
   return *active_routers.front();
@@ -268,6 +269,7 @@ bool ShadowRouterImpl::waitingForConnection() const {
 }
 
 void ShadowRouterImpl::maybeCleanup() {
+  ENVOY_LOG(debug, "maybeCleanup, removed: {}, router_destroyed: {}", removed_, router_destroyed_);
   if (removed_) {
     return;
   }

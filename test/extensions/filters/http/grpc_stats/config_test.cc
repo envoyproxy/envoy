@@ -15,7 +15,6 @@
 
 using testing::_;
 using testing::Property;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +26,8 @@ class GrpcStatsFilterConfigTest : public testing::Test {
 protected:
   void initialize() {
     GrpcStatsFilterConfigFactory factory;
-    Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config_, "stats", context_);
+    Http::FilterFactoryCb cb =
+        factory.createFilterFactoryFromProto(config_, "stats", context_).value();
     Http::MockFilterChainFactoryCallbacks filter_callback;
 
     ON_CALL(filter_callback, addStreamFilter(_)).WillByDefault(testing::SaveArg<0>(&filter_));
@@ -471,79 +471,7 @@ TEST_F(GrpcStatsFilterConfigTest, DisableStatsForAllMethods) {
 
 // Test that any method results in a specific stat, when stats_for_all_methods isn't set
 // at all.
-//
-// This is deprecated behavior and will be changed during the deprecation window.
 TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSetting) {
-  EXPECT_CALL(
-      context_.runtime_loader_.snapshot_,
-      deprecatedFeatureEnabled(
-          "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
-      .WillOnce(Invoke([](absl::string_view, bool default_value) { return default_value; }));
-  initialize();
-
-  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
-                                                 {":path", "/BadCompanions/GetBadCompanions"}};
-
-  doRequestResponse(request_headers);
-
-  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
-                     .value());
-  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
-                     .value());
-  EXPECT_EQ(
-      1UL,
-      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
-  EXPECT_EQ(1UL,
-            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
-}
-
-// Test that any method results in a specific stat, when stats_for_all_methods isn't set
-// at all.
-//
-// This is deprecated behavior and will be changed during the deprecation window.
-TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrideTrue) {
-  EXPECT_CALL(
-      context_.runtime_loader_.snapshot_,
-      deprecatedFeatureEnabled(
-          "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
-      .WillOnce(Return(true));
-  EXPECT_LOG_CONTAINS("warn",
-                      "Using deprecated default value for "
-                      "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
-                      "methods'",
-                      initialize());
-
-  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
-                                                 {":path", "/BadCompanions/GetBadCompanions"}};
-
-  doRequestResponse(request_headers);
-
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
-                     .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
-                     .value());
-  EXPECT_EQ(
-      0UL,
-      decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
-  EXPECT_EQ(0UL,
-            decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
-}
-
-// Test that the runtime override for the deprecated previous default behavior works.
-TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSettingRuntimeOverrideFalse) {
-  EXPECT_CALL(
-      context_.runtime_loader_.snapshot_,
-      deprecatedFeatureEnabled(
-          "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
-      .WillOnce(Return(false));
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},

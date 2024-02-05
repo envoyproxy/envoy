@@ -36,6 +36,7 @@ envoy_cc_test(
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -45,6 +46,7 @@ envoy_cc_test(
     srcs = ["json_sanitizer_test.cc"],
     deps = [
         ":json_sanitizer_test_util_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/json:json_internal_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
@@ -70,6 +72,17 @@ envoy_cc_fuzz_test(
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
         "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "json_streamer_test",
+    srcs = ["json_streamer_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/json:json_internal_lib",
+        "//source/common/json:json_streamer_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

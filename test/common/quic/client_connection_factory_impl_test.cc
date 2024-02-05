@@ -1,7 +1,7 @@
 #include <chrono>
 
 #include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -32,6 +32,8 @@ protected:
     auto* protocol_options = cluster_->http3_options_.mutable_quic_protocol_options();
     protocol_options->mutable_max_concurrent_streams()->set_value(43);
     protocol_options->mutable_initial_stream_window_size()->set_value(65555);
+    protocol_options->set_connection_options("5RTO,ACKD");
+    protocol_options->set_client_connection_options("6RTO,AKD4");
     quic_info_ = createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
     EXPECT_EQ(quic_info_->quic_config_.max_time_before_crypto_handshake(),
               quic::QuicTime::Delta::FromSeconds(10));
@@ -41,9 +43,21 @@ protected:
               protocol_options->max_concurrent_streams().value());
     EXPECT_EQ(quic_info_->quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
               protocol_options->initial_stream_window_size().value());
-    ASSERT_TRUE(quic_info_->quic_config_.HasSendConnectionOptions());
-    EXPECT_TRUE(
-        quic::ContainsQuicTag(quic_info_->quic_config_.SendConnectionOptions(), quic::kRVCM));
+    EXPECT_EQ(2, quic_info_->quic_config_.SendConnectionOptions().size());
+    std::string quic_copts = "";
+    for (auto& copt : quic_info_->quic_config_.SendConnectionOptions()) {
+      quic_copts.append(quic::QuicTagToString(copt));
+    }
+    EXPECT_EQ(quic_copts, "5RTOACKD");
+    EXPECT_EQ(
+        2, quic_info_->quic_config_.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT)
+               .size());
+    std::string quic_ccopts = "";
+    for (auto& ccopt :
+         quic_info_->quic_config_.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT)) {
+      quic_ccopts.append(quic::QuicTagToString(ccopt));
+    }
+    EXPECT_EQ(quic_ccopts, "6RTOAKD4");
 
     test_address_ = Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
@@ -78,13 +92,12 @@ protected:
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
-
   const int port = 30;
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
-      nullptr, connection_id_generator_);
+      nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -93,6 +106,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   EXPECT_EQ(highWatermark(session), 45);
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
   EXPECT_NE(absl::nullopt, session->lastRoundTripTime());
+  EXPECT_THAT(session->GetAlpnsToOffer(), testing::ElementsAre("h3"));
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -111,7 +125,7 @@ TEST_P(QuicNetworkConnectionTest, SocketOptions) {
       *quic_info_, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
-      socket_options, nullptr, connection_id_generator_);
+      socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
@@ -131,7 +145,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       info, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, *store_.rootScope(),
-      nullptr, nullptr, connection_id_generator_);
+      nullptr, nullptr, connection_id_generator_, *factory_);
 
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
 

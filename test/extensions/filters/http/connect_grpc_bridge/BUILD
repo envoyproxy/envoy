@@ -32,7 +32,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/connect_grpc_bridge:filter_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:global_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -61,7 +60,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/connect_grpc_bridge:end_stream_response_lib",
         "//test/test_common:global_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

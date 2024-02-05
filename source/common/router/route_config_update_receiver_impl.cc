@@ -26,10 +26,10 @@ void rebuildRouteConfigVirtualHosts(
     envoy::config::route::v3::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
   for (const auto& vhost : rds_vhosts) {
-    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+    route_config.mutable_virtual_hosts()->Add()->CheckTypeAndMergeFrom(vhost.second);
   }
   for (const auto& vhost : vhds_vhosts) {
-    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+    route_config.mutable_virtual_hosts()->Add()->CheckTypeAndMergeFrom(vhost.second);
   }
 }
 
@@ -45,8 +45,8 @@ ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
                                bool validate_clusters_default) const {
   ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
   return std::make_shared<ConfigImpl>(
-      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc), optional_http_filters_,
-      factory_context, validator_, validate_clusters_default);
+      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc), factory_context,
+      validator_, validate_clusters_default);
 }
 
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
@@ -56,7 +56,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
     return false;
   }
   auto new_route_config = std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-  new_route_config->CopyFrom(rc);
+  new_route_config->CheckTypeAndMergeFrom(rc);
   const uint64_t new_vhds_config_hash =
       new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
   if (new_route_config->has_vhds()) {
@@ -102,7 +102,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 
   auto route_config_after_this_update =
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-  route_config_after_this_update->CopyFrom(base_.protobufConfiguration());
+  route_config_after_this_update->CheckTypeAndMergeFrom(base_.protobufConfiguration());
   rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhosts_after_this_update,
                                  *route_config_after_this_update);
 

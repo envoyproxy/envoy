@@ -15,7 +15,7 @@ namespace ClusterProvided {
 namespace {
 
 TEST(ClusterProvidedConfigTest, ClusterProvidedConfigTest) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Upstream::MockClusterInfo> cluster_info;
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
@@ -29,7 +29,7 @@ TEST(ClusterProvidedConfigTest, ClusterProvidedConfigTest) {
   EXPECT_EQ("envoy.load_balancing_policies.cluster_provided", factory.name());
 
   auto thread_aware_lb =
-      factory.create(cluster_info, main_thread_priority_set, context.runtime_loader_,
+      factory.create({}, cluster_info, main_thread_priority_set, context.runtime_loader_,
                      context.api_.random_, context.time_system_);
   EXPECT_EQ(nullptr, thread_aware_lb);
 }

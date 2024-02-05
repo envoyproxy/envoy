@@ -1,17 +1,30 @@
 #include "source/extensions/common/aws/utility.h"
 
+#include "test/extensions/common/aws/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::ElementsAre;
+using testing::InSequence;
+using testing::NiceMock;
 using testing::Pair;
+using testing::Ref;
+using testing::Return;
+using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 namespace {
+
+MATCHER_P(WithName, expectedName, "") {
+  *result_listener << "\nexpected { name: \"" << expectedName << "\"} but got {name: \""
+                   << arg.name() << "\"}\n";
+  return ExplainMatchResult(expectedName, arg.name(), result_listener);
+}
 
 // Headers must be in alphabetical order by virtue of std::map
 TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
@@ -344,6 +357,80 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   std::map<std::string, std::string> headers;
   const auto names = Utility::joinCanonicalHeaderNames(headers);
   EXPECT_EQ("", names);
+}
+
+// Verify that we don't add a thread local cluster if it already exists.
+TEST(UtilityTest, ThreadLocalClusterExistsAlready) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _)).Times(0);
+  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name",
+                                                envoy::config::cluster::v3::Cluster::STATIC, ""));
+}
+
+// Verify that if thread local cluster doesn't exist we can create a new one.
+TEST(UtilityTest, AddStaticClusterSuccess) {
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
+  EXPECT_TRUE(Utility::addInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
+}
+
+// Handle exception when adding thread local cluster fails.
+TEST(UtilityTest, AddStaticClusterFailure) {
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _))
+      .WillOnce(Throw(EnvoyException("exeption message")));
+  EXPECT_FALSE(Utility::addInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
+}
+
+// Verify that for uri argument in addInternalClusterStatic port value is optional
+// and can contain request path which will be ignored.
+TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
+  NiceMock<Upstream::MockClusterManager> cm_;
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
+  EXPECT_TRUE(Utility::addInternalClusterStatic(
+      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something"));
+}
+
+// The region is simply interpolated into sts.{}.amazonaws.com for most regions
+// https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetNormalAndFipsSTSEndpoints) {
+  EXPECT_EQ("sts.ap-south-1.amazonaws.com", Utility::getSTSEndpoint("ap-south-1"));
+  EXPECT_EQ("sts.some-new-region.amazonaws.com", Utility::getSTSEndpoint("some-new-region"));
+#ifdef ENVOY_SSL_FIPS
+  // Under FIPS mode the Envoy should fetch the credentials from FIPS the dedicated endpoints.
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+  EXPECT_EQ("sts-fips.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+  EXPECT_EQ("sts-fips.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+  EXPECT_EQ("sts-fips.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+  // Even if FIPS mode is enabled ca-central-1 doesn't have a dedicated fips endpoint yet.
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+#else
+  EXPECT_EQ("sts.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+  EXPECT_EQ("sts.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+  EXPECT_EQ("sts.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+  EXPECT_EQ("sts.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+#endif
+}
+
+// China regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetChinaSTSEndpoints) {
+  EXPECT_EQ("sts.cn-north-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-north-1"));
+  EXPECT_EQ("sts.cn-northwest-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-northwest-1"));
+}
+
+// GovCloud regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetGovCloudSTSEndpoints) {
+  // No difference between fips vs non-fips endpoints in GovCloud.
+  EXPECT_EQ("sts.us-gov-east-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-east-1"));
+  EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
 } // namespace

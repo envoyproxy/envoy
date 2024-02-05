@@ -19,8 +19,9 @@ public:
   explicit ApiListenerManagerImpl(Instance& server);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
-                           const std::string& version_info, bool added_via_api) override;
+  absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                                           const std::string& version_info,
+                                           bool added_via_api) override;
   void createLdsApi(const envoy::config::core::v3::ConfigSource&,
                     const xds::core::v3::ResourceLocator*) override {}
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners(ListenerState) override {
@@ -28,8 +29,8 @@ public:
   }
   uint64_t numConnections() const override { return 0; }
   bool removeListener(const std::string&) override { return true; }
-  void startWorkers(GuardDog&, std::function<void()> callback) override { callback(); }
-  void stopListeners(StopListenersType) override {}
+  void startWorkers(OptRef<GuardDog>, std::function<void()> callback) override { callback(); }
+  void stopListeners(StopListenersType, const Network::ExtraShutdownListenerOptions&) override {}
   void stopWorkers() override {}
   void beginListenerUpdate() override {}
   void endListenerUpdate(FailureStates&&) override {}

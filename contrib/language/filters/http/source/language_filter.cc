@@ -31,9 +31,10 @@ bool validateHeaderValue(absl::string_view value_str) {
 
 LanguageFilterConfigImpl::LanguageFilterConfigImpl(
     const std::shared_ptr<icu::Locale> default_locale,
-    const std::shared_ptr<icu::LocaleMatcher> locale_matcher, const std::string& stats_prefix,
-    Stats::Scope& scope)
+    const std::shared_ptr<icu::LocaleMatcher> locale_matcher, const bool clear_route_cache,
+    const std::string& stats_prefix, Stats::Scope& scope)
     : default_locale_(std::move(default_locale)), locale_matcher_(std::move(locale_matcher)),
+      clear_route_cache_(clear_route_cache),
       stats_(LanguageFilter::generateStats(stats_prefix, scope)) {}
 
 const std::shared_ptr<icu::Locale>& LanguageFilterConfigImpl::defaultLocale() const {
@@ -43,6 +44,8 @@ const std::shared_ptr<icu::Locale>& LanguageFilterConfigImpl::defaultLocale() co
 const std::shared_ptr<icu::LocaleMatcher>& LanguageFilterConfigImpl::localeMatcher() const {
   return locale_matcher_;
 }
+
+bool LanguageFilterConfigImpl::clearRouteCache() const { return clear_route_cache_; }
 
 LanguageStats& LanguageFilterConfigImpl::stats() { return stats_; }
 
@@ -76,6 +79,12 @@ Http::FilterHeadersStatus LanguageFilter::decodeHeaders(Http::RequestHeaderMap& 
         if (U_SUCCESS(errorCode)) {
           if (!language_tag.empty()) {
             request_headers.addCopy(Language, language_tag);
+
+            if (config_->clearRouteCache()) {
+              ENVOY_LOG(debug, "clearing route cache");
+              decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+            }
+
             config_->stats().header_.inc();
 
             return Http::FilterHeadersStatus::Continue;

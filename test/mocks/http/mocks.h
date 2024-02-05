@@ -202,7 +202,8 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(FilterChainManager& manager, bool) const override {
+  bool createFilterChain(FilterChainManager& manager, bool,
+                         const FilterChainOptions&) const override {
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
@@ -269,6 +270,11 @@ public:
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
   MOCK_METHOD(absl::string_view, filterConfigName, (), (const override));
+  MOCK_METHOD(RequestHeaderMapOptRef, requestHeaders, ());
+  MOCK_METHOD(RequestTrailerMapOptRef, requestTrailers, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, informationalHeaders, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
 
   // Http::StreamDecoderFilterCallbacks
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -278,15 +284,12 @@ public:
                        absl::string_view details);
 
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override { encode1xxHeaders_(*headers); }
-  MOCK_METHOD(ResponseHeaderMapOptRef, informationalHeaders, (), (const));
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override {
     stream_info_.setResponseCodeDetails(details);
     encodeHeaders_(*headers, end_stream);
   }
-  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, (), (const));
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override { encodeTrailers_(*trailers); }
-  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, (), (const));
   void encodeMetadata(MetadataMapPtr&& metadata_map) override {
     encodeMetadata_(std::move(metadata_map));
   }
@@ -315,8 +318,9 @@ public:
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
-  MOCK_METHOD(void, setUpstreamOverrideHost, (absl::string_view host));
-  MOCK_METHOD(absl::optional<absl::string_view>, upstreamOverrideHost, (), (const));
+  MOCK_METHOD(void, setUpstreamOverrideHost, (Upstream::LoadBalancerContext::OverrideHost));
+  MOCK_METHOD(absl::optional<Upstream::LoadBalancerContext::OverrideHost>, upstreamOverrideHost, (),
+              (const));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -362,6 +366,11 @@ public:
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
   MOCK_METHOD(absl::string_view, filterConfigName, (), (const override));
+  MOCK_METHOD(RequestHeaderMapOptRef, requestHeaders, ());
+  MOCK_METHOD(RequestTrailerMapOptRef, requestTrailers, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, informationalHeaders, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
@@ -862,8 +871,12 @@ public:
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
     expected_headers_.iterate(saveHeaders(&expected_headers_vec));
 
-    return ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
-                              listener);
+    if (!ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
+                            listener)) {
+      *listener << "\nActual headers:\n" << headers;
+      return false;
+    }
+    return true;
   }
 
   void DescribeTo(std::ostream* os) const override {
@@ -898,6 +911,27 @@ IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers
 
 MATCHER_P(HeaderMapEqual, rhs, "") {
   const bool equal = (*arg == *rhs);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("header map:") << "\n"
+                     << *rhs << TestUtility::addLeftAndRightPadding("is not equal to:") << "\n"
+                     << *arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
+MATCHER_P(HeaderMapEqualWithMaxSize, rhs, "") {
+  bool equal = (*arg == *rhs);
+
+  // Check the max header count and size of the HeaderMap also equal.
+  if (equal) {
+    if (arg->maxHeadersCount() != rhs->maxHeadersCount() ||
+        arg->maxHeadersKb() != rhs->maxHeadersKb()) {
+      equal = false;
+    }
+  }
+
   if (!equal) {
     *result_listener << "\n"
                      << TestUtility::addLeftAndRightPadding("header map:") << "\n"

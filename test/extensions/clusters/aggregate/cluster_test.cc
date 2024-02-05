@@ -12,6 +12,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -33,8 +34,8 @@ class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testin
 public:
   AggregateClusterTest()
       : stat_names_(server_context_.store_.symbolTable()),
-        stats_(Upstream::ClusterInfoImpl::generateStats(*server_context_.store_.rootScope(),
-                                                        stat_names_)) {
+        traffic_stats_(Upstream::ClusterInfoImpl::generateStats(server_context_.store_.rootScope(),
+                                                                stat_names_, false)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
 
@@ -73,7 +74,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, 100);
+        nullptr, hosts, {}, absl::nullopt, 100);
   }
 
   void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
@@ -83,7 +84,7 @@ public:
         priority,
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts, {}, 100);
+        nullptr, hosts, {}, absl::nullopt, 100);
   }
 
   void setupPrioritySet() {
@@ -123,7 +124,7 @@ public:
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
-    lb_ = lb_factory_->create();
+    lb_ = lb_factory_->create(lb_params_);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -137,7 +138,7 @@ public:
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
   Upstream::ClusterTrafficStatNames stat_names_;
-  Upstream::LazyClusterTrafficStats stats_;
+  Upstream::DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{
@@ -145,6 +146,10 @@ public:
   NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
+
+  // Just use this as parameters of create() method but thread aware load balancer will not use it.
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
 
   const std::string default_yaml_config_ = R"EOF(
     name: aggregate_cluster

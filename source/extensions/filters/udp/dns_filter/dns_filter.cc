@@ -20,9 +20,12 @@ static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
     const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config)
-    : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
+    : root_scope_(context.scope()),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
+      api_(context.serverFactoryContext().api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),
-      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.api().randomGenerator()) {
+      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT),
+      random_(context.serverFactoryContext().api().randomGenerator()) {
   using envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
@@ -197,16 +200,18 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
 
   const auto& datasource = config.external_dns_table();
   bool data_source_loaded = false;
-  try {
+  TRY_NEEDS_AUDIT {
     // Data structure is deduced from the file extension. If the data is not read an exception
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
     MessageUtil::loadFromFile(datasource.filename(), table,
                               ProtobufMessage::getNullValidationVisitor(), api_);
     data_source_loaded = true;
-  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
+  }
+  END_TRY catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;
@@ -497,7 +502,7 @@ bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRe
   size_t cluster_endpoints = 0;
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(lookup_name);
   if (cluster != nullptr) {
-    // TODO(abaptiste): consider using host weights when returning answer addresses
+    // TODO(suniltheta): consider using host weights when returning answer addresses
     const std::chrono::seconds ttl = getDomainTTL(lookup_name);
 
     for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {

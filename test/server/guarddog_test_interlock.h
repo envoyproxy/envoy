@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/thread/thread.h"
 
 #include "source/server/guarddog_impl.h"

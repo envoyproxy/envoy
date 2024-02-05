@@ -24,6 +24,7 @@
 #include "source/common/http/http1/header_formatter.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
@@ -130,11 +131,8 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers")) {
-    // Don't consider 100-continue responses as the actual response.
-    started_response_ = false;
-  }
+  // Don't consider 100-continue responses as the actual response.
+  started_response_ = false;
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
@@ -978,6 +976,10 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
+ExecutionContext* ConnectionImpl::executionContext() const {
+  return getConnectionExecutionContext(connection_);
+}
+
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
@@ -1071,6 +1073,9 @@ ServerConnectionImpl::ServerConnectionImpl(
       headers_with_underscores_action_(headers_with_underscores_action),
       abort_dispatch_(
           overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
+  ENVOY_LOG_ONCE_IF(trace, abort_dispatch_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http1_server_abort_dispatch is not "
+                    "found. Is it configured?");
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
@@ -1111,6 +1116,11 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // This forces the behavior to be backwards compatible with the old codec behavior.
   // CONNECT "urls" are actually host:port so look like absolute URLs to the above checks.
   // Absolute URLS in CONNECT requests will be rejected below by the URL class validation.
+
+  /**
+   * @param scheme the scheme to validate
+   * @return bool true if the scheme is http.
+   */
   if (!codec_settings_.allow_absolute_url_ && !is_connect) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return okStatus();
@@ -1132,18 +1142,13 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme")) {
-      headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
-    } else {
-      headers.setScheme(absolute_url.scheme());
-    }
-    if (!HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+    headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
+    if (!Utility::schemeIsValid(headers.getSchemeValue())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
       return codecProtocolError("http/1.1 protocol error: invalid scheme");
     }
-    if (codec_settings_.validate_scheme_ &&
-        absolute_url.scheme() == header_values.SchemeValues.Https && !connection().ssl()) {
+    if (codec_settings_.validate_scheme_ && Utility::schemeIsHttps(absolute_url.scheme()) &&
+        !connection().ssl()) {
       error_code_ = Http::Code::Forbidden;
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpsInPlaintext));
       return codecProtocolError("http/1.1 protocol error: https in the clear");

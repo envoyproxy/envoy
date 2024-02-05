@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "codec_impl_test",
+    size = "large",
     srcs = ["codec_impl_test.cc"],
     external_deps = [
         "quiche_http2_adapter",
@@ -179,6 +180,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -189,6 +191,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

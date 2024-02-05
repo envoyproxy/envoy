@@ -173,6 +173,9 @@ public:
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
 
   uint64_t streamId() const override { return stream_id_; }
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
+    return server_factory_context_;
+  }
 
 private:
   const bool use_post_;
@@ -184,6 +187,7 @@ private:
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   uint64_t stream_id_;
+  Server::Configuration::ServerFactoryContext& server_factory_context_;
 };
 
 /**
@@ -194,9 +198,9 @@ public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
                  Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.clusterManager().allocateOdCdsApi(on_demand_message.odcds_config(),
-                                                         OptRef<xds::core::v3::ResourceLocator>(),
-                                                         context.messageValidationVisitor())),
+      : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
+            on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
+            context.messageValidationVisitor())),
         lookup_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
         stats_(generateStats(scope)) {}
@@ -383,6 +387,7 @@ class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
+  absl::optional<std::string> serializeAsString() const override { return cluster_; }
   static const std::string& key();
 
 private:
@@ -429,6 +434,10 @@ public:
   }
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
+  }
+
+  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return &read_callbacks_->connection().streamInfo();
   }
 
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
@@ -514,12 +523,14 @@ public:
                         const absl::optional<Grpc::Status::GrpcStatus>,
                         absl::string_view) override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
-    Http::ResponseHeaderMapOptRef informationalHeaders() const override { return {}; }
+    Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
     void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
-    Http::ResponseHeaderMapOptRef responseHeaders() const override { return {}; }
+    Http::ResponseHeaderMapOptRef responseHeaders() override { return {}; }
     void encodeData(Buffer::Instance&, bool) override {}
+    Http::RequestHeaderMapOptRef requestHeaders() override { return {}; }
+    Http::RequestTrailerMapOptRef requestTrailers() override { return {}; }
     void encodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
-    Http::ResponseTrailerMapOptRef responseTrailers() const override { return {}; }
+    Http::ResponseTrailerMapOptRef responseTrailers() override { return {}; }
     void encodeMetadata(Http::MetadataMapPtr&&) override {}
     // TODO(vikaschoudhary16): Implement watermark callbacks and test through flow control e2es.
     void onDecoderFilterAboveWriteBufferHighWatermark() override {}
@@ -535,7 +546,11 @@ public:
       return nullptr;
     }
     Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
-    void setUpstreamOverrideHost(absl::string_view) override {}
+    void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
+    absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+    upstreamOverrideHost() const override {
+      return absl::nullopt;
+    }
     void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
       tracked_object_stack.add(*this);
     }
@@ -545,9 +560,9 @@ public:
     OptRef<Http::DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
     OptRef<Http::UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
     void resetIdleTimer() override {}
-    absl::optional<absl::string_view> upstreamOverrideHost() const override {
-      return absl::nullopt;
-    }
+    // absl::optional<absl::string_view> upstreamOverrideHost() const override {
+    //   return absl::nullopt;
+    // }
     absl::string_view filterConfigName() const override { return ""; }
 
     // ScopeTrackedObject
@@ -609,6 +624,7 @@ protected:
   void onMaxDownstreamConnectionDuration();
   void onAccessLogFlushInterval();
   void resetAccessLogFlushTimer();
+  void flushAccessLog(AccessLog::AccessLogType access_log_type);
   void disableAccessLogFlushTimer();
 
   const ConfigSharedPtr config_;
@@ -632,6 +648,10 @@ protected:
   // This will be non-null from when an upstream connection is attempted until
   // it either succeeds or fails.
   std::unique_ptr<GenericConnPool> generic_conn_pool_;
+  // Time the filter first attempted to connect to the upstream after the
+  // cluster is discovered. Capture the first time as the filter may try multiple times to connect
+  // to the upstream.
+  absl::optional<MonotonicTime> initial_upstream_connection_start_time_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;

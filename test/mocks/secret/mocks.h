@@ -18,7 +18,7 @@ public:
   MockSecretManager();
   ~MockSecretManager() override;
 
-  MOCK_METHOD(void, addStaticSecret,
+  MOCK_METHOD(absl::Status, addStaticSecret,
               (const envoy::extensions::transport_sockets::tls::v3::Secret& secret));
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findStaticTlsCertificateProvider,
               (const std::string& name), (const));

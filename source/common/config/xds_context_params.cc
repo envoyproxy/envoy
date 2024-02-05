@@ -43,8 +43,7 @@ void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
                        const ProtobufWkt::Struct& metadata, const std::string& prefix) {
 #ifdef ENVOY_ENABLE_YAML
   for (const auto& it : metadata.fields()) {
-    ProtobufUtil::StatusOr<std::string> json_or_error =
-        MessageUtil::getJsonStringFromMessage(it.second);
+    absl::StatusOr<std::string> json_or_error = MessageUtil::getJsonStringFromMessage(it.second);
     ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
     if (json_or_error.ok()) {
       params[prefix + it.first] = json_or_error.value();
@@ -54,7 +53,7 @@ void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
   UNREFERENCED_PARAMETER(params);
   UNREFERENCED_PARAMETER(metadata);
   UNREFERENCED_PARAMETER(prefix);
-  throw EnvoyException("JSON/YAML support compiled out");
+  IS_ENVOY_BUG("JSON/YAML support compiled out");
 #endif
 }
 

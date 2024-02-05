@@ -10,8 +10,6 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -20,7 +18,6 @@ option java_outer_classname = "ExtProcProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3;ext_procv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External Processing Filter]
 // External Processing Filter
@@ -31,8 +28,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // **Current Implementation Status:**
 // All options and processing modes are implemented except for the following:
 //
-// * Request and response attributes are not sent and not processed.
-// * Dynamic metadata in responses from the external processor is ignored.
 // * "async mode" is not implemented.
 
 // The filter communicates with an external gRPC service called an "external processor"
@@ -54,16 +49,15 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * Whether subsequent HTTP requests are transmitted synchronously or whether they are
 //   sent asynchronously.
 // * To modify request or response trailers if they already exist
-// * To add request or response trailers where they are not present
 //
 // The filter supports up to six different processing steps. Each is represented by
 // a gRPC stream message that is sent to the external processor. For each message, the
 // processor must send a matching response.
 //
 // * Request headers: Contains the headers from the original HTTP request.
-// * Request body: Sent in a single message if the BUFFERED or BUFFERED_PARTIAL
-//   mode is chosen, in multiple messages if the STREAMED mode is chosen, and not
-//   at all otherwise.
+// * Request body: Delivered if they are present and sent in a single message if
+//   the BUFFERED or BUFFERED_PARTIAL mode is chosen, in multiple messages if the
+//   STREAMED mode is chosen, and not at all otherwise.
 // * Request trailers: Delivered if they are present and if the trailer mode is set
 //   to SEND.
 // * Response headers: Contains the headers from the HTTP response. Keep in mind
@@ -102,7 +96,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 15]
+// [#next-free-field: 17]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -129,7 +123,6 @@ message ExternalProcessor {
   // for a reply.
   bool async_mode = 4;
 
-  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the request_headers message.
@@ -137,7 +130,6 @@ message ExternalProcessor {
   // for the list of supported attributes and their types.
   repeated string request_attributes = 5;
 
-  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the response_headers message.
@@ -203,13 +195,64 @@ message ExternalProcessor {
   // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
   // If not set, ``mode_override`` API in the response message will be ignored.
   bool allow_mode_override = 14;
+
+  // If set to true, ignore the
+  // :ref:`immediate_response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>`
+  // message in an external processor response. In such case, no local reply will be sent.
+  // Instead, the stream to the external processor will be closed. There will be no
+  // more external processing for this stream from now on.
+  bool disable_immediate_response = 15;
+
+  // Options related to the sending and receiving of dynamic metadata.
+  MetadataOptions metadata_options = 16;
+}
+
+// The MetadataOptions structure defines options for the sending and receiving of
+// dynamic metadata. Specifically, which namespaces to send to the server, whether
+// metadata returned by the server may be written, and how that metadata may be written.
+message MetadataOptions {
+  message MetadataNamespaces {
+    // Specifies a list of metadata namespaces whose values, if present,
+    // will be passed to the ext_proc service as an opaque *protobuf::Struct*.
+    repeated string untyped = 1;
+
+    // Specifies a list of metadata namespaces whose values, if present,
+    // will be passed to the ext_proc service as a *protobuf::Any*. This allows
+    // envoy and the external processing server to share the protobuf message
+    // definition for safe parsing.
+    repeated string typed = 2;
+  }
+
+  // Describes which typed or untyped dynamic metadata namespaces to forward to
+  // the external processing server.
+  MetadataNamespaces forwarding_namespaces = 1;
+
+  // Describes which typed or untyped dynamic metadata namespaces to accept from
+  // the external processing server. Set to empty or leave unset to disallow writing
+  // any received dynamic metadata. Receiving of typed metadata is not supported.
+  MetadataNamespaces receiving_namespaces = 2;
 }
 
 // The HeaderForwardingRules structure specifies what headers are
 // allowed to be forwarded to the external processing server.
+//
+// This works as below:
+//
+//   1. If neither ``allowed_headers`` nor ``disallowed_headers`` is set, all headers are forwarded.
+//   2. If both ``allowed_headers`` and ``disallowed_headers`` are set, only headers in the
+//      ``allowed_headers`` but not in the ``disallowed_headers`` are forwarded.
+//   3. If ``allowed_headers`` is set, and ``disallowed_headers`` is not set, only headers in
+//      the ``allowed_headers`` are forwarded.
+//   4. If ``disallowed_headers`` is set, and ``allowed_headers`` is not set, all headers except
+//      headers in the ``disallowed_headers`` are forwarded.
 message HeaderForwardingRules {
-  // If not set, all headers are forwarded to the external processing server.
+  // If set, specifically allow any header in this list to be forwarded to the external
+  // processing server. This can be overridden by the below ``disallowed_headers``.
   type.matcher.v3.ListStringMatcher allowed_headers = 1;
+
+  // If set, specifically disallow any header in this list to be forwarded to the external
+  // processing server. This overrides the above ``allowed_headers`` if a header matches both.
+  type.matcher.v3.ListStringMatcher disallowed_headers = 2;
 }
 
 // Extra settings that may be added to per-route configuration for a
@@ -230,7 +273,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -251,4 +294,11 @@ message ExtProcOverrides {
 
   // Set a different gRPC service for this route than the default.
   config.core.v3.GrpcService grpc_service = 5;
+
+  // Options related to the sending and receiving of dynamic metadata.
+  // Lists of forwarding and receiving namespaces will be overridden in their entirety,
+  // meaning the most-specific config that specifies this override will be the final
+  // config used. It is the prerogative of the control plane to ensure this
+  // most-specific config contains the correct final overrides.
+  MetadataOptions metadata_options = 6;
 }

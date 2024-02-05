@@ -49,11 +49,11 @@ public:
     auto config = std::make_shared<NiceMock<MockConfig>>();
     EXPECT_CALL(*config, stats()).WillRepeatedly(ReturnRef(stat));
     auto context = std::make_shared<NiceMock<Server::Configuration::MockFactoryContext>>();
-    auto filter = std::make_shared<NiceMock<MockConnectionManager>>(*config, random_, time_source_,
-                                                                    *context, nullptr);
+    filter_ = std::make_shared<NiceMock<MockConnectionManager>>(*config, random_, time_source_,
+                                                                *context, nullptr);
 
     auto tra_handler = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandlerDeep>>(
-        *filter, dispatcher_, *tra_config, *context, stream_info_);
+        *filter_, dispatcher_, *tra_config, *context, stream_info_);
 
     auto async_client = std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
 
@@ -78,6 +78,7 @@ public:
   StreamInfo::StreamInfoImpl stream_info_;
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncStream>> async_stream_;
   TrafficRoutingAssistant::ClientPtr tra_client_;
+  std::shared_ptr<ConnectionManager> filter_;
 };
 
 TEST_F(SipTraTest, TraUpdate) {

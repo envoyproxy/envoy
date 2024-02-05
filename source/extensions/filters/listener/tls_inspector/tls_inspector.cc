@@ -26,6 +26,20 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
+namespace {
+
+uint64_t computeClientHelloSize(const BIO* bio, uint64_t prior_bytes_read,
+                                size_t original_bio_length) {
+  const uint8_t* remaining_buffer;
+  size_t remaining_bytes;
+  const int rc = BIO_mem_contents(bio, &remaining_buffer, &remaining_bytes);
+  ASSERT(rc == 1);
+  ASSERT(original_bio_length >= remaining_bytes);
+  const size_t processed_bio_bytes = original_bio_length - remaining_bytes;
+  return processed_bio_bytes + prior_bytes_read;
+}
+
+} // namespace
 
 // Min/max TLS version recognized by the underlying TLS/SSL library.
 const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
@@ -35,12 +49,16 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
     uint32_t max_client_hello_size)
-    : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
+    : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."),
+                                     POOL_HISTOGRAM_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       enable_ja3_fingerprinting_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja3_fingerprinting, false)),
-      max_client_hello_size_(max_client_hello_size) {
-
+      max_client_hello_size_(max_client_hello_size),
+      initial_read_buffer_size_(
+          std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
+                                                   max_client_hello_size),
+                   max_client_hello_size)) {
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
@@ -77,7 +95,9 @@ Config::Config(
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-Filter::Filter(const ConfigSharedPtr& config) : config_(config), ssl_(config_->newSsl()) {
+Filter::Filter(const ConfigSharedPtr& config)
+    : config_(config), ssl_(config_->newSsl()),
+      requested_read_bytes_(config->initialReadBufferSize()) {
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
@@ -130,8 +150,9 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   if (static_cast<uint64_t>(raw_slice.len_) > read_) {
     const uint8_t* data = static_cast<const uint8_t*>(raw_slice.mem_) + read_;
     const size_t len = raw_slice.len_ - read_;
+    const uint64_t bytes_already_processed = read_;
     read_ = raw_slice.len_;
-    ParseState parse_state = parseClientHello(data, len);
+    ParseState parse_state = parseClientHello(data, len, bytes_already_processed);
     switch (parse_state) {
     case ParseState::Error:
       cb_->socket().ioHandle().close();
@@ -148,46 +169,61 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::StopIteration;
 }
 
-ParseState Filter::parseClientHello(const void* data, size_t len) {
-  // Ownership is passed to ssl_ in SSL_set_bio()
+ParseState Filter::parseClientHello(const void* data, size_t len,
+                                    uint64_t bytes_already_processed) {
+  // Ownership remains here though we pass a reference to it in `SSL_set0_rbio()`.
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
   // Make the mem-BIO return that there is more data
-  // available beyond it's end
+  // available beyond it's end.
   BIO_set_mem_eof_return(bio.get(), -1);
 
-  SSL_set_bio(ssl_.get(), bio.get(), bio.get());
-  bio.release();
+  // We only do reading as we abort the handshake early.
+  SSL_set0_rbio(ssl_.get(), bssl::UpRef(bio).release());
 
   int ret = SSL_do_handshake(ssl_.get());
 
   // This should never succeed because an error is always returned from the SNI callback.
   ASSERT(ret <= 0);
-  switch (SSL_get_error(ssl_.get(), ret)) {
-  case SSL_ERROR_WANT_READ:
-    if (read_ == config_->maxClientHelloSize()) {
-      // We've hit the specified size limit. This is an unreasonably large ClientHello;
-      // indicate failure.
-      config_->stats().client_hello_too_large_.inc();
+  ParseState state = [this, ret]() {
+    switch (SSL_get_error(ssl_.get(), ret)) {
+    case SSL_ERROR_WANT_READ:
+      if (read_ == maxConfigReadBytes()) {
+        // We've hit the specified size limit. This is an unreasonably large ClientHello;
+        // indicate failure.
+        config_->stats().client_hello_too_large_.inc();
+        return ParseState::Error;
+      }
+      if (read_ == requested_read_bytes_) {
+        // Double requested bytes up to the maximum configured.
+        requested_read_bytes_ = std::min<uint32_t>(2 * requested_read_bytes_, maxConfigReadBytes());
+      }
+      return ParseState::Continue;
+    case SSL_ERROR_SSL:
+      if (clienthello_success_) {
+        config_->stats().tls_found_.inc();
+        if (alpn_found_) {
+          config_->stats().alpn_found_.inc();
+        } else {
+          config_->stats().alpn_not_found_.inc();
+        }
+        cb_->socket().setDetectedTransportProtocol("tls");
+      } else {
+        config_->stats().tls_not_found_.inc();
+      }
+      return ParseState::Done;
+    default:
       return ParseState::Error;
     }
-    return ParseState::Continue;
-  case SSL_ERROR_SSL:
-    if (clienthello_success_) {
-      config_->stats().tls_found_.inc();
-      if (alpn_found_) {
-        config_->stats().alpn_found_.inc();
-      } else {
-        config_->stats().alpn_not_found_.inc();
-      }
-      cb_->socket().setDetectedTransportProtocol("tls");
-    } else {
-      config_->stats().tls_not_found_.inc();
-    }
-    return ParseState::Done;
-  default:
-    return ParseState::Error;
+  }();
+
+  if (state != ParseState::Continue) {
+    // Record bytes analyzed as we're done processing.
+    config_->stats().bytes_processed_.recordValue(
+        computeClientHelloSize(bio.get(), bytes_already_processed, len));
   }
+
+  return state;
 }
 
 // Google GREASE values (https://datatracker.ietf.org/doc/html/rfc8701)

@@ -1,9 +1,9 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 selects.config_setting_group(
     name = "use_android_system_helper",
@@ -31,8 +31,8 @@ envoy_cc_library(
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
     ] + select({
         ":use_android_system_helper": [
-            "//library/common/jni:android_jni_utility_lib",
-            "//library/common/jni:android_network_utility_lib",
+            "//library/jni:android_jni_utility_lib",
+            "//library/jni:android_network_utility_lib",
         ],
         "//conditions:default": [],
     }) + select({
@@ -63,9 +63,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "lambda_logger_delegate_lib",
-    srcs = ["lambda_logger_delegate.cc"],
-    hdrs = ["lambda_logger_delegate.h"],
+    name = "logger_delegate_lib",
+    srcs = ["logger_delegate.cc"],
+    hdrs = ["logger_delegate.h"],
     repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",

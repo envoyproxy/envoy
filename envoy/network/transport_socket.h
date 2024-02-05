@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
@@ -37,6 +38,15 @@ enum class ConnectionEvent;
  * Result of each I/O event.
  */
 struct IoResult {
+  IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read)
+      : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
+        err_code_(absl::nullopt) {}
+
+  IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read,
+           absl::optional<Api::IoError::IoErrorCode> err_code)
+      : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
+        err_code_(err_code) {}
+
   PostIoAction action_;
 
   /**
@@ -49,6 +59,11 @@ struct IoResult {
    * can only be true for read operations.
    */
   bool end_stream_read_;
+
+  /**
+   * The underlying I/O error code.
+   */
+  absl::optional<Api::IoError::IoErrorCode> err_code_;
 };
 
 /**

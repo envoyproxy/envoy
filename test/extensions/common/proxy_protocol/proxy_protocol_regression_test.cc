@@ -3,13 +3,14 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -45,7 +46,8 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr) {
+        init_manager_(nullptr),
+        listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -56,7 +58,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr,
@@ -71,6 +73,9 @@ public:
     return socket_factories_;
   }
   bool bindToPort() const override { return true; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+  }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
@@ -78,15 +83,11 @@ public:
   Stats::Scope& listenerScope() override { return *stats_store_.rootScope(); }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
   ResourceLimit& openConnections() override { return open_connections_; }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
+  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+    return listener_info_;
   }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
@@ -129,7 +130,7 @@ public:
       read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
-                               const std::vector<Network::FilterFactoryCb>&) -> bool {
+                               const Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
@@ -193,6 +194,8 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
   NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
 };
 
 // Parameterize the listener socket address version.

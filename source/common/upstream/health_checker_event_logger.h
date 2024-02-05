@@ -25,18 +25,17 @@ namespace Upstream {
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
 public:
-  HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, TimeSource& time_source,
-                             const envoy::config::core::v3::HealthCheck& health_check_config,
+  HealthCheckEventLoggerImpl(const envoy::config::core::v3::HealthCheck& health_check_config,
                              Server::Configuration::HealthCheckerFactoryContext& context)
-      : time_source_(time_source) {
+      : time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
 
     // TODO(botengyao): Remove the file_ creation here into the file based health check
     // event sink. In this way you can remove the file_ based code from the createHealthCheckEvent
     if (!health_check_config.event_log_path().empty() /* deprecated */) {
-      file_ = log_manager.createAccessLog(Filesystem::FilePathAndType{
-          Filesystem::DestinationType::File, health_check_config.event_log_path()});
+      file_ = context.serverFactoryContext().accessLogManager().createAccessLog(
+          Filesystem::FilePathAndType{Filesystem::DestinationType::File,
+                                      health_check_config.event_log_path()});
     }
-
     for (const auto& config : health_check_config.event_logger()) {
       auto& factory = Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
       event_sinks_.push_back(factory.createHealthCheckEventSink(config.typed_config(), context));

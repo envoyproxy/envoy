@@ -75,6 +75,7 @@ struct ClientSslTransportOptions {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
   bool use_expired_spiffe_cert_{false};
   bool client_with_intermediate_cert_{false};
+  // It is owned by the caller that invokes `setCustomCertValidatorConfig()`.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
 };
 
@@ -106,6 +107,11 @@ class ContextImplPeer {
 public:
   static const Extensions::TransportSockets::Tls::CertValidator&
   getCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
+    return *context.cert_validator_;
+  }
+
+  static Extensions::TransportSockets::Tls::CertValidator&
+  getMutableCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
     return *context.cert_validator_;
   }
 };

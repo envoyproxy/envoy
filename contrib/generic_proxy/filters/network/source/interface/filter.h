@@ -16,6 +16,20 @@ namespace GenericProxy {
 using ResponseUpdateFunction = std::function<void(Response&)>;
 
 /**
+ * StreamFrameHandler to handle the frames from the stream (if exists).
+ */
+class StreamFrameHandler {
+public:
+  virtual ~StreamFrameHandler() = default;
+
+  /**
+   * Handle the frame from the stream.
+   * @param frame frame from the stream.
+   */
+  virtual void onStreamFrame(StreamFramePtr frame) PURE;
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -33,11 +47,6 @@ public:
    * decoder/encoder.
    */
   virtual const CodecFactory& downstreamCodec() PURE;
-
-  /**
-   * Reset the underlying stream.
-   */
-  virtual void resetStream() PURE;
 
   /**
    * @return const RouteEntry* cached route entry for current request.
@@ -67,88 +76,55 @@ public:
   virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
-   * @return absl::optional<ExtendedOptions> the extended options from downstream request.
-   */
-  virtual absl::optional<ExtendedOptions> requestOptions() const PURE;
-
-  /**
-   * @return absl::optional<ExtendedOptions> the extended options from upstream response.
-   */
-  virtual absl::optional<ExtendedOptions> responseOptions() const PURE;
-
-  /**
    * @return const Network::Connection* downstream connection.
    */
   virtual const Network::Connection* connection() const PURE;
 };
 
-class UpstreamBindingCallback {
-public:
-  virtual ~UpstreamBindingCallback() = default;
-
-  virtual void onBindFailure(ConnectionPool::PoolFailureReason reason,
-                             absl::string_view transport_failure_reason,
-                             Upstream::HostDescriptionConstSharedPtr host) PURE;
-
-  virtual void onBindSuccess(Network::ClientConnection& conn,
-                             Upstream::HostDescriptionConstSharedPtr host) PURE;
-};
-
-class PendingResponseCallback : public ResponseDecoderCallback {
-public:
-  virtual void onConnectionClose(Network::ConnectionEvent event) PURE;
-};
-
-/**
- * The upstream manager is used to manage the upstream connection and the registered upstream
- * or response callbacks.
- */
-class UpstreamManager {
-public:
-  virtual ~UpstreamManager() = default;
-
-  /**
-   * @param callbacks supplies the callback to be called when the upstream connection is ready.
-   */
-  virtual void registerUpstreamCallback(uint64_t stream_id, UpstreamBindingCallback& cb) PURE;
-
-  /**
-   * @param stream_id supplies the stream id of request.
-   */
-  virtual void unregisterUpstreamCallback(uint64_t stream_id) PURE;
-
-  /**
-   * @param cb supplies the callback to be called when the upstream response is ready.
-   */
-  virtual void registerResponseCallback(uint64_t stream_id, PendingResponseCallback& cb) PURE;
-
-  /**
-   * @param stream_id supplies the stream id of request.
-   */
-  virtual void unregisterResponseCallback(uint64_t stream_id) PURE;
-};
-
 class DecoderFilterCallback : public virtual StreamFilterCallbacks {
 public:
-  virtual void sendLocalReply(Status status, ResponseUpdateFunction&& cb = nullptr) PURE;
+  /**
+   * Send local reply directly to the downstream for the current request. Note encoder filters
+   * will be skipped for the local reply for now.
+   * @param status supplies the protocol independent response status to the codec to create
+   * actual response frame or message. Note the actual response code may be different with code
+   * in the status. For example, if the status is Protocol::Status::Ok, the actual response code
+   * may be 200 for HTTP/1.1 or 20 for Dubbo.
+   * The status message will be used as response code details and could be logged.
+   * @param data supplies the additional data to the codec to create actual response frame or
+   * message. This could be anything and is optional.
+   * @param cb supplies the callback to update the response. This is optional and could be nullptr.
+   */
+  virtual void sendLocalReply(Status status, absl::string_view data = {},
+                              ResponseUpdateFunction cb = {}) PURE;
 
   virtual void continueDecoding() PURE;
 
-  virtual void upstreamResponse(ResponsePtr response, ExtendedOptions options) PURE;
+  /**
+   * Called when the upstream response frame is received. This should only be called once.
+   * @param response supplies the upstream response frame.
+   */
+  virtual void onResponseStart(StreamResponsePtr response) PURE;
+
+  /**
+   * Called when the upstream response frame is received. This should only be called once.
+   * @param frame supplies the upstream frame.
+   */
+  virtual void onResponseFrame(StreamFramePtr frame) PURE;
+
+  /**
+   * Register a request frames handler to used to handle the request frames (except the special
+   * StreamRequest frame).
+   * This handler will be Called when the filter chain is completed.
+   * @param handler supplies the request frames handler.
+   *
+   * TODO(wbpcode): this is used by the terminal filter the handle the request frames because
+   * the filter chain doesn't support to handle extra frames. We should remove this when the
+   * filter chain supports to handle extra frames.
+   */
+  virtual void setRequestFramesHandler(StreamFrameHandler& handler) PURE;
 
   virtual void completeDirectly() PURE;
-
-  /**
-   * Try to create a new upstream connection and bind it to the current downstream connection.
-   * This should be called only once for each downstream connection.
-   * @param tcp_pool_data supplies the upstream connection pool.
-   */
-  virtual void bindUpstreamConn(Upstream::TcpPoolData&& tcp_pool_data) PURE;
-
-  /**
-   * @return OptRef<UpstreamManager> the upstream manager for the current downstream connection.
-   */
-  virtual OptRef<UpstreamManager> boundUpstreamConn() PURE;
 };
 
 class EncoderFilterCallback : public virtual StreamFilterCallbacks {
@@ -165,7 +141,7 @@ public:
   virtual void onDestroy() PURE;
 
   virtual void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) PURE;
-  virtual FilterStatus onStreamDecoded(Request& request) PURE;
+  virtual FilterStatus onStreamDecoded(StreamRequest& request) PURE;
 };
 
 class EncoderFilter {
@@ -175,7 +151,7 @@ public:
   virtual void onDestroy() PURE;
 
   virtual void setEncoderFilterCallbacks(EncoderFilterCallback& callbacks) PURE;
-  virtual FilterStatus onStreamEncoded(Response& response) PURE;
+  virtual FilterStatus onStreamEncoded(StreamResponse& response) PURE;
 };
 
 class StreamFilter : public DecoderFilter, public EncoderFilter {};

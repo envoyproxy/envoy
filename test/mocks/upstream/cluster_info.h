@@ -52,6 +52,7 @@ public:
   MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
   MOCK_METHOD(bool, panicModeAny, (), (const));
   MOCK_METHOD(bool, listAsAny, (), (const));
+  MOCK_METHOD(bool, allowRedundantKeys, (), (const));
 
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };
@@ -76,12 +77,25 @@ class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
 
-  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress,
-              (const Network::Address::InstanceConstSharedPtr& address,
-               const Network::ConnectionSocket::OptionsSharedPtr& connection_socket_options),
-              (const));
+  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddressImpl,
+              (const Network::Address::InstanceConstSharedPtr& address), (const));
 
   Network::Address::InstanceConstSharedPtr& address_;
+};
+
+class MockUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
+public:
+  MOCK_METHOD(absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>,
+              createLocalAddressSelector,
+              (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
+               absl::optional<std::string> cluster_name),
+              (const));
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Empty>();
+  }
+
+  std::string name() const override { return "mock.upstream.local.address.selector"; }
 };
 
 class MockClusterInfo : public ClusterInfo {
@@ -126,7 +140,7 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
-  MOCK_METHOD(const ProtobufTypes::MessagePtr&, loadBalancingPolicy, (), (const));
+  MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
   MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
@@ -152,7 +166,7 @@ public:
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
-  MOCK_METHOD(LazyClusterTrafficStats&, trafficStats, (), (const));
+  MOCK_METHOD(DeferredCreationCompatibleClusterTrafficStats&, trafficStats, (), (const));
   MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
   MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
@@ -160,7 +174,8 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (),
+  MOCK_METHOD(bool, perEndpointStatsEnabled, (), (const));
+  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
               (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
@@ -179,7 +194,8 @@ public:
               (const));
 
   MOCK_METHOD(bool, createFilterChain,
-              (Http::FilterChainManager & manager, bool only_create_if_configured),
+              (Http::FilterChainManager & manager, bool only_create_if_configured,
+               const Http::FilterChainOptions& options),
               (const, override));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
@@ -187,7 +203,9 @@ public:
                Http::FilterChainManager& manager),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
-
+  MOCK_METHOD(const absl::optional<
+                  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
+              happyEyeballsConfig, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -212,7 +230,7 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
-  LazyClusterTrafficStats traffic_stats_;
+  mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
   ClusterConfigUpdateStats config_update_stats_;
   ClusterLbStats lb_stats_;
   ClusterEndpointStats endpoint_stats_;
@@ -253,8 +271,9 @@ public:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  ProtobufTypes::MessagePtr load_balancing_policy_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      happy_eyeballs_config_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

@@ -77,6 +77,44 @@ TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
   EXPECT_TRUE(release_callback_called_);
 }
 
+TEST_F(OwnedImplTest, MoveBufferFragment) {
+  Buffer::OwnedImpl buffer1;
+  testing::MockFunction<void(const void*, size_t, const BufferFragmentImpl*)>
+      release_callback_tracker;
+  std::string frag_input("a");
+  BufferFragmentImpl frag(frag_input.c_str(), frag_input.size(),
+                          release_callback_tracker.AsStdFunction());
+  buffer1.addBufferFragment(frag);
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.move(buffer1);
+
+  EXPECT_EQ(0, buffer1.length());
+  EXPECT_EQ(1, buffer2.length());
+
+  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
+  buffer2.drain(buffer2.length());
+}
+
+TEST_F(OwnedImplTest, MoveBufferFragmentWithReleaseDrainTracker) {
+  Buffer::OwnedImpl buffer1;
+  testing::MockFunction<void(const void*, size_t, const BufferFragmentImpl*)>
+      release_callback_tracker;
+  std::string frag_input("a");
+  BufferFragmentImpl frag(frag_input.c_str(), frag_input.size(),
+                          release_callback_tracker.AsStdFunction());
+  buffer1.addBufferFragment(frag);
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.move(buffer1, true);
+
+  EXPECT_EQ(0, buffer1.length());
+  EXPECT_EQ(1, buffer2.length());
+
+  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
+  buffer2.drain(buffer2.length());
+}
+
 TEST_F(OwnedImplTest, AddEmptyFragment) {
   char input[] = "hello world";
   BufferFragmentImpl frag1(input, 11, [](const void*, size_t, const BufferFragmentImpl*) {});
@@ -667,10 +705,10 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   testing::MockFunction<void()> done_tracker;
   EXPECT_CALL(tracker1, Call());
   EXPECT_CALL(drain_tracker, Call(3 * LargeChunk + 108 * SmallChunk, 16384));
-  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
   EXPECT_CALL(tracker2, Call());
-  EXPECT_CALL(release_callback_tracker2, Call(_, _, _));
+  EXPECT_CALL(release_callback_tracker, Call(_, _, _));
   EXPECT_CALL(tracker3, Call());
+  EXPECT_CALL(release_callback_tracker2, Call(_, _, _));
   EXPECT_CALL(drain_tracker, Call(2 * LargeChunk + 107 * SmallChunk, 16384));
   EXPECT_CALL(drain_tracker, Call(LargeChunk + 106 * SmallChunk, 16384));
   EXPECT_CALL(tracker4, Call());
@@ -1360,6 +1398,9 @@ TYPED_TEST(OwnedImplTypedTest, ReserveZeroCommit) {
   const ssize_t rc = os_sys_calls.write(fds[1], data.data(), max_length).return_value_;
   ASSERT_GT(rc, 0);
   const uint32_t previous_length = buf.length();
+  // The remainder of this test flakes under Windows.
+  // See https://github.com/envoyproxy/envoy/issues/28177.
+  DISABLE_UNDER_WINDOWS;
   Api::IoCallUint64Result result = io_handle.read(buf, max_length);
   ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
   ASSERT_EQ(os_sys_calls.close(fds[1]).return_value_, 0);
@@ -1385,6 +1426,10 @@ TYPED_TEST(OwnedImplTypedTest, ReadReserveAndCommit) {
   std::string data = "e";
   const ssize_t rc = os_sys_calls.write(fds[1], data.data(), data.size()).return_value_;
   ASSERT_GT(rc, 0);
+
+  // The remainder of this test flakes under Windows.
+  // See https://github.com/envoyproxy/envoy/issues/28177.
+  DISABLE_UNDER_WINDOWS;
   Api::IoCallUint64Result result = io_handle.read(buf, read_length);
   ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
   ASSERT_EQ(os_sys_calls.close(fds[1]).return_value_, 0);

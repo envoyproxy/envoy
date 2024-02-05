@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -10,12 +11,31 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/ssl/context.h"
 
 #include "source/common/common/interval_value.h"
 
 namespace Envoy {
 namespace Network {
+
+// This interface allows for a listener to perform an alternative behavior when a
+// packet can't be routed correctly during draining; for example QUIC packets that
+// are not for an existing connection.
+// This is currently supported for QUIC listeners to forward packets to the child instance.
+// TODO(mattklein123): determine if other UDP listeners have a reason to do this.
+class NonDispatchedUdpPacketHandler {
+public:
+  virtual ~NonDispatchedUdpPacketHandler() = default;
+  virtual void handle(uint32_t worker_index, const Network::UdpRecvData& packet) PURE;
+};
+
+// Additional options for ConnectionHandler::ActiveListener::shutdownListener.
+// As a struct so that in the event of future additional parameters, the change
+// is isolated rather than cascading through all layers, mocks, etc.
+struct ExtraShutdownListenerOptions {
+  OptRef<NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
+};
 
 /**
  * Abstract connection handler.
@@ -47,9 +67,10 @@ public:
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    * @param runtime the runtime for the server.
+   * @param random a random number generator.
    */
   virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
-                           Runtime::Loader& runtime) PURE;
+                           Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
@@ -73,8 +94,10 @@ public:
    * Stop listeners using the listener tag as a key. This will not close any connections and is used
    * for draining.
    * @param listener_tag supplies the tag passed to addListener().
+   * @param options additional options to be passed through to shutdownListener.
    */
-  virtual void stopListeners(uint64_t listener_tag) PURE;
+  virtual void stopListeners(uint64_t listener_tag,
+                             const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
@@ -133,8 +156,11 @@ public:
 
     /**
      * Stop listening according to implementation's own definition.
+     * @param options provides extra options that some subset of listeners might
+     *                use, e.g. Quic listeners may need to configure packet forwarding
+     *                during hot restart.
      */
-    virtual void shutdownListener() PURE;
+    virtual void shutdownListener(const ExtraShutdownListenerOptions& options) PURE;
 
     /**
      * Update the listener config.
@@ -194,6 +220,20 @@ public:
    */
   virtual BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
+
+  /**
+   * Creates a TCP listener on a specific port.
+   * @param socket supplies the socket to listen on.
+   * @param cb supplies the callbacks to invoke for listener events.
+   * @param runtime supplies the runtime for this server.
+   * @param listener_config configuration for the TCP listener to be created.
+   * @return Network::ListenerPtr a new listener that is owned by the caller.
+   */
+  virtual Network::ListenerPtr
+  createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                 Runtime::Loader& runtime, Random::RandomGenerator& random,
+                 const Network::ListenerConfig& listener_config,
+                 Server::ThreadLocalOverloadStateOptRef overload_state) PURE;
 };
 
 /**

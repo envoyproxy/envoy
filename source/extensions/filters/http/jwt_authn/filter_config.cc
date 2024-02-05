@@ -15,7 +15,8 @@ FilterConfigImpl::FilterConfigImpl(
     envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
     : proto_config_(std::move(proto_config)), stats_(generateStats(stats_prefix, context.scope())),
-      cm_(context.clusterManager()), time_source_(context.mainThreadDispatcher().timeSource()) {
+      cm_(context.serverFactoryContext().clusterManager()),
+      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
@@ -34,8 +35,9 @@ FilterConfigImpl::FilterConfigImpl(
   for (const auto& rule : proto_config_.rules()) {
     switch (rule.requirement_type_case()) {
     case RequirementRule::RequirementTypeCase::kRequires:
-      rule_pairs_.emplace_back(Matcher::create(rule),
-                               Verifier::create(rule.requires(), proto_config_.providers(), *this));
+      rule_pairs_.emplace_back(
+          Matcher::create(rule),
+          Verifier::create(rule.requires_(), proto_config_.providers(), *this));
       break;
     case RequirementRule::RequirementTypeCase::kRequirementName: {
       // Use requirement_name to lookup requirement_map.
@@ -55,7 +57,7 @@ FilterConfigImpl::FilterConfigImpl(
 
   if (proto_config_.has_filter_state_rules()) {
     filter_state_name_ = proto_config_.filter_state_rules().name();
-    for (const auto& it : proto_config_.filter_state_rules().requires()) {
+    for (const auto& it : proto_config_.filter_state_rules().requires_()) {
       filter_state_verifiers_.emplace(
           it.first, Verifier::create(it.second, proto_config_.providers(), *this));
     }

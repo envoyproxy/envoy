@@ -73,7 +73,7 @@ TEST_P(FilterIntegrationTest, OnLocalReply) {
   }
 
   // The second two tests validate the filter intercepting local replies, but
-  // upstream filters don't run on local replies.
+  // upstream HTTP filters don't run on local replies.
   if (!testing_downstream_filter_) {
     return;
   }
@@ -121,10 +121,6 @@ TEST_P(FilterIntegrationTest, AddInvalidDecodedData) {
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(FilterIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // Make sure one end to end test verifies the old path with runtime singleton,
-  // to check for regressions.
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "false");
-
   prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");
@@ -168,6 +164,40 @@ TEST_P(FilterIntegrationTest, AddBodyToResponseAndWaitForIt) {
   EXPECT_EQ("body", response->body());
 }
 
+// Verify that filters can add a body and trailers to a header-only request or
+// response.
+TEST_P(FilterIntegrationTest, AddBodyAndTrailer) {
+  prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      add_trailers_in_encode_decode_header: true
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("body", upstream_request_->body().toString());
+  EXPECT_EQ("dummy_request_trailer_value",
+            upstream_request_->trailers()
+                ->get(Http::LowerCaseString("dummy_request_trailer"))[0]
+                ->value()
+                .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("body", response->body());
+  EXPECT_EQ("dummy_response_trailer_value",
+            response->trailers()
+                ->get(Http::LowerCaseString("dummy_response_trailer"))[0]
+                ->value()
+                .getStringView());
+}
+
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
@@ -188,19 +218,15 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(40, 58, 40, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                           BytesCountExpectation(0, 58, 0, 58),
-                                           BytesCountExpectation(7, 10, 7, 8));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                         BytesCountExpectation(40, 58, 40, 58),
+                                         BytesCountExpectation(7, 10, 7, 8));
   }
 }
 
-TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
+TEST_P(FilterIntegrationTest, RoundTripTimeForDownstreamConnection) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.refresh_rtt_after_request", "true");
+
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
   )EOF");
@@ -208,19 +234,39 @@ TEST_P(FilterIntegrationTest, RoundTripTimeForUpstreamConnection) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Send a headers only request.
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
+  // Send first request.
+  {
+    // Send a headers only request.
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
 
-  // Make sure that the body was injected to the request.
-  EXPECT_TRUE(upstream_request_->complete());
+    // Make sure that the body was injected to the request.
+    EXPECT_TRUE(upstream_request_->complete());
 
-  // Send a headers only response.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
+    // Send a headers only response.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
 
-  // Make sure that round trip time was populated
-  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
+    // Make sure that round trip time was populated
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
+  }
+
+  // Send second request.
+  {
+    // Send a headers only request.
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+
+    // Make sure that the body was injected to the request.
+    EXPECT_TRUE(upstream_request_->complete());
+
+    // Send a headers only response.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+
+    // Make sure that round trip time was populated
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
+  }
 }
 
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
@@ -287,7 +333,7 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   if (testing_downstream_filter_) {
-    // When testing an upstream filters, we may receive body bytes before we
+    // When testing an upstream HTTP filters, we may receive body bytes before we
     // process headers, so don't set expectations.
     expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1152, 90, 81),
                                          BytesCountExpectation(0, 58, 0, 58),
@@ -669,7 +715,7 @@ name: passthrough-filter
   verifyUpStreamRequestAfterStopAllFilter();
 }
 
-// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
+// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(FilterIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
   prependFilter(R"EOF(
@@ -1155,8 +1201,15 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeTrailersWithContinu
   codec_client_->sendData(*request_encoder, 1024, false);
   codec_client_->sendData(*request_encoder, 1024, false);
 
-  codec_client_->sendTrailers(*request_encoder,
-                              Http::TestRequestTrailerMapImpl{{"some", "trailer"}});
+  if (std::get<0>(GetParam()).http2_implementation == Http2Impl::Oghttp2) {
+    EXPECT_LOG_NOT_CONTAINS(
+        "error", "DataFrameSource will send fin, preventing trailers",
+        codec_client_->sendTrailers(*request_encoder,
+                                    Http::TestRequestTrailerMapImpl{{"some", "trailer"}}));
+  } else {
+    codec_client_->sendTrailers(*request_encoder,
+                                Http::TestRequestTrailerMapImpl{{"some", "trailer"}});
+  }
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -1226,11 +1279,94 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
   EXPECT_FALSE(response->complete());
 }
 
+// Verify filters can reset the stream
+TEST_P(FilterIntegrationTest, ResetFilterWithRuntimeFlagFalse) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.abort_filter_chain_on_stream_reset",
+                                    "false");
+
+  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
+  prependFilter(R"EOF(
+  name: reset-stream-filter
+  )EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+}
+
+// Verify filters can reset the stream
+TEST_P(FilterIntegrationTest, EncoderResetFilter) {
+  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
+  prependFilter(R"EOF(
+  name: encoder-reset-stream-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Accept request and send response.
+  waitForNextUpstreamRequest(0);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // The stream will be in the response path.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+}
+
+TEST_P(FilterIntegrationTest, EncoderResetFilterWithRuntimeFlagFalse) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.abort_filter_chain_on_stream_reset",
+                                    "false");
+
+  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
+  prependFilter(R"EOF(
+  name: encoder-reset-stream-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Accept request and send response.
+  waitForNextUpstreamRequest(0);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // The stream will be in the response path.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+}
+
+TEST_P(FilterIntegrationTest, EncoderResetFilterAndContinue) {
+  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
+  prependFilter(R"EOF(
+  name: encoder-reset-stream-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.addCopy("continue-after-reset", "true");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Accept request and send response.
+  waitForNextUpstreamRequest(0);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // The stream will be in the response path.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+}
+
 TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {
-    return;
-  }
   prependFilter(R"EOF(
   name: assert-non-reentrant-filter
   )EOF");

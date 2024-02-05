@@ -113,6 +113,16 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("udp://[a:b:c:d::]:0")->asString());
 }
 
+TEST(NetworkUtility, urlFromDatagramAddress) {
+  // UDP and unix URLs should be reversible with resolveUrl and urlFromDatagramAddress.
+  std::vector<std::string> urls{
+      "udp://[::1]:1", "udp://[a:b:c:d::]:0", "udp://1.2.3.4:1234", "unix://foo", "unix://",
+  };
+  for (const std::string& url : urls) {
+    EXPECT_EQ(url, Utility::urlFromDatagramAddress(*Utility::resolveUrl(url)));
+  }
+}
+
 TEST(NetworkUtility, socketTypeFromUrl) {
   EXPECT_FALSE(Utility::socketTypeFromUrl("foo").ok());
   EXPECT_FALSE(Utility::socketTypeFromUrl("abc://foo").ok());
@@ -321,6 +331,27 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   if (ip_version == Address::IpVersion::v6) {
     EXPECT_EQ(0u, local_address->ip()->ipv6()->scopeId());
   }
+}
+
+TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddressGetifaddrsFailure) {
+  Api::SysCallIntResult rc;
+  rc.return_value_ = -1;
+  rc.errno_ = 42;
+  testing::StrictMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_)).WillRepeatedly(Return(rc));
+  Address::IpVersion ip_version = GetParam();
+  Address::InstanceConstSharedPtr expected_address;
+  if (ip_version == Address::IpVersion::v6) {
+    expected_address = std::make_shared<Address::Ipv6Instance>("::1");
+  } else {
+    expected_address = std::make_shared<Address::Ipv4Instance>("127.0.0.1");
+  }
+  Address::InstanceConstSharedPtr local_address = Utility::getLocalAddress(ip_version);
+  EXPECT_EQ(ip_version, local_address->ip()->version());
+  EXPECT_NE(nullptr, local_address);
+  EXPECT_EQ(*expected_address, *local_address);
 }
 
 TEST(NetworkUtility, GetOriginalDst) {
@@ -662,9 +693,7 @@ TEST(PortRangeListTest, Errors) {
   }
 }
 
-static Address::Ipv4Instance makeFromPort(uint32_t port) {
-  return Address::Ipv4Instance("0.0.0.0", port);
-}
+static Address::Ipv4Instance makeFromPort(uint32_t port) { return {"0.0.0.0", port}; }
 
 TEST(PortRangeListTest, Normal) {
   {

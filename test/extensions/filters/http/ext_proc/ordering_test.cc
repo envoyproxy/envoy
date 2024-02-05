@@ -7,6 +7,7 @@
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -59,7 +60,7 @@ protected:
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -70,8 +71,11 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
-                                   *stats_store_.rootScope(), ""));
+    config_ = std::make_shared<FilterConfig>(
+        proto_config, kMessageTimeout, kMaxMessageTimeoutMs, *stats_store_.rootScope(), "",
+        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+        local_info_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -81,7 +85,7 @@ protected:
 
   // Called by the "start" method on the stream by the filter
   virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                             const envoy::config::core::v3::GrpcService&,
+                                             const Grpc::GrpcServiceConfigWithHashKey&,
                                              const StreamInfo::StreamInfo&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
@@ -212,20 +216,18 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 // A base class for tests that will check that gRPC streams fail while being created
-
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const envoy::config::core::v3::GrpcService&,
+                                     const Grpc::GrpcServiceConfigWithHashKey&,
                                      const StreamInfo::StreamInfo&) override {
-    auto stream = std::make_unique<MockStream>();
-    EXPECT_CALL(*stream, close());
-    EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
     callbacks.onGrpcError(Grpc::Status::Internal);
-    return stream;
+    // Returns nullptr on start stream failure.
+    return nullptr;
   }
 };
 
@@ -503,8 +505,8 @@ TEST_F(OrderingTest, ResponseSomeDataComesFast) {
   sendResponseBodyReply();
 }
 
-// Add trailers to the request path
-TEST_F(OrderingTest, AddRequestTrailers) {
+// Processing mode send request trailer while client is not sending trailers.
+TEST_F(OrderingTest, ProcessingModeRequestTrailers) {
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_trailer_mode(ProcessingMode::SEND);
@@ -520,15 +522,8 @@ TEST_F(OrderingTest, AddRequestTrailers) {
   Buffer::OwnedImpl req_buffer;
   expectBufferedRequest(req_buffer);
 
-  Http::TestRequestTrailerMapImpl response_trailers;
-
-  // Expect the trailers callback to be sent in line with decodeData
-  EXPECT_CALL(stream_delegate_, send(_, false));
-  EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(response_trailers));
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body_1, true));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_body_1, true));
   req_buffer.add(req_body_1);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  sendRequestTrailersReply();
 
   Buffer::OwnedImpl resp_body_1("Dummy response");
   Buffer::OwnedImpl resp_buffer;
@@ -1125,26 +1120,8 @@ TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartResponseTrailers) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 }
 
-// gRPC failure while opening stream with only response body enabled
-TEST_F(FastFailOrderingTest, GrpcErrorOnStartAddResponseTrailers) {
-  initialize([](ExternalProcessor& cfg) {
-    auto* pm = cfg.mutable_processing_mode();
-    pm->set_request_header_mode(ProcessingMode::SKIP);
-    pm->set_response_header_mode(ProcessingMode::SKIP);
-    pm->set_response_trailer_mode(ProcessingMode::SEND);
-  });
-
-  sendRequestHeadersGet(false);
-  sendResponseHeaders(false);
-  Buffer::OwnedImpl resp_body("Hello!");
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  Http::TestResponseTrailerMapImpl response_trailers;
-  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(response_trailers));
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_body, true));
-}
-
 // gRPC failure while opening stream with only response body enabled but errors ignored
-TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartAddResponseTrailers) {
+TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnNotSendResponseTrailer) {
   initialize([](ExternalProcessor& cfg) {
     cfg.set_failure_mode_allow(true);
     auto* pm = cfg.mutable_processing_mode();
@@ -1156,8 +1133,6 @@ TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartAddResponseTrailers) {
   sendRequestHeadersGet(false);
   sendResponseHeaders(false);
   Buffer::OwnedImpl resp_body("Hello!");
-  Http::TestResponseTrailerMapImpl response_trailers;
-  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(response_trailers));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
 }
 

@@ -64,14 +64,14 @@ public:
 
   /**
    * @param headers the headers to parse.
-   * @return bool indicating whether the header is a Buf Connect request header.
+   * @return bool indicating whether the header is a Connect request header.
    * This is determined by checking for the connect protocol version header and a path header.
    */
   static bool isConnectRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * @param headers the headers to parse.
-   * @return bool indicating whether the header is a Buf Connect streaming request header.
+   * @return bool indicating whether the header is a Connect streaming request header.
    * This is determined by checking for the connect streaming content type and a path header.
    */
   static bool isConnectStreamingRequestHeaders(const Http::RequestHeaderMap& headers);
@@ -93,7 +93,7 @@ public:
 
   /**
    * @param headers the headers to parse.
-   * @return bool indicating whether the header is a Buf Connect streaming response header.
+   * @return bool indicating whether the header is a Connect streaming response header.
    */
   static bool isConnectStreamingResponseHeaders(const Http::ResponseHeaderMap& headers);
 
@@ -178,11 +178,6 @@ public:
                  const absl::optional<std::chrono::milliseconds>& timeout);
 
   /**
-   * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.
-   */
-  static void validateResponse(Http::ResponseMessage& http_response);
-
-  /**
    * @return const std::string& type URL prefix.
    */
   static const std::string& typeUrlPrefix();
@@ -223,8 +218,6 @@ public:
   static absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
 
 private:
-  static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
-
   static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
 };
 

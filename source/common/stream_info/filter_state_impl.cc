@@ -120,7 +120,7 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
 }
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {
-  return data_storage_.count(data_name) > 0;
+  return data_storage_.contains(data_name);
 }
 
 void FilterStateImpl::maybeCreateParent(ParentAccessMode parent_access_mode) {

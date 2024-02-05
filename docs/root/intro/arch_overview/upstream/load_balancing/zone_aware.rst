@@ -21,7 +21,6 @@ performed:
 * Both originating and upstream cluster are not in
   :ref:`panic mode <arch_overview_load_balancing_panic_threshold>`.
 * Zone aware :ref:`routing is enabled <config_cluster_manager_cluster_runtime_zone_routing>`.
-* The originating cluster has the same number of zones as the upstream cluster.
 * The upstream cluster has enough hosts. See
   :ref:`here <config_cluster_manager_cluster_runtime_zone_routing>` for more information.
 

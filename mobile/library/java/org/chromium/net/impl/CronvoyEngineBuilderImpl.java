@@ -20,24 +20,10 @@ import org.chromium.net.CronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
 import org.chromium.net.impl.Annotations.HttpCacheType;
 
+import io.envoyproxy.envoymobile.engine.EnvoyEngine;
+
 /** Implementation of {@link ICronetEngineBuilder} that builds Envoy-Mobile based Cronet engine. */
 public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
-
-  /** A hint that a host supports QUIC. */
-  final static class QuicHint {
-    // The host.
-    final String mHost;
-    // Port of the server that supports QUIC.
-    final int mPort;
-    // Alternate protocol port.
-    final int mAlternatePort;
-
-    QuicHint(String host, int port, int alternatePort) {
-      mHost = host;
-      mPort = port;
-      mAlternatePort = alternatePort;
-    }
-  }
 
   /** A public key pin. */
   final static class Pkp {
@@ -65,12 +51,15 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   // Private fields are simply storage of configuration for the resulting CronetEngine.
   // See setters below for verbose descriptions.
   private final Context mApplicationContext;
-  private final List<QuicHint> mQuicHints = new LinkedList<>();
+  private final Map<String, Integer> mQuicHints = new HashMap<>();
+  private final List<String> mQuicCanonicalSuffixes = new LinkedList<>();
   private final List<Pkp> mPkps = new LinkedList<>();
   private boolean mPublicKeyPinningBypassForLocalTrustAnchorsEnabled;
   private String mUserAgent;
   private String mStoragePath;
   private boolean mQuicEnabled;
+  private String mQuicConnectionOptions = "";
+  private String mQuicClientConnectionOptions = "";
   private boolean mHttp2Enabled;
   private boolean mBrotiEnabled;
   private boolean mDisableCache;
@@ -79,7 +68,8 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mExperimentalOptions;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
-  private String mLogLevel = "info";
+  private EnvoyEngine.LogLevel mLogLevel = EnvoyEngine.LogLevel.OFF;
+  private CronvoyLogger mCronvoyLogger = new CronvoyLogger();
 
   /**
    * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
@@ -141,6 +131,20 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   }
 
   boolean quicEnabled() { return mQuicEnabled; }
+
+  public CronvoyEngineBuilderImpl setQuicConnectionOptions(String options) {
+    mQuicConnectionOptions = options;
+    return this;
+  }
+
+  String quicConnectionOptions() { return mQuicConnectionOptions; }
+
+  public CronvoyEngineBuilderImpl setQuicClientConnectionOptions(String options) {
+    mQuicClientConnectionOptions = options;
+    return this;
+  }
+
+  String quicClientConnectionOptions() { return mQuicClientConnectionOptions; }
 
   /**
    * Constructs default QUIC User Agent Id string including application name and Cronet version.
@@ -222,11 +226,18 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
     if (host.contains("/")) {
       throw new IllegalArgumentException("Illegal QUIC Hint Host: " + host);
     }
-    mQuicHints.add(new QuicHint(host, port, alternatePort));
+    mQuicHints.put(host, port);
     return this;
   }
 
-  List<QuicHint> quicHints() { return mQuicHints; }
+  Map<String, Integer> quicHints() { return mQuicHints; }
+
+  public CronvoyEngineBuilderImpl addQuicCanonicalSuffix(String suffix) {
+    mQuicCanonicalSuffixes.add(suffix);
+    return this;
+  }
+
+  List<String> quicCanonicalSuffixes() { return mQuicCanonicalSuffixes; }
 
   @Override
   public CronvoyEngineBuilderImpl addPublicKeyPins(String hostName, Set<byte[]> pinsSha256,
@@ -344,17 +355,28 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
     return mThreadPriority == INVALID_THREAD_PRIORITY ? defaultThreadPriority : mThreadPriority;
   }
 
-  public CronvoyEngineBuilderImpl setLogLevel(String logLevel) {
-    mLogLevel = logLevel;
-    return this;
-  }
-
-  public String getLogLevel() { return mLogLevel; }
-
   /**
    * Returns {@link Context} for builder.
    *
    * @return {@link Context} for builder.
    */
   Context getContext() { return mApplicationContext; }
+
+  /** Sets the log level. */
+  public CronvoyEngineBuilderImpl setLogLevel(EnvoyEngine.LogLevel logLevel) {
+    this.mLogLevel = logLevel;
+    return this;
+  }
+
+  /** Gets the log level. It defaults to `OFF` when not set. */
+  public EnvoyEngine.LogLevel getLogLevel() { return mLogLevel; }
+
+  /** Sets the {@link io.envoyproxy.envoymobile.engine.types.EnvoyLogger}. */
+  public CronvoyEngineBuilderImpl setLogger(CronvoyLogger cronvoyLogger) {
+    this.mCronvoyLogger = cronvoyLogger;
+    return this;
+  }
+
+  /** Gets the {@link org.chromium.net.impl.CronvoyLogger} implementation. */
+  public CronvoyLogger getLogger() { return mCronvoyLogger; }
 }

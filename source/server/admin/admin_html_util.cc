@@ -54,10 +54,11 @@ namespace Server {
 namespace {
 class BuiltinResourceProvider : public AdminHtmlUtil::ResourceProvider {
 public:
-  BuiltinResourceProvider() {
+  BuiltinResourceProvider() : histogram_js_(absl::StrCat(HistogramsJs1, HistogramsJs2)) {
     map_["admin_head_start.html"] = AdminHtmlStart;
     map_["admin.css"] = AdminCss;
     map_["active_stats.js"] = AdminActiveStatsJs;
+    map_["histograms.js"] = histogram_js_;
     map_["active_params.html"] = AdminActiveParamsHtml;
   }
 
@@ -66,6 +67,7 @@ public:
   }
 
 private:
+  const std::string histogram_js_;
   absl::flat_hash_map<absl::string_view, absl::string_view> map_;
 };
 
@@ -122,14 +124,14 @@ void AdminHtmlUtil::finalize(Buffer::Instance& response) { response.add("</body>
 void AdminHtmlUtil::renderHandlerParam(Buffer::Instance& response, absl::string_view id,
                                        absl::string_view name, absl::string_view path,
                                        Admin::ParamDescriptor::Type type,
-                                       OptRef<const Http::Utility::QueryParams> query,
+                                       OptRef<const Http::Utility::QueryParamsMulti> query,
                                        const std::vector<absl::string_view>& enum_choices,
                                        bool submit_on_change) {
   std::string value;
   if (query.has_value()) {
-    auto iter = query->find(std::string(name));
-    if (iter != query->end()) {
-      value = iter->second;
+    auto result = query->getFirstValue(name);
+    if (result.has_value()) {
+      value = result.value();
     }
   }
 
@@ -169,7 +171,7 @@ void AdminHtmlUtil::renderHandlerParam(Buffer::Instance& response, absl::string_
 
 void AdminHtmlUtil::renderEndpointTableRow(Buffer::Instance& response,
                                            const Admin::UrlHandler& handler,
-                                           OptRef<const Http::Utility::QueryParams> query,
+                                           OptRef<const Http::Utility::QueryParamsMulti> query,
                                            int index, bool submit_on_change, bool active) {
   absl::string_view path = handler.prefix_;
 

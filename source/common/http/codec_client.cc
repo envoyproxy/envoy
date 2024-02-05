@@ -114,7 +114,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
         reason = StreamResetReason::ProtocolError;
-        connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+        connection_->streamInfo().setResponseFlag(
+            StreamInfo::CoreResponseFlag::UpstreamProtocolError);
       }
     }
     while (!active_requests_.empty()) {
@@ -247,7 +248,6 @@ void CodecClient::ActiveRequest::decodeHeaders(ResponseHeaderMapPtr&& headers, b
                 .http3Options()
                 .override_stream_error_on_invalid_http_message()
                 .value())) {
-        parent_.host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
         parent_.protocol_error_ = true;
         parent_.close();
       } else {

@@ -5,16 +5,16 @@
 namespace Envoy {
 namespace Http {
 
-RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
+absl::StatusOr<RequestIDExtensionSharedPtr> RequestIDExtensionFactory::fromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
         config,
-    Server::Configuration::CommonFactoryContext& context) {
+    Server::Configuration::FactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::RequestIDExtensionFactory>::getFactoryByType(
           type);
   if (factory == nullptr) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
 

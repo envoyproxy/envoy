@@ -1,3 +1,8 @@
+envoy.filters.http.checksum:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.http.dynamo:
   categories:
   - envoy.filters.http
@@ -7,6 +12,11 @@ envoy.filters.http.golang:
   categories:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.compression.qatzip.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
 envoy.filters.http.squash:
   categories:
@@ -33,6 +43,11 @@ envoy.filters.network.kafka_mesh:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: wip
+envoy.filters.network.golang:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.network.rocketmq_proxy:
   categories:
   - envoy.filters.network
@@ -117,6 +132,13 @@ envoy.generic_proxy.codecs.dubbo:
   status: wip
   type_urls:
   - envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig
+envoy.generic_proxy.codecs.kafka:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.kafka.v3.KafkaCodecConfig
 envoy.router.cluster_specifier_plugin.golang:
   categories:
   - envoy.router.cluster_specifier_plugin

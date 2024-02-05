@@ -104,6 +104,8 @@ void Filter::setExtractedData(const ProtobufWkt::Struct& extracted_data) {
                                                       extracted_data);
 }
 
+void Filter::clearRouteCache() { decoder_callbacks_->downstreamCallbacks()->clearRouteCache(); }
+
 void Filter::onComplete(const Status& status) {
   ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));

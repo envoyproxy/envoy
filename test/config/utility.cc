@@ -207,7 +207,7 @@ std::string ConfigHelper::testInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.test"
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
 )EOF";
 }
 
@@ -852,6 +852,28 @@ void ConfigHelper::setConnectConfig(
   }
 }
 
+void ConfigHelper::setConnectUdpConfig(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
+    bool terminate_connect, bool http3) {
+  auto* route_config = hcm.mutable_route_config();
+  ASSERT_EQ(1, route_config->virtual_hosts_size());
+  auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+  auto* match = route->mutable_match();
+  match->Clear();
+  match->mutable_connect_matcher();
+
+  if (terminate_connect) {
+    auto* upgrade = route->mutable_route()->add_upgrade_configs();
+    upgrade->set_upgrade_type("connect-udp");
+  }
+
+  hcm.add_upgrade_configs()->set_upgrade_type("connect-udp");
+  hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+  if (http3) {
+    hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
+  }
+}
+
 void ConfigHelper::applyConfigModifiers() {
   for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
@@ -862,9 +884,11 @@ void ConfigHelper::applyConfigModifiers() {
 void ConfigHelper::configureUpstreamTls(
     bool use_alpn, bool http3,
     absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
-        alternate_protocol_cache_config) {
-  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config](
-                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        alternate_protocol_cache_config,
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+        configure_tls_context) {
+  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config,
+                     configure_tls_context](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -907,6 +931,9 @@ void ConfigHelper::configureUpstreamTls(
               .PackFrom(new_protocol_options);
     }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    if (configure_tls_context != nullptr) {
+      configure_tls_context(*tls_context.mutable_common_tls_context());
+    }
     auto* validation_context =
         tls_context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
@@ -928,7 +955,15 @@ void ConfigHelper::configureUpstreamTls(
 void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
-  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+
+  if (value == "true") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(true);
+  } else if (value == "false") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(false);
+  } else {
+    (*static_layer->mutable_fields())[std::string(key)] =
+        ValueUtil::stringValue(std::string(value));
+  }
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
@@ -1275,7 +1310,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  initializeTls(options, *tls_context.mutable_common_tls_context());
+  initializeTls(options, *tls_context.mutable_common_tls_context(), false);
   if (options.ocsp_staple_required_) {
     tls_context.set_ocsp_staple_policy(
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE);
@@ -1284,7 +1319,8 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(
+    bool enable_early_data, std::vector<absl::string_view> custom_alpns) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1294,8 +1330,12 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data
   }
   configDownstreamTransportSocketWithTls(
       bootstrap_,
-      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
+      [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
+                      true);
+        for (absl::string_view alpn : custom_alpns) {
+          common_tls_context.add_alpn_protocols(alpn);
+        }
       },
       enable_early_data);
 }
@@ -1412,9 +1452,14 @@ void ConfigHelper::initializeTlsKeyLog(
 
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
-  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+    bool http3) {
+  if (!http3) {
+    // If it's HTTP/3, leave it empty as QUIC will derive the supported ALPNs from QUIC version by
+    // default.
+    common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+    common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+  }
 
   auto* validation_context = common_tls_context.mutable_validation_context();
   if (options.custom_validator_config_) {
@@ -1458,6 +1503,9 @@ void ConfigHelper::initializeTls(
   common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
       options.tlsv1_3_ ? envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3
                        : envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  for (const auto& curve : options.curves_) {
+    common_tls_context.mutable_tls_params()->add_ecdh_curves(curve);
+  }
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
@@ -1664,7 +1712,7 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   auto* timeout = route->mutable_timeout();
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
   // response_timeout.
-  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+  timeout->set_seconds(TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 
 envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::http2ToHttp3ProtocolOptions(

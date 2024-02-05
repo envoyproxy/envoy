@@ -2,6 +2,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -10,6 +12,10 @@ bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
   if constexpr (!(ENVOY_BIT_ARRAY_SUPPORTED)) {
     return false;
   }
+
+#ifdef MAGLEV_LB_FORCE_ORIGINAL_IMPL
+  return false;
+#endif
 
   if (num_hosts > MaglevTable::MaxNumberOfHostsForCompactMaglev) {
     return false;
@@ -35,8 +41,7 @@ public:
                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
 
     MaglevTableSharedPtr maglev_table;
-    if (shouldUseCompactTable(normalized_host_weights.size(), table_size) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_compact_maglev")) {
+    if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
       maglev_table =
           std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
                                                table_size, use_hostname_for_hashing, stats);
@@ -55,6 +60,14 @@ public:
 };
 
 } // namespace
+
+LegacyMaglevLbConfig::LegacyMaglevLbConfig(const ClusterProto& cluster) {
+  if (cluster.has_maglev_lb_config()) {
+    lb_config_ = cluster.maglev_lb_config();
+  }
+}
+
+TypedMaglevLbConfig::TypedMaglevLbConfig(const MaglevLbProto& lb_config) : lb_config_(lb_config) {}
 
 ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr
 MaglevLoadBalancer::createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
@@ -81,16 +94,32 @@ void MaglevTable::constructMaglevTableInternal(
     return;
   }
 
-  // Implementation of pseudocode listing 1 in the paper (see header file for more info).
-  std::vector<TableBuildEntry> table_build_entries;
-  table_build_entries.reserve(normalized_host_weights.size());
+  // Prepare stable (sorted) vector of host_weight.
+  // Maglev requires stable order of table_build_entries because the hash table will be filled in
+  // the order. Unstable table_build_entries results the change of backend assignment.
+  std::vector<std::tuple<absl::string_view, HostConstSharedPtr, double>> sorted_host_weights;
+  sorted_host_weights.reserve(normalized_host_weights.size());
   for (const auto& host_weight : normalized_host_weights) {
     const auto& host = host_weight.first;
     const absl::string_view key_to_hash = hashKey(host, use_hostname_for_hashing);
     ASSERT(!key_to_hash.empty());
+
+    sorted_host_weights.emplace_back(key_to_hash, host_weight.first, host_weight.second);
+  }
+
+  std::sort(sorted_host_weights.begin(), sorted_host_weights.end());
+
+  // Implementation of pseudocode listing 1 in the paper (see header file for more info).
+  std::vector<TableBuildEntry> table_build_entries;
+  table_build_entries.reserve(normalized_host_weights.size());
+  for (const auto& sorted_host_weight : sorted_host_weights) {
+    const auto& key_to_hash = std::get<0>(sorted_host_weight);
+    const auto& host = std::get<1>(sorted_host_weight);
+    const auto& weight = std::get<2>(sorted_host_weight);
+
     table_build_entries.emplace_back(host, HashUtil::xxHash64(key_to_hash) % table_size_,
                                      (HashUtil::xxHash64(key_to_hash, 1) % (table_size_ - 1)) + 1,
-                                     host_weight.second);
+                                     weight);
   }
 
   constructImplementationInternals(table_build_entries, max_normalized_weight);

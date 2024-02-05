@@ -67,35 +67,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAdminInterfaceIsDisabledByDefault() {
-    let expectation = self.expectation(description: "Run called with disabled admin interface")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.adminInterfaceEnabled)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
-#if ENVOY_ADMIN_FUNCTIONALITY
-  func testEnablingAdminInterfaceAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with enabled admin interface")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.adminInterfaceEnabled)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableAdminInterface()
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-#endif
-
   func testEnablingInterfaceBindingAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled interface binding")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -134,20 +105,6 @@ final class EngineBuilderTests: XCTestCase {
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .forceIPv6(true)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
-  func testAddinggrpcStatsDomainAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual("stats.envoyproxy.io", config.grpcStatsDomain)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addGrpcStatsDomain("stats.envoyproxy.io")
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -279,20 +236,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingStatsFlushSecondsAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual(42, config.statsFlushSeconds)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addStatsFlushSeconds(42)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingStreamIdleTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -385,23 +328,25 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-#if ENVOY_GOOGLE_GRPC
-  func testAddingRtdsAndAdsConfigurationWhenRunningEnvoy() {
+#if ENVOY_MOBILE_XDS
+  func testAddingRtdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addRTDSLayer(name: "rtds_layer_name", timeoutSeconds: 14325)
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
-    XCTAssertTrue(bootstrapDebugDescription.contains("rtds_layer_name"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("some_rtds_resource"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 14325 }"))
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_SWIFT_ADDRESS"))
   }
 
-  func testAddingCdsAndAdsConfigurationWhenRunningEnvoy() {
+  func testAddingCdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addClusterDiscoveryService(cdsResourcesLocator: "FAKE_CDS_LOCATOR", timeoutInSeconds: 2543)
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addCDSLayer(resourcesLocator: "FAKE_CDS_LOCATOR", timeoutSeconds: 2543)
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("FAKE_CDS_LOCATOR"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 2543 }"))
@@ -409,14 +354,33 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testAddingDefaultCdsConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addClusterDiscoveryService()
     let bootstrapDebugDescription = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addCDSLayer()
-      .setAggregatedDiscoveryService(address: "FAKE_SWIFT_ADDRESS", port: 0)
+      .setXds(xdsBuilder)
       .bootstrapDebugDescription()
     XCTAssertTrue(bootstrapDebugDescription.contains("cds_config {"))
     XCTAssertTrue(bootstrapDebugDescription.contains("initial_fetch_timeout { seconds: 5 }"))
   }
+
+  func testAddingXdsSecurityConfigurationWhenRunningEnvoy() {
+    let xdsBuilder = XdsBuilder(xdsServerAddress: "FAKE_SWIFT_ADDRESS", xdsServerPort: 0)
+      .addInitialStreamHeader(header: "x-goog-api-key", value: "A1B2C3")
+      .addInitialStreamHeader(header: "x-android-package", value: "com.google.myapp")
+      .setSslRootCerts(rootCerts: "fake_ssl_root_certs")
+      .addRuntimeDiscoveryService(resourceName: "some_rtds_resource", timeoutInSeconds: 14325)
+    let bootstrapDebugDescription = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .setXds(xdsBuilder)
+      .bootstrapDebugDescription()
+    XCTAssertTrue(bootstrapDebugDescription.contains("x-goog-api-key"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("A1B2C3"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("x-android-package"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("com.google.myapp"))
+    XCTAssertTrue(bootstrapDebugDescription.contains("fake_ssl_root_certs"))
+  }
+#endif
 
   func testXDSDefaultValues() {
     // rtds, ads, node_id, node_locality
@@ -446,7 +410,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(bootstrapDebugDescription.contains(#"zone: "SWIFT_ZONE""#))
     XCTAssertTrue(bootstrapDebugDescription.contains(#"sub_zone: "SWIFT_SUB""#))
   }
-#endif
 
   func testAddingKeyValueStoreToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")

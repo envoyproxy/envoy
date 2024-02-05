@@ -36,19 +36,6 @@ RequestHeadersBuilder& RequestHeadersBuilder::addRetryPolicy(const RetryPolicy& 
   return *this;
 }
 
-RequestHeadersBuilder&
-RequestHeadersBuilder::enableRequestCompression(CompressionAlgorithm algorithm) {
-  std::string value;
-  switch (algorithm) {
-  case CompressionAlgorithm::Gzip:
-    value = "gzip";
-  case CompressionAlgorithm::Brotli:
-    value = "brotli";
-  }
-  internalSet("x-envoy-mobile-compression", std::vector<std::string>{value});
-  return *this;
-}
-
 RequestHeaders RequestHeadersBuilder::build() const { return RequestHeaders(allHeaders()); }
 
 } // namespace Platform

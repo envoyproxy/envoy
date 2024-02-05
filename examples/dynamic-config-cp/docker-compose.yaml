@@ -2,6 +2,7 @@ services:
 
   proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     depends_on:
     - service1
@@ -22,6 +23,7 @@ services:
 
   go-control-plane:
     build:
+      context: .
       dockerfile: ../shared/golang/Dockerfile
       target: golang-control-plane
     command: /usr/local/bin/example

@@ -67,11 +67,9 @@ public:
    * @param stream, the stream to start.
    * @param bridge_callbacks, wrapper for callbacks for events on this stream.
    * @param explicit_flow_control, whether the stream will require explicit flow control.
-   * @param min_delivery_size, if greater than zero, indicates the smallest number of bytes that
-   * will be delivered up via the on_data callbacks without end stream.
    */
   void startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
-                   bool explicit_flow_control, uint64_t min_delivery_size);
+                   bool explicit_flow_control);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -145,16 +143,13 @@ private:
   public:
     DirectStreamCallbacks(DirectStream& direct_stream, envoy_http_callbacks bridge_callbacks,
                           Client& http_client);
+    virtual ~DirectStreamCallbacks();
 
-    void closeStream();
+    void closeStream(bool end_stream = true);
     void onComplete();
     void onCancel();
     void onError();
     void onSendWindowAvailable();
-
-    // Remove the stream and clear up state if possible, else set up deferred
-    // removal path.
-    void removeStream();
 
     // ResponseEncoder
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
@@ -187,18 +182,18 @@ private:
     //
     // Bytes will only be sent up once, even if the bytes available are fewer
     // than bytes_to_send.
-    void resumeData(int32_t bytes_to_send);
+    void resumeData(size_t bytes_to_send);
 
-    void setFinalStreamIntel(StreamInfo::StreamInfo& stream_info);
+    void latchError();
 
   private:
     bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
 
     void sendDataToBridge(Buffer::Instance& data, bool end_stream);
     void sendTrailersToBridge(const ResponseTrailerMap& trailers);
+    void sendErrorToBridge();
     envoy_stream_intel streamIntel();
     envoy_final_stream_intel& finalStreamIntel();
-    envoy_error streamError();
 
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;
@@ -206,15 +201,12 @@ private:
     absl::optional<envoy_error> error_;
     bool success_{};
 
-    // Buffered response data when in explicit flow control or buffering due to min delivery size.
+    // Buffered response data when in explicit flow control mode.
     Buffer::InstancePtr response_data_;
     ResponseTrailerMapPtr response_trailers_;
     // True if the bridge should operate in explicit flow control mode, and only send
     // data when it is requested by the caller.
     bool explicit_flow_control_{};
-    // If greater than zero, indicates the minimum size of data that should be
-    // delivered up via on_data without end stream.
-    uint64_t min_delivery_size_{};
     // Set true when the response headers have been forwarded to the bridge.
     bool response_headers_forwarded_{};
     // Called in closeStream() to communicate that the end of the stream has
@@ -222,7 +214,7 @@ private:
     bool remote_end_stream_received_{};
     // Set true when the end stream has been forwarded to the bridge.
     bool remote_end_stream_forwarded_{};
-    uint32_t bytes_to_send_{};
+    size_t bytes_to_send_{};
   };
 
   using DirectStreamCallbacksPtr = std::unique_ptr<DirectStreamCallbacks>;
@@ -242,11 +234,7 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-    CodecEventCallbacks*
-    registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
-      std::swap(codec_callbacks, codec_callbacks_);
-      return codec_callbacks;
-    }
+    CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override;
 
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
@@ -306,10 +294,18 @@ private:
       }
     }
 
+    OptRef<RequestDecoder> requestDecoder() {
+      if (!request_decoder_) {
+        return {};
+      }
+      ENVOY_BUG(request_decoder_->get(), "attempting to access deleted decoder");
+      return request_decoder_->get();
+    }
+
     const envoy_stream_t stream_handle_;
 
     // Used to issue outgoing HTTP stream operations.
-    RequestDecoder* request_decoder_;
+    RequestDecoderHandlePtr request_decoder_;
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Client& parent_;
@@ -334,10 +330,6 @@ private:
     // back, avoids excessive buffering of response bodies if the response body is
     // read faster than the mobile caller can process it.
     bool explicit_flow_control_ = false;
-    // If this is non-zero, Envoy will buffer at the C++ layer until either
-    // min_delivery_size_ bytes are received or end_stream is received. If this is
-    // zero, it will deliver data as it arrivies, modulo explicit flow control rules.
-    uint64_t min_delivery_size_{};
     // Latest intel data retrieved from the StreamInfo.
     envoy_stream_intel stream_intel_{-1, -1, 0, 0};
     envoy_final_stream_intel envoy_final_stream_intel_{-1, -1, -1, -1, -1, -1, -1, -1,

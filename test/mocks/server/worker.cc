@@ -12,15 +12,16 @@ using ::testing::_;
 using ::testing::Invoke;
 
 MockWorker::MockWorker() {
-  ON_CALL(*this, addListener(_, _, _, _))
-      .WillByDefault(Invoke([this](absl::optional<uint64_t> overridden_listener,
-                                   Network::ListenerConfig& config,
-                                   AddListenerCompletion completion, Runtime::Loader&) -> void {
-        UNREFERENCED_PARAMETER(overridden_listener);
-        config.listenSocketFactories()[0]->getListenSocket(0);
-        EXPECT_EQ(nullptr, add_listener_completion_);
-        add_listener_completion_ = completion;
-      }));
+  ON_CALL(*this, addListener(_, _, _, _, _))
+      .WillByDefault(
+          Invoke([this](absl::optional<uint64_t> overridden_listener,
+                        Network::ListenerConfig& config, AddListenerCompletion completion,
+                        Runtime::Loader&, Random::RandomGenerator&) -> void {
+            UNREFERENCED_PARAMETER(overridden_listener);
+            config.listenSocketFactories()[0]->getListenSocket(0);
+            EXPECT_EQ(nullptr, add_listener_completion_);
+            add_listener_completion_ = completion;
+          }));
 
   ON_CALL(*this, removeListener(_, _))
       .WillByDefault(
@@ -29,12 +30,14 @@ MockWorker::MockWorker() {
             remove_listener_completion_ = completion;
           }));
 
-  ON_CALL(*this, stopListener(_, _))
-      .WillByDefault(Invoke([](Network::ListenerConfig&, std::function<void()> completion) -> void {
-        if (completion != nullptr) {
-          completion();
-        }
-      }));
+  ON_CALL(*this, stopListener(_, _, _))
+      .WillByDefault(
+          Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
+                    std::function<void()> completion) -> void {
+            if (completion != nullptr) {
+              completion();
+            }
+          }));
 
   ON_CALL(*this, removeFilterChains(_, _, _))
       .WillByDefault(Invoke([this](uint64_t, const std::list<const Network::FilterChain*>&,
@@ -44,7 +47,8 @@ MockWorker::MockWorker() {
       }));
 
   ON_CALL(*this, start(_, _))
-      .WillByDefault(Invoke([](GuardDog&, const std::function<void()>& cb) -> void { cb(); }));
+      .WillByDefault(
+          Invoke([](OptRef<GuardDog>, const std::function<void()>& cb) -> void { cb(); }));
 }
 
 MockWorker::~MockWorker() = default;

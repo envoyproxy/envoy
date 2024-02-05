@@ -18,8 +18,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
-    // TODO(dio): Add the case when using parseAndDecodeQueryString().
-    Http::Utility::parseQueryString(input.parse_query_string());
+    Http::Utility::QueryParamsMulti::parseQueryString(input.parse_query_string());
+    Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(input.parse_query_string());
     break;
   }
   case test::common::http::UtilityTestCase::kParseCookieValue: {
@@ -58,9 +58,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kParseParameters: {
     const auto& parse_parameters = input.parse_parameters();
-    // TODO(dio): Add a case when doing parse_parameters with decode_params flag true.
-    Http::Utility::parseParameters(parse_parameters.data(), parse_parameters.start(),
-                                   /*decode_params*/ false);
+    Http::Utility::QueryParamsMulti::parseParameters(parse_parameters.data(),
+                                                     parse_parameters.start(),
+                                                     /*decode_params*/ false);
+    Http::Utility::QueryParamsMulti::parseParameters(parse_parameters.data(),
+                                                     parse_parameters.start(),
+                                                     /*decode_params*/ true);
     break;
   }
   case test::common::http::UtilityTestCase::kFindQueryString: {
@@ -71,8 +74,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kMakeSetCookieValue: {
     const auto& cookie_value = input.make_set_cookie_value();
     std::chrono::seconds max_age(cookie_value.max_age());
+    Http::CookieAttributeRefVector cookie_attributes;
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
-                                      max_age, cookie_value.httponly());
+                                      max_age, cookie_value.httponly(), cookie_attributes);
     break;
   }
   case test::common::http::UtilityTestCase::kParseAuthorityString: {
@@ -82,10 +86,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
-    try {
-      Http2::Utility::initializeAndValidateOptions(options);
-    } catch (EnvoyException& e) {
-      absl::string_view msg = e.what();
+    auto options_or_error = Http2::Utility::initializeAndValidateOptions(options);
+    if (options_or_error.status().ok()) {
+      absl::string_view msg = options_or_error.status().message();
       // initializeAndValidateOptions throws exceptions for 4 different reasons due to malformed
       // settings, so check for them and allow any other exceptions through
       if (absl::StartsWith(
@@ -99,9 +102,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
           absl::EndsWith(
               msg, "HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
                    "custom parameters")) {
-        ENVOY_LOG_MISC(trace, "Caught exception {} in initializeAndValidateOptions test", e.what());
+        ENVOY_LOG_MISC(trace, "Ignoring error {} in initializeAndValidateOptions", msg);
       } else {
-        throw EnvoyException(e.what());
+        throw EnvoyException(std::string(msg));
       }
     }
     break;

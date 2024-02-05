@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/common:utility_lib",
         "//source/common/event:libevent_lib",
+        "@com_google_absl//absl/functional:any_invocable",
     ],
 )
 
@@ -40,5 +41,15 @@ envoy_cc_library(
     deps = [
         ":buffer_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "buffer_util_lib",
+    srcs = ["buffer_util.cc"],
+    hdrs = ["buffer_util.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//source/common/common:assert_lib",
     ],
 )

@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg_cc_proto",
     ],
 )
@@ -32,6 +33,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],

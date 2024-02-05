@@ -26,13 +26,12 @@ using ::Envoy::Matcher::MatchingDataType;
 using CelMatcher = ::xds::type::matcher::v3::CelMatcher;
 using CompiledExpressionPtr = std::unique_ptr<google::api::expr::runtime::CelExpression>;
 using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActivation>;
-using Builder = google::api::expr::runtime::CelExpressionBuilder;
-using BuilderPtr = std::unique_ptr<Builder>;
 using CelMatcherSharedPtr = std::shared_ptr<::xds::type::matcher::v3::CelMatcher>;
 
 class CelInputMatcher : public InputMatcher, public Logger::Loggable<Logger::Id::matcher> {
 public:
-  CelInputMatcher(CelMatcherSharedPtr cel_matcher, Builder& builder);
+  CelInputMatcher(CelMatcherSharedPtr cel_matcher,
+                  Filters::Common::Expr::BuilderInstanceSharedPtr builder);
 
   bool match(const MatchingDataType& input) override;
 
@@ -42,6 +41,7 @@ public:
   }
 
 private:
+  Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
   // Expression proto must outlive the compiled expression.
   CelMatcherSharedPtr cel_matcher_;
   CompiledExpressionPtr compiled_expr_;

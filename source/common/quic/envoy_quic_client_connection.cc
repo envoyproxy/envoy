@@ -4,13 +4,24 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
+
+// Used to defer deleting connection socket to avoid deleting IoHandle in a read loop.
+class DeferredDeletableSocket : public Event::DeferredDeletable {
+public:
+  explicit DeferredDeletableSocket(std::unique_ptr<Network::ConnectionSocket> socket)
+      : socket_(std::move(socket)) {}
+
+  void deleteIsPending() override { socket_->close(); }
+
+private:
+  std::unique_ptr<Network::ConnectionSocket> socket_;
+};
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id,
@@ -107,13 +118,10 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
       connection_socket->connectionInfoProvider().remoteAddress()->ip());
 
   // The old socket is not closed in this call, because it could still receive useful packets.
+  num_socket_switches_++;
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket(*connectionSocket(), delegate_);
-  if (connection_migration_use_new_cid()) {
-    MigratePath(self_address, peer_address, writer.release(), true);
-  } else {
-    SetQuicPacketWriter(writer.release(), true);
-  }
+  MigratePath(self_address, peer_address, writer.release(), true);
 }
 
 void EnvoyQuicClientConnection::OnPathDegradingDetected() {
@@ -122,8 +130,8 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
 }
 
 void EnvoyQuicClientConnection::maybeMigratePort() {
-  if (!IsHandshakeConfirmed() || !connection_migration_use_new_cid() ||
-      HasPendingPathValidation() || !migrate_port_on_path_degrading_) {
+  if (!IsHandshakeConfirmed() || HasPendingPathValidation() || !migrate_port_on_path_degrading_ ||
+      num_socket_switches_ >= kMaxNumSocketSwitches) {
     return;
   }
 
@@ -178,6 +186,7 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
       peer_address() == envoy_context->peer_address()) {
     // probing_socket will be set as the new default socket. But old sockets are still able to
     // receive packets.
+    num_socket_switches_++;
     setConnectionSocket(std::move(probing_socket));
     return;
   }
@@ -191,6 +200,10 @@ void EnvoyQuicClientConnection::onPathValidationFailure(
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
+  std::unique_ptr<Network::ConnectionSocket> probing_socket =
+      static_cast<EnvoyQuicPathValidationContext*>(context.get())->releaseSocket();
+  // Extend the socket life time till the end of the current event loop.
+  dispatcher_.deferredDelete(std::make_unique<DeferredDeletableSocket>(std::move(probing_socket)));
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events,

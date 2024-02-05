@@ -70,7 +70,7 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
   *config_update = std::move(owned_message);
   const auto decoded_resources =
       DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
-  callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
+  THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info()));
   return message.version_info();
 }
 
@@ -154,7 +154,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
     }
   }
   *config_update = std::move(owned_resource_message);
-  callbacks_.onConfigUpdate(decoded_resources.refvec_, resource_message.version());
+  THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources.refvec_, resource_message.version()));
   return resource_message.version();
 }
 

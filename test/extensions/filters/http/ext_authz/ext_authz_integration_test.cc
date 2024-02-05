@@ -9,6 +9,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -26,7 +27,8 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
-  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+  ExtAuthzGrpcIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, ExtAuthzGrpcIntegrationTest::ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -87,7 +89,16 @@ public:
 
   void setDenyAtDisableRuntimeConfig(bool deny_at_disable, bool disable_with_metadata) {
     if (!disable_with_metadata) {
-      config_helper_.addRuntimeOverride("envoy.ext_authz.enable", "numerator: 0");
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+        layer->set_name("enable layer");
+        ProtobufWkt::Struct& runtime = *layer->mutable_static_layer();
+        bootstrap.mutable_layered_runtime()->mutable_layers(0)->set_name("base layer");
+
+        ProtobufWkt::Struct& enable =
+            *(*runtime.mutable_fields())["envoy.ext_authz.enable"].mutable_struct_value();
+        (*enable.mutable_fields())["numerator"].set_number_value(0);
+      });
     }
     if (deny_at_disable) {
       config_helper_.addRuntimeOverride("envoy.ext_authz.deny_at_disable", "true");
@@ -173,6 +184,7 @@ public:
     attributes->clear_source();
     attributes->clear_destination();
     attributes->clear_metadata_context();
+    attributes->clear_route_metadata_context();
     attributes->mutable_request()->clear_time();
     http_request->clear_id();
     http_request->clear_headers();
@@ -365,7 +377,9 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  const std::string expectedCheckRequest(Http::CodecType downstream_protocol) {
+  const std::string
+  expectedCheckRequest(Http::CodecType downstream_protocol,
+                       absl::optional<uint64_t> override_expected_size = absl::nullopt) {
     const std::string expected_downstream_protocol =
         downstream_protocol == Http::CodecType::HTTP1 ? "HTTP/1.1" : "HTTP/2";
     constexpr absl::string_view expected_format = R"EOF(
@@ -380,7 +394,9 @@ attributes:
       protocol: %s
 )EOF";
 
-    return absl::StrFormat(expected_format, request_body_.length(), expectedRequestBody(),
+    uint64_t expected_size = override_expected_size.has_value() ? override_expected_size.value()
+                                                                : request_body_.length();
+    return absl::StrFormat(expected_format, expected_size, expectedRequestBody(),
                            expected_downstream_protocol);
   }
 
@@ -471,7 +487,7 @@ public:
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    response_ = codec_client_->makeHeaderOnlyRequest(
+    const auto headers =
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                        {":path", "/"},
                                        {":scheme", "http"},
@@ -488,7 +504,13 @@ public:
                                        {"not-allowed", "nope"},
                                        {"authorization", "legit"},
                                        {"regex-food", "food"},
-                                       {"regex-fool", "fool"}});
+                                       {"regex-fool", "fool"},
+                                       {"x-forwarded-for", "1.2.3.4"}};
+    if (client_request_body_.empty()) {
+      response_ = codec_client_->makeHeaderOnlyRequest(headers);
+    } else {
+      response_ = codec_client_->makeRequestWithBody(headers, client_request_body_, true);
+    }
   }
 
   void waitForExtAuthzRequest() {
@@ -632,6 +654,7 @@ public:
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
   IntegrationStreamDecoderPtr response_;
+  std::string client_request_body_;
   const Http::LowerCaseString case_sensitive_header_name_{"x-case-sensitive-header"};
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
   const std::string legacy_default_config_ = R"EOF(
@@ -673,6 +696,7 @@ public:
     - prefix: allowed-prefix
     - safe_regex:
         regex: regex-foo.?
+    - exact: x-forwarded-for
 
   http_service:
     server_uri:
@@ -689,6 +713,9 @@ public:
         - exact: bat
         - prefix: x-append
   failure_mode_allow: true
+  with_request_body:
+    max_request_bytes: 1024
+    allow_partial_message: true
   )EOF";
 };
 
@@ -749,6 +776,59 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
+  // Set up ext_authz filter.
+  initializeConfig();
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and start request.
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},           {":path", "/test"},
+      {":scheme", "http"},           {":authority", "host"},
+      {"x-duplicate", "one"},        {"x-duplicate", "two"},
+      {"x-duplicate", "three"},      {"allowed-prefix-one", "one"},
+      {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
+      {"regex-food", "food"},        {"regex-fool", "fool"}};
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  response_ = std::move(encoder_decoder.second);
+
+  // Split the request body into two parts
+  TestUtility::feedBufferWithRandomCharacters(request_body_, 10000);
+  std::string initial_body = request_body_.toString().substr(0, 2000);
+  std::string final_body = request_body_.toString().substr(2000, 8000);
+
+  // Send the first part of the request body without ending the stream
+  codec_client_->sendData(encoder_decoder.first, initial_body, false);
+
+  // Expect that since the buffer is full, the request is sent to the authorization server
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1, 2000));
+
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
+
+  // Send the rest of the data and end the stream
+  codec_client_->sendData(encoder_decoder.first, final_body, true);
+
+  // Expect a 200 OK response
+  waitForSuccessfulUpstreamResponse("200");
+
+  const std::string expected_body(response_size_, 'a');
+  verifyResponse(std::move(response_), "200",
+                 Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                 {"replaceable", "set-by-upstream"},
+                                                 {"set-cookie", "cookie1=snickerdoodle"}},
+                 expected_body);
+
+  cleanup();
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
@@ -909,6 +989,43 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
   setup(false);
   const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_TRUE(header_entry.empty());
+}
+
+// Verifies that "X-Forwarded-For" header is unmodified.
+TEST_P(ExtAuthzHttpIntegrationTest, UnmodifiedForwardedForHeader) {
+  setup(false);
+  EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("x-forwarded-for", "1.2.3.4"));
+}
+
+// Verifies that local address is appended to "X-Forwarded-For" header
+// if "envoy.reloadable_features.ext_authz_http_send_original_xff" runtime guard is disabled.
+TEST_P(ExtAuthzHttpIntegrationTest, LegacyAppendLocalAddressToForwardedForHeader) {
+  TestScopedRuntime scoped_runtime_;
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_authz_http_send_original_xff", "false"}});
+
+  setup(false);
+
+  const auto local_address = test_server_->server().localInfo().address()->ip()->addressAsString();
+  EXPECT_THAT(ext_authz_request_->headers(),
+              Http::HeaderValueOf("x-forwarded-for", absl::StrCat("1.2.3.4", ",", local_address)));
+}
+
+// Verifies that by default HTTP service uses the case-sensitive string matcher
+// (uses new config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest, Body) {
+  client_request_body_ = "the request body";
+  setup(false);
+  EXPECT_EQ(ext_authz_request_->body().toString(), client_request_body_);
+}
+
+TEST_P(ExtAuthzHttpIntegrationTest, BodyNonUtf8) {
+  client_request_body_ = "valid_prefix";
+  client_request_body_.append(1, char(0xc3));
+  client_request_body_.append(1, char(0x28));
+  client_request_body_.append("valid_suffix");
+  setup(false);
+  EXPECT_EQ(ext_authz_request_->body().toString(), client_request_body_);
 }
 
 // (uses new config for allowed_headers).

@@ -18,12 +18,22 @@ def api_dependencies():
     )
     external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:pgv.patch"],
     )
     external_http_archive(
         name = "com_google_googleapis",
     )
+
+    external_http_archive(
+        name = "com_github_cncf_xds",
+    )
+
+    # Needed until @com_github_grpc_grpc renames @com_github_cncf_udpa
+    # to @com_github_cncf_xds as well.
     external_http_archive(
         name = "com_github_cncf_udpa",
+        location_name = "com_github_cncf_xds",
     )
 
     external_http_archive(
@@ -51,6 +61,10 @@ def api_dependencies():
 
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
+    )
+
+    external_http_archive(
+        name = "envoy_toolshed",
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """

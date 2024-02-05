@@ -1,20 +1,18 @@
 #include "source/common/quic/http_datagram_handler.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 
 #include "absl/strings/string_view.h"
-#include "quiche/common/simple_buffer_allocator.h"
+#include "quiche/common/capsule.h"
+#include "quiche/common/quiche_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_stream.h"
 
 namespace Envoy {
 namespace Quic {
 
-HttpDatagramHandler::HttpDatagramHandler(quic::QuicSpdyStream& stream) : stream_(stream) {
-  stream_.RegisterHttp3DatagramVisitor(this);
-}
-
-HttpDatagramHandler::~HttpDatagramHandler() { stream_.UnregisterHttp3DatagramVisitor(); }
+HttpDatagramHandler::HttpDatagramHandler(quic::QuicSpdyStream& stream) : stream_(stream) {}
 
 void HttpDatagramHandler::decodeCapsule(const quiche::Capsule& capsule) {
   quiche::QuicheBuffer serialized_capsule = SerializeCapsule(capsule, &capsule_buffer_allocator_);
@@ -51,9 +49,14 @@ bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
   if (status == quic::MessageStatus::MESSAGE_STATUS_SUCCESS) {
     return true;
   }
-  // Drops the Datagram and move on without reporting a failure in the following statuses.
-  if (status == quic::MessageStatus::MESSAGE_STATUS_BLOCKED ||
-      status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE) {
+  // When SendHttp3Datagram cannot send a datagram immediately, it puts it into the queue and
+  // returns MESSAGE_STATUS_BLOCKED.
+  if (status == quic::MessageStatus::MESSAGE_STATUS_BLOCKED) {
+    ENVOY_LOG(trace, fmt::format("SendHttpH3Datagram failed: status = {}, buffers the Datagram.",
+                                 quic::MessageStatusToString(status)));
+    return true;
+  }
+  if (status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE) {
     ENVOY_LOG(warn, fmt::format("SendHttpH3Datagram failed: status = {}, drops the Datagram.",
                                 quic::MessageStatusToString(status)));
     return true;

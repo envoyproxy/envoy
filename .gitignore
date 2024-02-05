@@ -12,6 +12,7 @@
 !\.coveragerc
 !\.devcontainer
 !\.dockerignore
+!\.eslintrc.yml
 !\.flake8
 !\.gitattributes
 !\.github
@@ -37,7 +38,7 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
-*.s??
+*.swap*
 tags
 TAGS
 /test/coverage/BUILD
@@ -55,3 +56,19 @@ bazel.output.txt
 tools/dev/src
 distribution/custom
 examples/websocket/certs
+/contrib/golang/**/test_data/go.sum
+/contrib/golang/**/test_data/*/go.sum
+
+examples/single-page-app/xds/lds.yml
+!examples/single-page-app/ui/.env
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+node_modules
+dist
+*.bak

@@ -18,9 +18,9 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
@@ -38,11 +38,13 @@ namespace {
 
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
-  std::vector<Network::FilterFactoryCb> factories;
+  Filter::NetworkFilterFactoriesList factories;
   ReadyWatcher watcher;
   Network::FilterFactoryCb factory = [&](Network::FilterManager&) -> void { watcher.ready(); };
-  factories.push_back(factory);
-  factories.push_back(factory);
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
+  factories.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(factory));
 
   EXPECT_CALL(watcher, ready()).Times(2);
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(true));
@@ -51,7 +53,7 @@ TEST(FilterChainUtility, buildFilterChain) {
 
 TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
   Network::MockConnection connection;
-  std::vector<Network::FilterFactoryCb> factories;
+  Filter::NetworkFilterFactoriesList factories;
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(false));
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);
 }
@@ -79,6 +81,7 @@ protected:
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Server::MockInstance> server_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };
 
@@ -86,7 +89,7 @@ TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsConfig().flushInterval());
   EXPECT_FALSE(config.statsConfig().flushOnAdmin());
@@ -119,7 +122,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_EQ(std::chrono::milliseconds(500), config.statsConfig().flushInterval());
   EXPECT_FALSE(config.statsConfig().flushOnAdmin());
@@ -153,7 +156,7 @@ TEST_F(ConfigurationImplTest, StatsOnAdmin) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_TRUE(config.statsConfig().flushOnAdmin());
 }
@@ -216,9 +219,8 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+  EXPECT_EQ(config.initialize(bootstrap, server_, cluster_manager_factory_).message(),
+            "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
@@ -277,7 +279,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   ASSERT_EQ(1U, config.clusterManager()->clusters().active_clusters_.count("test_cluster"));
   EXPECT_EQ(8192U, config.clusterManager()
@@ -330,7 +332,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_THAT(envoy::config::trace::v3::Tracing{},
               ProtoEq(server_.httpContext().defaultTracingConfig()));
@@ -378,7 +380,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_THAT(envoy::config::trace::v3::Tracing{},
               ProtoEq(server_.httpContext().defaultTracingConfig()));
@@ -436,10 +438,11 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException,
-                            "Didn't find a registered implementation for 'invalid' with type URL: "
-                            "'envoy.config.trace.v2.BlackHoleConfig'");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok()),
+      EnvoyException,
+      "Didn't find a registered implementation for 'invalid' with type URL: "
+      "'envoy.config.trace.v2.BlackHoleConfig'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
@@ -477,7 +480,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_EQ(1, config.statsConfig().sinks().size());
 }
@@ -516,7 +519,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok()),
+      EnvoyException,
       "Didn't find a registered implementation for 'envoy.invalid' with type URL: ''");
 }
 
@@ -552,9 +556,9 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   bootstrap.mutable_stats_sinks()->Add();
 
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException,
-                            "Didn't find a registered implementation for '' with type URL: ''");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok()),
+      EnvoyException, "Didn't find a registered implementation for '' with type URL: ''");
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
@@ -593,9 +597,9 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   sink.mutable_typed_config()->PackFrom(typed_struct);
 
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException,
-                            "Didn't find a registered implementation for '' with type URL: ''");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok()),
+      EnvoyException, "Didn't find a registered implementation for '' with type URL: ''");
 }
 
 // An explicit non-empty LayeredRuntime is available to the server with no
@@ -617,7 +621,9 @@ TEST(InitialImplTest, LayeredRuntime) {
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -629,7 +635,9 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -678,9 +686,10 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
@@ -718,9 +727,10 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
@@ -809,8 +819,8 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "The sum of weights of all upstream hosts in a locality exceeds 4294967295");
+      EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok()),
+      EnvoyException, "The sum of weights of all upstream hosts in a locality exceeds 4294967295");
 }
 
 TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
@@ -923,7 +933,8 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok()),
+      EnvoyException,
       "The sum of weights of all localities at the same priority exceeds 4294967295");
 }
 
@@ -939,7 +950,7 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   TestUtility::loadFromJson(json, bootstrap);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
   EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
@@ -958,7 +969,7 @@ TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
   TestUtility::loadFromJson(json, bootstrap);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_LT(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
   EXPECT_LT(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
@@ -978,7 +989,7 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   TestUtility::loadFromJson(json, bootstrap);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
   EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
@@ -992,8 +1003,8 @@ TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {
 
   MainImpl config;
 
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException, "Only one of watchdog or watchdogs should be set!");
+  EXPECT_EQ(config.initialize(bootstrap, server_, cluster_manager_factory_).message(),
+            "Only one of watchdog or watchdogs should be set!");
 }
 
 TEST_F(ConfigurationImplTest, CanSetMultiWatchdogConfigs) {
@@ -1010,7 +1021,7 @@ TEST_F(ConfigurationImplTest, CanSetMultiWatchdogConfigs) {
   TestUtility::loadFromJson(json, bootstrap);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
 
   EXPECT_EQ(config.mainThreadWatchdogConfig().missTimeout(), std::chrono::milliseconds(2000));
   EXPECT_EQ(config.workerWatchdogConfig().missTimeout(), std::chrono::milliseconds(500));
@@ -1041,9 +1052,10 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
@@ -1077,8 +1089,10 @@ TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
+  config.initAdminAccessLog(bootstrap, factory_context_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
@@ -1112,8 +1126,10 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
+  config.initAdminAccessLog(bootstrap, factory_context_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
 }
@@ -1126,8 +1142,10 @@ TEST_F(ConfigurationImplTest, EmptyAdmin) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
+  config.initAdminAccessLog(bootstrap, factory_context_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 0);
 }
@@ -1149,8 +1167,10 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap);
-  config.initAdminAccessLog(bootstrap, server_);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_TRUE(status.ok());
+  config.initAdminAccessLog(bootstrap, factory_context_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);

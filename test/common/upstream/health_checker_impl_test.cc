@@ -28,12 +28,12 @@
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
@@ -76,15 +76,12 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   EXPECT_CALL(*cluster.info_, features()).WillRepeatedly(Return(0));
 
   Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  AccessLog::MockAccessLogManager log_manager;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  Api::MockApi api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, dispatcher,
-                                   log_manager, validation_visitor, api),
-      EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
+  EXPECT_EQ(HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, server_context)
+                .status()
+                .message(),
+            "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
 TEST(HealthCheckerFactoryTest, CreateGrpc) {
@@ -93,16 +90,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   EXPECT_CALL(*cluster.info_, features())
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  AccessLog::MockAccessLogManager log_manager;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  NiceMock<Api::MockApi> api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
   EXPECT_NE(nullptr,
             dynamic_cast<GrpcHealthCheckerImpl*>(
-                HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime,
-                                             dispatcher, log_manager, validation_visitor, api)
+                HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, server_context)
+                    .value()
                     .get()));
 }
 
@@ -4063,7 +4056,8 @@ TEST(PayloadMatcher, loadJsonBytes) {
     repeated_payload.Add()->set_text("39000000");
     repeated_payload.Add()->set_text("EEEEEEEE");
 
-    PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+    PayloadMatcher::MatchSegments segments =
+        PayloadMatcher::loadProtoBytes(repeated_payload).value();
     EXPECT_EQ(2U, segments.size());
   }
 
@@ -4071,14 +4065,14 @@ TEST(PayloadMatcher, loadJsonBytes) {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("4");
 
-    EXPECT_THROW(PayloadMatcher::loadProtoBytes(repeated_payload), EnvoyException);
+    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(repeated_payload).status().ok());
   }
 
   {
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("gg");
 
-    EXPECT_THROW(PayloadMatcher::loadProtoBytes(repeated_payload), EnvoyException);
+    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(repeated_payload).status().ok());
   }
 }
 
@@ -4091,7 +4085,7 @@ TEST(PayloadMatcher, matchHexText) {
   repeated_payload.Add()->set_text("01");
   repeated_payload.Add()->set_text("02");
 
-  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload).value();
 
   Buffer::OwnedImpl buffer;
   EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
@@ -4118,7 +4112,7 @@ TEST(PayloadMatcher, matchBinary) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
   repeated_payload.Add()->set_binary(std::string({0x01, 0x02}));
 
-  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload);
+  PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(repeated_payload).value();
 
   Buffer::OwnedImpl buffer;
   EXPECT_FALSE(PayloadMatcher::match(segments, buffer));
@@ -6387,74 +6381,87 @@ TEST(Printer, HealthTransitionPrinter) {
 }
 
 TEST(HealthCheckEventLoggerImplTest, All) {
-  AccessLog::MockAccessLogManager log_manager;
-  std::shared_ptr<AccessLog::MockAccessLogFile> file(new AccessLog::MockAccessLogFile());
-  EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
-                               Filesystem::DestinationType::File, "foo"}))
-      .WillOnce(Return(file));
-
   envoy::config::core::v3::HealthCheck health_check_config;
   health_check_config.set_event_log_path("foo");
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  NiceMock<Api::MockApi> api;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  std::shared_ptr<AccessLog::MockAccessLogFile> file(new AccessLog::MockAccessLogFile());
+  EXPECT_CALL(server_context.access_log_manager_, createAccessLog(Filesystem::FilePathAndType{
+                                                      Filesystem::DestinationType::File, "foo"}))
+      .WillOnce(Return(file));
 
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   NiceMock<MockClusterInfo> cluster_info;
+  MetadataConstSharedPtr metadata(new envoy::config::core::v3::Metadata());
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager);
+  HealthCheckerFactoryContextImpl context(cluster, server_context);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config, context);
+  HealthCheckEventLoggerImpl event_logger(health_check_config, context);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\",\"ipv4_compat\":false}},"
+                         "\"cluster_name\":\"fake_cluster\","
+                         "\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"add_healthy_event\":{\"first_check\":false},\"timestamp\":"
-                         "\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+                         "cluster\",\"add_healthy_event\":{\"first_check\":false},"
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"metadata\":"
+                         "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
+                         "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logAddHealthy(envoy::data::core::v3::HTTP, host, false);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
                          "\"first_check\":false},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
                             false);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"degraded_healthy_host\":{},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"degraded_healthy_host\":{},"
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logDegraded(envoy::data::core::v3::HTTP, host);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"no_longer_degraded_host\":{},"
-                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"no_longer_degraded_host\":{},"
+                         "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+                         "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
   event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
 }
 
@@ -6465,66 +6472,84 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   config.set_event_log_path("foo");
   event_log->mutable_typed_config()->PackFrom(config);
 
-  NiceMock<AccessLog::MockAccessLogManager> log_manager;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   StringViewSaver file_log_data;
-  ON_CALL(*log_manager.file_, write(_)).WillByDefault(SaveArg<0>(&file_log_data));
+  ON_CALL(*server_context.access_log_manager_.file_, write(_))
+      .WillByDefault(SaveArg<0>(&file_log_data));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  Runtime::MockLoader runtime;
-  Event::MockDispatcher dispatcher;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  NiceMock<Api::MockApi> api;
 
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   NiceMock<MockClusterInfo> cluster_info;
+  MetadataConstSharedPtr metadata(new envoy::config::core::v3::Metadata());
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster_info));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  HealthCheckerFactoryContextImpl context(cluster, runtime, dispatcher, validation_visitor, api,
-                                          log_manager);
+  HealthCheckerFactoryContextImpl context(cluster, server_context);
 
   Event::SimulatedTimeSystem time_system;
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, health_check_config, context);
+  HealthCheckEventLoggerImpl event_logger(health_check_config, context);
 
   event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
-  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                           "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
-                           "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
+  EXPECT_EQ(
+      file_log_data.value(),
+      "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+      "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
+      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+      "\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
+      "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+      "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+      "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
   event_logger.logAddHealthy(envoy::data::core::v3::HTTP, host, false);
-  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                           "cluster\",\"add_healthy_event\":{\"first_check\":false},\"timestamp\":"
-                           "\"2009-02-13T23:31:31.234Z\"}\n");
+  EXPECT_EQ(
+      file_log_data.value(),
+      "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+      "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
+      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+      "cluster\",\"add_healthy_event\":{\"first_check\":false},"
+      "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+      "\"metadata\":"
+      "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
+      "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
   event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
                             false);
-  EXPECT_EQ(file_log_data.value(),
-            "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-            "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-            "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-            "cluster\",\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
-            "\"first_check\":false},"
-            "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
+  EXPECT_EQ(
+      file_log_data.value(),
+      "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+      "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
+      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+      "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+      "\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
+      "\"first_check\":false},"
+      "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+      "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
   event_logger.logDegraded(envoy::data::core::v3::HTTP, host);
-  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                           "cluster\",\"degraded_healthy_host\":{},"
-                           "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
+  EXPECT_EQ(
+      file_log_data.value(),
+      "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+      "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
+      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+      "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+      "\"degraded_healthy_host\":{},"
+      "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+      "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
   event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
-  EXPECT_EQ(file_log_data, "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
-                           "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
-                           "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                           "cluster\",\"no_longer_degraded_host\":{},"
-                           "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
+  EXPECT_EQ(
+      file_log_data.value(),
+      "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+      "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
+      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
+      "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+      "\"no_longer_degraded_host\":{},"
+      "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
+      "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 }
 
 // Validate that the proto constraints don't allow zero length edge durations.

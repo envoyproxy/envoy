@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 38]
+// [#next-free-field: 41]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -99,6 +99,48 @@ message Bootstrap {
     // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
     core.v3.ApiConfigSource ads_config = 3;
+  }
+
+  message ApplicationLogConfig {
+    message LogFormat {
+      oneof log_format {
+        option (validate.required) = true;
+
+        // Flush application logs in JSON format. The configured JSON struct can
+        // support all the format flags specified in the :option:`--log-format`
+        // command line options section, except for the ``%v`` and ``%_`` flags.
+        google.protobuf.Struct json_format = 1;
+
+        // Flush application log in a format defined by a string. The text format
+        // can support all the format flags specified in the :option:`--log-format`
+        // command line option section.
+        string text_format = 2;
+      }
+    }
+
+    // Optional field to set the application logs format. If this field is set, it will override
+    // the default log format. Setting both this field and :option:`--log-format` command line
+    // option is not allowed, and will cause a bootstrap error.
+    LogFormat log_format = 1;
+  }
+
+  message DeferredStatOptions {
+    // When the flag is enabled, Envoy will lazily initialize a subset of the stats (see below).
+    // This will save memory and CPU cycles when creating the objects that own these stats, if those
+    // stats are never referenced throughout the lifetime of the process. However, it will incur additional
+    // memory overhead for these objects, and a small increase of CPU usage when a at least one of the stats
+    // is updated for the first time.
+    // Groups of stats that will be lazily initialized:
+    // - Cluster traffic stats: a subgroup of the :ref:`cluster statistics <config_cluster_manager_cluster_stats>`
+    // that are used when requests are routed to the cluster.
+    bool enable_deferred_creation_stats = 1;
+  }
+
+  message GrpcAsyncClientManagerConfig {
+    // Optional field to set the expiration time for the cached gRPC client object.
+    // The minimal value is 5s and the default is 50s.
+    google.protobuf.Duration max_cached_entry_idle_duration = 1
+        [(validate.rules).duration = {gte {seconds: 5}}];
   }
 
   reserved 10, 11;
@@ -162,6 +204,9 @@ message Bootstrap {
 
   // Optional set of stats sinks.
   repeated metrics.v3.StatsSink stats_sinks = 6;
+
+  // Options to control behaviors of deferred creation compatible stats.
+  DeferredStatOptions deferred_stat_options = 39;
 
   // Configuration for internal processing of stats.
   metrics.v3.StatsConfig stats_config = 13;
@@ -360,6 +405,12 @@ message Bootstrap {
   // Envoy only supports ListenerManager for this field and Envoy Mobile
   // supports ApiListenerManager.
   core.v3.TypedExtensionConfig listener_manager = 37;
+
+  // Optional application log configuration.
+  ApplicationLogConfig application_log_config = 38;
+
+  // Optional gRPC async manager config.
+  GrpcAsyncClientManagerConfig grpc_async_client_manager_config = 40;
 }
 
 // Administration interface :ref:`operations documentation
@@ -397,6 +448,7 @@ message Admin {
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
+// [#next-free-field: 6]
 message ClusterManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.ClusterManager";
@@ -437,6 +489,11 @@ message ClusterManager {
   // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
   // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
   core.v3.ApiConfigSource load_stats_config = 4;
+
+  // Whether the ClusterManager will create clusters on the worker threads
+  // inline during requests. This will save memory and CPU cycles in cases where
+  // there are lots of inactive clusters and > 1 worker thread.
+  bool enable_deferred_cluster_creation = 5;
 }
 
 // Allows you to specify different watchdog configs for different subsystems.

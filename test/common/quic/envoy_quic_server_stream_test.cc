@@ -15,6 +15,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -118,8 +119,6 @@ public:
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
-    quic_stream_->useCapsuleProtocol();
-
     // Decodes a CONNECT-UDP request.
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _))
         .WillOnce(Invoke([](const Http::RequestHeaderMapSharedPtr& headers, bool) {
@@ -266,6 +265,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";
   spdy_headers[":path"] = "/";
+  spdy_headers[":scheme"] = "https";
   spdy_headers.AppendValueOrAddHeader("cookie", "a=b");
   spdy_headers.AppendValueOrAddHeader("cookie", "c=d");
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);
@@ -276,6 +276,21 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+
+  std::string response(18 * 1024, 'a');
+  Buffer::OwnedImpl buffer(response);
+  quic_stream_->encodeData(buffer, false);
+  quic_stream_->encodeTrailers(response_trailers_);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithMemSliceReleasor) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quiche_use_mem_slice_releasor_api", "true"}});
+
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
@@ -846,7 +861,7 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
   EXPECT_GT(quic_stream_->statsGatherer()->bytesOutstanding(), 0);
   // Close the stream; incoming acks will no longer invoke the stats gatherer but
   // the stats gatherer should log on stream close despite not receiving final downstream ack.
-  EXPECT_CALL(*mock_logger, log(_, _, _, _, _));
+  EXPECT_CALL(*mock_logger, log(_, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
 }
 

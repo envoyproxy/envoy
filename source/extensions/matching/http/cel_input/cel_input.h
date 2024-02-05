@@ -39,15 +39,11 @@ public:
     ResponseHeaderMapOptConstRef maybe_response_headers = data.responseHeaders();
     ResponseTrailerMapOptConstRef maybe_response_trailers = data.responseTrailers();
 
-    // Returns NotAvailable state when all of three below are empty.
-    if (!maybe_request_headers && !maybe_response_headers && !maybe_response_trailers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
-    }
-
-    // CEL library supports mixed matching condition of request headers, response headers and
-    // response trailers.
+    // CEL library supports mixed matching of request/response attributes(e.g., headers, trailers)
+    // and attributes from stream info.
     std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
         Extensions::Filters::Common::Expr::createActivation(
+            nullptr, // TODO: pass local_info to CEL activation.
             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
             maybe_response_trailers.ptr());
 

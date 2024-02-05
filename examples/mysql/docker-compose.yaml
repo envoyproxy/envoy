@@ -2,6 +2,7 @@ services:
 
   proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_VARIANT: contrib-dev
@@ -13,6 +14,7 @@ services:
 
   mysql:
     build:
+      context: .
       dockerfile: Dockerfile-mysql
     environment:
     - MYSQL_ALLOW_EMPTY_PASSWORD=yes

@@ -125,5 +125,9 @@ generate_x509_cert upstreamlocalhost upstreamca
 generate_rsa_key expired_
 generate_x509_cert expired_ ca -365
 
+# Generate cert has keyUsage extension that is incompatible with the TLS usage
+generate_rsa_key bad_rsa_key_usage
+generate_x509_cert bad_rsa_key_usage ca
+
 rm ./*.csr
 rm ./*.srl

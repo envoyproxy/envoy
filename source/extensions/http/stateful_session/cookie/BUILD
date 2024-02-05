@@ -16,6 +16,7 @@ envoy_cc_library(
     hdrs = ["cookie.h"],
     deps = [
         ":cookie_encoding_cc_proto",
+        "//envoy/http:hash_policy_interface",
         "//envoy/http:stateful_session_interface",
         "//source/common/common:base64_lib",
         "//source/common/http:headers_lib",

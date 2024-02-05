@@ -8,15 +8,17 @@ services:
   dd-agent:
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - '/run/user:/run/user:ro'
       - '/proc/:/host/proc/:ro'
       - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
     environment:
+      - DOCKER_HOST
       - DD_API_KEY
       - DD_APM_ENABLED=true
       - DD_LOG_LEVEL=ERROR
     ports:
       - 8126:8126
-    image: 'datadog/agent'
+    image: 'datadog/agent@sha256:1d9b8e28704b207626cdeca5386019f673d9f3a9baf817f5094b8e08b1f99fca'
 
   # `http` is an HTTP server that is reverse proxied by `nginx`.
   http:

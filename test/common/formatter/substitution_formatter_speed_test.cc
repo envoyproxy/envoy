@@ -25,7 +25,7 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool type
     user-agent: '%REQ(USER-AGENT)%'
   )EOF";
   TestUtility::loadFromYaml(format_yaml, JsonLogFormat);
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false);
+  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false, false);
 }
 
 std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool typed) {
@@ -86,15 +86,8 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
       std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += formatter
-                        ->format(request_headers, response_headers, response_trailers, *stream_info,
-                                 body, AccessLog::AccessLogType::NotSet)
-                        .length();
+    output_bytes += formatter->formatWithContext({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -107,15 +100,8 @@ static void BM_StructAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::Formatter::StructFormatter> struct_formatter = makeStructFormatter(false);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += struct_formatter
-                        ->format(request_headers, response_headers, response_trailers, *stream_info,
-                                 body, AccessLog::AccessLogType::NotSet)
-                        .ByteSize();
+    output_bytes += struct_formatter->formatWithContext({}, *stream_info).ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -129,15 +115,8 @@ static void BM_TypedStructAccessLogFormatter(benchmark::State& state) {
       makeStructFormatter(true);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += typed_struct_formatter
-                        ->format(request_headers, response_headers, response_trailers, *stream_info,
-                                 body, AccessLog::AccessLogType::NotSet)
-                        .ByteSize();
+    output_bytes += typed_struct_formatter->formatWithContext({}, *stream_info).ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -150,15 +129,8 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += json_formatter
-                        ->format(request_headers, response_headers, response_trailers, *stream_info,
-                                 body, AccessLog::AccessLogType::NotSet)
-                        .length();
+    output_bytes += json_formatter->formatWithContext({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -172,15 +144,8 @@ static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
       makeJsonFormatter(true);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += typed_json_formatter
-                        ->format(request_headers, response_headers, response_trailers, *stream_info,
-                                 body, AccessLog::AccessLogType::NotSet)
-                        .length();
+    output_bytes += typed_json_formatter->formatWithContext({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -191,7 +156,7 @@ static void BM_FormatterCommandParsing(benchmark::State& state) {
   const std::string token = "Listener:namespace:key";
   std::string listener, names, key;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    Formatter::SubstitutionFormatParser::parseSubcommand(token, ':', listener, names, key);
+    Formatter::SubstitutionFormatUtils::parseSubcommand(token, ':', listener, names, key);
   }
 }
 BENCHMARK(BM_FormatterCommandParsing);

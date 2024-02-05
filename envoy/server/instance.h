@@ -47,6 +47,11 @@ public:
   virtual ~Instance() = default;
 
   /**
+   * Runs the server.
+   */
+  virtual void run() PURE;
+
+  /**
    * @return OptRef<Admin> the global HTTP admin endpoint for the server.
    */
   virtual OptRef<Admin> admin() PURE;
@@ -84,8 +89,10 @@ public:
 
   /**
    * Close the server's listening sockets and begin draining the listeners.
+   * @param options - if provided, options are passed through to shutdownListener.
    */
-  virtual void drainListeners() PURE;
+  virtual void
+  drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options = absl::nullopt) PURE;
 
   /**
    * @return DrainManager& singleton for use by the entire server.

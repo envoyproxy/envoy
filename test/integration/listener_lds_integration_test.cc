@@ -693,16 +693,16 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
 // This is multiple addresses version test for the above one.
 TEST_P(ListenerMultiAddressesIntegrationTest,
        MultipleLdsUpdatesSharingListenSocketFactoryWithMultiAddresses) {
-// https://github.com/envoyproxy/envoy/issues/26336
-#if defined(__arm64__)
-  return;
-#endif
   on_server_init_function_ = [&]() {
     createLdsStream();
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };
   initialize();
+// https://github.com/envoyproxy/envoy/issues/26336
+#if defined(__aarch64__)
+  return;
+#endif
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
@@ -1652,8 +1652,9 @@ public:
           src_listener_config.mutable_use_original_dst()->set_value(true);
           // Note that the below original_dst is replaced by FakeOriginalDstListenerFilter at the
           // link time.
-          src_listener_config.add_listener_filters()->set_name(
-              "envoy.filters.listener.original_dst");
+          auto& filter = *src_listener_config.add_listener_filters();
+          filter.set_name("envoy.filters.listener.original_dst");
+          filter.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
           auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
           virtual_listener_config = src_listener_config;
           virtual_listener_config.mutable_use_original_dst()->set_value(false);

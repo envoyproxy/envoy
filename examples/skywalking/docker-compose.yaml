@@ -2,6 +2,7 @@ services:
 
   envoy-front-proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-front-proxy.yaml
@@ -17,6 +18,7 @@ services:
 
   envoy-1:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-1.yaml
@@ -30,6 +32,7 @@ services:
 
   envoy-2:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
       args:
         ENVOY_CONFIG: envoy-2.yaml
@@ -56,6 +59,7 @@ services:
   # Skywalking components.
   elasticsearch:
     build:
+      context: .
       dockerfile: Dockerfile-elasticsearch
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
@@ -83,6 +87,7 @@ services:
 
   skywalking-oap:
     build:
+      context: .
       dockerfile: Dockerfile-skywalking-oap
     depends_on:
       elasticsearch:
@@ -101,6 +106,7 @@ services:
 
   skywalking-ui:
     build:
+      context: .
       dockerfile: Dockerfile-skywalking-ui
     healthcheck:
       test: ["CMD-SHELL", 'curl --silent --fail http://localhost:8080/graphql -X POST -H "Content-Type:application/json" -d "{ \"query\": \"query version { version }\"}" || exit 1']

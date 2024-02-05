@@ -28,6 +28,9 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
+// The default limit of 80 KiB is the vanilla http_parser behaviour.
+inline constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
+
 class ConnectionImpl;
 
 /**
@@ -269,6 +272,7 @@ public:
   Envoy::Http::Status codec_status_;
 
   // ScopeTrackedObject
+  ExecutionContext* executionContext() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
@@ -314,6 +318,8 @@ protected:
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
+  const uint32_t max_headers_kb_;
+  const uint32_t max_headers_count_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -451,8 +457,6 @@ private:
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
   Protocol protocol_{Protocol::Http11};
-  const uint32_t max_headers_kb_;
-  const uint32_t max_headers_count_;
 };
 
 /**
@@ -540,14 +544,15 @@ private:
   void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    auto headers = RequestHeaderMapImpl::create();
+    auto headers = RequestHeaderMapImpl::create(max_headers_kb_, max_headers_count_);
     headers->setFormatter(std::move(formatter));
     headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(
+          RequestTrailerMapImpl::create(max_headers_kb_, max_headers_count_));
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
@@ -645,14 +650,15 @@ private:
   void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    auto headers = ResponseHeaderMapImpl::create();
+    auto headers = ResponseHeaderMapImpl::create(max_headers_kb_, max_headers_count_);
     headers->setFormatter(std::move(formatter));
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
+      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
+          ResponseTrailerMapImpl::create(max_headers_kb_, max_headers_count_));
     }
   }
   void dumpAdditionalState(std::ostream& os, int indent_level) const override;
@@ -676,9 +682,6 @@ private:
   // detected while parsing the first trailer field (if trailers are enabled). The variant is reset
   // to null headers on message complete for assertion purposes.
   absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
-
-  // The default limit of 80 KiB is the vanilla http_parser behaviour.
-  static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 
   // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
   // plaintext HTTP should be sent with fully qualified URLs.

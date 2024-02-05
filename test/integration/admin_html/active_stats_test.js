@@ -1,6 +1,4 @@
-// This file contains helper functions for writing JavaScript unit tests, in the
-// style of Google's Closure Compiler, but without taking on a large dependency
-// or build infrastructure.
+// This file uses unit-test helper functions defined in web_test.js.
 //
 // See source/server/admin/javascript.md for background info.
 

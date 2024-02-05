@@ -214,7 +214,7 @@ ScaledRangeTimerManagerImpl::activateTimer(std::chrono::milliseconds duration,
     resetQueueTimer(queue, dispatcher_.approximateMonotonicTime());
   }
 
-  return ScalingTimerHandle(queue, --queue.range_timers_.end());
+  return {queue, --queue.range_timers_.end()};
 }
 
 void ScaledRangeTimerManagerImpl::removeTimer(ScalingTimerHandle handle) {

@@ -24,7 +24,7 @@ namespace {
 class SampleDriver : public Driver {
 public:
   SpanPtr startSpan(const Config&, Tracing::TraceContext&, const StreamInfo::StreamInfo&,
-                    const std::string&, const Tracing::Decision) override {
+                    const std::string&, Tracing::Decision) override {
     return nullptr;
   }
 };
@@ -64,10 +64,9 @@ TEST_F(TracerManagerImplTest, ShouldReturnWhenNoTracingProviderHasBeenConfigured
 }
 
 TEST_F(TracerManagerImplTest, ShouldUseProperTracerFactory) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
+  tracing_config.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
 
   auto tracer = tracer_manager_.getOrCreateTracer(&tracing_config);
 
@@ -119,19 +118,16 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
 }
 
 TEST_F(TracerManagerImplTest, ShouldFailIfTracerProviderIsUnknown) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("invalid");
+  tracing_config.mutable_typed_config()->PackFrom(ProtobufWkt::Value());
 
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+                            "Didn't find a registered implementation for 'invalid' "
+                            "with type URL: 'google.protobuf.Value'");
 }
 
 TEST_F(TracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
   tracing_config.mutable_typed_config()->PackFrom(ValueUtil::stringValue("value"));
@@ -139,8 +135,8 @@ TEST_F(TracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) {
   ProtobufWkt::Any expected_any_proto;
   expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
-                            fmt::format("Unable to unpack as google.protobuf.Struct: {}",
-                                        expected_any_proto.DebugString()));
+                            "Didn't find a registered implementation for 'envoy.tracers.sample' "
+                            "with type URL: 'google.protobuf.Value'");
 }
 
 class TracerManagerImplCacheTest : public testing::Test {

@@ -129,100 +129,12 @@ Example two: SDS server
 
 This example shows how to configure secrets fetched from remote SDS servers:
 
-.. code-block:: yaml
-
-    clusters:
-      - name: sds_server_mtls
-        typed_extension_protocol_options:
-          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-            explicit_http_config:
-              http2_protocol_options:
-                connection_keepalive:
-                  interval: 30s
-                  timeout: 5s
-        load_assignment:
-          cluster_name: sds_server_mtls
-          endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: 127.0.0.1
-                    port_value: 8234
-        transport_socket:
-          name: envoy.transport_sockets.tls
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-            common_tls_context:
-            - tls_certificate:
-              certificate_chain:
-                filename: certs/sds_cert.pem
-              private_key:
-                filename: certs/sds_key.pem
-      - name: sds_server_uds
-        typed_extension_protocol_options:
-          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-            explicit_http_config:
-              http2_protocol_options: {}
-        load_assignment:
-          cluster_name: sds_server_uds
-          endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  pipe:
-                    path: /tmp/uds_path
-      - name: example_cluster
-        connect_timeout: 0.25s
-        load_assignment:
-          cluster_name: local_service_tls
-          ...
-          transport_socket:
-          name: envoy.transport_sockets.tls
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-            common_tls_context:
-              tls_certificate_sds_secret_configs:
-              - name: client_cert
-                sds_config:
-                  resource_api_version: V3
-                  api_config_source:
-                    api_type: GRPC
-                    transport_api_version: V3
-                    grpc_services:
-                      google_grpc:
-                        target_uri: unix:/tmp/uds_path
-    listeners:
-      ....
-      filter_chains:
-      - transport_socket:
-          name: envoy.transport_sockets.tls
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-            common_tls_context:
-              tls_certificate_sds_secret_configs:
-              - name: server_cert
-                sds_config:
-                  resource_api_version: V3
-                  api_config_source:
-                    api_type: GRPC
-                    transport_api_version: V3
-                    grpc_services:
-                      envoy_grpc:
-                        cluster_name: sds_server_mtls
-              validation_context_sds_secret_config:
-                name: validation_context
-                sds_config:
-                  resource_api_version: V3
-                  api_config_source:
-                    api_type: GRPC
-                    transport_api_version: V3
-                    grpc_services:
-                      envoy_grpc:
-                        cluster_name: sds_server_uds
-
+.. literalinclude:: _include/sds-source-example.yaml
+   :language: yaml
+   :lines: 1-103
+   :linenos:
+   :lineno-start: 1
+   :caption: :download:`sds-source-example.yaml <_include/sds-source-example.yaml>`
 
 For illustration, above example uses three methods to access the SDS server. A gRPC SDS server can be reached by Unix Domain Socket path **/tmp/uds_path** and **127.0.0.1:8234** by mTLS. It provides three secrets, **client_cert**, **server_cert** and **validation_context**. In the config, cluster **example_cluster** certificate **client_cert** is configured to use Google gRPC with UDS to talk to the SDS server. The Listener needs to fetch **server_cert** and **validation_context** from the SDS server. The **server_cert** is using Envoy gRPC with cluster **sds_server_mtls** configured with client certificate to use mTLS to talk to SDS server. The **validate_context** is using Envoy gRPC with cluster **sds_server_uds** configured with UDS path to talk to the SDS server.
 

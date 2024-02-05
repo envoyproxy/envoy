@@ -2160,40 +2160,6 @@ TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
   EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/");
 }
 
-TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled", "false"}});
-
-  TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
-            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
-  EXPECT_EQ(header_map.getPathValue(), "/foo/bar#boom");
-
-  TestRequestHeaderMapImpl header_map_just_fragment{{":path", "#"}};
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
-            ConnectionManagerUtility::maybeNormalizePath(header_map_just_fragment, config_));
-  EXPECT_EQ(header_map_just_fragment.getPathValue(), "#");
-
-  TestRequestHeaderMapImpl header_map_just_fragment2{{":path", "/#"}};
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
-            ConnectionManagerUtility::maybeNormalizePath(header_map_just_fragment2, config_));
-  EXPECT_EQ(header_map_just_fragment2.getPathValue(), "/#");
-
-  TestRequestHeaderMapImpl header_map_with_empty_fragment{{":path", "/foo/baz/#"}};
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
-            ConnectionManagerUtility::maybeNormalizePath(header_map_with_empty_fragment, config_));
-  EXPECT_EQ(header_map_with_empty_fragment.getPathValue(), "/foo/baz/#");
-
-  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
-  TestRequestHeaderMapImpl header_map_with_fragment2{{":path", "/foo/../baz/#fragment"}};
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
-            ConnectionManagerUtility::maybeNormalizePath(header_map_with_fragment2, config_));
-  EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/%23fragment");
-}
-
 // Verify when append_x_forwarded_port is turned on, the x-forwarded-port header should be appended.
 TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
   ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));

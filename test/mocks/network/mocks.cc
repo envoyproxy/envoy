@@ -33,7 +33,8 @@ MockUdpListenerConfig::MockUdpListenerConfig(uint32_t concurrency)
 MockUdpListenerConfig::~MockUdpListenerConfig() = default;
 
 MockListenerConfig::MockListenerConfig()
-    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()) {
+    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()),
+      listener_info_(std::make_shared<testing::NiceMock<MockListenerInfo>>()) {
   socket_factories_.emplace_back(std::make_unique<MockListenSocketFactory>());
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
   ON_CALL(*this, listenSocketFactories()).WillByDefault(ReturnRef(socket_factories_));
@@ -43,6 +44,10 @@ MockListenerConfig::MockListenerConfig()
       .WillByDefault(Return(socket_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, maxConnectionsToAcceptPerSocketEvent())
+      .WillByDefault(Return(Network::DefaultMaxConnectionsToAcceptPerSocketEvent));
+  ON_CALL(*this, ignoreGlobalConnLimit()).WillByDefault(Return(false));
+  ON_CALL(*this, bindToPort()).WillByDefault(Return(true));
 }
 MockListenerConfig::~MockListenerConfig() = default;
 
@@ -125,6 +130,12 @@ MockListenerFilterManager::~MockListenerFilterManager() = default;
 
 MockFilterChain::MockFilterChain() = default;
 MockFilterChain::~MockFilterChain() = default;
+
+MockFilterChainInfo::MockFilterChainInfo() {
+  ON_CALL(*this, name()).WillByDefault(Invoke([this]() {
+    return absl::string_view{filter_chain_name_};
+  }));
+}
 
 MockFilterChainManager::MockFilterChainManager() = default;
 MockFilterChainManager::~MockFilterChainManager() = default;

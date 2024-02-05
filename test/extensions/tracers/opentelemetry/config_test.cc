@@ -16,7 +16,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracer) {
+TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerWithGrpcExporter) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   OpenTelemetryTracerFactory factory;
@@ -41,7 +41,36 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracer) {
   EXPECT_NE(nullptr, opentelemetry_tracer);
 }
 
-TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracerNoExporter) {
+TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerWithHttpExporter) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+  OpenTelemetryTracerFactory factory;
+
+  const std::string yaml_string = R"EOF(
+    http:
+      name: envoy.tracers.opentelemetry
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+        http_service:
+          http_uri:
+            uri: "https://some-o11y.com//otlp/v1/traces"
+            cluster: "my_o11y_backend"
+            timeout: 0.250s
+          request_headers_to_add:
+          - header:
+              key: "Authorization"
+              value: "auth-token"
+  )EOF";
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  auto opentelemetry_tracer = factory.createTracerDriver(*message, context);
+  EXPECT_NE(nullptr, opentelemetry_tracer);
+}
+
+TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerNoExporter) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   OpenTelemetryTracerFactory factory;
@@ -57,6 +86,7 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracerNoExporter) {
 
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+
   auto opentelemetry_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, opentelemetry_tracer);
 }

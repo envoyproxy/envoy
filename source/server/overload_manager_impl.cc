@@ -194,8 +194,7 @@ public:
                            int64_t increment) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
-      ENVOY_LOG_MISC(warn, " {Failed to allocate unknown proactive resource }");
-      // Resource monitor is not configured.
+      ENVOY_LOG_MISC(warn, "Failed to allocate resource usage, resource monitor is not configured");
       return false;
     }
 
@@ -206,7 +205,8 @@ public:
                              int64_t decrement) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
-      ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown proactive resource }");
+      ENVOY_LOG_MISC(warn,
+                     "Failed to deallocate resource usage, resource monitor is not configured");
       return false;
     }
 
@@ -216,6 +216,16 @@ public:
   bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     return proactive_resource != proactive_resources_->end();
+  }
+
+  ProactiveResourceMonitorOptRef
+  getProactiveResourceMonitorForTest(OverloadProactiveResourceName resource_name) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource == proactive_resources_->end()) {
+      ENVOY_LOG_MISC(warn, "Failed to get resource usage, resource monitor is not configured");
+      return makeOptRefFromPtr<ProactiveResourceMonitor>(nullptr);
+    }
+    return proactive_resource->second.getProactiveResourceMonitorForTest();
   }
 
 private:
@@ -252,11 +262,6 @@ NamedOverloadActionSymbolTable::lookup(absl::string_view string) const {
 
 const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) const {
   return names_.at(symbol.index());
-}
-
-bool operator==(const NamedOverloadActionSymbolTable::Symbol& lhs,
-                const NamedOverloadActionSymbolTable::Symbol& rhs) {
-  return lhs.index() == rhs.index();
 }
 
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
@@ -360,9 +365,9 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Api::Api& api, const Server::Options& options)
-    : started_(false), dispatcher_(dispatcher), time_source_(api.timeSource()),
-      tls_(slot_allocator), refresh_interval_(std::chrono::milliseconds(
-                                PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
+    : dispatcher_(dispatcher), time_source_(api.timeSource()), tls_(slot_allocator),
+      refresh_interval_(
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
       refresh_interval_delays_(makeHistogram(stats_scope, "refresh_interval_delay",
                                              Stats::Histogram::Unit::Milliseconds)),
       proactive_resources_(
@@ -415,13 +420,10 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     ENVOY_LOG(debug, "Adding overload action {}", name);
 
     // Validate that this is a well known overload action.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.overload_manager_error_unknown_action")) {
-      auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
-      if (std::find(well_known_actions.begin(), well_known_actions.end(), name) ==
-          well_known_actions.end()) {
-        throw EnvoyException(absl::StrCat("Unknown Overload Manager Action ", name));
-      }
+    const auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
+    if (std::find(well_known_actions.begin(), well_known_actions.end(), name) ==
+        well_known_actions.end()) {
+      throw EnvoyException(absl::StrCat("Unknown Overload Manager Action ", name));
     }
 
     // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
@@ -570,7 +572,6 @@ LoadShedPoint* OverloadManagerImpl::getLoadShedPoint(absl::string_view point_nam
   if (auto it = loadshed_points_.find(point_name); it != loadshed_points_.end()) {
     return it->second.get();
   }
-  ENVOY_LOG(trace, "LoadShedPoint {} is not found. Is it configured?", point_name);
   return nullptr;
 }
 
@@ -650,7 +651,7 @@ void OverloadManagerImpl::flushResourceUpdates() {
 
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
-    : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
+    : name_(name), monitor_(std::move(monitor)), manager_(manager),
       pressure_gauge_(
           makeGauge(stats_scope, name, "pressure", Stats::Gauge::ImportMode::NeverImport)),
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),

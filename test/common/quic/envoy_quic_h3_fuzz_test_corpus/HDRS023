@@ -1,0 +1,75 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "https"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "options"
+            }
+            headers {
+              key: "-upstream-service-time"
+              value: "empty"
+            }
+            headers {
+              key: "authentication"
+              value: "empty"
+            }
+            headers {
+              key: "x-client-trace-id"
+              value: "empty"
+            }
+            headers {
+              key: "access-control-allow-methods"
+              value: "empty"
+            }
+            headers {
+              key: "cache-control"
+              value: "private"
+            }
+            headers {
+              key: "-original-url"
+              value: "empty"
+            }
+            headers {
+              key: "-not-forwarded"
+              value: "empty"
+            }
+            headers {
+              key: "grpc-status"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

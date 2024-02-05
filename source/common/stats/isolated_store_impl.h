@@ -236,6 +236,7 @@ public:
 
   void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {}
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {}
+  const TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(TagVector); }
 
 protected:
   /**

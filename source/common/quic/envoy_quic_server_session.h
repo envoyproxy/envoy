@@ -86,6 +86,8 @@ public:
   void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                         const quic::QuicSocketAddress& peer_address,
                         const quic::QuicReceivedPacket& packet) override;
+  std::vector<absl::string_view>::const_iterator
+  SelectAlpn(const std::vector<absl::string_view>& alpns) const override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -115,9 +117,11 @@ protected:
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
-    // TODO(jeongseokson): Http3 Datagram support should be turned on by returning
-    // quic::HttpDatagramSupport::kRfc once the CONNECT-UDP support work is completed.
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+    return quic::HttpDatagramSupport::kRfc;
+#else
     return quic::HttpDatagramSupport::kNone;
+#endif
   }
 
   // QuicFilterManagerConnectionImpl

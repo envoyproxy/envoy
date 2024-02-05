@@ -54,9 +54,10 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 void ConnectionManager::emitLogEntry(const Http::RequestHeaderMap* request_headers,
                                      const Http::ResponseHeaderMap* response_headers,
                                      const StreamInfo::StreamInfo& stream_info) {
+  const Formatter::HttpFormatterContext log_context{request_headers, response_headers};
+
   for (const auto& access_log : config_.accessLogs()) {
-    access_log->log(request_headers, response_headers, nullptr, stream_info,
-                    AccessLog::AccessLogType::NotSet);
+    access_log->log(log_context, stream_info);
   }
 }
 
@@ -71,7 +72,7 @@ void ConnectionManager::dispatch() {
     return;
   }
 
-  try {
+  TRY_NEEDS_AUDIT {
     bool underflow = false;
     while (!underflow) {
       FilterStatus status = decoder_->onData(request_buffer_, underflow);
@@ -82,7 +83,8 @@ void ConnectionManager::dispatch() {
     }
 
     return;
-  } catch (const AppException& ex) {
+  }
+  END_TRY catch (const AppException& ex) {
     ENVOY_LOG(debug, "thrift application exception: {}", ex.what());
     if (rpcs_.empty()) {
       MessageMetadata metadata;
@@ -90,7 +92,8 @@ void ConnectionManager::dispatch() {
     } else {
       sendLocalReply(*(*rpcs_.begin())->metadata_, ex, true);
     }
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "thrift error: {}", read_callbacks_->connection(), ex.what());
 
     if (rpcs_.empty()) {
@@ -868,11 +871,8 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
 
   FilterStatus result = FilterStatus::StopIteration;
   absl::optional<std::string> error;
-  try {
-    result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
-  } catch (const std::bad_function_call& e) {
-    error = std::string(e.what());
-  }
+  TRY_NEEDS_AUDIT { result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata); }
+  END_TRY catch (const std::bad_function_call& e) { error = std::string(e.what()); }
 
   const auto& route_ptr = route();
   const std::string& cluster_name = route_ptr ? route_ptr->routeEntry()->clusterName() : "-";
@@ -1077,20 +1077,22 @@ void ConnectionManager::ActiveRpc::startUpstreamResponse(Transport& transport, P
 ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer::Instance& buffer) {
   ASSERT(response_decoder_ != nullptr);
 
-  try {
+  TRY_NEEDS_AUDIT {
     if (response_decoder_->onData(buffer)) {
       // Completed upstream response.
       parent_.doDeferredRpcDestroy(*this);
       return ThriftFilters::ResponseStatus::Complete;
     }
     return ThriftFilters::ResponseStatus::MoreData;
-  } catch (const AppException& ex) {
+  }
+  END_TRY catch (const AppException& ex) {
     ENVOY_LOG(error, "thrift response application error: {}", ex.what());
     parent_.stats_.response_decoding_error_.inc();
 
     sendLocalReply(ex, true);
     return ThriftFilters::ResponseStatus::Reset;
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "thrift response error: {}", parent_.read_callbacks_->connection(),
                    ex.what());
     parent_.stats_.response_decoding_error_.inc();

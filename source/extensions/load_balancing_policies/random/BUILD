@@ -12,6 +12,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        # previously considered core code.
+        "//test:__subpackages__",
+    ],
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/upstream:load_balancer_lib",

@@ -130,3 +130,30 @@ index c57dc9f..587bf0e 100644
 -    rm -rf $$TEMP_DIR
 -    """,
 -)
+diff --git a/3rd_party/include/opentracing/variant/variant.hpp b/3rd_party/include/opentracing/variant/variant.hpp
+--- a/3rd_party/include/opentracing/variant/variant.hpp	2023-07-11 17:17:48.563874883 +0000
++++ b/3rd_party/include/opentracing/variant/variant.hpp	2023-07-11 17:45:38.558235212 +0000
+@@ -167,7 +167,11 @@
+ template <typename F, typename V, typename Enable = void>
+ struct result_of_unary_visit
+ {
++#if __cplusplus >= 202002L
++    using type = typename std::invoke_result<F, V&>::type;
++#else
+     using type = typename std::result_of<F(V&)>::type;
++#endif
+ };
+ 
+ template <typename F, typename V>
+@@ -179,7 +183,11 @@
+ template <typename F, typename V, typename Enable = void>
+ struct result_of_binary_visit
+ {
++#if __cplusplus >= 202002L
++    using type = typename std::invoke_result<F, V&, V&>::type;
++#else
+     using type = typename std::result_of<F(V&, V&)>::type;
++#endif
+ };
+ 
+ template <typename F, typename V>

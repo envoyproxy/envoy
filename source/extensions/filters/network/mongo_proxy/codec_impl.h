@@ -45,6 +45,9 @@ public:
 
   // Mongo::GetMoreMessage
   bool operator==(const GetMoreMessage& rhs) const override;
+  bool operator==(const GetMoreMessageImpl& rhs) const {
+    return operator==(static_cast<const GetMoreMessage&>(rhs));
+  }
   const std::string& fullCollectionName() const override { return full_collection_name_; }
   void fullCollectionName(const std::string& name) override { full_collection_name_ = name; }
   int32_t numberToReturn() const override { return number_to_return_; }
@@ -72,6 +75,9 @@ public:
 
   // Mongo::InsertMessage
   bool operator==(const InsertMessage& rhs) const override;
+  bool operator==(const InsertMessageImpl& rhs) const {
+    return operator==(static_cast<const InsertMessage&>(rhs));
+  }
   int32_t flags() const override { return flags_; }
   void flags(int32_t flags) override { flags_ = flags; }
   const std::string& fullCollectionName() const override { return full_collection_name_; }
@@ -99,6 +105,9 @@ public:
 
   // Mongo::KillCursorsMessage
   bool operator==(const KillCursorsMessage& rhs) const override;
+  bool operator==(const KillCursorsMessageImpl& rhs) const {
+    return operator==(static_cast<const KillCursorsMessage&>(rhs));
+  }
   int32_t numberOfCursorIds() const override { return number_of_cursor_ids_; }
   void numberOfCursorIds(int32_t number_of_cursor_ids) override {
     number_of_cursor_ids_ = number_of_cursor_ids;
@@ -127,6 +136,9 @@ public:
 
   // Mongo::QueryMessage
   bool operator==(const QueryMessage& rhs) const override;
+  bool operator==(const QueryMessageImpl& rhs) const {
+    return operator==(static_cast<const QueryMessage&>(rhs));
+  }
   int32_t flags() const override { return flags_; }
   void flags(int32_t flags) override { flags_ = flags; }
   const std::string& fullCollectionName() const override { return full_collection_name_; }
@@ -167,6 +179,9 @@ public:
 
   // Mongo::ReplyMessage
   bool operator==(const ReplyMessage& rhs) const override;
+  bool operator==(const ReplyMessageImpl& rhs) const {
+    return operator==(static_cast<const ReplyMessage&>(rhs));
+  }
   int32_t flags() const override { return flags_; }
   void flags(int32_t flags) override { flags_ = flags; }
   int64_t cursorId() const override { return cursor_id_; }
@@ -199,6 +214,9 @@ public:
 
   // CommandMessageImpl accessors.
   bool operator==(const CommandMessage& rhs) const override;
+  bool operator==(const CommandMessageImpl& rhs) const {
+    return operator==(static_cast<const CommandMessage&>(rhs));
+  }
   std::string database() const override { return database_; }
   void database(std::string database) override { database_ = database; }
   std::string commandName() const override { return command_name_; }
@@ -233,6 +251,9 @@ public:
 
   // CommandMessageReplyImpl accessors.
   bool operator==(const CommandReplyMessage& rhs) const override;
+  bool operator==(const CommandReplyMessageImpl& rhs) const {
+    return operator==(static_cast<const CommandReplyMessage&>(rhs));
+  }
   const Bson::Document* metadata() const override { return metadata_.get(); }
   void metadata(Bson::DocumentSharedPtr&& metadata) override { metadata_ = std::move(metadata); }
   const Bson::Document* commandReply() const override { return command_reply_.get(); }

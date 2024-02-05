@@ -25,10 +25,10 @@
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
 
+using absl::Status;
+using absl::StatusCode;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
-using Envoy::ProtobufUtil::Status;
-using Envoy::ProtobufUtil::StatusCode;
 using google::api::HttpRule;
 using google::grpc::transcoding::JsonRequestTranslator;
 using JsonRequestTranslatorPtr = std::unique_ptr<JsonRequestTranslator>;
@@ -90,10 +90,10 @@ public:
   ::google::grpc::transcoding::TranscoderInputStream* RequestOutput() override {
     return request_stream_.get();
   }
-  ProtobufUtil::Status RequestStatus() override { return request_message_stream_.Status(); }
+  absl::Status RequestStatus() override { return request_message_stream_.Status(); }
 
   ZeroCopyInputStream* ResponseOutput() override { return response_stream_.get(); }
-  ProtobufUtil::Status ResponseStatus() override { return response_translator_->Status(); }
+  absl::Status ResponseStatus() override { return response_translator_->Status(); }
 
 private:
   RequestMessageTranslatorPtr request_translator_;
@@ -120,12 +120,14 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   switch (proto_config.descriptor_set_case()) {
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      DescriptorSetCase::kProtoDescriptor:
-    if (!descriptor_set.ParseFromString(
-            api.fileSystem().fileReadToEnd(proto_config.proto_descriptor()))) {
+      DescriptorSetCase::kProtoDescriptor: {
+    auto file_or_error = api.fileSystem().fileReadToEnd(proto_config.proto_descriptor());
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    if (!descriptor_set.ParseFromString(file_or_error.value())) {
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
     break;
+  }
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptorBin:
     if (!descriptor_set.ParseFromString(proto_config.proto_descriptor_bin())) {
@@ -182,14 +184,14 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       MethodInfoSharedPtr method_info;
       Status status = createMethodInfo(method, http_rule, method_info);
       if (!status.ok()) {
-        throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
-                             "': " + status.message().ToString());
+        throw EnvoyException(absl::StrCat("transcoding_filter: Cannot register '",
+                                          method->full_name(), "': ", status.message()));
       }
 
       if (!PathMatcherUtility::RegisterByHttpRule(pmb, http_rule, ignored_query_parameters,
                                                   method_info)) {
-        throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
-                             "' to path matcher");
+        throw EnvoyException(absl::StrCat("transcoding_filter: Cannot register '",
+                                          method->full_name(), "' to path matcher"));
       }
     }
   }
@@ -322,7 +324,7 @@ bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
 
 bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_status_; }
 
-ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
+absl::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) const {
@@ -401,7 +403,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   return {};
 }
 
-ProtobufUtil::Status
+absl::Status
 JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                           google::grpc::transcoding::RequestInfo* info) const {
   const std::string& request_type_full_name = method_info->descriptor_->input_type()->full_name();
@@ -415,9 +417,8 @@ JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info
   return {};
 }
 
-ProtobufUtil::Status
-JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& message,
-                                                  std::string* json_out) const {
+absl::Status JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& message,
+                                                               std::string* json_out) const {
   return ProtobufUtil::BinaryToJsonString(
       type_helper_->Resolver(), Grpc::Common::typeUrl(message.GetDescriptor()->full_name()),
       message.SerializeAsString(), json_out, response_translate_options_.json_print_options);
@@ -494,7 +495,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                      *decoder_callbacks_);
     error_ = true;
     decoder_callbacks_->sendLocalReply(
-        static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, absl::nullopt,
+        static_cast<Http::Code>(http_code), status.message(), nullptr, absl::nullopt,
         absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
                      StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
                      "}"));

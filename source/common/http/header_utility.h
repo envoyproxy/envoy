@@ -126,13 +126,6 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
-   * Validates the provided scheme is valid (either http or https)
-   * @param scheme the scheme to validate
-   * @return bool true if the scheme is valid.
-   */
-  static bool schemeIsValid(const absl::string_view scheme);
-
-  /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
@@ -172,10 +165,26 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
+   */
+  static bool isConnectUdpRequest(const RequestHeaderMap& headers);
+
+  /**
+   * @brief a helper function to determine if the headers represent a CONNECT-UDP response.
+   */
+  static bool isConnectUdpResponse(const ResponseHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.
    */
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
+
+  /**
+   * @brief Rewrites the authority header field by parsing the path using the default CONNECT-UDP
+   * URI template. Returns true if the parsing was successful, otherwise returns false.
+   */
+  static bool rewriteAuthorityForConnectUdp(RequestHeaderMap& headers);
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   /**

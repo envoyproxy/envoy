@@ -20,7 +20,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "zstd_dictionary_manager_lib",
-    srcs = ["dictionary_manager.h"],
+    hdrs = ["dictionary_manager.h"],
     external_deps = ["zstd"],
     deps = [
         "//envoy/event:dispatcher_interface",

@@ -18,3 +18,8 @@ rules:
     - "false"
     # https://github.com/adrienverge/yamllint/issues/430
     - "on"
+
+yaml-files:
+- .clang-format
+- "*.yml"
+- "*.yaml"

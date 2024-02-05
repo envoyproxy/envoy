@@ -22,7 +22,7 @@ namespace File {
 namespace {
 
 TEST(FileAccessLogNegativeTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
                    envoy::extensions::access_loggers::file::v3::FileAccessLog(), nullptr, context),
@@ -32,7 +32,7 @@ TEST(FileAccessLogNegativeTest, ValidateFail) {
 TEST(FileAccessLogNegativeTest, InvalidNameFail) {
   envoy::config::accesslog::v3::AccessLog config;
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
                             "Didn't find a registered implementation for '' with type URL: ''");
 
@@ -56,7 +56,8 @@ public:
 
     auto file = std::make_shared<AccessLog::MockAccessLogFile>();
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
-    EXPECT_CALL(context_.access_log_manager_, createAccessLog(file_info)).WillOnce(Return(file));
+    EXPECT_CALL(context_.server_factory_context_.access_log_manager_, createAccessLog(file_info))
+        .WillOnce(Return(file));
 
     AccessLog::InstanceSharedPtr logger = AccessLog::AccessLogFactory::fromProto(config, context_);
 
@@ -64,7 +65,7 @@ public:
         TestUtility::parseTime("Dec 18 01:50:34 2018 GMT", "%b %e %H:%M:%S %Y GMT");
     stream_info_.start_time_ = absl::ToChronoTime(abslStartTime);
     stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
-    stream_info_.response_code_ = 200;
+    stream_info_.setResponseCode(200);
 
     EXPECT_CALL(*file, write(_)).WillOnce(Invoke([expected, is_json](absl::string_view got) {
       if (is_json) {
@@ -73,8 +74,7 @@ public:
         EXPECT_EQ(got, expected);
       }
     }));
-    logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_,
-                AccessLog::AccessLogType::NotSet);
+    logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/bar/foo"}};
@@ -82,7 +82,7 @@ public:
   Http::TestResponseTrailerMapImpl response_trailers_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
 TEST_F(FileAccessLogTest, DEPRECATED_FEATURE_TEST(LegacyFormatEmpty)) {

@@ -20,6 +20,7 @@
 #include "datadog/sampling_priority.h"
 #include "datadog/span_config.h"
 #include "datadog/trace_segment.h"
+#include "datadog/tracer_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,11 +31,12 @@ namespace {
 std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
     datadog::tracing::TracerConfig config, Upstream::ClusterManager& cluster_manager,
     const std::string& collector_cluster, const std::string& collector_reference_host,
-    TracerStats& tracer_stats, Event::Dispatcher& dispatcher, spdlog::logger& logger) {
+    TracerStats& tracer_stats, Event::Dispatcher& dispatcher, spdlog::logger& logger,
+    TimeSource& time_source) {
   config.logger = std::make_shared<Logger>(logger);
   config.agent.event_scheduler = std::make_shared<EventScheduler>(dispatcher);
   config.agent.http_client = std::make_shared<AgentHTTPClient>(
-      cluster_manager, collector_cluster, collector_reference_host, tracer_stats);
+      cluster_manager, collector_cluster, collector_reference_host, tracer_stats, time_source);
 
   datadog::tracing::Expected<datadog::tracing::FinalizedTracerConfig> maybe_config =
       datadog::tracing::finalize_config(config);
@@ -56,19 +58,21 @@ Tracer::ThreadLocalTracer::ThreadLocalTracer(const datadog::tracing::FinalizedTr
 Tracer::Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                const datadog::tracing::TracerConfig& config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-               ThreadLocal::SlotAllocator& thread_local_slot_allocator)
+               ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source)
     : tracer_stats_(makeTracerStats(scope)),
       thread_local_slot_(
           ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
   const bool allow_added_via_api = true;
-  Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster, cluster_manager,
-                                allow_added_via_api);
+  THROW_IF_STATUS_NOT_OK(Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster,
+                                                       cluster_manager, allow_added_via_api),
+                         throw);
 
   thread_local_slot_->set([&logger = ENVOY_LOGGER(), collector_cluster, collector_reference_host,
-                           config, &tracer_stats = tracer_stats_,
-                           &cluster_manager](Event::Dispatcher& dispatcher) {
+                           config, &tracer_stats = tracer_stats_, &cluster_manager,
+                           &time_source](Event::Dispatcher& dispatcher) {
     return makeThreadLocalTracer(config, cluster_manager, collector_cluster,
-                                 collector_reference_host, tracer_stats, dispatcher, logger);
+                                 collector_reference_host, tracer_stats, dispatcher, logger,
+                                 time_source);
   });
 }
 
@@ -77,7 +81,7 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::Decision tracing_decision) {
   ThreadLocalTracer& thread_local_tracer = **thread_local_slot_;
   if (!thread_local_tracer.tracer) {
     return std::make_unique<Tracing::NullSpan>();
@@ -86,11 +90,35 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   // The OpenTracing implementation ignored the `Tracing::Config` argument,
   // so we will as well.
   datadog::tracing::SpanConfig span_config;
-  span_config.name = operation_name;
+  // The `operation_name` parameter to this function more closely matches
+  // Datadog's concept of "resource name." Datadog's "span name," or "operation
+  // name," instead describes the category of operation being performed, which
+  // here we hard-code.
+  span_config.name = "envoy.proxy";
+  span_config.resource = operation_name;
   span_config.start = estimateTime(stream_info.startTime());
 
-  datadog::tracing::Tracer& tracer = *thread_local_tracer.tracer;
   TraceContextReader reader{trace_context};
+  datadog::tracing::Span span =
+      extract_or_create_span(*thread_local_tracer.tracer, span_config, reader);
+
+  // If we did not extract a sampling decision, and if Envoy is telling us to
+  // drop the trace, then we treat that as a "user drop" (manual override).
+  //
+  // If Envoy is telling us to keep the trace, then we leave it up to the
+  // tracer's internal sampler (which might decide to drop the trace anyway).
+  if (!span.trace_segment().sampling_decision().has_value() && !tracing_decision.traced) {
+    span.trace_segment().override_sampling_priority(
+        int(datadog::tracing::SamplingPriority::USER_DROP));
+  }
+
+  return std::make_unique<Span>(std::move(span));
+}
+
+datadog::tracing::Span
+Tracer::extract_or_create_span(datadog::tracing::Tracer& tracer,
+                               const datadog::tracing::SpanConfig& span_config,
+                               const datadog::tracing::DictReader& reader) {
   datadog::tracing::Expected<datadog::tracing::Span> maybe_span =
       tracer.extract_span(reader, span_config);
   if (datadog::tracing::Error* error = maybe_span.if_error()) {
@@ -106,23 +134,10 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
           int(error->code), error->message);
     }
 
-    maybe_span = tracer.create_span(span_config);
+    return tracer.create_span(span_config);
   }
 
-  ASSERT(maybe_span);
-  datadog::tracing::Span& span = *maybe_span;
-
-  // If Envoy is telling us to drop the trace, then we treat that as a
-  // "user drop" (manual override).
-  //
-  // If Envoy is telling us to keep the trace, then we leave it up to the
-  // tracer's internal sampler (which might decide to drop the trace anyway).
-  if (!tracing_decision.traced) {
-    span.trace_segment().override_sampling_priority(
-        int(datadog::tracing::SamplingPriority::USER_DROP));
-  }
-
-  return std::make_unique<Span>(std::move(span));
+  return std::move(*maybe_span);
 }
 
 } // namespace Datadog

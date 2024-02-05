@@ -6,6 +6,7 @@
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_subject_alt_names.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "gtest/gtest.h"
@@ -18,6 +19,16 @@ class TransportSocketOptionsImplTest : public testing::Test {
 public:
   TransportSocketOptionsImplTest()
       : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {}
+  void setFilterStateObject(const std::string& key, const std::string& value) {
+    auto* factory =
+        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
+    ASSERT_NE(nullptr, factory);
+    EXPECT_EQ(key, factory->name());
+    auto object = factory->createFromBytes(value);
+    ASSERT_NE(nullptr, object);
+    filter_state_.setData(key, std::move(object), StreamInfo::FilterState::StateType::ReadOnly,
+                          StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
 
 protected:
   StreamInfo::FilterStateImpl filter_state_;
@@ -126,6 +137,19 @@ TEST_F(TransportSocketOptionsImplTest, FilterStateNonHashable) {
   std::vector<uint8_t> keys;
   factory.hashKey(keys, transport_socket_options);
   EXPECT_EQ(keys.size(), 0);
+}
+
+TEST_F(TransportSocketOptionsImplTest, DynamicObjects) {
+  setFilterStateObject(UpstreamServerName::key(), "www.example.com");
+  setFilterStateObject(ApplicationProtocols::key(), "h2,http/1.1");
+  setFilterStateObject(UpstreamSubjectAltNames::key(), "www.example.com,example.com");
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
+            transport_socket_options->serverNameOverride());
+  std::vector<std::string> http_alpns{"h2", "http/1.1"};
+  EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
+  std::vector<std::string> sans{"www.example.com", "example.com"};
+  EXPECT_EQ(sans, transport_socket_options->verifySubjectAltNameListOverride());
 }
 
 } // namespace

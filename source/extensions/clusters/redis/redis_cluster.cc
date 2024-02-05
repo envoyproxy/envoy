@@ -1,4 +1,4 @@
-#include "redis_cluster.h"
+#include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include <cstdint>
 #include <memory>
@@ -87,7 +87,7 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-      hosts_added, hosts_removed, absl::nullopt);
+      hosts_added, hosts_removed, absl::nullopt, absl::nullopt, absl::nullopt);
 }
 
 void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots) {
@@ -571,13 +571,13 @@ void RedisCluster::RedisDiscoverySession::onFailure() {
 
 RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 
-std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 RedisClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
   if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
-    throw EnvoyException("Redis cluster can only created with redis cluster type.");
+    return absl::InvalidArgumentError("Redis cluster can only created with redis cluster type.");
   }
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
   // in the future

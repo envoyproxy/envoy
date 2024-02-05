@@ -2,14 +2,14 @@ load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
-    "envoy_package",
-    "envoy_select_google_grpc",
+    "envoy_mobile_package",
+    "envoy_select_envoy_mobile_xds",
     "envoy_select_signal_trace",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_test(
     name = "client_integration_test",
@@ -19,19 +19,30 @@ envoy_cc_test(
         "sandboxNetwork": "standard",
     },
     repository = "@envoy",
+    shard_count = 6,
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
+        "@envoy//source/common/quic:active_quic_listener_lib",
+        "@envoy//source/common/quic:client_connection_factory_lib",
+        "@envoy//source/common/quic:quic_server_factory_lib",
+        "@envoy//source/common/quic:quic_server_transport_socket_factory_lib",
+        "@envoy//source/common/quic:quic_transport_socket_factory_lib",
+        "@envoy//source/common/quic:udp_gso_batch_writer_lib",
+        "@envoy//source/extensions/udp_packet_writer/gso:config",
+        "@envoy//test/test_common:test_random_generator_lib",
     ],
 )
 
 envoy_cc_test(
     name = "rtds_integration_test",
-    # The test relies on the Google gRPC library.
-    srcs = envoy_select_google_grpc(
+    srcs = envoy_select_envoy_mobile_xds(
         ["rtds_integration_test.cc"],
         "@envoy",
     ),
+    data = [
+        "@envoy//test/config/integration/certs",
+    ],
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
@@ -42,6 +53,8 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
+        "@envoy//test/test_common:environment_lib",
+        "@envoy//test/test_common:test_runtime_lib",
         "@envoy//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
@@ -50,11 +63,13 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cds_integration_test",
-    # The test relies on the Google gRPC library.
-    srcs = envoy_select_google_grpc(
+    srcs = envoy_select_envoy_mobile_xds(
         ["cds_integration_test.cc"],
         "@envoy",
     ),
+    data = [
+        "@envoy//test/config/integration/certs",
+    ],
     exec_properties = {
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
@@ -65,6 +80,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":xds_integration_test_lib",
+        "@envoy//test/test_common:environment_lib",
         "@envoy//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
@@ -73,9 +89,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_integration_test",
-    srcs = [
-        "sds_integration_test.cc",
-    ],
+    srcs = envoy_select_envoy_mobile_xds(
+        ["sds_integration_test.cc"],
+        "@envoy",
+    ),
     data = [
         "@envoy//test/config/integration/certs",
     ],
@@ -90,12 +107,12 @@ envoy_cc_test(
         "@envoy//source/extensions/transport_sockets/tls:config",
         "@envoy//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy//source/extensions/transport_sockets/tls:context_lib",
+        "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
-        "@envoy_build_config//:extension_registry",
     ],
 )
 
@@ -109,7 +126,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
-        ":test_engine_builder_lib",
+        "//library/cc:engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -131,10 +148,10 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",
-        "@envoy//source/common/grpc:google_grpc_creds_lib",
-        "@envoy//test/common/grpc:grpc_client_integration_lib",
+        "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_build_config//:extension_registry",
         "@envoy_build_config//:test_extensions",
     ],
 )
@@ -155,6 +172,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
@@ -168,15 +186,31 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "test_engine_builder_lib",
+    name = "xds_test_server_interface_lib",
     srcs = [
-        "test_engine_builder.cc",
+        "xds_test_server.cc",
+        "xds_test_server_interface.cc",
     ],
     hdrs = [
-        "test_engine_builder.h",
+        "xds_test_server.h",
+        "xds_test_server_interface.h",
     ],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
-    ],
+        ":base_client_integration_test_lib",
+        "@envoy//source/common/event:libevent_lib",
+        "@envoy//source/exe:process_wide_lib",
+        "@envoy//source/extensions/transport_sockets/tls:context_config_lib",
+        "@envoy//source/extensions/transport_sockets/tls:context_lib",
+        "@envoy//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "@envoy//test/integration:autonomous_upstream_lib",
+        "@envoy//test/integration:utility_lib",
+        "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
+        "@envoy//test/test_common:environment_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_build_config//:extension_registry",
+    ] + envoy_select_signal_trace(
+        ["@envoy//source/common/signal:sigaction_lib"],
+        "@envoy",
+    ),
 )

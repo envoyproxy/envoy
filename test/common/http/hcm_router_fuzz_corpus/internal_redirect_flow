@@ -1,0 +1,49 @@
+actions {
+  request_header {
+    headers {
+      headers {
+        key: ":method"
+        value: "get"
+      }
+      headers {
+        key: ":path"
+        value: "/default0"
+      }
+      headers {
+        key: ":scheme"
+        value: "https"
+      }
+    }
+    end_stream: true
+  }
+}
+actions {
+  respond_header {
+    cluster: 0
+    stream: 0
+    headers {
+      headers {
+        key: ":status"
+        value: "301"
+      }
+      headers {
+        key: "location"
+        value: "http://localhost/default1"
+      }
+    }
+    end_stream: true
+  }
+}
+actions {
+  respond_header {
+    cluster: 1
+    stream: 0
+    headers {
+      headers {
+        key: ":status"
+        value: "200"
+      }
+    }
+    end_stream: true
+  }
+}

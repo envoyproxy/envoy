@@ -11,15 +11,7 @@ parameters:
   type: boolean
   default: true
 
-- name: checkDeps
-  displayName: "Run dependency checker"
-  type: string
-  default: false
-
 # Auth
-- name: authGithub
-  type: string
-  default: ""
 - name: authGCP
   type: string
   default: ""
@@ -33,13 +25,27 @@ parameters:
   type: string
   default: ""
 
+# Timeout/s
+- name: timeoutPrechecks
+  type: number
+  # Building the rst from protos can take a while even with RBE if there is
+  # a lot of change - eg protobuf changed, or a primitve proto changed.
+  default: 40
+
+- name: runPrechecks
+  displayName: "Run prechecks"
+  type: string
+  default: true
 
 jobs:
 - job: prechecks
   displayName: Precheck
-  timeoutInMinutes: 30
+  timeoutInMinutes: ${{ parameters.timeoutPrechecks }}
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runPrechecks }}, 'true'))
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   variables:
     CI_TARGET: ""
   strategy:
@@ -49,12 +55,15 @@ jobs:
         CI_TARGET: "format"
       protobuf:
         CI_TARGET: "check_and_fix_proto_format"
-      publishing:
-        CI_TARGET: docs
+      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+        publishing:
+          CI_TARGET: docs
   steps:
-  - template: ../bazel.yml
+  - template: ../ci.yml
     parameters:
+      bazelBuildExtraOptions: --config=docs-ci
       ciTarget: $(CI_TARGET)
+      cacheName: $(CI_TARGET)
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
@@ -90,7 +99,7 @@ jobs:
           authGPGKey: ${{ parameters.authGPGKey }}
           # GNUPGHOME inside the container
           pathGPGConfiguredHome: /build/.gnupg
-          pathGPGHome: /tmp/envoy-docker-build/.gnupg
+          pathGPGHome: $(Build.StagingDirectory)/.gnupg
       - bash: |
           set -e
           ci/run_envoy_docker.sh "
@@ -98,7 +107,7 @@ jobs:
               && gpg --clearsign /tmp/authority \
               && cat /tmp/authority.asc \
               && gpg --verify /tmp/authority.asc"
-          rm -rf /tmp/envoy-docker-build/.gnupg
+          rm -rf $(Build.StagingDirectory)/.gnupg
         displayName: "Ensure container CI can sign with GPG"
         condition: and(not(canceled()), eq(variables['CI_TARGET'], 'docs'))
 
@@ -120,12 +129,6 @@ jobs:
           ci/run_envoy_docker.sh 'ci/do_ci.sh dockerhub-readme'
         displayName: "Dockerhub publishing test"
         env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
 
@@ -148,42 +151,17 @@ jobs:
         condition: and(failed(), eq(variables['CI_TARGET'], 'check_and_fix_proto_format'))
 
       # Publish docs
-      - script: |
-          ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
+      - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
         displayName: "Upload Docs to GCS"
         env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          ENVOY_RBE: "1"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-          GCP_SERVICE_ACCOUNT_KEY: ${{ parameters.authGCP }}
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
 
-- job: dependencies
-  displayName: Precheck dependencies
-  timeoutInMinutes: 20
-  pool:
-    vmImage: "ubuntu-20.04"
-  condition: |
-    and(not(canceled()),
-        eq(${{ parameters.checkDeps }}, 'true'))
-  steps:
-  - template: ../bazel.yml
-    parameters:
-      ciTarget: deps
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-      cacheVersion: $(cacheKeyBazel)
-      publishEnvoy: false
-      publishTestResults: false
-      authGithub: ${{ parameters.authGithub }}
-
 - job: prechecked
   displayName: Prechecked
-  dependsOn: ["prechecks", "dependencies"]
+  dependsOn: ["prechecks"]
   pool:
-    vmImage: "ubuntu-20.04"
+    vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
   # the preceeding jobs either pass or are skipped
   # adapted from:
@@ -191,7 +169,6 @@ jobs:
   condition: |
     and(
       eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.dependencies.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
   - checkout: none

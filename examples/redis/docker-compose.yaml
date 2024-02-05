@@ -2,6 +2,7 @@ services:
 
   proxy:
     build:
+      context: .
       dockerfile: ../shared/envoy/Dockerfile
     ports:
     - "${PORT_PROXY:-1999}:1999"
@@ -9,4 +10,5 @@ services:
 
   redis:
     build:
+      context: .
       dockerfile: Dockerfile-redis

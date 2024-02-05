@@ -29,7 +29,7 @@ namespace Http {
 namespace {
 
 absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
-  if (HeaderUtility::schemeIsValid(forwarded_proto)) {
+  if (Utility::schemeIsValid(forwarded_proto)) {
     return forwarded_proto;
   }
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
@@ -92,6 +92,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   if (!Utility::isUpgrade(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
+      request_headers.removeTE();
+    }
   }
 
   // Clean proxy headers.
@@ -207,6 +210,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lowercase_scheme")) {
+    request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
+  }
 
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:
@@ -295,9 +301,7 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_original_path")) {
-      request_headers.removeEnvoyOriginalPath();
-    }
+    request_headers.removeEnvoyOriginalPath();
   }
 
   // Headers to be stripped from edge *and* intermediate-hop external requests.
@@ -564,11 +568,7 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
       return NormalizePathAction::Reject;
     }
     // Check runtime override and throw away fragment from URI path
-    // TODO(yanavlasov): remove this override after deprecation period.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
-      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
-    }
+    request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

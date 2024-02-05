@@ -9,20 +9,13 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
-
-class OpenTelemetryConstantValues {
-public:
-  const Http::LowerCaseString TRACE_PARENT{"traceparent"};
-  const Http::LowerCaseString TRACE_STATE{"tracestate"};
-};
-
-using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
 
 /**
  * OpenTelemetry tracing driver.
@@ -32,11 +25,15 @@ public:
   Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
          Server::Configuration::TracerFactoryContext& context);
 
+  Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
+         Server::Configuration::TracerFactoryContext& context,
+         const ResourceProvider& resource_provider);
+
   // Tracing::Driver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const StreamInfo::StreamInfo& stream_info,
                              const std::string& operation_name,
-                             const Tracing::Decision tracing_decision) override;
+                             Tracing::Decision tracing_decision) override;
 
 private:
   class TlsTracer : public ThreadLocal::ThreadLocalObject {

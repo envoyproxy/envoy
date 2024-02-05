@@ -33,8 +33,9 @@ go_library(
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/golang/common/go/api",
+        "//contrib/golang/common/go/api_impl",
         "//contrib/golang/common/go/utils",
-        "//contrib/golang/filters/http/source/go/pkg/api",
         "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/structpb",

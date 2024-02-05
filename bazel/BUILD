@@ -1,11 +1,12 @@
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("@envoy_api//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
+load("@envoy_toolshed//:macros.bzl", "json_data")
+load("@envoy_toolshed//dependency:macros.bzl", "updater")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
@@ -41,8 +42,8 @@ genrule(
     outs = ["gnu_build_id.ldscript"],
     cmd = """
       echo --build-id=0x$$(
-          grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-        | sed 's/^BUILD_SCM_REVISION //') \\
+          grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+        | sed 's/^BUILD_SCM_REVISION //') \
         > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -55,8 +56,8 @@ genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
-      grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-    | sed 's/^BUILD_SCM_REVISION //' \\
+      grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+    | sed 's/^BUILD_SCM_REVISION //' \
     | tr -d '\\n' \\
     > $@
     """,
@@ -361,18 +362,25 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_envoy_mobile_request_compression",
-    values = {"define": "envoy_mobile_request_compression=disabled"},
-)
-
-config_setting(
-    name = "disable_envoy_mobile_stats_reporting",
-    values = {"define": "envoy_mobile_stats_reporting=disabled"},
+    name = "disable_envoy_mobile_xds",
+    values = {"define": "envoy_mobile_xds=disabled"},
 )
 
 config_setting(
     name = "disable_yaml",
     values = {"define": "envoy_yaml=disabled"},
+)
+
+# The goal here is to allow Envoy to build with this option but it is not yet
+# complete.  See https://github.com/envoyproxy/envoy/issues/27412
+config_setting(
+    name = "disable_exceptions",
+    values = {"define": "envoy_exceptions=disabled"},
+)
+
+config_setting(
+    name = "disable_full_protos",
+    values = {"define": "envoy_full_protos=disabled"},
 )
 
 config_setting(
@@ -382,7 +390,7 @@ config_setting(
 
 config_setting(
     name = "disable_http_datagrams",
-    values = {"define": "enable_http_datagrams=disabled"},
+    values = {"define": "envoy_enable_http_datagrams=disabled"},
 )
 
 config_setting(
@@ -692,6 +700,15 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "darwin_any",
+    match_any = [
+        ":darwin",
+        ":darwin_arm64",
+        ":darwin_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "apple_dbg",
     match_all = [
         ":apple",
@@ -865,4 +882,38 @@ platform(
         "@platforms//os:ios",
         "@build_bazel_apple_support//constraints:device",
     ],
+)
+
+# A dependency required by python protobuf
+# Envoy does not have any C++ code that includes python.h so this dummy
+# target is enough. However if such code is added in the future when this
+# should be changed to alias "@system_python//:python_headers"
+cc_library(
+    name = "python_headers",
+    visibility = ["//visibility:public"],
+)
+
+# These can be run as follows:
+#
+# $ bazel run //bazel:update ENVOY_DEP NEW_VERSION
+# $ bazel run //bazel:api-update API_DEP NEW_VERSION
+updater(
+    name = "update",
+    data = ["//tools/dependency:check"],
+    dependencies = "//tools/dependency:filtered-dependencies",
+    post_script = ":version_update_post.sh",
+    pydict = True,
+    tags = ["skip_on_windows"],
+    version_file = ":repository_locations.bzl",
+)
+
+updater(
+    name = "api-update",
+    data = ["//tools/dependency:check"],
+    dependencies = "@envoy_api//bazel:repository_locations",
+    post_script = ":version_update_post.sh",
+    pydict = True,
+    tags = ["skip_on_windows"],
+    version_file = "@envoy_api//bazel:repository_locations.bzl",
+    version_path_replace = "external/envoy_api:api",
 )

@@ -45,13 +45,17 @@ envoy_sh_test(
     #    curl: (3) URL using bad/illegal format or missing URL
     #
     # This seems fixable, if someone is so inclined.
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocoverage",
+        "skip_on_windows",
+    ],
 )
 
 filegroup(
     name = "test_server_files",
     srcs = [
         "active_stats_test.js",
+        "histograms_test.js",
         "web_test.html",
         "web_test.js",
         "web_test.yaml",

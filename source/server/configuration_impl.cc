@@ -30,8 +30,14 @@ namespace Server {
 namespace Configuration {
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
-                                          const std::vector<Network::FilterFactoryCb>& factories) {
-  for (const Network::FilterFactoryCb& factory : factories) {
+                                          const Filter::NetworkFilterFactoriesList& factories) {
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (!config.has_value()) {
+      return false;
+    }
+
+    Network::FilterFactoryCb& factory = config.value();
     factory(filter_manager);
   }
 
@@ -60,11 +66,31 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
-StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+bool FilterChainUtility::buildQuicFilterChain(
+    Network::QuicListenerFilterManager& filter_manager,
+    const Filter::QuicListenerFilterFactoriesList& factories) {
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (!config.has_value()) {
+      return false;
+    }
+    auto config_value = config.value();
+    config_value(filter_manager);
+  }
+
+  return true;
+}
+
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                 absl::Status& status)
+    : deferred_stat_options_(bootstrap.deferred_stat_options()) {
+  status = absl::OkStatus();
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
-    throw EnvoyException("Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+    status = absl::InvalidArgumentError(
+        "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+    return;
   }
 
   flush_interval_ =
@@ -75,9 +101,9 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
   }
 }
 
-void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                          Instance& server,
-                          Upstream::ClusterManagerFactory& cluster_manager_factory) {
+absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  Instance& server,
+                                  Upstream::ClusterManagerFactory& cluster_manager_factory) {
   // In order to support dynamic configuration of tracing providers,
   // a former server-wide Tracer singleton has been replaced by
   // an Tracer instance per "envoy.filters.network.http_connection_manager" filter.
@@ -87,11 +113,18 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   // tracing configuration is missing from the bootstrap config.
   initializeTracers(bootstrap.tracing(), server);
 
+  // stats_config_ should be set before creating the ClusterManagers so that it is available
+  // from the ServerFactoryContext when creating the static clusters and stats sinks, where
+  // stats deferred instantiation setting is read.
+  absl::Status status = absl::OkStatus();
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap, status);
+  RETURN_IF_NOT_OK(status);
+
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
     ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
-    server.secretManager().addStaticSecret(secrets[i]);
+    RETURN_IF_NOT_OK(server.secretManager().addStaticSecret(secrets[i]));
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
@@ -101,20 +134,20 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(debug, "listener #{}:", i);
-    server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    absl::StatusOr<bool> update_or_error =
+        server.listenerManager().addOrUpdateListener(listeners[i], "", false);
+    RETURN_IF_STATUS_NOT_OK(update_or_error);
   }
-
-  initializeWatchdogs(bootstrap, server);
+  RETURN_IF_NOT_OK(initializeWatchdogs(bootstrap, server));
+  // This has to happen after ClusterManager initialization, as it depends on config from
+  // ClusterManager.
   initializeStatsConfig(bootstrap, server);
+  return absl::OkStatus();
 }
 
 void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                      Instance& server) {
   ENVOY_LOG(info, "loading stats configuration");
-
-  // stats_config_ should be set before populating the sinks so that it is available
-  // from the ServerFactoryContext when creating the stats sinks.
-  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config.
@@ -152,10 +185,10 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   // is no longer validated in this step.
 }
 
-void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                   Instance& server) {
+absl::Status MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                           Instance& server) {
   if (bootstrap.has_watchdog() && bootstrap.has_watchdogs()) {
-    throw EnvoyException("Only one of watchdog or watchdogs should be set!");
+    return absl::InvalidArgumentError("Only one of watchdog or watchdogs should be set!");
   }
 
   if (bootstrap.has_watchdog()) {
@@ -167,6 +200,7 @@ void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap
     worker_watchdog_ =
         std::make_unique<WatchdogImpl>(bootstrap.watchdogs().worker_watchdog(), server);
   }
+  return absl::OkStatus();
 }
 
 WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdog,
@@ -196,13 +230,20 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   actions_ = watchdog.actions();
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                         absl::Status& creation_status) {
+  creation_status = absl::OkStatus();
   const auto& admin = bootstrap.admin();
 
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
-    admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
+    auto address_or_error = Network::Address::resolveProtoAddress(admin.address());
+    if (!address_or_error.status().ok()) {
+      creation_status = address_or_error.status();
+      return;
+    }
+    admin_.address_ = std::move(address_or_error.value());
   }
   admin_.socket_options_ = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   if (!admin.socket_options().empty()) {
@@ -225,12 +266,12 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
 }
 
 void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                     Instance& server) {
+                                     FactoryContext& factory_context) {
   const auto& admin = bootstrap.admin();
 
   for (const auto& access_log : admin.access_log()) {
     AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+        AccessLog::AccessLogFactory::fromProto(access_log, factory_context);
     admin_.access_logs_.emplace_back(current_access_log);
   }
 
@@ -238,8 +279,8 @@ void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstr
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
                                           admin.access_log_path()};
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-        server.accessLogManager()));
+        file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        factory_context.serverFactoryContext().accessLogManager()));
   }
 }
 

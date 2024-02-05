@@ -2,6 +2,7 @@
 
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/type_to_endpoint.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
@@ -19,32 +20,36 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
       data.validation_visitor_, data.server_, api_config_source.config_validators());
   const std::string control_plane_id = Utility::getGrpcControlPlane(api_config_source).value_or("");
 
-  JitteredExponentialBackOffStrategyPtr backoff_strategy =
-      Utility::prepareJitteredExponentialBackOffStrategy(
-          api_config_source, data.api_.randomGenerator(), SubscriptionFactory::RetryInitialDelayMs,
-          SubscriptionFactory::RetryMaxDelayMs);
+  auto strategy_or_error = Utility::prepareJitteredExponentialBackOffStrategy(
+      api_config_source, data.api_.randomGenerator(), SubscriptionFactory::RetryInitialDelayMs,
+      SubscriptionFactory::RetryMaxDelayMs);
+  THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+  JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
+
+  auto factory_or_error = Utility::factoryForGrpcApiConfigSource(
+      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true);
+  THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/factory_or_error.value()->createUncachedRawAsyncClient(),
+      /*dispatcher_=*/data.dispatcher_,
+      /*service_method_=*/sotwGrpcMethod(data.type_url_),
+      /*local_info_=*/data.local_info_,
+      /*rate_limit_settings_=*/Utility::parseRateLimitSettings(api_config_source),
+      /*scope_=*/data.scope_,
+      /*config_validators_=*/std::move(custom_config_validators),
+      /*xds_resources_delegate_=*/data.xds_resources_delegate_,
+      /*xds_config_tracker_=*/data.xds_config_tracker_,
+      /*backoff_strategy_=*/std::move(backoff_strategy),
+      /*target_xds_authority_=*/control_plane_id,
+      /*eds_resources_cache_=*/nullptr // EDS cache is only used for ADS.
+  };
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
-        Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(), api_config_source,
-                                               data.scope_, true)
-            ->createUncachedRawAsyncClient(),
-        data.dispatcher_, sotwGrpcMethod(data.type_url_), data.scope_,
-        Utility::parseRateLimitSettings(api_config_source), data.local_info_,
-        api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-        std::move(backoff_strategy), data.xds_config_tracker_, data.xds_resources_delegate_,
-        control_plane_id);
+        grpc_mux_context, api_config_source.set_node_on_first_message_only());
   } else {
-    mux = std::make_shared<Config::GrpcMuxImpl>(
-        data.local_info_,
-        Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(), api_config_source,
-                                               data.scope_, true)
-            ->createUncachedRawAsyncClient(),
-        data.dispatcher_, sotwGrpcMethod(data.type_url_), data.scope_,
-        Utility::parseRateLimitSettings(api_config_source),
-        api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-        std::move(backoff_strategy), data.xds_config_tracker_, data.xds_resources_delegate_,
-        control_plane_id);
+    mux = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context,
+                                                api_config_source.set_node_on_first_message_only());
   }
   return std::make_unique<GrpcSubscriptionImpl>(
       std::move(mux), data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,
@@ -60,28 +65,35 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
   CustomConfigValidatorsPtr custom_config_validators = std::make_unique<CustomConfigValidatorsImpl>(
       data.validation_visitor_, data.server_, api_config_source.config_validators());
 
-  JitteredExponentialBackOffStrategyPtr backoff_strategy =
-      Utility::prepareJitteredExponentialBackOffStrategy(
-          api_config_source, data.api_.randomGenerator(), SubscriptionFactory::RetryInitialDelayMs,
-          SubscriptionFactory::RetryMaxDelayMs);
+  auto strategy_or_error = Utility::prepareJitteredExponentialBackOffStrategy(
+      api_config_source, data.api_.randomGenerator(), SubscriptionFactory::RetryInitialDelayMs,
+      SubscriptionFactory::RetryMaxDelayMs);
+  THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+  JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
+
+  auto factory_or_error = Utility::factoryForGrpcApiConfigSource(
+      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true);
+  THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/factory_or_error.value()->createUncachedRawAsyncClient(),
+      /*dispatcher_=*/data.dispatcher_,
+      /*service_method_=*/deltaGrpcMethod(data.type_url_),
+      /*local_info_=*/data.local_info_,
+      /*rate_limit_settings_=*/Utility::parseRateLimitSettings(api_config_source),
+      /*scope_=*/data.scope_,
+      /*config_validators_=*/std::move(custom_config_validators),
+      /*xds_resources_delegate_=*/{},
+      /*xds_config_tracker_=*/data.xds_config_tracker_,
+      /*backoff_strategy_=*/std::move(backoff_strategy),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/nullptr // EDS cache is only used for ADS.
+  };
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
-        Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(), api_config_source,
-                                               data.scope_, true)
-            ->createUncachedRawAsyncClient(),
-        data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
-        Utility::parseRateLimitSettings(api_config_source), data.local_info_,
-        api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-        std::move(backoff_strategy), data.xds_config_tracker_);
+        grpc_mux_context, api_config_source.set_node_on_first_message_only());
   } else {
-    mux = std::make_shared<Config::NewGrpcMuxImpl>(
-        Config::Utility::factoryForGrpcApiConfigSource(data.cm_.grpcAsyncClientManager(),
-                                                       api_config_source, data.scope_, true)
-            ->createUncachedRawAsyncClient(),
-        data.dispatcher_, deltaGrpcMethod(data.type_url_), data.scope_,
-        Utility::parseRateLimitSettings(api_config_source), data.local_info_,
-        std::move(custom_config_validators), std::move(backoff_strategy), data.xds_config_tracker_);
+    mux = std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
   }
   return std::make_unique<GrpcSubscriptionImpl>(
       std::move(mux), data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,

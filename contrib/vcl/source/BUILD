@@ -1,3 +1,4 @@
+load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -6,7 +7,6 @@ load(
     "envoy_cmake",
     "envoy_contrib_package",
 )
-load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -18,6 +18,7 @@ cc_library(
     name = "vpp_vcl",
     srcs = [
         "external/libsvm.a",
+        "external/libvlibapi.a",
         "external/libvlibmemoryclient.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
@@ -50,6 +51,7 @@ envoy_cmake(
         "libvppcom.a",
         "libvppinfra.a",
         "libsvm.a",
+        "libvlibapi.a",
         "libvlibmemoryclient.a",
     ],
     postfix_script = """
@@ -71,6 +73,7 @@ genrule(
     name = "build_files",
     outs = [
         "external/libsvm.a",
+        "external/libvlibapi.a",
         "external/libvlibmemoryclient.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
@@ -82,7 +85,7 @@ genrule(
         && find . -name "*.a" | xargs -I{} cp -a {} $$EXTERNAL_DIR \
         && find . -name "vppcom.h" | xargs -I{} cp -a {} $$EXTERNAL_DIR
     """,
-    exec_tools = [":build"],
+    tools = [":build"],
 )
 
 envoy_cc_library(

@@ -26,10 +26,12 @@ The design of the filter and Lua support at a high level is as follows:
 Currently supported high level features
 ---------------------------------------
 
-**NOTE:** It is expected that this list will expand over time as the filter is used in production.
-The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
-safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
-API.
+.. note::
+
+  It is expected that this list will expand over time as the filter is used in production.
+  The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
+  safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
+  API.
 
 * Inspection of headers, body, and trailers while streaming in either the request flow, response
   flow, or both.
@@ -147,7 +149,7 @@ Statistics
 ----------
 .. _config_http_filters_lua_stats:
 
-The lua filter outputs statistics in the *.lua.* namespace by default. When
+The lua filter outputs statistics in the ``.lua.`` namespace by default. When
 there are multiple lua filters configured in a filter chain, stats from
 individual filter instance/script can be tracked by providing a per filter
 :ref:`stat prefix
@@ -789,6 +791,8 @@ downstreamLocalAddress()
 Returns the string representation of :repo:`downstream local address <envoy/stream_info/stream_info.h>`
 used by the current request.
 
+.. _config_http_filters_lua_stream_info_downstream_direct_remote_address:
+
 downstreamDirectRemoteAddress()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -798,6 +802,19 @@ downstreamDirectRemoteAddress()
 
 Returns the string representation of :repo:`downstream directly connected address <envoy/stream_info/stream_info.h>`
 used by the current request. This is equivalent to the address of the physical connection.
+
+.. _config_http_filters_lua_stream_info_downstream_remote_address:
+
+downstreamRemoteAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamRemoteAddress()
+
+Returns the string representation of the downstream remote address for the current request. This may differ from
+:ref:`downstreamDirectRemoteAddress() <config_http_filters_lua_stream_info_downstream_direct_remote_address>` depending upon the setting of
+:ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
 
 dynamicMetadata()
 ^^^^^^^^^^^^^^^^^
@@ -928,11 +945,21 @@ peerCertificateValidated()
 
 .. code-block:: lua
 
-  if downstreamSslConnection:peerCertificateVaidated() then
-    print("peer certificate is valiedated")
+  if downstreamSslConnection:peerCertificateValidated() then
+    print("peer certificate is validated")
   end
 
 Returns bool whether the peer certificate was validated.
+
+.. warning::
+
+   Client certificate validation is not currently performed upon TLS session resumption. For a
+   resumed TLS session this method will return false, regardless of whether the peer certificate is
+   valid.
+
+   The only known workaround for this issue is to disable TLS session resumption entirely, by
+   setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+   and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
 
 uriSanLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^

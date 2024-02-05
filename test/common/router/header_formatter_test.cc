@@ -10,7 +10,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
@@ -205,8 +204,7 @@ TEST(HeaderParserTest, TestParse) {
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
-  ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-      .WillByDefault(Return(true));
+  stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
 
   absl::optional<std::string> rc_details{"via_upstream"};
   ON_CALL(stream_info, responseCodeDetails()).WillByDefault(ReturnRef(rc_details));
@@ -720,8 +718,8 @@ response_headers_to_remove: ["x-nope"]
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
   EXPECT_CALL(stream_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
-  resp_header_parser->evaluateHeaders(response_header_map, request_header_map, response_header_map,
-                                      stream_info);
+  resp_header_parser->evaluateHeaders(response_header_map,
+                                      {&request_header_map, &response_header_map}, stream_info);
   EXPECT_TRUE(response_header_map.has("x-client-ip"));
   EXPECT_TRUE(response_header_map.has("x-client-ip-port"));
   EXPECT_TRUE(response_header_map.has("x-request-start-multiple"));
@@ -827,6 +825,57 @@ response_headers_to_add:
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("exist-per", header_map.get_("x-per-header"));
+  }
+}
+
+TEST(HeaderParserTest, EvaluateHeadersOverwriteIfPresent) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "foo"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-bar-header"
+      value: "bar"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-per-header"
+      value: "per"
+    append_action: ADD_IF_ABSENT
+  - header:
+      key: "x-overwrite"
+      value: "overwritten"
+    append_action: OVERWRITE_IF_EXISTS
+)EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+  HeaderParserPtr resp_header_parser = HeaderParser::configure(route.response_headers_to_add());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  {
+    Http::TestResponseHeaderMapImpl header_map;
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
+    EXPECT_EQ("foo", header_map.get_("x-foo-header"));
+    EXPECT_EQ("bar", header_map.get_("x-bar-header"));
+    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    // If the response headers do not contain "x-overwrite" header,
+    // the final set should also not contain it.
+    EXPECT_FALSE(header_map.has("x-overwrite"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl header_map{{"x-overwrite", "to overwrite"}};
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
+    EXPECT_EQ("foo", header_map.get_("x-foo-header"));
+    EXPECT_EQ("bar", header_map.get_("x-bar-header"));
+    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    // If the response headers contain "x-overwrite" header it should
+    // be overwritten with the new value.
+    EXPECT_EQ("overwritten", header_map.get_("x-overwrite"));
   }
 }
 

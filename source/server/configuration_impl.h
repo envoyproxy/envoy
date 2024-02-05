@@ -49,18 +49,23 @@ public:
 
 class StatsConfigImpl : public StatsConfig {
 public:
-  StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                  absl::Status& creation_status);
 
   const std::list<Stats::SinkPtr>& sinks() const override { return sinks_; }
   std::chrono::milliseconds flushInterval() const override { return flush_interval_; }
   bool flushOnAdmin() const override { return flush_on_admin_; }
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
+  bool enableDeferredCreationStats() const override {
+    return deferred_stat_options_.enable_deferred_creation_stats();
+  }
 
 private:
   std::list<Stats::SinkPtr> sinks_;
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
+  const envoy::config::bootstrap::v3::Bootstrap::DeferredStatOptions deferred_stat_options_;
 };
 
 /**
@@ -73,7 +78,7 @@ public:
    * exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::FilterManager& filter_manager,
-                               const std::vector<Network::FilterFactoryCb>& factories);
+                               const Filter::NetworkFilterFactoriesList& factories);
 
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
@@ -92,6 +97,15 @@ public:
   buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
                       Network::UdpReadFilterCallbacks& callbacks,
                       const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
+
+  /**
+   * Given a QuicListenerFilterManager and a list of factories, create a new filter chain. Chain
+   * creation will exit early if any filters don't have a valid config.
+   *
+   * TODO(sumukhs): Coalesce with the above as they are very similar
+   */
+  static bool buildQuicFilterChain(Network::QuicListenerFilterManager& filter_manager,
+                                   const Filter::QuicListenerFilterFactoriesList& factories);
 };
 
 /**
@@ -109,9 +123,11 @@ public:
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
+   * @return a status indicating initialization success or failure.
    */
-  void initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server,
-                  Upstream::ClusterManagerFactory& cluster_manager_factory);
+  absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                          Instance& server,
+                          Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
@@ -135,8 +151,8 @@ private:
   /**
    * Initialize watchdog(s). Call before accessing any watchdog configuration.
    */
-  void initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                           Instance& server);
+  absl::Status initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                   Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::unique_ptr<StatsConfigImpl> stats_config_;
@@ -172,7 +188,8 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+              absl::Status& creation_status);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -185,7 +202,7 @@ public:
    * Initialize admin access log.
    */
   void initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                          Instance& server);
+                          FactoryContext& factory_context);
 
 private:
   struct AdminImpl : public Admin {

@@ -16,7 +16,7 @@ CLANG_TIDY_APPLY_FIXES="${CLANG_TIDY_APPLY_FIXES:-}"
 CLANG_TIDY_FIX_DIFF="${CLANG_TIDY_FIX_DIFF:-}"
 
 DIFF_TARGET_REMOTE="${DIFF_TARGET_REMOTE:-origin}"
-DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-${AZP_TARGET_BRANCH:-origin/main}}"
+DIFF_TARGET_BRANCH="${DIFF_TARGET_BRANCH:-${CI_TARGET_BRANCH:-origin/main}}"
 # Exclude merges for finding merge base if required
 DIFF_HEAD="$(git rev-list --no-merges HEAD -n1)"
 MERGE_HEAD="$(git rev-list HEAD -n1)"

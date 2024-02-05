@@ -7,13 +7,45 @@
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/bit_array.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
-#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
+
+using MaglevLbProto = envoy::extensions::load_balancing_policies::maglev::v3::Maglev;
+using ClusterProto = envoy::config::cluster::v3::Cluster;
+using LegacyMaglevLbProto = ClusterProto::MaglevLbConfig;
+
+/**
+ * Load balancer config that used to wrap legacy maglev config.
+ */
+class LegacyMaglevLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  LegacyMaglevLbConfig(const ClusterProto& cluster);
+
+  OptRef<const LegacyMaglevLbProto> lbConfig() const {
+    if (lb_config_.has_value()) {
+      return lb_config_.value();
+    }
+    return {};
+  };
+
+private:
+  absl::optional<LegacyMaglevLbProto> lb_config_;
+};
+
+/**
+ * Load balancer config that used to wrap typed maglev config.
+ */
+class TypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  TypedMaglevLbConfig(const MaglevLbProto& config);
+
+  const MaglevLbProto lb_config_;
+};
 
 /**
  * All Maglev load balancer stats. @see stats_macros.h
@@ -144,8 +176,7 @@ private:
 /**
  * Thread aware load balancer implementation for Maglev.
  */
-class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase,
-                           Logger::Loggable<Logger::Id::upstream> {
+class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
   MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,

@@ -16,7 +16,7 @@ The OAuth filter's flow involves:
   are sent as query string parameters in this first redirect.
 * After a successful login, the authn server should be configured to redirect the user back to the
   :ref:`redirect_uri <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.redirect_uri>`
-  provided in the query string in the first step. In the below code example, we choose /callback as the configured match path.
+  provided in the query string in the first step. In the below code example, we choose ``/callback`` as the configured match path.
   An "authorization grant" is included in the query string for this second redirect.
 * Using this new grant and the :ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.token_secret>`,
   the filter then attempts to retrieve an access token from
@@ -38,7 +38,7 @@ is set to true the filter will send over a
 cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
 with the same value.
 
-The OAuth filer encodes URLs in query parameters using the
+The OAuth filter encodes URLs in query parameters using the
 `URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
 
 When receiving request redirected from the authorization service the Oauth filer decodes URLs from query parameters.
@@ -46,11 +46,11 @@ However the encoded character sequences that represent ASCII control characters 
 decoded. The characters without defined meaning in URL according to `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_
 are also left undecoded. Specifically the following characters are left in the encoded form:
 
-* Control characters with values less than or equal 0x1F
-* Space (0x20)
-* DEL character (0x7F)
-* Extended ASCII characters with values grteater than or equal 0x80
-* Characters without defined meaning in URL: `"<>\^{}|`
+* Control characters with values less than or equal ``0x1F``
+* Space (``0x20``)
+* DEL character (``0x7F``)
+* Extended ASCII characters with values greater than or equal ``0x80``
+* Characters without defined meaning in URL: ``"<>\^{}|``
 
 .. note::
   By default, OAuth2 filter sets some cookies with the following names:
@@ -246,12 +246,17 @@ sending the user to the configured auth endpoint.
 an interface for users to provide specific header matching criteria such that, when applicable, the OAuth flow is entirely skipped.
 When this occurs, the ``oauth_passthrough`` metric is incremented but ``success`` is not.
 
+:ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` provides
+possibility to update access token by using a refresh token. By default after expiration the user is always redirected to the authorization endpoint to log in again.
+By enabling this flag a new access token is obtained using by a refresh token without redirecting the user to log in again. This requires the refresh token to be provided by authorization_endpoint when the user logs in.
+If the attempt to get an access token by using a refresh token fails then the user is redirected to the authorization endpoint as usual.
+
 Generally, allowlisting is inadvisable from a security standpoint.
 
 Statistics
 ----------
 
-The OAuth2 filter outputs statistics in the *<stat_prefix>.* namespace.
+The OAuth2 filter outputs statistics in the ``<stat_prefix>.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
@@ -261,3 +266,5 @@ The OAuth2 filter outputs statistics in the *<stat_prefix>.* namespace.
   oauth_passthrough, Counter, Total request that matched a passthrough header.
   oauth_success, Counter, Total requests that were allowed.
   oauth_unauthorization_rq, Counter, Total unauthorized requests.
+  oauth_refreshtoken_success, Counter, Total successfull requests for update access token using by refresh token
+  oauth_refreshtoken_failure, Counter, Total failed requests for update access token using by refresh token

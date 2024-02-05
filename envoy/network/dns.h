@@ -62,7 +62,10 @@ enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
 class DnsResponse {
 public:
   DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
-      : response_(AddrInfoResponse{address, ttl}) {}
+      : response_(AddrInfoResponse{
+            address,
+            std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
+                                          std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
   DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
       : response_(SrvResponse{host, port, priority, weight}) {}
 

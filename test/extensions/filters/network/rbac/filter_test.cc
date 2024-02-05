@@ -72,7 +72,7 @@ public:
     config.set_shadow_rules_stat_prefix("prefix_");
 
     if (with_matcher) {
-      const std::string matcher_yaml = R"EOF(
+      constexpr absl::string_view matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:
@@ -109,7 +109,7 @@ on_no_match:
       name: none
       action: {}
 )EOF";
-      const std::string shadow_matcher_yaml = R"EOF(
+      constexpr absl::string_view shadow_matcher_yaml = R"EOF(
 matcher_list:
   matchers:
   - predicate:

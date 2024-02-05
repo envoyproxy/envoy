@@ -22,8 +22,8 @@ public:
 class ResetFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
 public:
   ResetFilterConfig() : EmptyHttpDualFilterConfig("reset-stream-filter") {}
-  Http::FilterFactoryCb createDualFilter(const std::string&,
-                                         Server::Configuration::ServerFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::ResetFilter>());
     };
@@ -37,5 +37,44 @@ static Registry::RegisterFactory<ResetFilterConfig,
 static Registry::RegisterFactory<ResetFilterConfig,
                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
+
+class EncoderResetFilter : public Http::PassThroughFilter {
+public:
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_headers, bool) override {
+    if (!request_headers.get(Http::LowerCaseString("continue-after-reset")).empty()) {
+      continue_after_reset_ = true;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    encoder_callbacks_->resetStream();
+    if (continue_after_reset_) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+private:
+  bool continue_after_reset_{false};
+};
+
+class EncoderResetFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+public:
+  EncoderResetFilterConfig() : EmptyHttpDualFilterConfig("encoder-reset-stream-filter") {}
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<::Envoy::EncoderResetFilter>());
+    };
+  }
+};
+
+static Registry::RegisterFactory<EncoderResetFilterConfig,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    encoder_register_;
+static Registry::RegisterFactory<EncoderResetFilterConfig,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    encoder_register_upstream_;
 
 } // namespace Envoy

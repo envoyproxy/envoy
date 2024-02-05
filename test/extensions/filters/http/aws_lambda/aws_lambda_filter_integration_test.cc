@@ -23,13 +23,14 @@ public:
     // instance metadata and timing-out.
     TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "aws-user", 1 /*overwrite*/);
     TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1 /*overwrite*/);
+    TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1 /*overwrite*/);
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   void TearDown() override { fake_upstream_connection_.reset(); }
 
   void setupLambdaFilter(bool passthrough) {
-    const std::string filter =
+    constexpr absl::string_view filter =
         R"EOF(
             name: envoy.filters.http.aws_lambda
             typed_config:

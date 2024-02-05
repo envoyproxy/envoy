@@ -51,6 +51,12 @@ public:
    */
   virtual bool checkFips() PURE;
 
+  /**
+   * Check whether the private key method is available.
+   * @return true if the private key method is available, false if not.
+   */
+  virtual bool isAvailable() PURE;
+
 #ifdef OPENSSL_IS_BORINGSSL
   /**
    * Get the private key methods from the provider.
