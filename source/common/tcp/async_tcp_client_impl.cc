@@ -54,7 +54,7 @@ bool AsyncTcpClientImpl::connect() {
   return true;
 }
 
-void AsyncTcpClientImpl::onConnectTimeout() 
+void AsyncTcpClientImpl::onConnectTimeout() {
   if (connection_) {
     ENVOY_CONN_LOG(debug, "async tcp connection timed out", *connection_);
   } else {
