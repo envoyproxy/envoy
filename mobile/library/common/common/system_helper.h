@@ -47,7 +47,7 @@ public:
 private:
   friend class test::SystemHelperPeer;
 
-  static std::unique_ptr<SystemHelper> instance_;
+  static SystemHelper* instance_;
 };
 
 } // namespace Envoy

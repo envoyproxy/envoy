@@ -36,7 +36,7 @@ using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
 namespace StreamInfo {
 
-enum ResponseFlag : uint16_t {
+enum CoreResponseFlag : uint16_t {
   // Local server healthcheck failed.
   FailedLocalHealthCheck,
   // No healthy upstream.
@@ -99,28 +99,24 @@ enum ResponseFlag : uint16_t {
 
 class ResponseFlagUtils;
 
-// TODO(wbpcode): rename the ExtendedResponseFlag to ResponseFlag and legacy
-// ResponseFlag to CoreResponseFlag.
-class ExtendedResponseFlag {
+class ResponseFlag {
 public:
-  ExtendedResponseFlag() = default;
+  constexpr ResponseFlag() = default;
 
   /**
    * Construct a response flag from the core response flag enum. The integer
    * value of the enum is used as the raw integer value of the flag.
    * @param flag the core response flag enum.
    */
-  ExtendedResponseFlag(ResponseFlag flag) : raw_value_(flag) {}
+  constexpr ResponseFlag(CoreResponseFlag flag) : value_(flag) {}
 
   /**
    * Get the raw integer value of the flag.
    * @return uint16_t the raw integer value.
    */
-  uint16_t value() const { return raw_value_; }
+  uint16_t value() const { return value_; }
 
-  bool operator==(const ExtendedResponseFlag& other) const {
-    return raw_value_ == other.raw_value_;
-  }
+  bool operator==(const ResponseFlag& other) const { return value_ == other.value_; }
 
 private:
   friend class ResponseFlagUtils;
@@ -128,9 +124,9 @@ private:
   // This private constructor is used to create extended response flags from
   // uint16_t values. This can only be used by ResponseFlagUtils to ensure
   // only validated values are used.
-  ExtendedResponseFlag(uint16_t value) : raw_value_(value) {}
+  ResponseFlag(uint16_t value) : value_(value) {}
 
-  uint16_t raw_value_{};
+  uint16_t value_{};
 };
 
 /**
@@ -632,7 +628,7 @@ public:
    * @param response_flag the response flag. Each filter can set independent response flags. The
    * flags are accumulated.
    */
-  virtual void setResponseFlag(ExtendedResponseFlag response_flag) PURE;
+  virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
    * @param code the HTTP response code to set for this request.
@@ -787,7 +783,7 @@ public:
   /**
    * @return whether response flag is set or not.
    */
-  virtual bool hasResponseFlag(ExtendedResponseFlag response_flag) const PURE;
+  virtual bool hasResponseFlag(ResponseFlag response_flag) const PURE;
 
   /**
    * @return whether any response flag is set or not.
@@ -797,11 +793,11 @@ public:
   /**
    * @return all response flags that are set.
    */
-  virtual absl::Span<const ExtendedResponseFlag> responseFlags() const PURE;
+  virtual absl::Span<const ResponseFlag> responseFlags() const PURE;
 
   /**
    * @return response flags encoded as an integer. Every bit of the integer is used to represent a
-   * flag. Only flags that are declared in the enum ResponseFlag type are supported.
+   * flag. Only flags that are declared in the enum CoreResponseFlag type are supported.
    */
   virtual uint64_t legacyResponseFlags() const PURE;
 

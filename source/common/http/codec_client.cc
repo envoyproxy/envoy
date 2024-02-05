@@ -114,7 +114,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
         reason = StreamResetReason::ProtocolError;
-        connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+        connection_->streamInfo().setResponseFlag(
+            StreamInfo::CoreResponseFlag::UpstreamProtocolError);
       }
     }
     while (!active_requests_.empty()) {

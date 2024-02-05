@@ -44,7 +44,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
               socket->connectionInfoProvider().remoteAddress()->asString());
     stats_.no_filter_chain_match_.inc();
-    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    stream_info->setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
     emitLogs(*config_, *stream_info);
     socket->close();

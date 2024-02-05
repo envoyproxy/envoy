@@ -6,8 +6,8 @@
 #include "absl/strings/string_view.h"
 #include "library/common/api/c_types.h"
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
-#include "library/common/jni/import/jni_import.h"
-#include "library/common/jni/jni_helper.h"
+#include "library/jni/import/jni_import.h"
+#include "library/jni/jni_helper.h"
 
 namespace Envoy {
 namespace JNI {

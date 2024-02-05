@@ -31,8 +31,8 @@ envoy_cc_library(
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
     ] + select({
         ":use_android_system_helper": [
-            "//library/common/jni:android_jni_utility_lib",
-            "//library/common/jni:android_network_utility_lib",
+            "//library/jni:android_jni_utility_lib",
+            "//library/jni:android_network_utility_lib",
         ],
         "//conditions:default": [],
     }) + select({

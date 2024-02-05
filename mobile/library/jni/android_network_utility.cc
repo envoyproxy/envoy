@@ -1,10 +1,10 @@
-#include "library/common/jni/android_network_utility.h"
+#include "library/jni/android_network_utility.h"
 
 #include "library/common/data/utility.h"
-#include "library/common/jni/jni_support.h"
-#include "library/common/jni/jni_utility.h"
-#include "library/common/jni/types/exception.h"
-#include "library/common/jni/types/java_virtual_machine.h"
+#include "library/jni/jni_support.h"
+#include "library/jni/jni_utility.h"
+#include "library/jni/types/exception.h"
+#include "library/jni/types/java_virtual_machine.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {

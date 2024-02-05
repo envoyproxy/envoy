@@ -10,13 +10,13 @@
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/extensions/key_value/platform/c_types.h"
 #include "library/common/internal_engine.h"
-#include "library/common/jni/android_network_utility.h"
-#include "library/common/jni/import/jni_import.h"
-#include "library/common/jni/jni_support.h"
-#include "library/common/jni/jni_utility.h"
-#include "library/common/jni/types/exception.h"
-#include "library/common/jni/types/java_virtual_machine.h"
 #include "library/common/types/managed_envoy_headers.h"
+#include "library/jni/android_network_utility.h"
+#include "library/jni/import/jni_import.h"
+#include "library/jni/jni_support.h"
+#include "library/jni/jni_utility.h"
+#include "library/jni/types/exception.h"
+#include "library/jni/types/java_virtual_machine.h"
 
 using Envoy::Platform::EngineBuilder;
 

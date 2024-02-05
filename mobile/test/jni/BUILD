@@ -11,7 +11,7 @@ cc_library(
     testonly = True,
     deps = [
         ":server_envoy_jni_lib",
-        "//library/common/jni:envoy_jni_lib",
+        "//library/jni:envoy_jni_lib",
         "@envoy_build_config//:test_extensions",
     ],
 )
@@ -28,7 +28,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//library/common/jni:envoy_jni_lib",
+        "//library/jni:envoy_jni_lib",
         "//test/common/integration:test_server_interface_lib",
         "//test/common/integration:xds_test_server_interface_lib",
     ],
@@ -63,7 +63,7 @@ cc_library(
     testonly = True,
     deps = [
         ":server_envoy_jni_lib",
-        "//library/common/jni:envoy_jni_lib",
+        "//library/jni:envoy_jni_lib",
         "@envoy//source/common/listener_manager:listener_manager_lib",
     ],
 )
@@ -90,7 +90,7 @@ cc_library(
         "jni_helper_test.cc",
     ],
     deps = [
-        "//library/common/jni:jni_helper_lib",
+        "//library/jni:jni_helper_lib",
     ],
     alwayslink = True,
 )
@@ -110,7 +110,7 @@ cc_library(
         "jni_utility_test.cc",
     ],
     deps = [
-        "//library/common/jni:jni_utility_lib",
+        "//library/jni:jni_utility_lib",
     ],
     alwayslink = True,
 )

@@ -29,24 +29,27 @@ public:
   // Handle's `mock_helper()` accessor.
   static std::unique_ptr<Handle> replaceSystemHelper() { return std::make_unique<Handle>(); }
 
-  // RAII type for replacing the SystemHelper singleton with a the MockSystemHelper.
+  // RAII type for replacing the SystemHelper singleton with the MockSystemHelper.
   // When this object is destroyed, it resets the SystemHelper singleton back
   // to the previous state.
   class Handle {
   public:
     Handle() {
-      previous_ = std::make_unique<test::MockSystemHelper>();
-      SystemHelper::instance_.swap(previous_);
+      previous_ = new test::MockSystemHelper();
+      std::swap(SystemHelper::instance_, previous_);
     }
 
-    ~Handle() { SystemHelper::instance_ = std::move(previous_); }
+    ~Handle() {
+      delete SystemHelper::instance_;
+      SystemHelper::instance_ = previous_;
+    }
 
     test::MockSystemHelper& mock_helper() {
-      return *static_cast<test::MockSystemHelper*>(SystemHelper::instance_.get());
+      return *static_cast<test::MockSystemHelper*>(SystemHelper::instance_);
     }
 
   private:
-    std::unique_ptr<SystemHelper> previous_;
+    SystemHelper* previous_;
   };
 };
 
