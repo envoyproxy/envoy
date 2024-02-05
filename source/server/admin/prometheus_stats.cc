@@ -286,15 +286,15 @@ std::string generateSummaryOutput(const Stats::ParentHistogram& histogram,
   const std::string tags = PrometheusStatsFormatter::formattedTags(histogram.tags());
   const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
 
-  const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
+  const Stats::HistogramStatistics& stats = histogram.intervalStatistics();
   Stats::ConstSupportedBuckets& supported_quantiles = stats.supportedQuantiles();
   const std::vector<double>& computed_quantiles = stats.computedQuantiles();
   std::string output;
   for (size_t i = 0; i < supported_quantiles.size(); ++i) {
     double quantile = supported_quantiles[i];
     double value = computed_quantiles[i];
-    output.append(fmt::format("{0}{{{1}quantile=\"{2}\"}} {3}\n", prefixed_tag_extracted_name,
-                              hist_tags, quantile, std::isnan(value) ? 0 : value));
+    output.append(fmt::format("{0}{{{1}quantile=\"{2}\"}} {3:.32g}\n", prefixed_tag_extracted_name,
+                              hist_tags, quantile, value));
   }
 
   output.append(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,

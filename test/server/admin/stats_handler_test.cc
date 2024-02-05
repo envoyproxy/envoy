@@ -1511,9 +1511,9 @@ envoy_h1{quantile="0.5"} 305
 envoy_h1{quantile="0.75"} 307.5
 envoy_h1{quantile="0.9"} 309
 envoy_h1{quantile="0.95"} 309.5
-envoy_h1{quantile="0.99"} 309.9
-envoy_h1{quantile="0.995"} 309.95
-envoy_h1{quantile="0.999"} 309.99
+envoy_h1{quantile="0.99"} 309.89999999999997726263245567679
+envoy_h1{quantile="0.995"} 309.9499999999999886313162278384
+envoy_h1{quantile="0.999"} 309.99000000000000909494701772928
 envoy_h1{quantile="1"} 310
 envoy_h1_sum{} 305
 envoy_h1_count{} 1
