@@ -231,8 +231,8 @@ void HttpConnectionManagerImplMixin::sendRequestHeadersAndData() {
 }
 
 ResponseHeaderMap* HttpConnectionManagerImplMixin::sendResponseHeaders(
-    ResponseHeaderMapPtr&& response_headers, absl::optional<StreamInfo::ResponseFlag> response_flag,
-    std::string response_code_details) {
+    ResponseHeaderMapPtr&& response_headers,
+    absl::optional<StreamInfo::CoreResponseFlag> response_flag, std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))

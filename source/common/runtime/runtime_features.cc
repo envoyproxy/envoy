@@ -35,7 +35,6 @@ RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_convert_legacy_lb_config);
 RUNTIME_GUARD(envoy_reloadable_features_copy_response_code_to_downstream_stream_info);
-RUNTIME_GUARD(envoy_reloadable_features_count_unused_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 RUNTIME_GUARD(envoy_reloadable_features_detect_and_raise_rst_tcp_connection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
@@ -45,6 +44,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_connect_udp_support);
 RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_zone_routing_different_zone_counts);
+RUNTIME_GUARD(envoy_reloadable_features_exclude_host_in_eds_status_draining);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_send_original_xff);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_change_http_status);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_http1_reverse_bridge_handle_empty_response);
@@ -97,7 +97,11 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
-// Begin false flags. These should come with a TODO to flip true.
+// Begin false flags. Most of them should come with a TODO to flip true.
+
+// Execution context is optional and must be enabled explicitly.
+// See https://github.com/envoyproxy/envoy/issues/32012.
+FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(paul-r-gall) Make this enabled by default after additional soak time.
