@@ -35,19 +35,19 @@ type filterFactoryAndParser struct {
 // nullParser is a no-op implementation of the StreamFilterConfigParser interface.
 type nullParser struct{}
 
-// Parse do nothing, returns the input any as is.
+// Parse does nothing, returns the input `any` as is.
 func (p *nullParser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
 	return any, nil
 }
 
-// Merge only use the childConfig, ignore the parentConfig.
+// Merge only uses the childConfig, ignore the parentConfig.
 func (p *nullParser) Merge(parentConfig interface{}, childConfig interface{}) interface{} {
 	return childConfig
 }
 
 var NullParser api.StreamFilterConfigParser = &nullParser{}
 
-// RegisterHttpFilterFactoryAndConfigParser register http filter factory and config parser for the specified plugin.
+// RegisterHttpFilterFactoryAndConfigParser registers the http filter factory and config parser for the specified plugin.
 // The factory and parser should not be nil.
 // Use the NullParser if the plugin does not care about config.
 func RegisterHttpFilterFactoryAndConfigParser(name string, factory api.StreamFilterFactory, parser api.StreamFilterConfigParser) {
