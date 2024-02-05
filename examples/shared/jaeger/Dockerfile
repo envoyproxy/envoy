@@ -1,4 +1,4 @@
-FROM jaegertracing/all-in-one@sha256:ead304a221a110b26b54bed36129ee48eaac67f1b68b733b40dc9fde8039c513
+FROM jaegertracing/all-in-one@sha256:6b345b7bdf2d47499d7f666b2a2260e659f203d2ab6b8b9215be104306cf19b4
 HEALTHCHECK \
     --interval=1s \
     --timeout=1s \
