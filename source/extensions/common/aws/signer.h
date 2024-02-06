@@ -19,7 +19,7 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::RequestMessage& message, bool sign_body,
+  virtual absl::Status sign(Http::RequestMessage& message, bool sign_body,
                     const absl::string_view override_region = "") PURE;
 
   /**
@@ -28,7 +28,7 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void signEmptyPayload(Http::RequestHeaderMap& headers,
+  virtual absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
                                 const absl::string_view override_region = "") PURE;
 
   /**
@@ -37,7 +37,7 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void signUnsignedPayload(Http::RequestHeaderMap& headers,
+  virtual absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
                                    const absl::string_view override_region = "") PURE;
 
   /**
@@ -47,7 +47,7 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+  virtual absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                     const absl::string_view override_region = "") PURE;
 };
 

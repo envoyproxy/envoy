@@ -20,26 +20,26 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-void SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
+absl::Status SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
                           const absl::string_view override_region) {
 
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
-  sign(headers, content_hash, override_region);
+  return sign(headers, content_hash, override_region);
 }
 
-void SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
+absl::Status SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
                                       const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().HashedEmptyString);
-  sign(headers, SignatureConstants::get().HashedEmptyString, override_region);
+  return sign(headers, SignatureConstants::get().HashedEmptyString, override_region);
 }
 
-void SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
+absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
                                          const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().UnsignedPayload);
-  sign(headers, SignatureConstants::get().UnsignedPayload, override_region);
+  return sign(headers, SignatureConstants::get().UnsignedPayload, override_region);
 }
 
 // Required only for sigv4a
@@ -49,7 +49,7 @@ void SignerBaseImpl::addRegionHeader(
 
 std::string SignerBaseImpl::getRegion() const { return region_; }
 
-void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                           const absl::string_view override_region) {
 
   headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
@@ -57,15 +57,15 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
     // This behavior matches what the AWS SDK would do.
-    return;
+    return absl::OkStatus();
   }
   const auto* method_header = headers.Method();
   if (method_header == nullptr) {
-    throw EnvoyException("Message is missing :method header");
+    return absl::NotFoundError("Message is missing :method header");
   }
   const auto* path_header = headers.Path();
   if (path_header == nullptr) {
-    throw EnvoyException("Message is missing :path header");
+    return absl::NotFoundError("Message is missing :path header");
   }
 
   if (credentials.sessionToken()) {
@@ -98,6 +98,9 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
       credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
   ENVOY_LOG(debug, "Signing request with: {}", authorization_header);
   headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
+
+  return absl::OkStatus();
+
 }
 
 std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {
