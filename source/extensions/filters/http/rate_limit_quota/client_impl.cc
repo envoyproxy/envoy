@@ -33,7 +33,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 
   // Set the domain name.
   report.set_domain(domain_name_);
-  ENVOY_LOG(debug, "The usage report that will be sent to RLQS server: ", report.DebugString());
+  ENVOY_LOG(debug, "The usage report that will be sent to RLQS server:\n{}", report.DebugString());
   return report;
 }
 
@@ -47,7 +47,7 @@ void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  ENVOY_LOG(debug, "The response that is received from RLQS server: ", response->DebugString());
+  ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
   for (const auto& action : response->bucket_action()) {
     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
       ENVOY_LOG(error,
