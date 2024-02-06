@@ -100,6 +100,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_fuzz_test",
     srcs = ["ext_authz_fuzz_test.cc"],
     corpus = "ext_authz_corpus",
+    external_deps = ["abseil_optional"],
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/http:context_lib",

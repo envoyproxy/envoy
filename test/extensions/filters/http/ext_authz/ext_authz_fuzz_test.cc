@@ -12,6 +12,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 
 using testing::Return;
@@ -64,6 +65,16 @@ public:
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+
+    ON_CALL(decoder_callbacks_.stream_info_, dynamicMetadata())
+        .WillByDefault(Invoke([&]() -> envoy::config::core::v3::Metadata& {
+          // Must be set before this mock is called!
+          return *filter_metadata_;
+        }));
+  }
+
+  void setFilterMetadata(envoy::config::core::v3::Metadata metadata) {
+    filter_metadata_ = std::move(metadata);
   }
 
   NiceMock<Runtime::MockLoader> runtime_;
@@ -71,6 +82,9 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+
+  // Returned by mock decoder_callbacks_.stream_info_.dynamicMetadata()
+  absl::optional<envoy::config::core::v3::Metadata> filter_metadata_;
 };
 
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
@@ -81,7 +95,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
     return;
   }
 
-  FuzzerMocks mocks;
+  static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -106,10 +120,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   // Set metadata context.
-  envoy::config::core::v3::Metadata metadata = input.filter_metadata();
+  mocks.setFilterMetadata(input.filter_metadata());
 
-  ON_CALL(mocks.decoder_callbacks_.stream_info_, dynamicMetadata())
-      .WillByDefault(testing::ReturnRef(metadata));
   // Set check result default action.
   envoy::service::auth::v3::CheckRequest check_request;
   ON_CALL(*client, check(_, _, _, _))
