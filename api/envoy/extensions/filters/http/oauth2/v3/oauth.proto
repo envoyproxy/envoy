@@ -74,7 +74,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -137,6 +137,12 @@ message OAuth2Config {
   // If this value is not set, it will default to ``0s``. In this case, the expiry must be set by
   // the authorization server or the OAuth flow will fail.
   google.protobuf.Duration default_expires_in = 13;
+
+  // The default lifetime in seconds of the refresh token, if the exp claim is ommitted in the refresh token
+  //
+  // If this value is not set, it will default to ``0s``. In this case, the refresh token will be expired
+  // instantly and the access token is not updated using by the refresh token.
+  google.protobuf.Duration refresh_token_expires_in = 14;
 }
 
 // Filter config.
