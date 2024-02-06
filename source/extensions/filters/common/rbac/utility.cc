@@ -13,8 +13,22 @@ namespace RBAC {
 RoleBasedAccessControlFilterStats
 generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats::Scope& scope) {
   const std::string final_prefix = Envoy::statPrefixJoin(prefix, "rbac.");
-  return {ENFORCE_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))
-              SHADOW_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix + shadow_prefix))};
+  const std::string per_policy_final_prefix = Envoy::statPrefixJoin(final_prefix, "policy.");
+  const std::string final_shadow_prefix = Envoy::statPrefixJoin(final_prefix, shadow_prefix);
+  const std::string per_policy_final_shadow_prefix = Envoy::statPrefixJoin(final_shadow_prefix, "policy.");
+
+  Stats::StatNameDynamicPool pool(scope.symbolTable());
+  const Stats::StatName per_policy_stat(pool.add(per_policy_final_prefix));
+  const Stats::StatName per_policy_shadow_stat(pool.add(per_policy_final_shadow_prefix));
+
+  return {
+      ENFORCE_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))
+      SHADOW_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_shadow_prefix))
+      scope,
+      std::move(per_policy_stat),
+      std::move(per_policy_shadow_stat),
+      std::move(pool),
+  };
 }
 
 std::string responseDetail(const std::string& policy_id) {
