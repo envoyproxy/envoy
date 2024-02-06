@@ -23,7 +23,7 @@ minor_behavior_changes:
   change: |
     Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
     is degrading. Can be manually turned on via
-    :ref:`port_migration <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+    :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
