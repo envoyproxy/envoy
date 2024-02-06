@@ -409,7 +409,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
 
     // Verify the usage report content.
     for (const auto& usage : reports.bucket_quota_usages()) {
-      // We only send signle downstream client request and it is allowed.
+      // We only send single downstream client request and it is allowed.
       EXPECT_EQ(usage.num_requests_allowed(), 1);
       EXPECT_EQ(usage.num_requests_denied(), 0);
       // time_elapsed euqals to peridocial reporting interval.
