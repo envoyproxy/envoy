@@ -3429,10 +3429,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 }
 
 #if defined(USE_CEL_PARSER)
-// Test the filter using the default configuration by connecting to
-// an ext_proc server that responds to the request_headers message
-// by requesting to modify the request headers.
-TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
+TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_request_attributes()->Add("request.path");

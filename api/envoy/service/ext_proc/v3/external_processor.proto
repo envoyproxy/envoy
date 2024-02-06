@@ -199,8 +199,6 @@ message ProcessingResponse {
 // This message is sent to the external server when the HTTP request and responses
 // are first received.
 message HttpHeaders {
-  reserved 2;
-
   // The HTTP request headers. All header keys will be
   // lower-cased, because HTTP header keys are case-insensitive.
   // The ``headers`` encoding is based on the runtime guard
@@ -210,6 +208,12 @@ message HttpHeaders {
   // When it is false, the header value is encoded in the
   // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap headers = 1;
+
+  // [#not-implemented-hide:]
+  // This field is deprecated and not implemented. Attributes will be sent in
+  // the  top-level :ref:`attributes <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.attributes`
+  // field.
+  map<string, google.protobuf.Struct> attributes = 2;
 
   // If true, then there is no message body associated with this
   // request or response.
