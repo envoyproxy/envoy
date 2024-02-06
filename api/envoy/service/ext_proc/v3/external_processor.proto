@@ -113,7 +113,6 @@ message ProcessingRequest {
   // Dynamic metadata associated with the request.
   config.core.v3.Metadata metadata_context = 8;
 
-  // [#not-implemented-hide:]
   // The values of properties selected by the ``request_attributes``
   // or ``response_attributes`` list in the configuration. Each entry
   // in the list is populated from the standard
@@ -200,6 +199,8 @@ message ProcessingResponse {
 // This message is sent to the external server when the HTTP request and responses
 // are first received.
 message HttpHeaders {
+  reserved 2;
+
   // The HTTP request headers. All header keys will be
   // lower-cased, because HTTP header keys are case-insensitive.
   // The ``headers`` encoding is based on the runtime guard
@@ -209,15 +210,6 @@ message HttpHeaders {
   // When it is false, the header value is encoded in the
   // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap headers = 1;
-
-  // [#not-implemented-hide:]
-  // TODO(jbohanon) reserve field as part of rework detailed in https://github.com/envoyproxy/envoy/issues/32125
-  // The values of properties selected by the ``request_attributes``
-  // or ``response_attributes`` list in the configuration. Each entry
-  // in the list is populated
-  // from the standard :ref:`attributes <arch_overview_attributes>`
-  // supported across Envoy.
-  map<string, google.protobuf.Struct> attributes = 2;
 
   // If true, then there is no message body associated with this
   // request or response.
