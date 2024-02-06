@@ -230,6 +230,15 @@ TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEqualToEmptyWithAddedEntries) {
   }
 }
 
+// Validating that calling `createWithPicks()` with no entries returns an empty
+// scheduler.
+TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEmptyEntries) {
+  EdfScheduler<double> sched = EdfScheduler<double>::createWithPicks(
+      {}, [](const double& w) { return w; }, 123);
+  EXPECT_EQ(nullptr, sched.peekAgain([](const double&) { return 0; }));
+  EXPECT_EQ(nullptr, sched.pickAndAdd([](const double&) { return 0; }));
+}
+
 // Emulates first-pick scenarios by creating a scheduler with the given
 // weights and a random number of pre-picks, and validates that the next pick
 // of all the weights is close to the given weights.
@@ -303,7 +312,7 @@ class EdfSchedulerSpecialTest : public testing::TestWithParam<uint64_t> {};
 // equal to the weights. Trying the case of 2 weights between 0 to 100, in steps
 // of 0.001. This test takes too long, and therefore it is disabled by default.
 // If the EDF scheduler is enable, it can be manually executed.
-TEST_P(EdfSchedulerSpecialTest, DISABLED_ExhustiveValidator) {
+TEST_P(EdfSchedulerSpecialTest, DISABLED_ExhaustiveValidator) {
   const uint64_t start_idx = GetParam();
   for (uint64_t i = start_idx; i < start_idx + BATCH_SIZE; ++i) {
     const double w1 = 0.001 * i;
