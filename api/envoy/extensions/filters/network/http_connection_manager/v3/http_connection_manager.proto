@@ -667,7 +667,7 @@ message HttpConnectionManager {
 
   // If set, Envoy will not append the
   // :ref:`config_http_conn_man_headers_x-envoy-local-overloaded` HTTP header in the scenario where
-  // the Overload Manager has been triggered
+  // the Overload Manager has been triggered. This defaults to true.
   bool skip_local_overload_append = 57;
 
   // If set, Envoy will not append the remote address to the
