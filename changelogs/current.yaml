@@ -432,6 +432,9 @@ new_features:
   change: |
     The ``/stats/prometheus`` endpoint can now emit prometheus ``summary`` metric types by explicitly setting the
     ``histogram_buckets`` query parameter to ``summary``.
+- area: rbac
+  change: |
+    Added additional statistics for rules and shadow rules to the RBAC HTTP filter.
 
 deprecated:
 - area: listener

@@ -128,10 +128,16 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       ENVOY_LOG(debug, "shadow allowed, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_allowed_.inc();
+      if (!effective_policy_id.empty()) {
+        config_->stats().inc_policy_shadow_allowed(effective_policy_id);
+      }
     } else {
       ENVOY_LOG(debug, "shadow denied, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_denied_.inc();
+      if (!effective_policy_id.empty()) {
+        config_->stats().inc_policy_shadow_denied(effective_policy_id);
+      }
       shadow_resp_code =
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
@@ -156,6 +162,9 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     if (allowed) {
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();
+      if (!effective_policy_id.empty()) {
+        config_->stats().inc_policy_allowed(effective_policy_id);
+      }
       return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
@@ -163,6 +172,9 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
                                  absl::nullopt,
                                  Filters::Common::RBAC::responseDetail(log_policy_id));
       config_->stats().denied_.inc();
+      if (!effective_policy_id.empty()) {
+        config_->stats().inc_policy_denied(effective_policy_id);
+      }
       return Http::FilterHeadersStatus::StopIteration;
     }
   }

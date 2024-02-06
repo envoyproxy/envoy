@@ -32,6 +32,32 @@ namespace RBAC {
 struct RoleBasedAccessControlFilterStats {
   ENFORCE_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
   SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+
+  Stats::Scope& scope_;
+  Stats::StatName per_policy_stat_;
+  Stats::StatName per_policy_shadow_stat_;
+  Stats::StatNameDynamicPool pool_;
+
+  void inc_policy_allowed(absl::string_view name) {
+    incCounter(per_policy_stat_, name, ".allowed");
+  }
+
+  void inc_policy_denied(absl::string_view name) {
+    incCounter(per_policy_stat_, name, ".denied");
+  }
+
+  void inc_policy_shadow_allowed(absl::string_view name) {
+    incCounter(per_policy_shadow_stat_, name, ".shadow_allowed");
+  }
+
+  void inc_policy_shadow_denied(absl::string_view name) {
+    incCounter(per_policy_shadow_stat_, name, ".shadow_denied");
+  }
+
+  void incCounter(const Stats::StatName& prefix, absl::string_view name, absl::string_view suffix) {
+    Stats::StatName metric_name = pool_.add(absl::StrCat(name, suffix));
+    Stats::Utility::counterFromElements(scope_, {prefix, metric_name}).inc();
+  }
 };
 
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
