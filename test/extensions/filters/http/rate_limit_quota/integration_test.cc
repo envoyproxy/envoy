@@ -412,7 +412,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
       // We only send single downstream client request and it is allowed.
       EXPECT_EQ(usage.num_requests_allowed(), 1);
       EXPECT_EQ(usage.num_requests_denied(), 0);
-      // time_elapsed euqals to peridocial reporting interval.
+      // time_elapsed equals to periodical reporting interval.
       EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
                 report_interval_sec);
     }
