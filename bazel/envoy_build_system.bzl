@@ -58,6 +58,10 @@ load(
     _envoy_mobile_defines = "envoy_mobile_defines",
 )
 load(
+    ":envoy_internal.bzl",
+    _envoy_linkstatic = "envoy_linkstatic",
+)
+load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
@@ -250,6 +254,7 @@ envoy_select_wasm_v8 = _envoy_select_wasm_v8
 envoy_select_wasm_wamr = _envoy_select_wasm_wamr
 envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
+envoy_select_linkstatic = _envoy_linkstatic
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary
