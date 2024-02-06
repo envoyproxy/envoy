@@ -28,7 +28,6 @@ public:
   HealthCheckEventLoggerImpl(const envoy::config::core::v3::HealthCheck& health_check_config,
                              Server::Configuration::HealthCheckerFactoryContext& context)
       : time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
-
     // TODO(botengyao): Remove the file_ creation here into the file based health check
     // event sink. In this way you can remove the file_ based code from the createHealthCheckEvent
     if (!health_check_config.event_log_path().empty() /* deprecated */) {

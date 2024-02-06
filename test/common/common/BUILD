@@ -511,3 +511,11 @@ envoy_benchmark_test(
     name = "inline_map_speed_test_benchmark_test",
     benchmark_binary = "inline_map_speed_test",
 )
+
+envoy_cc_test(
+    name = "execution_context_test",
+    srcs = ["execution_context_test.cc"],
+    deps = [
+        "//envoy/common:execution_context",
+    ],
+)

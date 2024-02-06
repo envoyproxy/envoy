@@ -1,4 +1,3 @@
-#include "load_balancer_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
 #include <atomic>

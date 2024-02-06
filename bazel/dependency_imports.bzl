@@ -27,7 +27,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
-    envoy_download_go_sdks(go_version)
+    if go_version != "host":
+        envoy_download_go_sdks(go_version)
     gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()

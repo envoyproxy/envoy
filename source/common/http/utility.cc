@@ -467,22 +467,16 @@ void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostn
                               const bool append_xfh) {
   const auto host = headers.getHostValue();
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.append_xfh_idempotent")) {
-    // Only append to x-forwarded-host if the value was not the last value appended.
-    const auto xfh = headers.getForwardedHostValue();
+  // Only append to x-forwarded-host if the value was not the last value appended.
+  const auto xfh = headers.getForwardedHostValue();
 
-    if (append_xfh && !host.empty()) {
-      if (!xfh.empty()) {
-        const auto xfh_split = StringUtil::splitToken(xfh, ",");
-        if (!xfh_split.empty() && xfh_split.back() != host) {
-          headers.appendForwardedHost(host, ",");
-        }
-      } else {
+  if (append_xfh && !host.empty()) {
+    if (!xfh.empty()) {
+      const auto xfh_split = StringUtil::splitToken(xfh, ",");
+      if (!xfh_split.empty() && xfh_split.back() != host) {
         headers.appendForwardedHost(host, ",");
       }
-    }
-  } else {
-    if (append_xfh && !host.empty()) {
+    } else {
       headers.appendForwardedHost(host, ",");
     }
   }

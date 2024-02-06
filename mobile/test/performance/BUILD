@@ -9,5 +9,5 @@ envoy_cc_binary(
     srcs = ["test_binary_size.cc"],
     repository = "@envoy",
     stamped = True,
-    deps = ["//library/common:engine_lib"],
+    deps = ["//library/common:internal_engine_lib"],
 )

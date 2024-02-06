@@ -417,7 +417,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
       ENVOY_CONN_LOG(debug, "Cluster not found {} and no on demand cluster set.",
                      read_callbacks_->connection(), cluster_name);
       config_->stats().downstream_cx_no_route_.inc();
-      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+      getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
       onInitFailure(UpstreamFailureReason::NoRoute);
     } else {
       ASSERT(!cluster_discovery_handle_);
@@ -445,7 +445,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
   // will never be released.
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
     cluster->trafficStats()->upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
     return Network::FilterStatus::StopIteration;
@@ -453,7 +453,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   const uint32_t max_connect_attempts = config_->maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
     cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::ConnectFailed);
     return Network::FilterStatus::StopIteration;
@@ -487,7 +487,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   if (!maybeTunnel(*thread_local_cluster)) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
     // cluster->trafficStats()->upstream_cx_none_healthy in the latter case.
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
   }
   return Network::FilterStatus::StopIteration;
@@ -520,7 +520,7 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
   }
   // Failure path.
   config_->stats().downstream_cx_no_route_.inc();
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
   onInitFailure(UpstreamFailureReason::NoRoute);
 }
 
@@ -667,7 +667,7 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   }
   filter_state->setData(
       TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseTrailers(
@@ -685,7 +685,7 @@ void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginTimeout);
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
 
   // Raise LocalClose, which will trigger a reconnect if needed/configured.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
@@ -799,7 +799,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
-        getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+        getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
@@ -864,7 +864,7 @@ void Filter::onIdleTimeout() {
 
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(
       Network::ConnectionCloseType::NoFlush,
