@@ -4,8 +4,8 @@
 #include <memory>
 #include <type_traits>
 
-#include "library/common/common/system_helper.h"
 #include "library/common/data/utility.h"
+#include "library/common/system/system_helper.h"
 
 namespace Envoy {
 namespace Extensions {
