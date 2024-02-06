@@ -325,18 +325,15 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 
 #if defined(__linux__)
   rc = ::accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
-  // If failed with EINVAL try without flags
-  if (rc >= 0 || errno != EINVAL) {
-    return {rc, rc != -1 ? 0 : errno};
-  }
-#endif
-
+  return {rc, rc != -1 ? 0 : errno};
+#else
   rc = ::accept(sockfd, addr, addrlen);
   if (rc >= 0) {
     setsocketblocking(rc, false);
   }
 
   return {rc, rc != -1 ? 0 : errno};
+#endif
 }
 
 SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
