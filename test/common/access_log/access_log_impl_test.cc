@@ -91,7 +91,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
   request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addCopy(Http::Headers::get().RequestId, "id");
   request_headers_.addCopy(Http::Headers::get().Host, "host");
@@ -118,7 +118,7 @@ typed_config:
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
       Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination);
 
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 DC 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
@@ -135,7 +135,7 @@ void AccessLogImplTest::routeNameTest(std::string yaml, bool omit_empty) {
   route->route_name_ = "route-test-name";
 
   stream_info_.route_ = route;
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
   request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addCopy(Http::Headers::get().RequestId, "id");
   request_headers_.addCopy(Http::Headers::get().Host, "host");
@@ -977,7 +977,7 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
@@ -999,11 +999,11 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
@@ -1026,11 +1026,11 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
   EXPECT_CALL(*file_, write(_));
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
@@ -1076,9 +1076,10 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto& [flag_strings, response_flag] :
+  for (const auto& [short_string, long_string, response_flag] :
        StreamInfo::ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-    UNREFERENCED_PARAMETER(flag_strings);
+    UNREFERENCED_PARAMETER(short_string);
+    UNREFERENCED_PARAMETER(long_string);
 
     TestStreamInfo stream_info(time_source_);
     stream_info.setResponseFlag(response_flag);

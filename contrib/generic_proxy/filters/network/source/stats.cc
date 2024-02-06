@@ -18,8 +18,10 @@ CodeOrFlags::CodeOrFlags(Server::Configuration::ServerFactoryContext& context)
     code_stat_names_.push_back(pool_.add(std::to_string(i)));
   }
 
-  for (const auto& flag : StreamInfo::ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-    flag_stat_names_.emplace(flag.second, pool_.add(flag.first.short_string_));
+  flag_stat_names_.reserve(StreamInfo::ResponseFlagUtils::responseFlagsVec().size());
+
+  for (const auto& flag : StreamInfo::ResponseFlagUtils::responseFlagsVec()) {
+    flag_stat_names_.push_back(pool_.add(flag.short_string_));
   }
 
   unknown_code_or_flag_ = pool_.add("-");
@@ -33,27 +35,10 @@ Stats::StatName CodeOrFlags::statNameFromCode(uint32_t code) const {
 }
 
 Stats::StatName CodeOrFlags::statNameFromFlag(StreamInfo::ResponseFlag flag) const {
-  const auto iter = flag_stat_names_.find(flag);
-  if (iter != flag_stat_names_.end()) {
-    return iter->second;
-  }
-  return unknown_code_or_flag_;
-}
-
-absl::InlinedVector<StreamInfo::ResponseFlag, 2>
-getResponseFlags(const StreamInfo::StreamInfo& info) {
-  if (!info.hasAnyResponseFlag()) {
-    return {};
-  }
-
-  absl::InlinedVector<StreamInfo::ResponseFlag, 2> flags;
-
-  for (const auto& flag : StreamInfo::ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-    if (info.hasResponseFlag(flag.second)) {
-      flags.push_back(flag.second);
-    }
-  }
-  return flags;
+  // Any flag value should be less than the size of flag_stat_names_. Because flag_stat_names_
+  // is initialized with all possible flags.
+  ASSERT(flag.value() < flag_stat_names_.size());
+  return flag_stat_names_[flag.value()];
 }
 
 void GenericFilterStatsHelper::onRequestReset() { stats_.downstream_rq_reset_.inc(); }
@@ -93,7 +78,7 @@ void GenericFilterStatsHelper::onRequestComplete(const StreamInfo::StreamInfo& i
   }
 
   const auto response_code = info.responseCode().value_or(0);
-  const auto response_flags = getResponseFlags(info);
+  const auto response_flags = info.responseFlags();
 
   if (last_code_counter_.second.has_value() && response_code == last_code_counter_.first) {
     last_code_counter_.second->inc();

@@ -34,10 +34,10 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 
 } // namespace
 
-Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
+    const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& server_context) {
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
@@ -60,9 +60,9 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
   FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
                                  proto_config.payload_passthrough()};
 
-  FilterStats stats = generateStats(stat_prefix, context.scope());
-  return [stats, signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
-    auto filter = std::make_shared<Filter>(filter_settings, stats, signer);
+  FilterStats stats = generateStats(stats_prefix, dual_info.scope);
+  return [stats, signer, filter_settings, dual_info](Http::FilterChainFactoryCallbacks& cb) {
+    auto filter = std::make_shared<Filter>(filter_settings, stats, signer, dual_info.is_upstream);
     cb.addStreamFilter(filter);
   };
 }
@@ -86,6 +86,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
  * Static registration for the AWS Lambda filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(AwsLambdaFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAwsLambdaFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters

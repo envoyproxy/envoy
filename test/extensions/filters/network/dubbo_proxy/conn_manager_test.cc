@@ -871,7 +871,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   // First filter sends local reply.
   EXPECT_CALL(*first_filter, onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
-        callbacks->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+        callbacks->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::AbortIteration;
       }));

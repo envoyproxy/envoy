@@ -12,7 +12,7 @@
 
 namespace Envoy {
 
-std::unique_ptr<SystemHelper> SystemHelper::instance_ = std::make_unique<DefaultSystemHelper>();
+SystemHelper* SystemHelper::instance_ = new DefaultSystemHelper();
 
 SystemHelper& SystemHelper::getInstance() { return *instance_; }
 
