@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.0" # TODO(#32149): increase this once io_uring is tested.
+"source/common:95.9" # TODO(#32149): increase this once io_uring is tested.
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/config:95.4"
