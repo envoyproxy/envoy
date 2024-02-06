@@ -100,6 +100,24 @@ typed_config:
           - any: true
 )EOF";
 
+const std::string RBAC_CONFIG_PERMISSION_WITH_URI_PATH_TEMPLATE_MATCH = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: DENY
+    policies:
+      foo:
+        permissions:
+          - uri_template:
+              name: envoy.path.match.uri_template.uri_template_matcher
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+                path_template: "/test/deny/path"
+        principals:
+          - any: true
+)EOF";
+
 const std::string RBAC_CONFIG_WITH_LOG_ACTION = R"EOF(
 name: rbac
 typed_config:
@@ -769,6 +787,27 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+}
+
+TEST_P(RBACIntegrationTest, PermissionUriPathTemplateMatch) {
+  config_helper_.prependFilter(RBAC_CONFIG_PERMISSION_WITH_URI_PATH_TEMPLATE_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test/deny/path"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, LogConnectionAllow) {

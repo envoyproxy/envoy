@@ -79,7 +79,8 @@ envoy::config::core::v3::Http2ProtocolOptions
 fromHttp2Settings(const test::common::http::Http2Settings& settings) {
   envoy::config::core::v3::Http2ProtocolOptions options(
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions()));
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value());
   // We apply an offset and modulo interpretation to settings to ensure that
   // they are valid. Rejecting invalid settings is orthogonal to the fuzzed
   // code.

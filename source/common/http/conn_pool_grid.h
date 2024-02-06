@@ -80,9 +80,9 @@ public:
     StreamCreationResult newStream();
 
     // Called on pool failure or timeout to kick off another connection attempt.
-    // Returns true if there is a failover pool and a connection has been
-    // attempted, false if all pools have been tried.
-    bool tryAnotherConnection();
+    // Returns the StreamCreationResult if there is a failover pool and a
+    // connection has been attempted, an empty optional otherwise.
+    absl::optional<StreamCreationResult> tryAnotherConnection();
 
     // Called by a ConnectionAttempt when the underlying pool fails.
     void onConnectionAttemptFailed(ConnectionAttemptCallbacks* attempt,
@@ -205,17 +205,12 @@ private:
   Event::Dispatcher& dispatcher_;
   Random::RandomGenerator& random_generator_;
   Upstream::HostConstSharedPtr host_;
-  Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr options_;
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   HttpServerPropertiesCacheSharedPtr alternate_protocols_;
-
-  // True iff this pool is draining. No new streams or connections should be created
-  // in this state.
-  bool draining_{false};
 
   // Tracks the callbacks to be called on drain completion.
   std::list<Instance::IdleCb> idle_callbacks_;
@@ -224,23 +219,31 @@ private:
   // desired use.
   std::list<ConnectionPool::InstancePtr> pools_;
 
-  // True iff under the stack of the destructor, to avoid calling drain
-  // callbacks on deletion.
-  bool destroying_{};
-
-  // True iff this pool is being being defer deleted.
-  bool deferred_deleting_{};
-
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;
 
   Quic::QuicStatNames& quic_stat_names_;
+
   Stats::Scope& scope_;
+
   // The origin for this pool.
   // Note the host name here is based off of the host name used for SNI, which
   // may be from the cluster config, or the request headers for auto-sni.
   HttpServerPropertiesCache::Origin origin_;
+
   Http::PersistentQuicInfo& quic_info_;
+  Upstream::ResourcePriority priority_;
+
+  // True iff this pool is draining. No new streams or connections should be created
+  // in this state.
+  bool draining_{false};
+
+  // True iff under the stack of the destructor, to avoid calling drain
+  // callbacks on deletion.
+  bool destroying_{};
+
+  // True iff this pool is being deferred deleted.
+  bool deferred_deleting_{};
 };
 
 } // namespace Http

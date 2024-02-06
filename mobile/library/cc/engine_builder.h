@@ -13,12 +13,12 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "direct_response_testing.h"
-#include "engine.h"
-#include "engine_callbacks.h"
-#include "key_value_store.h"
+#include "library/cc/engine.h"
+#include "library/cc/engine_callbacks.h"
+#include "library/cc/key_value_store.h"
+#include "library/cc/log_level.h"
+#include "library/cc/string_accessor.h"
 #include "library/common/types/matcher_data.h"
-#include "log_level.h"
-#include "string_accessor.h"
 
 namespace Envoy {
 namespace Platform {

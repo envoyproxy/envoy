@@ -46,7 +46,7 @@ envoy_cc_library(
     hdrs = ["socket_tag_socket_option_impl.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/jni:android_jni_utility_lib",
+        "//library/jni:android_jni_utility_lib",
         "@envoy//envoy/network:address_interface",
         "@envoy//source/common/common:scalar_to_byte_vector_lib",
         "@envoy//source/common/network:socket_option_lib",

@@ -16,6 +16,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -67,9 +68,10 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({GetParam()}),
         peer_addr_(
-            Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(), 0)),
-        self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
-                                                        54321)),
+            Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0])),
+        self_addr_(Network::Utility::getAddressWithPort(
+            *Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]),
+            54321)),
         peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
