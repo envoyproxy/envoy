@@ -122,8 +122,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "execution_context",
+    hdrs = ["execution_context.h"],
+    deps = [":pure_lib"],
+)
+
+envoy_cc_library(
     name = "scope_tracker_interface",
     hdrs = ["scope_tracker.h"],
+    deps = [
+        ":execution_context",
+        ":pure_lib",
+    ],
 )
 
 envoy_cc_library(

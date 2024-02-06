@@ -127,7 +127,7 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   if (!config_->allowedPrincipals().allowed(
           read_callbacks_->connection().ssl()->sha256PeerCertificateDigest())) {
     read_callbacks_->connection().streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamProtocolError);
+        StreamInfo::CoreResponseFlag::UpstreamProtocolError);
     read_callbacks_->connection().streamInfo().setResponseCodeDetails(AuthDigestNoMatch);
     config_->stats().auth_digest_no_match_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

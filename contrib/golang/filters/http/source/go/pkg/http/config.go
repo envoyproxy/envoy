@@ -79,23 +79,20 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 
 	name := utils.BytesToString(uint64(c.plugin_name_ptr), uint64(c.plugin_name_len))
 	configParser := getHttpFilterConfigParser(name)
-	if configParser != nil {
-		var parsedConfig interface{}
-		var err error
-		if c.is_route_config == 1 {
-			parsedConfig, err = configParser.Parse(&any, nil)
-		} else {
-			http_config := createConfig(c)
-			parsedConfig, err = configParser.Parse(&any, http_config)
-		}
-		if err != nil {
-			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
-			return 0
-		}
-		configCache.Store(configNum, parsedConfig)
+
+	var parsedConfig interface{}
+	var err error
+	if c.is_route_config == 1 {
+		parsedConfig, err = configParser.Parse(&any, nil)
 	} else {
-		configCache.Store(configNum, &any)
+		config := createConfig(c)
+		parsedConfig, err = configParser.Parse(&any, config)
 	}
+	if err != nil {
+		cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
+		return 0
+	}
+	configCache.Store(configNum, parsedConfig)
 
 	return configNum
 }
@@ -121,24 +118,17 @@ func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint
 	name := utils.BytesToString(namePtr, nameLen)
 	configParser := getHttpFilterConfigParser(name)
 
-	if configParser != nil {
-		parent, ok := configCache.Load(parentId)
-		if !ok {
-			panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
-		}
-		child, ok := configCache.Load(childId)
-		if !ok {
-			panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
-		}
-
-		new := configParser.Merge(parent, child)
-		configNum := atomic.AddUint64(&configNumGenerator, 1)
-		configCache.Store(configNum, new)
-		return configNum
-
-	} else {
-		// child override parent by default.
-		// It's safe to reuse the childId, since the merged config have the same life time with the child config.
-		return childId
+	parent, ok := configCache.Load(parentId)
+	if !ok {
+		panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
 	}
+	child, ok := configCache.Load(childId)
+	if !ok {
+		panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
+	}
+
+	new := configParser.Merge(parent, child)
+	configNum := atomic.AddUint64(&configNumGenerator, 1)
+	configCache.Store(configNum, new)
+	return configNum
 }

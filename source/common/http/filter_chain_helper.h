@@ -26,7 +26,8 @@ using UpstreamFilterConfigProviderManager =
 class MissingConfigFilter : public Http::PassThroughDecoderFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
+    decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::CoreResponseFlag::NoFilterConfigFound);
     decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
                                        absl::nullopt, EMPTY_STRING);
     return Http::FilterHeadersStatus::StopIteration;

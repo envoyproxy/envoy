@@ -17,15 +17,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "engine_test",
+    name = "internal_engine_test",
     srcs = envoy_select_enable_yaml(
-        ["engine_test.cc"],
+        ["internal_engine_test.cc"],
         "@envoy",
     ),
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
-        "//library/common:engine_lib_no_stamp",
+        "//library/common:internal_engine_lib_no_stamp",
         "//library/common/types:c_types_lib",
         "@envoy//test/common/http:common_lib",
     ],
@@ -39,7 +39,7 @@ envoy_cc_test(
     ),
     repository = "@envoy",
     deps = [
-        "//library/common:engine_lib_no_stamp",
+        "//library/common:internal_engine_lib_no_stamp",
         "//library/common/data:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",

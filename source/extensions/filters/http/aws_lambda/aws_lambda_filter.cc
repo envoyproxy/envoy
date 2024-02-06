@@ -114,8 +114,9 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 
 // TODO(nbaws) Implement Sigv4a support
 Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
-               const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer)
-    : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
+               const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer,
+               bool is_upstream)
+    : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer), is_upstream_(is_upstream) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
   const auto* settings =
@@ -139,11 +140,13 @@ void Filter::resolveSettings() {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  auto cluster_info_ptr = decoder_callbacks_->clusterInfo();
-  if (!cluster_info_ptr || !isTargetClusterLambdaGateway(*cluster_info_ptr)) {
-    skip_ = true;
-    ENVOY_LOG(trace, "Target cluster does not have the Lambda metadata. Moving on.");
-    return Http::FilterHeadersStatus::Continue;
+  if (!is_upstream_) {
+    auto cluster_info_ptr = decoder_callbacks_->clusterInfo();
+    if (!cluster_info_ptr || !isTargetClusterLambdaGateway(*cluster_info_ptr)) {
+      skip_ = true;
+      ENVOY_LOG(trace, "Target cluster does not have the Lambda metadata. Moving on.");
+      return Http::FilterHeadersStatus::Continue;
+    }
   }
 
   resolveSettings();

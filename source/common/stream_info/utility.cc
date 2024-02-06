@@ -16,6 +16,8 @@ namespace {
 
 // This flag is used to ensure that the responseFlagsVec() contains all the flags and no
 // any new custom flags are registered after the responseFlagsVec() is initialized.
+// NOTE: we expect all registrations of custom flags to happen during static initialization
+// before the first use of responseFlagsVec(). So no thread safety is needed here.
 bool& responseFlagsVecInitialized() { MUTABLE_CONSTRUCT_ON_FIRST_USE(bool, false); }
 
 } // namespace
@@ -52,13 +54,12 @@ ResponseFlagUtils::ResponseFlagsMapType& ResponseFlagUtils::mutableResponseFlags
     ResponseFlagsMapType map;
     // Initialize the map with the all core flags first to ensure no custom flags
     // conflict with them.
-    RELEASE_ASSERT(CORE_RESPONSE_FLAGS.size() == ResponseFlag::LastFlag + 1,
+    RELEASE_ASSERT(CORE_RESPONSE_FLAGS.size() == CoreResponseFlag::LastFlag + 1,
                    "Not all inlined flags are contained by CORE_RESPONSE_FLAGS.");
 
     map.reserve(CORE_RESPONSE_FLAGS.size());
     for (const auto& flag : CORE_RESPONSE_FLAGS) {
-      map.emplace(flag.first.short_string_,
-                  FlagLongString{flag.second, std::string(flag.first.long_string_)});
+      map.emplace(flag.short_string_, FlagLongString{flag.flag_, std::string(flag.long_string_)});
     }
     RELEASE_ASSERT(map.size() == CORE_RESPONSE_FLAGS.size(),
                    "Duplicate flags in CORE_RESPONSE_FLAGS");
@@ -66,8 +67,8 @@ ResponseFlagUtils::ResponseFlagsMapType& ResponseFlagUtils::mutableResponseFlags
   }());
 }
 
-ExtendedResponseFlag ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag,
-                                                           absl::string_view custom_flag_long) {
+ResponseFlag ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag,
+                                                   absl::string_view custom_flag_long) {
   auto& mutable_flags = mutableResponseFlagsMap();
 
   RELEASE_ASSERT(!responseFlagsVecInitialized(),
@@ -85,14 +86,14 @@ ExtendedResponseFlag ResponseFlagUtils::registerCustomFlag(absl::string_view cus
 
 const ResponseFlagUtils::ResponseFlagsVecType& ResponseFlagUtils::responseFlagsVec() {
   CONSTRUCT_ON_FIRST_USE(ResponseFlagsVecType, []() {
-    static_assert(ResponseFlag::LastFlag == 27,
+    static_assert(CoreResponseFlag::LastFlag == 27,
                   "A flag has been added. Add the new flag to CORE_RESPONSE_FLAGS.");
 
     responseFlagsVecInitialized() = true;
 
     ResponseFlagsVecType res;
 
-    uint16_t max_flag = ResponseFlag::LastFlag;
+    uint16_t max_flag = CoreResponseFlag::LastFlag;
     for (const auto& flag : responseFlagsMap()) {
       if (flag.second.flag_.value() > max_flag) {
         max_flag = flag.second.flag_.value();
@@ -103,7 +104,8 @@ const ResponseFlagUtils::ResponseFlagsVecType& ResponseFlagUtils::responseFlagsV
 
     for (const auto& flag : responseFlagsMap()) {
       res[flag.second.flag_.value()] = {absl::string_view(flag.first),
-                                        absl::string_view(flag.second.long_string_)};
+                                        absl::string_view(flag.second.long_string_),
+                                        flag.second.flag_};
     }
 
     return res;
@@ -114,7 +116,7 @@ const ResponseFlagUtils::ResponseFlagsMapType& ResponseFlagUtils::responseFlagsM
   return mutableResponseFlagsMap();
 }
 
-absl::optional<ExtendedResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
+absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
   const auto iter = responseFlagsMap().find(flag);
   if (iter != responseFlagsMap().end()) {
     return iter->second.flag_;
@@ -424,53 +426,53 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
 
 const absl::optional<ProxyStatusError>
 ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
-  // NB: This mapping from Envoy-specific ResponseFlag enum to Proxy-Status
-  // error enum is lossy, since ResponseFlag is really a bitset of many
-  // ResponseFlag enums. Here, we search the list of all known ResponseFlag values in
+  // NB: This mapping from Envoy-specific CoreResponseFlag enum to Proxy-Status
+  // error enum is lossy, since CoreResponseFlag is really a bitset of many
+  // CoreResponseFlag enums. Here, we search the list of all known CoreResponseFlag values in
   // enum order, returning the first matching ProxyStatusError.
-  if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
+  if (stream_info.hasResponseFlag(CoreResponseFlag::FailedLocalHealthCheck)) {
     return ProxyStatusError::DestinationUnavailable;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::NoHealthyUpstream)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoHealthyUpstream)) {
     return ProxyStatusError::DestinationUnavailable;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRequestTimeout)) {
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.proxy_status_upstream_request_timeout")) {
       return ProxyStatusError::ConnectionTimeout;
     }
     return ProxyStatusError::HttpResponseTimeout;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::LocalReset)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
     return ProxyStatusError::ConnectionTimeout;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRemoteReset)) {
     return ProxyStatusError::ConnectionTerminated;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionFailure)) {
     return ProxyStatusError::ConnectionRefused;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
     return ProxyStatusError::ConnectionTerminated;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamOverflow)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamOverflow)) {
     return ProxyStatusError::ConnectionLimitReached;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::NoRouteFound)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoRouteFound)) {
     return ProxyStatusError::DestinationNotFound;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::RateLimited)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::RateLimited)) {
     return ProxyStatusError::ConnectionLimitReached;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::RateLimitServiceError)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::RateLimitServiceError)) {
     return ProxyStatusError::ConnectionLimitReached;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRetryLimitExceeded)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRetryLimitExceeded)) {
     return ProxyStatusError::DestinationUnavailable;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::StreamIdleTimeout)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::StreamIdleTimeout)) {
     return ProxyStatusError::HttpResponseTimeout;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::InvalidEnvoyRequestHeaders)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::InvalidEnvoyRequestHeaders)) {
     return ProxyStatusError::HttpRequestError;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::DownstreamProtocolError)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamProtocolError)) {
     return ProxyStatusError::HttpRequestError;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamMaxStreamDurationReached)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamMaxStreamDurationReached)) {
     return ProxyStatusError::HttpResponseTimeout;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::NoFilterConfigFound)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoFilterConfigFound)) {
     return ProxyStatusError::ProxyConfigurationError;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamProtocolError)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamProtocolError)) {
     return ProxyStatusError::HttpProtocolError;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::NoClusterFound)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoClusterFound)) {
     return ProxyStatusError::DestinationUnavailable;
-  } else if (stream_info.hasResponseFlag(ResponseFlag::DnsResolutionFailed)) {
+  } else if (stream_info.hasResponseFlag(CoreResponseFlag::DnsResolutionFailed)) {
     return ProxyStatusError::DnsError;
   } else {
     return absl::nullopt;

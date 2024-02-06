@@ -93,20 +93,20 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
+  Random::RandomGeneratorImpl random;
   PrioritySetImpl priority_set;
   priority_set.updateHosts(
       0,
       updateHostsParams(updated_hosts, updated_locality_hosts,
                         std::make_shared<const HealthyHostVector>(*updated_hosts),
                         updated_locality_hosts),
-      {}, hosts, {}, absl::nullopt);
+      {}, hosts, {}, random.random(), absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterLbStatNames stat_names(stats_store.symbolTable());
   ClusterLbStats lb_stats{stat_names, *stats_store.rootScope()};
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  Random::RandomGeneratorImpl random;
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
@@ -264,7 +264,7 @@ public:
           updateHostsParams(originating_hosts, per_zone_local_shared,
                             std::make_shared<const HealthyHostVector>(*originating_hosts),
                             per_zone_local_shared),
-          {}, empty_vector_, empty_vector_, absl::nullopt);
+          {}, empty_vector_, empty_vector_, random_.random(), absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;
