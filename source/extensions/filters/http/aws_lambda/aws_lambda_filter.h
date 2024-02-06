@@ -97,7 +97,7 @@ class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filt
 
 public:
   Filter(const FilterSettings& config, const FilterStats& stats,
-         const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer);
+         const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer, bool is_upstream);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -135,6 +135,7 @@ private:
   InvocationMode invocation_mode_ = InvocationMode::Synchronous;
   bool payload_passthrough_ = false;
   bool skip_ = false;
+  bool is_upstream_ = false;
 };
 
 } // namespace AwsLambdaFilter
