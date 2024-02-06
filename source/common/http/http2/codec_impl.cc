@@ -25,6 +25,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -1397,7 +1398,10 @@ Status ConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint
                  connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
                  static_cast<uint64_t>(length), padding_length);
 
-  result = protocol_constraints_.trackInboundFrames(length, type, flags, padding_length);
+  const bool end_stream =
+      (type == NGHTTP2_DATA || type == NGHTTP2_HEADERS) && (flags & NGHTTP2_FLAG_END_STREAM);
+  const bool is_empty = (length - padding_length) == 0;
+  result = protocol_constraints_.trackInboundFrame(type, end_stream, is_empty);
   if (!result.ok()) {
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());
@@ -1922,6 +1926,10 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
       options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
 }
 
+ExecutionContext* ConnectionImpl::executionContext() const {
+  return getConnectionExecutionContext(connection_);
+}
+
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "Http2::ConnectionImpl " << this << DUMP_MEMBER(max_headers_kb_)
@@ -2093,7 +2101,7 @@ int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 }
 
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
-  connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  connection_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
 
   return StreamResetReason::ProtocolError;
 }
