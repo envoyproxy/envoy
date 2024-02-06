@@ -68,13 +68,12 @@ public:
 
     ON_CALL(decoder_callbacks_.stream_info_, dynamicMetadata())
         .WillByDefault(Invoke([&]() -> envoy::config::core::v3::Metadata& {
-          // Must be set before this mock is called!
-          return *filter_metadata_;
+          return filter_metadata_;
         }));
   }
 
-  void setFilterMetadata(envoy::config::core::v3::Metadata metadata) {
-    filter_metadata_ = std::move(metadata);
+  void setFilterMetadata(const envoy::config::core::v3::Metadata& metadata) {
+    filter_metadata_.CopyFrom(metadata);
   }
 
   NiceMock<Runtime::MockLoader> runtime_;
@@ -84,7 +83,7 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
 
   // Returned by mock decoder_callbacks_.stream_info_.dynamicMetadata()
-  absl::optional<envoy::config::core::v3::Metadata> filter_metadata_;
+  envoy::config::core::v3::Metadata filter_metadata_;
 };
 
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
