@@ -491,7 +491,6 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
       absl::optional<const uint32_t> default_max_interval_ms) {
-
     auto& grpc_services = api_config_source.grpc_services();
     if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
       return prepareJitteredExponentialBackOffStrategy(
