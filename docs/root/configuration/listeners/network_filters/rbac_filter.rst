@@ -23,10 +23,8 @@ Statistics
 
 The RBAC network filter outputs statistics in the *<stat_prefix>.rbac.* namespace.
 
-For the allowed and denied statistics, the :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.rules_stat_prefix>`
-and :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.shadow_rules_stat_prefix>`
-can be used to add an extra prefix to output the statistics in the ``<stat_prefix>.rbac.<rules_stat_prefix>.`` and
-``<stat_prefix>.rbac.<shadow_rules_stat_prefix>.`` namespace, respectively.
+For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.network.rbac.v3.RBAC.shadow_rules_stat_prefix>`
+can be used to add an extra prefix to output the statistics in the *<stat_prefix>.rbac.<shadow_rules_stat_prefix>.* namespace.
 
 .. csv-table::
   :header: Name, Type, Description
