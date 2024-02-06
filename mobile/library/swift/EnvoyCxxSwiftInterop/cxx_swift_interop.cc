@@ -2,7 +2,7 @@
 
 #include "source/server/options_impl_base.h"
 
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 
 namespace Envoy {
 namespace CxxSwift {
@@ -12,7 +12,7 @@ void run(BootstrapPtr bootstrap_ptr, Platform::LogLevel log_level, envoy_engine_
   options->setConfigProto(bootstrapFromPtr(bootstrap_ptr));
   options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level));
   options->setConcurrency(1);
-  reinterpret_cast<Envoy::Engine*>(engine_handle)->run(std::move(options));
+  reinterpret_cast<Envoy::InternalEngine*>(engine_handle)->run(std::move(options));
 }
 
 } // namespace CxxSwift

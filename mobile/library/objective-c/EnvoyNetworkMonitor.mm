@@ -1,13 +1,13 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-#import "library/common/engine.h"
+#import "library/common/internal_engine.h"
 
 #import <Foundation/Foundation.h>
 #import <Network/Network.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 
 @implementation EnvoyNetworkMonitor {
-  Envoy::Engine *_engine;
+  Envoy::InternalEngine *_engine;
   nw_path_monitor_t _path_monitor;
   SCNetworkReachabilityRef _reachability_ref;
 }
@@ -18,7 +18,7 @@
     return nil;
   }
 
-  _engine = reinterpret_cast<Envoy::Engine *>(engineHandle);
+  _engine = reinterpret_cast<Envoy::InternalEngine *>(engineHandle);
   return self;
 }
 
@@ -43,7 +43,7 @@
   nw_path_monitor_set_queue(_path_monitor, queue);
 
   __block envoy_network_t previousNetworkType = (envoy_network_t)-1;
-  Envoy::Engine *engine = _engine;
+  Envoy::InternalEngine *engine = _engine;
   nw_path_monitor_set_update_handler(_path_monitor, ^(nw_path_t _Nonnull path) {
     BOOL isSatisfied = nw_path_get_status(path) == nw_path_status_satisfied;
     if (!isSatisfied) {

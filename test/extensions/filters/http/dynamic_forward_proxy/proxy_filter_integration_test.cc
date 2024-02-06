@@ -50,9 +50,11 @@ name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
+    dns_min_refresh_rate: 1s
     name: foo
     dns_lookup_family: {}
     max_hosts: {}
+    host_ttl: 1s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
@@ -127,9 +129,11 @@ name: envoy.clusters.dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
   dns_cache_config:
+    dns_min_refresh_rate: 1s
     name: foo
     dns_lookup_family: {}
     max_hosts: {}
+    host_ttl: 1s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
@@ -162,9 +166,9 @@ typed_config:
     if (use_cache_file_) {
       cache_file_value_contents_ +=
           absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
-                       fake_upstreams_[0]->localAddress()->ip()->port(), "|1000000|0");
+                       fake_upstreams_[0]->localAddress()->ip()->port(), "|", dns_cache_ttl_, "|0");
       std::string host =
-          fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+          fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
       TestEnvironment::writeStringToFileForTest("dns_cache.txt",
                                                 absl::StrCat(host.length(), "\n", host,
                                                              cache_file_value_contents_.length(),
@@ -254,8 +258,10 @@ typed_config:
   envoy::config::cluster::v3::Cluster cluster_;
   std::string cache_file_value_contents_;
   bool use_cache_file_{};
+  uint32_t dns_cache_ttl_{1000000};
   std::string filename_;
   std::string key_value_config_;
+  std::string dns_hostname_{"localhost"};
 };
 
 int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view name) {
@@ -644,6 +650,61 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_http1_total")->value());
+}
+
+TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
+  upstream_tls_ = false; // avoid cert errors for unknown hostname
+  use_cache_file_ = true;
+  dns_cache_ttl_ = 2;
+
+  dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
+  initializeWithArgs();
+  std::string host =
+      fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_http1_total")->value());
+
+  // Wait for the host to be removed due to short TTL
+  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+
+  // Send a request and expect an error due to 1) removed host and 2) DNS resolution fail.
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtlHostActive) {
+  upstream_tls_ = false; // avoid cert errors for unknown hostname
+  use_cache_file_ = true;
+  dns_cache_ttl_ = 2;
+
+  dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
+  initializeWithArgs();
+  std::string host =
+      fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Wait for the host to be removed due to short TTL
+  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+
+  // Finish the response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // The disconnect will trigger failure.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {

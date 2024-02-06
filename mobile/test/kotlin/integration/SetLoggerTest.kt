@@ -29,7 +29,7 @@ class SetLoggerTest {
           "test_logger",
           "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger\"}"
         )
-        .setLogger { msg ->
+        .setLogger { _, msg ->
           if (msg.contains("starting main dispatch loop")) {
             countDownLatch.countDown()
           }
