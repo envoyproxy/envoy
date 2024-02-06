@@ -286,7 +286,8 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr 
   expects_response_ = !options.oneWayStream();
 
   // Set tracing config.
-  if (tracing_config_ = parent_.callbacks_->tracingConfig(); tracing_config_.has_value()) {
+  tracing_config_ = parent_.callbacks_->tracingConfig();
+  if (tracing_config_.has_value() && tracing_config_->spawnUpstreamSpan()) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),

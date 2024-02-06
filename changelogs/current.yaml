@@ -25,6 +25,11 @@ bug_fixes:
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
+- area: load balancing
+  change: |
+    Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
+    a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.edf_lb_locality_scheduler_init_fix`` to false.
 - area: UDP and TCP tunneling
   change: |
     fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
@@ -56,6 +61,10 @@ new_features:
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: aws_lambda
+  change: |
+    Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
 - area: grpc reverse bridge
   change: |

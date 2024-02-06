@@ -1,4 +1,4 @@
-#include "library/common/common/default_system_helper.h"
+#include "library/common/system/default_system_helper.h"
 #include "library/jni/android_jni_utility.h"
 #include "library/jni/android_network_utility.h"
 
