@@ -29,7 +29,7 @@ public:
   /**
    * InternalEngine destructor.
    */
-  InternalEngine();
+  ~InternalEngine();
 
   /**
    * Run the engine with the provided configuration.
