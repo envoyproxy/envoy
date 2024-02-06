@@ -82,6 +82,7 @@ envoy_cc_test(
     name = "alpn_integration_test",
     size = "large",
     srcs = ["alpn_integration_test.cc"],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
