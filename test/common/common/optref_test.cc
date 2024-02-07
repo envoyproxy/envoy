@@ -39,6 +39,13 @@ TEST(OptRefTest, NonConst) {
   EXPECT_EQ("Bye", *optref);
 }
 
+TEST(OptRefTest, NonConstToConst) {
+  std::string str("Hello");
+  OptRef<std::string> nonconst_ref(str);
+  OptRef<const std::string> const_ref = nonconst_ref;
+  EXPECT_EQ(*nonconst_ref, *const_ref);
+}
+
 TEST(OptRefTest, ConstOptRef) {
   std::string str("Hello");
   const OptRef<std::string> optref(str);
