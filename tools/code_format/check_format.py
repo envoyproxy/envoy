@@ -36,6 +36,8 @@ class FormatConfig:
     @cached_property
     def buildifier_path(self) -> str:
         """Path to the buildifer binary."""
+        print(f"ERROR: {self.source_path}")
+        print(f"ERROR: {self.args.buildifier_path}")
         path = (
             os.path.join(self.source_path, self.args.buildifier_path)
             if self.source_path else self.args.buildifier_path)

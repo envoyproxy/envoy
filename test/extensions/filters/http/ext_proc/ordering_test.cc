@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -60,7 +61,7 @@ protected:
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -84,9 +85,10 @@ protected:
   void TearDown() override { filter_->onDestroy(); }
 
   // Called by the "start" method on the stream by the filter
-  virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                             const Grpc::GrpcServiceConfigWithHashKey&,
-                                             const StreamInfo::StreamInfo&) {
+  virtual ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const StreamInfo::StreamInfo&,
+          const absl::optional<envoy::config::route::v3::RetryPolicy>&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
@@ -222,9 +224,10 @@ protected:
 // A base class for tests that will check that gRPC streams fail while being created
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const Grpc::GrpcServiceConfigWithHashKey&,
-                                     const StreamInfo::StreamInfo&) override {
+  ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const StreamInfo::StreamInfo&,
+          const absl::optional<envoy::config::route::v3::RetryPolicy>&) override {
     callbacks.onGrpcError(Grpc::Status::Internal);
     // Returns nullptr on start stream failure.
     return nullptr;

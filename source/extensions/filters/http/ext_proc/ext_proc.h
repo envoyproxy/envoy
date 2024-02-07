@@ -7,6 +7,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
@@ -150,7 +151,11 @@ public:
             config.metadata_options().receiving_namespaces().untyped().begin(),
             config.metadata_options().receiving_namespaces().untyped().end()),
         expression_manager_(builder, local_info, config.request_attributes(),
-                            config.response_attributes()) {}
+                            config.response_attributes()),
+        retry_policy_(
+            config.has_retry_policy()
+                ? absl::optional<envoy::config::route::v3::RetryPolicy>{config.retry_policy()}
+                : std::nullopt) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -194,6 +199,10 @@ public:
     return untyped_receiving_namespaces_;
   }
 
+  const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
+    return retry_policy_;
+  }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -224,6 +233,8 @@ private:
   const std::vector<std::string> untyped_receiving_namespaces_;
 
   const ExpressionManager expression_manager_;
+
+  const absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

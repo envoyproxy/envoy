@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/route/v3/route_components.pb.h"
+
 #include "source/extensions/filters/http/ext_proc/client.h"
 
 #include "gmock/gmock.h"
@@ -15,7 +17,8 @@ public:
   ~MockClient() override;
   MOCK_METHOD(ExternalProcessorStreamPtr, start,
               (ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-               const StreamInfo::StreamInfo&));
+               const StreamInfo::StreamInfo&,
+               const absl::optional<envoy::config::route::v3::RetryPolicy>&));
 };
 
 class MockStream : public ExternalProcessorStream {
