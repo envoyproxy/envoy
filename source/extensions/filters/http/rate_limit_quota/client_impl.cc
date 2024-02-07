@@ -100,7 +100,8 @@ void RateLimitClientImpl::closeStream() {
   }
 }
 
-void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
+void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
+                                        const std::string& message) {
   // TODO(tyxia) Revisit later, maybe add some logging.
   stream_closed_ = true;
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
