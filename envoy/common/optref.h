@@ -35,6 +35,13 @@ template <class T> struct OptRef {
   }
 
   /**
+   * Cast operator to extract a ref to a const T from a ref to a T.
+   *
+   * @return const version of this.
+   */
+  operator OptRef<const T>() { return OptRef<const T>(*ptr_); }
+
+  /**
    * Helper to call a const method on T. The caller is responsible for ensuring
    * has_value() is true.
    */
