@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.service.ext_proc.v3;
 
-import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
@@ -10,6 +9,7 @@ import "envoy/type/v3/http_status.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
