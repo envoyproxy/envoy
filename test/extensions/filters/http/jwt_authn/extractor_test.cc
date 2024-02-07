@@ -144,9 +144,8 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
 }
 
 TEST_F(ExtractorTest, TestDuplicatedHeadersWithDuplicatedTokenPrefixes) {
-  auto headers = TestRequestHeaderMapImpl{
-    {"Authorization", absl::StrCat("Bearer ", GoodToken)},
-    {"Authorization", absl::StrCat("Bearer ", GoodToken)}};
+  auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat("Bearer ", GoodToken)},
+                                          {"Authorization", absl::StrCat("Bearer ", GoodToken)}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 2);
 
@@ -158,9 +157,8 @@ TEST_F(ExtractorTest, TestDuplicatedHeadersWithDuplicatedTokenPrefixes) {
 }
 
 TEST_F(ExtractorTest, TestDuplicatedHeadersWithUniqueTokenPrefixes) {
-  auto headers = TestRequestHeaderMapImpl{
-    {"Authorization", absl::StrCat("Bearer ", GoodToken)},
-    {"Authorization", absl::StrCat("Basic ", "basic")}};
+  auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat("Bearer ", GoodToken)},
+                                          {"Authorization", absl::StrCat("Basic ", "basic")}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
