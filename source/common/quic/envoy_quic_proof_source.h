@@ -34,15 +34,16 @@ protected:
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  struct CertConfigWithFilterChain {
-    absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_;
+  struct CertWithFilterChain {
+    quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_;
+    std::shared_ptr<quic::CertificatePrivateKey> private_key_;
     absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
   };
 
-  CertConfigWithFilterChain
-  getTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                 const quic::QuicSocketAddress& client_address,
-                                 const std::string& hostname);
+  CertWithFilterChain getTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                                     const quic::QuicSocketAddress& client_address,
+                                                     const std::string& hostname,
+                                                     bool* cert_matched_sni);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};

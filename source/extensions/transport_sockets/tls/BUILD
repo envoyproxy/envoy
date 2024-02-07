@@ -181,6 +181,7 @@ envoy_cc_library(
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
     ],
 )
 

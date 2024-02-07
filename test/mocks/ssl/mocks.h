@@ -28,7 +28,8 @@ public:
               (Stats::Scope & scope, const ClientContextConfig& config));
   MOCK_METHOD(ServerContextSharedPtr, createSslServerContext,
               (Stats::Scope & stats, const ServerContextConfig& config,
-               const std::vector<std::string>& server_names));
+               const std::vector<std::string>& server_names,
+               ContextAdditionalInitFunc additional_init));
   MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));

@@ -19,9 +19,10 @@ class QuicServerTransportSocketFactory : public Network::DownstreamTransportSock
                                          public QuicTransportSocketFactoryBase {
 public:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
-                                   Ssl::ServerContextConfigPtr config)
-      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)),
-        enable_early_data_(enable_early_data) {}
+                                   Ssl::ServerContextConfigPtr config,
+                                   Envoy::Ssl::ContextManager& manager,
+                                   const std::vector<std::string>& server_names);
+  ~QuicServerTransportSocketFactory() override;
 
   // Network::DownstreamTransportSocketFactory
   Network::TransportSocketPtr createDownstreamTransportSocket() const override {
@@ -31,24 +32,22 @@ public:
 
   void initialize() override;
 
-  // Return TLS certificates if the context config is ready.
-  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
-  getTlsCertificates() const {
-    if (!config_->isReady()) {
-      ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
-      stats_.downstream_context_secrets_not_ready_.inc();
-      return {};
-    }
-    return config_->tlsCertificates();
-  }
+  std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
+            std::shared_ptr<quic::CertificatePrivateKey>>
+  getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const;
 
   bool earlyDataEnabled() const { return enable_early_data_; }
 
 protected:
-  void onSecretUpdated() override { stats_.context_config_update_by_sds_.inc(); }
+  void onSecretUpdated() override;
 
 private:
+  Envoy::Ssl::ContextManager& manager_;
+  Stats::Scope& stats_scope_;
   Ssl::ServerContextConfigPtr config_;
+  const std::vector<std::string> server_names_;
+  mutable absl::Mutex ssl_ctx_mu_;
+  Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
   bool enable_early_data_;
 };
 

@@ -20,10 +20,9 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
     throwException();
   }
 
-  Ssl::ServerContextSharedPtr
-  createSslServerContext(Stats::Scope& /* scope */,
-                         const Envoy::Ssl::ServerContextConfig& /* config */,
-                         const std::vector<std::string>& /* server_names */) override {
+  Ssl::ServerContextSharedPtr createSslServerContext(
+      Stats::Scope& /* scope */, const Envoy::Ssl::ServerContextConfig& /* config */,
+      const std::vector<std::string>& /* server_names */, Ssl::ContextAdditionalInitFunc) override {
     throwException();
   }
 

@@ -429,7 +429,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
       config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -463,7 +463,7 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+  auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
     std::swap(ctx, ssl_ctx_);
