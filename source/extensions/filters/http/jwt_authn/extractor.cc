@@ -257,16 +257,22 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
         Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
     if (result.result().has_value()) {
       auto value_str = result.result().value();
-      if (!location_spec->value_prefix_.empty()) {
-        const auto pos = value_str.find(location_spec->value_prefix_);
-        if (pos == absl::string_view::npos) {
-          // value_prefix not found anywhere in value_str, so skip
-          continue;
+      auto headers = absl::StrSplit(value_str, absl::ByString(","));
+      for (auto &header : headers) {
+        if (!location_spec->value_prefix_.empty()) {
+          const auto pos = header.find(location_spec->value_prefix_);
+          if (pos == absl::string_view::npos) {
+            // value_prefix not found anywhere in value_str, so skip
+            continue;
+          }
+          auto header_value = extractJWT(header, pos + location_spec->value_prefix_.length());
+          tokens.push_back(std::make_unique<const JwtHeaderLocation>(
+              std::string(header_value), location_spec->issuer_checker_, location_spec->header_));
+        } else {
+          tokens.push_back(std::make_unique<const JwtHeaderLocation>(
+            std::string(header), location_spec->issuer_checker_, location_spec->header_));
         }
-        value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
       }
-      tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-          std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
     }
   }
 

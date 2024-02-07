@@ -143,6 +143,32 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
 
+TEST_F(ExtractorTest, TestDuplicatedAuthorizationHeaderWithBearerTokens) {
+  auto headers = TestRequestHeaderMapImpl{
+    {"Authorization", absl::StrCat("Bearer ", GoodToken)},
+    {"Authorization", absl::StrCat("Bearer ", GoodToken)}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 2);
+
+  // Only the issue1 is using default header location.
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+  EXPECT_EQ(tokens[1]->token(), GoodToken);
+  EXPECT_TRUE(tokens[1]->isIssuerAllowed("issuer1"));
+}
+
+TEST_F(ExtractorTest, TestDuplicatedAuthorizationHeaderWithBearerAndBasicTokens) {
+  auto headers = TestRequestHeaderMapImpl{
+    {"Authorization", absl::StrCat("Bearer ", GoodToken)},
+    {"Authorization", absl::StrCat("Basic ", "basic")}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  // Only the issue1 is using default header location.
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+}
+
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -
 // using an actual (correctly-formatted) JWT but token is invalid, like: GoodToken +
 // chars_after_space expected to get all token include characters after the space:
@@ -203,12 +229,13 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
   EXPECT_FALSE(headers.has(Http::LowerCaseString("token-header")));
 }
 
-// Make sure a double custom header concatenates the token
+// Make sure a double custom header does not concatenate the token
 TEST_F(ExtractorTest, TestDoubleCustomHeaderToken) {
   auto headers = TestRequestHeaderMapImpl{{"token-header", "jwt_token"}, {"token-header", "foo"}};
   auto tokens = extractor_->extract(headers);
-  EXPECT_EQ(tokens.size(), 1);
-  EXPECT_EQ(tokens[0]->token(), "jwt_token,foo");
+  EXPECT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+  EXPECT_EQ(tokens[1]->token(), "foo");
 }
 
 // Test extracting token from the custom header: "prefix-header"
@@ -249,7 +276,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
 
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "jwt_token,extra=more");
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
@@ -260,7 +287,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
 
   // Match issuer 7 with map key as: prefix-header + AAA
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\",comment=\"fish tag\"");
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\"");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
