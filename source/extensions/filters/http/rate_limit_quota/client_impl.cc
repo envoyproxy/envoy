@@ -38,7 +38,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
   ASSERT(stream_ != nullptr);
   // Build the report and then send the report to RLQS server.
-  // `end_stream` should always be false as we don't want to close the stream locally.
+  // `end_stream` should always be set to false as we don't want to close the stream locally.
   stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
 }
 
