@@ -39,13 +39,6 @@ TEST(OptRefTest, NonConst) {
   EXPECT_EQ("Bye", *optref);
 }
 
-TEST(OptRefTest, NonConstToConst) {
-  std::string str("Hello");
-  OptRef<std::string> nonconst_ref(str);
-  OptRef<const std::string> const_ref = nonconst_ref;
-  EXPECT_EQ(*nonconst_ref, *const_ref);
-}
-
 TEST(OptRefTest, ConstOptRef) {
   std::string str("Hello");
   const OptRef<std::string> optref(str);
@@ -97,6 +90,14 @@ TEST(OptRefTest, Conversion) {
   // Assignment conversion.
   foo_ref = bar;
   foo_ref = bar_ref;
+
+  // Ref conversion on construction from derived class.
+  OptRef<Foo> foo_ref_to_bar = bar_ref;
+  EXPECT_EQ(&(*foo_ref_to_bar), &bar);
+
+  // Ref conversion on construction from non-const to const.
+  OptRef<const Bar> const_ref_to_bar = bar_ref;
+  EXPECT_EQ(&(*const_ref_to_bar), &bar);
 }
 
 TEST(OptRefTest, Size) {
