@@ -263,13 +263,10 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
             // value_prefix not found anywhere in value_str, so skip
             continue;
           }
-          auto header_value = extractJWT(value_str, pos + location_spec->value_prefix_.length());
-          tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-              std::string(header_value), location_spec->issuer_checker_, location_spec->header_));
-        } else {
-          tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-              std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
+          value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
         }
+        tokens.push_back(std::make_unique<const JwtHeaderLocation>(
+            std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
       }
     }
   }
