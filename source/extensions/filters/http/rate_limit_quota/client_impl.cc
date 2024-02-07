@@ -38,7 +38,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
   ASSERT(stream_ != nullptr);
   // Build the report and then send the report to RLQS server.
-  // TODO(tyxia) Revisit end_stream, means send and close.
+  // `end_stream` should always be set to false as we don't want to close the stream locally.
   stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
 }
 
@@ -93,21 +93,25 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
   if (stream_ != nullptr && !stream_closed_) {
+    ENVOY_LOG(debug, "Closing gRPC stream");
     stream_->closeStream();
     stream_closed_ = true;
     stream_->resetStream();
   }
 }
 
-void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
+void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
+                                        const std::string& message) {
   // TODO(tyxia) Revisit later, maybe add some logging.
   stream_closed_ = true;
+  ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
   closeStream();
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Trying to start the new gRPC stream");
     stream_ = aync_client_.start(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
