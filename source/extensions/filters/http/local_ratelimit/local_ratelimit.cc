@@ -152,7 +152,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },
       config->rateLimitedGrpcStatus(), "local_rate_limited");
-  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
 
   return Http::FilterHeadersStatus::StopIteration;
 }

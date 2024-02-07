@@ -11,20 +11,24 @@ namespace HttpFilters {
 namespace AwsLambdaFilter {
 
 class AwsLambdaFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::aws_lambda::v3::Config,
-                                 envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig> {
+    : public Common::DualFactoryBase<
+          envoy::extensions::filters::http::aws_lambda::v3::Config,
+          envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig> {
 public:
-  AwsLambdaFilterFactory() : FactoryBase("envoy.filters.http.aws_lambda") {}
+  AwsLambdaFilterFactory() : DualFactoryBase("envoy.filters.http.aws_lambda") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, DualInfo dual_info,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig&,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
+
+using UpstreamAwsLambdaFilterFactory = AwsLambdaFilterFactory;
 
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters

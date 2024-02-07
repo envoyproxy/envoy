@@ -32,10 +32,10 @@ BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uin
       Upstream::makeHostsPerLocality({hosts});
   priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {}, hosts, {},
-      absl::nullopt);
+      random_.random(), absl::nullopt);
   local_priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {}, hosts, {},
-      absl::nullopt);
+      random_.random(), absl::nullopt);
 }
 
 } // namespace Common
