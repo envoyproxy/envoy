@@ -15,21 +15,25 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
     *usage->mutable_bucket_id() = bucket->bucket_id;
     usage->set_num_requests_allowed(bucket->quota_usage.num_requests_allowed);
     usage->set_num_requests_denied(bucket->quota_usage.num_requests_denied);
+    auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        time_source_.monotonicTime().time_since_epoch());
     // For the newly created bucket (i.e., `bucket_id` input is not null), its time
     // elapsed since last report is 0.
     // This case happens when we send the report to RLQS server immediately.
     if (bucket_id.has_value() && bucket_id.value() == id) {
       *usage->mutable_time_elapsed() = Protobuf::util::TimeUtil::NanosecondsToDuration(0);
     } else {
-      auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-          time_source_.monotonicTime().time_since_epoch());
       *usage->mutable_time_elapsed() = Protobuf::util::TimeUtil::NanosecondsToDuration(
           (now - bucket->quota_usage.last_report).count());
     }
+
+    // Update the last_report time point.
+    bucket->quota_usage.last_report = now;
   }
 
   // Set the domain name.
   report.set_domain(domain_name_);
+  ENVOY_LOG(debug, "The usage report that will be sent to RLQS server:\n{}", report.DebugString());
   return report;
 }
 
@@ -43,6 +47,7 @@ void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
+  ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
   for (const auto& action : response->bucket_action()) {
     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
       ENVOY_LOG(error,
