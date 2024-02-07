@@ -2,7 +2,7 @@
 
 #include "envoy/access_log/access_log_config.h"
 
-#include "source/common/config/datasource.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +25,7 @@ public:
 
 private:
   absl::flat_hash_map<std::string, std::string> convertJsonFormatToMap(ProtobufWkt::Struct config);
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 } // namespace Wasm

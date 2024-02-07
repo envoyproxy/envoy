@@ -32,6 +32,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "@envoy_api//envoy/extensions/access_loggers/wasm/v3:pkg_cc_proto",
     ],

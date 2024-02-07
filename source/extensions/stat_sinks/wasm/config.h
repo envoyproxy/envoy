@@ -6,6 +6,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/config/datasource.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/server/configuration_impl.h"
 
 namespace Envoy {
@@ -31,7 +32,7 @@ public:
   std::string name() const override;
 
 private:
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 } // namespace Wasm

@@ -114,7 +114,7 @@ public:
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
   envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
 
   void setRootId(std::string root_id) { root_id_ = root_id; }
   void setVmConfiguration(std::string vm_configuration) { vm_configuration_ = vm_configuration; }
