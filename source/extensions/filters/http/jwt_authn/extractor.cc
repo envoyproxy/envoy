@@ -253,24 +253,22 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
     ENVOY_LOG(debug, "extract {}", location_it.first);
-    const auto result =
-        Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
-    if (result.result().has_value()) {
-      auto value_str = result.result().value();
-      auto headers = absl::StrSplit(value_str, absl::ByString(","));
-      for (auto &header : headers) {
+    auto header_value = headers.get(location_spec->header_);
+    if (!header_value.empty()) {
+      for (size_t i = 0; i < header_value.size(); i++) {
+        auto value_str = header_value[i]->value().getStringView();
         if (!location_spec->value_prefix_.empty()) {
-          const auto pos = header.find(location_spec->value_prefix_);
+          const auto pos = value_str.find(location_spec->value_prefix_);
           if (pos == absl::string_view::npos) {
             // value_prefix not found anywhere in value_str, so skip
             continue;
           }
-          auto header_value = extractJWT(header, pos + location_spec->value_prefix_.length());
+          auto header_value = extractJWT(value_str, pos + location_spec->value_prefix_.length());
           tokens.push_back(std::make_unique<const JwtHeaderLocation>(
               std::string(header_value), location_spec->issuer_checker_, location_spec->header_));
         } else {
           tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-            std::string(header), location_spec->issuer_checker_, location_spec->header_));
+            std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
         }
       }
     }

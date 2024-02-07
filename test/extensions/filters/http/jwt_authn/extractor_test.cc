@@ -276,7 +276,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
 
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+  EXPECT_EQ(tokens[0]->token(), "jwt_token,extra=more");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
@@ -287,7 +287,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
 
   // Match issuer 7 with map key as: prefix-header + AAA
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer7"));
-  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\"");
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu\",comment=\"fish tag\"");
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
