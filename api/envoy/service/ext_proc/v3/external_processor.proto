@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.ext_proc.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
@@ -113,7 +114,6 @@ message ProcessingRequest {
   // Dynamic metadata associated with the request.
   config.core.v3.Metadata metadata_context = 8;
 
-  // [#not-implemented-hide:]
   // The values of properties selected by the ``request_attributes``
   // or ``response_attributes`` list in the configuration. Each entry
   // in the list is populated from the standard
@@ -211,13 +211,11 @@ message HttpHeaders {
   config.core.v3.HeaderMap headers = 1;
 
   // [#not-implemented-hide:]
-  // TODO(jbohanon) reserve field as part of rework detailed in https://github.com/envoyproxy/envoy/issues/32125
-  // The values of properties selected by the ``request_attributes``
-  // or ``response_attributes`` list in the configuration. Each entry
-  // in the list is populated
-  // from the standard :ref:`attributes <arch_overview_attributes>`
-  // supported across Envoy.
-  map<string, google.protobuf.Struct> attributes = 2;
+  // This field is deprecated and not implemented. Attributes will be sent in
+  // the  top-level :ref:`attributes <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.attributes`
+  // field.
+  map<string, google.protobuf.Struct> attributes = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // If true, then there is no message body associated with this
   // request or response.
