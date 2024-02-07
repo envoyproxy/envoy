@@ -806,7 +806,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
   auto upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
   EXPECT_TRUE(upstream_headers != nullptr);
-  EXPECT_EQ("", upstream_headers->getTEValue());
+  EXPECT_EQ("trailers", upstream_headers->getTEValue());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
