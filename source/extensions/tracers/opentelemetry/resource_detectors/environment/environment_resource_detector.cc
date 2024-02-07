@@ -43,6 +43,7 @@ Resource EnvironmentResourceDetector::detect() {
   for (const auto& pair : StringUtil::splitToken(attributes_str, ",")) {
     const auto keyValue = StringUtil::splitToken(pair, "=");
     if (keyValue.size() != 2) {
+      ENVOY_LOG(warn, "Invalid resource format from the environment, invalid text: {}.", pair);
       continue;
     }
 
