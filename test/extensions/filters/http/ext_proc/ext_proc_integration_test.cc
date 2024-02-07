@@ -3431,7 +3431,9 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 #if defined(USE_CEL_PARSER)
 TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_request_attributes()->Add("request.path");
   proto_config_.mutable_request_attributes()->Add("request.method");
   proto_config_.mutable_request_attributes()->Add("request.scheme");
@@ -3442,28 +3444,59 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& req, HeadersResponse&) {
+
+  // Handle request headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse&) {
+        EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
         EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
         EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
         EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.request_headers().attributes().empty());
         return true;
       });
 
+  // Handle request trailers message, making sure we did not send request attributes again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [](const ProcessingRequest& req, ProcessingResponse&) {
+                          EXPECT_TRUE(req.has_request_trailers());
+                          EXPECT_TRUE(req.attributes().empty());
+                          return true;
+                        });
+
   handleUpstreamRequest();
 
-  processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [](const HttpHeaders& req, HeadersResponse&) {
+  // Handle response headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], false, [](const ProcessingRequest& req, ProcessingResponse&) {
+        EXPECT_TRUE(req.has_response_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
         EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(),
                   StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+
+        // Make sure we didn't include request attributes in the response-path processing request.
+        EXPECT_FALSE(proto_struct.fields().contains("request.method"));
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.response_headers().attributes().empty());
         return true;
       });
+
+  // Handle response trailers message, making sure we did not send request or response attributes
+  // again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [](const ProcessingRequest& req, ProcessingResponse&) {
+                          EXPECT_TRUE(req.has_response_trailers());
+                          EXPECT_TRUE(req.attributes().empty());
+                          return true;
+                        });
 
   verifyDownstreamResponse(*response, 200);
 }

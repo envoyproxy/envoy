@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.ext_proc.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
@@ -213,7 +214,8 @@ message HttpHeaders {
   // This field is deprecated and not implemented. Attributes will be sent in
   // the  top-level :ref:`attributes <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.attributes`
   // field.
-  map<string, google.protobuf.Struct> attributes = 2;
+  map<string, google.protobuf.Struct> attributes = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // If true, then there is no message body associated with this
   // request or response.

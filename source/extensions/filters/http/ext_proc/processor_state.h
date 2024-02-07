@@ -135,9 +135,10 @@ public:
     return body_mode_;
   }
 
+  void setRequestHeaders(Http::RequestOrResponseHeaderMap* headers) { request_headers_ = headers; }
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
-  virtual const Http::RequestOrResponseHeaderMap* requestHeaders() const PURE;
+  const Http::RequestOrResponseHeaderMap* requestHeaders() const { return request_headers_; };
   virtual const Http::RequestOrResponseHeaderMap* responseHeaders() const PURE;
   const Http::HeaderMap* responseTrailers() const { return trailers_; }
 
@@ -208,7 +209,7 @@ public:
 
   virtual bool sendAttributes(const ExpressionManager& mgr) const PURE;
 
-  void sentAttributes(bool sent) { attributes_sent_ = sent; }
+  void setSentAttributes(bool sent) { attributes_sent_ = sent; }
 
 protected:
   void setBodyMode(
@@ -244,6 +245,10 @@ protected:
   // The specific mode for body handling
   envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode_;
 
+  // The request_headers_ field is guaranteed to hold the pointer to the request
+  // headers as set in decodeHeaders. This allows both decoding and encoding states
+  // to have access to the request headers map.
+  Http::RequestOrResponseHeaderMap* request_headers_ = nullptr;
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
@@ -339,7 +344,6 @@ public:
     return !attributes_sent_ && mgr.hasRequestExpr();
   }
 
-  const Http::RequestOrResponseHeaderMap* requestHeaders() const override { return headers_; };
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return nullptr; }
 
 private:
@@ -426,7 +430,6 @@ public:
     return !attributes_sent_ && mgr.hasResponseExpr();
   }
 
-  const Http::RequestOrResponseHeaderMap* requestHeaders() const override { return nullptr; };
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return headers_; }
 
 private:

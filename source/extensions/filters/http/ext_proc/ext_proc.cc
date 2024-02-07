@@ -312,6 +312,11 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
+  // Set the request headers on decoding and encoding state in case they are
+  // needed later.
+  decoding_state_.setRequestHeaders(&headers);
+  encoding_state_.setRequestHeaders(&headers);
+
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
     status = onHeaders(decoding_state_, headers, end_stream);
@@ -760,7 +765,7 @@ void Filter::addAttributes(const ProcessorState& state, ProcessingRequest& req) 
       state.requestHeaders(), state.responseHeaders(), state.trailers());
   attributes = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
 
-  state.sentAttributes(true);
+  state.setSentAttributes(true);
   (*req.mutable_attributes())[FilterName] = *attributes;
 }
 
