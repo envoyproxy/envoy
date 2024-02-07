@@ -232,8 +232,7 @@ void RouterTestBase::enableRedirects(uint32_t max_internal_redirects) {
       .WillByDefault(Return(max_internal_redirects));
   ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, isCrossSchemeRedirectAllowed())
       .WillByDefault(Return(false));
-  ON_CALL(callbacks_, connection())
-      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  ON_CALL(callbacks_, connection()).WillByDefault(Return(OptRef<Network::Connection>{connection_}));
 }
 
 void RouterTestBase::setNumPreviousRedirect(uint32_t num_previous_redirects) {

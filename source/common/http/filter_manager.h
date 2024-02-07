@@ -1085,7 +1085,7 @@ private:
 class DownstreamFilterManager : public FilterManager {
 public:
   DownstreamFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
-                          Event::Dispatcher& dispatcher, const Network::Connection& connection,
+                          Event::Dispatcher& dispatcher, Network::Connection& connection,
                           uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
                           bool proxy_100_continue, uint32_t buffer_limit,
                           FilterChainFactory& filter_chain_factory,

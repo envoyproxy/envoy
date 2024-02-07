@@ -27,6 +27,7 @@ envoy_cc_test(
     deps = [
         ":lua_wrappers_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/network:address_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",

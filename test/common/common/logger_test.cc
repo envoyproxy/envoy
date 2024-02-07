@@ -455,7 +455,7 @@ public:
     EXPECT_CALL(connection_, id()).WillRepeatedly(Return(200));
     EXPECT_CALL(stream_, streamId()).WillRepeatedly(Return(300));
     EXPECT_CALL(stream_, connection())
-        .WillRepeatedly(Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection_))));
+        .WillRepeatedly(Return(makeOptRef(dynamic_cast<Network::Connection&>(connection_))));
   }
 
   void logTaggedMessageWithPreCreatedTags() {

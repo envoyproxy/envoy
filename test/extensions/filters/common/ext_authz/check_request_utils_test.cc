@@ -39,7 +39,7 @@ public:
   void expectBasicHttp() {
     EXPECT_CALL(callbacks_, connection())
         .Times(2)
-        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+        .WillRepeatedly(Return(OptRef<Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
     EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
@@ -352,7 +352,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(callbacks_, connection())
       .Times(2)
-      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+      .WillRepeatedly(Return(OptRef<Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
@@ -431,7 +431,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
   EXPECT_CALL(callbacks_, connection())
       .Times(5)
-      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+      .WillRepeatedly(Return(OptRef<Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(5).WillRepeatedly(Return(ssl_));
@@ -455,7 +455,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(callbacks_, connection())
       .Times(4)
-      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+      .WillRepeatedly(Return(OptRef<Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(4).WillRepeatedly(Return(ssl_));

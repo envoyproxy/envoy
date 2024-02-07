@@ -104,7 +104,7 @@ public:
   /**
    * @return const Network::Connection* the current network connection handle.
    */
-  virtual const Network::Connection* connection() const PURE;
+  virtual const Network::Connection* connection() PURE;
 
   /**
    * @return const Tracing::Span& the current tracing active span.
@@ -356,7 +356,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
   State state_{State::Running};
@@ -553,9 +553,7 @@ private:
 
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
-    const Network::Connection* connection() const override {
-      return callbacks_->connection().ptr();
-    }
+    const Network::Connection* connection() override { return callbacks_->connection().ptr(); }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;
@@ -577,9 +575,7 @@ private:
 
     const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
-    const Network::Connection* connection() const override {
-      return callbacks_->connection().ptr();
-    }
+    const Network::Connection* connection() override { return callbacks_->connection().ptr(); }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
 
     Filter& parent_;

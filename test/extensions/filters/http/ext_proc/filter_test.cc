@@ -105,9 +105,9 @@ protected:
         .WillRepeatedly(Invoke(this, &HttpFilterTest::doSetDynamicMetadata));
 
     EXPECT_CALL(decoder_callbacks_, connection())
-        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+        .WillRepeatedly(Return(OptRef<Network::Connection>{connection_}));
     EXPECT_CALL(encoder_callbacks_, connection())
-        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+        .WillRepeatedly(Return(OptRef<Network::Connection>{connection_}));
 
     // Pointing dispatcher_.time_system_ to a SimulatedTimeSystem object.
     test_time_ = new Envoy::Event::SimulatedTimeSystem();

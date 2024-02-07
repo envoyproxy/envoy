@@ -148,13 +148,13 @@ void UberFilterFuzzer::perFilterSetup() {
       .WillByDefault(Return(&async_request_));
 
   ON_CALL(decoder_callbacks_, connection())
-      .WillByDefault(testing::Return(OptRef<const Network::Connection>{connection_}));
+      .WillByDefault(testing::Return(OptRef<Network::Connection>{connection_}));
   ON_CALL(decoder_callbacks_, activeSpan())
       .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
   decoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
 
   ON_CALL(encoder_callbacks_, connection())
-      .WillByDefault(testing::Return(OptRef<const Network::Connection>{connection_}));
+      .WillByDefault(testing::Return(OptRef<Network::Connection>{connection_}));
   ON_CALL(encoder_callbacks_, activeSpan())
       .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
   encoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
