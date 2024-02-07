@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <memory>
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
@@ -762,7 +764,8 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
       &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.requestHeaders(), state.responseHeaders(), state.responseTrailers());
+      state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
+      dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
   auto attributes = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
 
   state.setSentAttributes(true);
