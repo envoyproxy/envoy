@@ -12,7 +12,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 
 using testing::Return;
@@ -67,9 +66,8 @@ public:
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
     ON_CALL(decoder_callbacks_.stream_info_, dynamicMetadata())
-        .WillByDefault(Invoke([&]() -> envoy::config::core::v3::Metadata& {
-          return filter_metadata_;
-        }));
+        .WillByDefault(
+            Invoke([&]() -> envoy::config::core::v3::Metadata& { return filter_metadata_; }));
   }
 
   void setFilterMetadata(const envoy::config::core::v3::Metadata& metadata) {
