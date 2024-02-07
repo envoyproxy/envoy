@@ -1,4 +1,4 @@
-#include "environment_resource_detector.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/environment/environment_resource_detector.h"
 
 #include <sstream>
 #include <string>
