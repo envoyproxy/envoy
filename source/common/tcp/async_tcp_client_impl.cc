@@ -47,7 +47,6 @@ bool AsyncTcpClientImpl::connect() {
   }
 
   connect_timer_->enableTimer(cluster_info_->connectTimeout());
-
   connection_->setConnectionStats({cluster_info_->trafficStats()->upstream_cx_rx_bytes_total_,
                                    cluster_info_->trafficStats()->upstream_cx_rx_bytes_buffered_,
                                    cluster_info_->trafficStats()->upstream_cx_tx_bytes_total_,
