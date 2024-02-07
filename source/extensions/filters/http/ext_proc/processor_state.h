@@ -135,10 +135,10 @@ public:
     return body_mode_;
   }
 
-  void setRequestHeaders(Http::RequestOrResponseHeaderMap* headers) { request_headers_ = headers; }
+  void setRequestHeaders(Http::RequestHeaderMap* headers) { request_headers_ = headers; }
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
-  const Http::RequestOrResponseHeaderMap* requestHeaders() const { return request_headers_; };
+  const Http::RequestHeaderMap* requestHeaders() const { return request_headers_; };
   virtual const Http::RequestOrResponseHeaderMap* responseHeaders() const PURE;
   const Http::HeaderMap* responseTrailers() const { return trailers_; }
 
@@ -248,7 +248,7 @@ protected:
   // The request_headers_ field is guaranteed to hold the pointer to the request
   // headers as set in decodeHeaders. This allows both decoding and encoding states
   // to have access to the request headers map.
-  Http::RequestOrResponseHeaderMap* request_headers_ = nullptr;
+  Http::RequestHeaderMap* request_headers_ = nullptr;
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
