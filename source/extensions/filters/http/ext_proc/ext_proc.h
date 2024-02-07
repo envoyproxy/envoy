@@ -385,8 +385,7 @@ private:
   void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void addDynamicMetadata(const ProcessorState& state,
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
-  void addAttributes(const ProcessorState& state,
-                     envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;

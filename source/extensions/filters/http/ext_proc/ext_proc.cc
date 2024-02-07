@@ -755,18 +755,18 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   *req.mutable_metadata_context() = forwarding_metadata;
 }
 
-void Filter::addAttributes(const ProcessorState& state, ProcessingRequest& req) {
+void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   if (!state.sendAttributes(config_->expressionManager())) {
     return;
   }
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
       &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.requestHeaders(), state.responseHeaders(), state.trailers());
-  attributes = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
+      state.requestHeaders(), state.responseHeaders(), state.responseTrailers());
+  auto attributes = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
 
   state.setSentAttributes(true);
-  (*req.mutable_attributes())[FilterName] = *attributes;
+  (*req.mutable_attributes())[FilterName] = attributes;
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
