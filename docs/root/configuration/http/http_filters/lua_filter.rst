@@ -42,6 +42,7 @@ Currently supported high level features
 * Performing a direct response and skipping further filter iteration. For example, a script
   could make an upstream HTTP call for authentication, and then directly respond with a 403
   response code.
+* Inspection of connection (network) or request level dynamic metadata.
 
 Configuration
 -------------
@@ -923,6 +924,17 @@ Returns :repo:`SSL connection <envoy/ssl/connection.h>` object when the connecti
 secured and *nil* when it is not.
 
 Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+
+streamInfo()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local streamInfo = handle:streamInfo()
+
+Returns :repo:`information <envoy/stream_info/stream_info.h>` related to the current connection.
+
+Returns a :ref:`stream info object <config_http_filters_lua_stream_info_wrapper>`.
 
 .. _config_http_filters_lua_ssl_socket_info:
 

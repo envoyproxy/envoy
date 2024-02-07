@@ -79,7 +79,7 @@ public:
     }
     // UpstreamToDownstream
     const Route& route() const override { return *filter_.callbacks_->route(); }
-    OptRef<const Network::Connection> connection() const override {
+    OptRef<Network::Connection> connection() const override {
       return filter_.callbacks_->connection();
     }
     const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {

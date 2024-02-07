@@ -195,6 +195,11 @@ new_features:
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
+- area: lua
+  change: |
+    Exposed the ``streamInfo`` on ``connection`` to the HTTP filter
+    Lua, primarily to allow access to Cloud provider proxy protocol
+    TLV extensions stored in connection level dynamic metadata.
 
 deprecated:
 - area: listener

@@ -105,7 +105,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void onMatchCallback(const Matcher::Action& action) PURE;
 
   // Http::StreamFilterCallbacks
-  OptRef<const Network::Connection> connection() override;
+  OptRef<Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
   Router::RouteConstSharedPtr route() override;
   void resetStream(Http::StreamResetReason reset_reason,
@@ -634,7 +634,7 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                OptRef<const Network::Connection> connection, uint64_t stream_id,
+                OptRef<Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
                 uint32_t buffer_limit, const FilterChainFactory& filter_chain_factory)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
@@ -841,7 +841,7 @@ public:
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
 
-  OptRef<const Network::Connection> connection() const { return connection_; }
+  OptRef<Network::Connection> connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
@@ -1014,7 +1014,7 @@ private:
   Event::Dispatcher& dispatcher_;
   // This is unset if there is no downstream connection, e.g. for health check or
   // async requests.
-  OptRef<const Network::Connection> connection_;
+  OptRef<Network::Connection> connection_;
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
@@ -1085,7 +1085,7 @@ private:
 class DownstreamFilterManager : public FilterManager {
 public:
   DownstreamFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
-                          Event::Dispatcher& dispatcher, const Network::Connection& connection,
+                          Event::Dispatcher& dispatcher, Network::Connection& connection,
                           uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
                           bool proxy_100_continue, uint32_t buffer_limit,
                           FilterChainFactory& filter_chain_factory,

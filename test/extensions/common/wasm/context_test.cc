@@ -147,15 +147,15 @@ TEST_F(ContextTest, GetConnectionTest) {
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
   Envoy::Network::MockConnection encoder_connection;
   EXPECT_CALL(encoder_callbacks, connection())
-      .WillRepeatedly(testing::Return(
-          makeOptRef(dynamic_cast<const Network::Connection&>(encoder_connection))));
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<Network::Connection&>(encoder_connection))));
   ctx_.setEncoderFilterCallbacksPtr(&encoder_callbacks);
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   Envoy::Network::MockConnection decoder_connection;
   EXPECT_CALL(decoder_callbacks, connection())
-      .WillRepeatedly(testing::Return(
-          makeOptRef(dynamic_cast<const Network::Connection&>(decoder_connection))));
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<Network::Connection&>(decoder_connection))));
   ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
 
   Envoy::StreamInfo::MockStreamInfo access_log_si;

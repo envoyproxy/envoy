@@ -233,9 +233,7 @@ bool ActiveStreamFilterBase::commonHandleAfterTrailersCallback(FilterTrailersSta
   return true;
 }
 
-OptRef<const Network::Connection> ActiveStreamFilterBase::connection() {
-  return parent_.connection();
-}
+OptRef<Network::Connection> ActiveStreamFilterBase::connection() { return parent_.connection(); }
 
 Event::Dispatcher& ActiveStreamFilterBase::dispatcher() { return parent_.dispatcher_; }
 

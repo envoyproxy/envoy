@@ -45,7 +45,7 @@ namespace Router {
 class UpstreamFilterManager : public Http::FilterManager {
 public:
   UpstreamFilterManager(Http::FilterManagerCallbacks& filter_manager_callbacks,
-                        Event::Dispatcher& dispatcher, OptRef<const Network::Connection> connection,
+                        Event::Dispatcher& dispatcher, OptRef<Network::Connection> connection,
                         uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
                         bool proxy_100_continue, uint32_t buffer_limit,
                         const Http::FilterChainFactory& filter_chain_factory,
@@ -346,7 +346,7 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
 
 const Route& UpstreamRequest::route() const { return *parent_.callbacks()->route(); }
 
-OptRef<const Network::Connection> UpstreamRequest::connection() const {
+OptRef<Network::Connection> UpstreamRequest::connection() const {
   return parent_.callbacks()->connection();
 }
 
