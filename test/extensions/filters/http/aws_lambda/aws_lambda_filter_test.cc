@@ -91,7 +91,7 @@ TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
  */
 TEST_F(AwsLambdaFilterTest, ClusterMetadataIsNotNeededInUpstreamMode) {
   signer_ = std::make_shared<NiceMock<MockSigner>>();
-  auto settings = FilterSettings{arn_, InvocationMode::Synchronous, true};
+  auto settings = FilterSettings{arn_, InvocationMode::Synchronous, true, ""};
   filter_ = std::make_unique<Filter>(settings, stats_, signer_, true);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
