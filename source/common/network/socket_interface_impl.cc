@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Network {
 
 namespace {
-bool hasIoUringWorkerFactory(Io::IoUringWorkerFactory* io_uring_worker_factory) {
+[[maybe_unused]] bool hasIoUringWorkerFactory(Io::IoUringWorkerFactory* io_uring_worker_factory) {
   return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
          io_uring_worker_factory->getIoUringWorker() != absl::nullopt;
 }
