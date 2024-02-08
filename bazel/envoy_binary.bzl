@@ -59,7 +59,7 @@ def _envoy_linkopts():
         "@envoy//bazel:apple": [
             # https://github.com/envoyproxy/envoy/issues/24782
             "-Wl,-framework,CoreFoundation",
-	    # Required for iOS proxy support.
+	    # Required for Apple proxy support.
 	    # (see https://github.com/envoyproxy/envoy/pull/30903)
             "-Wl,-framework,CFNetwork",
             # https://github.com/bazelbuild/bazel/pull/16414
