@@ -367,7 +367,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   EXPECT_NE(nullptr,
             async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).value());
 #else
-  EXPECT_EQ
+  EXPECT_EQ(
       async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
       "Google C++ gRPC client is not linked");
 #endif
