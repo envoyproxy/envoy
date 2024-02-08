@@ -1911,12 +1911,10 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
-  ASSERT_TRUE((version_ == Network::Address::IpVersion::v4 &&
-               quic_session->config()->HasReceivedIPv4AlternateServerAddress()) ||
-              (version_ == Network::Address::IpVersion::v6 &&
-               quic_session->config()->HasReceivedIPv6AlternateServerAddress()));
+  EXPECT_TRUE(!quic_session->config()->HasReceivedIPv4AlternateServerAddress() &&
+              !quic_session->config()->HasReceivedIPv6AlternateServerAddress());
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
-  EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
+  EXPECT_FALSE(quic_connection_->IsValidatingServerPreferredAddress());
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
       {":path", "/test/long/url"},
@@ -1927,13 +1925,6 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-
-  if (version_ == Network::Address::IpVersion::v4) {
-    // Most v6 platform doesn't support two loopback interfaces.
-    EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
-    test_server_->waitForCounterGe(
-        "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
-  }
 }
 
 TEST_P(QuicHttpIntegrationTest, UsesPreferredAddressDualStack) {

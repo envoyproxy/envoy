@@ -60,9 +60,6 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
 #ifdef ENVOY_ENABLE_QUIC
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 
-  // Note: when this runtime flag is removed, a call to
-  // ``SetQuicheFlagImpl(quic_always_support_server_preferred_address, true)`` must be added
-  // somewhere during startup, because the default is false for QUICHE but should be true for Envoy.
   SetQuicheFlagImpl(
       quic_always_support_server_preferred_address,
       Runtime::runtimeFeatureEnabled(
