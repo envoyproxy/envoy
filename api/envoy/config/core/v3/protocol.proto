@@ -105,7 +105,7 @@ message QuicProtocolOptions {
 
   // The duration that a QUIC connection stays idle before it closes itself. If this field is not present, QUIC default will be applied.
   google.protobuf.UInt32Value idle_timeout_seconds = 8
-    [(validate.rules).uint32 = {lte: 600 gte: 1}];
+      [(validate.rules).uint32 = {lte: 600 gte: 1}];
 }
 
 message UpstreamHttpProtocolOptions {
