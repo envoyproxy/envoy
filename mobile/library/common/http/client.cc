@@ -8,11 +8,11 @@
 #include "source/common/http/utility.h"
 
 #include "library/common/bridge/utility.h"
-#include "library/common/common/system_helper.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
 #include "library/common/stream_info/extra_stream_info.h"
+#include "library/common/system/system_helper.h"
 
 namespace Envoy {
 namespace Http {

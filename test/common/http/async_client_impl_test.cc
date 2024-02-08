@@ -1878,23 +1878,37 @@ TEST_F(AsyncClientImplTest, DumpState) {
 // Must not be in anonymous namespace for friend to work.
 class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
+  Router::RetryPolicyImpl retry_policy_;
   std::unique_ptr<NullRouteImpl> route_impl_{new NullRouteImpl(
-      client_.cluster_->name(), client_.singleton_manager_, absl::nullopt,
-      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
-      absl::nullopt)};
+      client_.cluster_->name(), retry_policy_, absl::nullopt,
+      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>())};
+  std::unique_ptr<Http::AsyncStreamImpl> stream_{
+      new Http::AsyncStreamImpl(client_, stream_callbacks_, AsyncClient::StreamOptions())};
   NullVirtualHost vhost_;
   NullCommonConfig config_;
 
-  void setupRouteImpl(const std::string& yaml_config) {
+  void setProtoRetryPolicy(const std::string& yaml_config) {
     envoy::config::route::v3::RetryPolicy retry_policy;
 
     TestUtility::loadFromYaml(yaml_config, retry_policy);
 
-    route_impl_ = std::make_unique<NullRouteImpl>(
-        client_.cluster_->name(), client_.singleton_manager_, absl::nullopt,
-        Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
-        std::move(retry_policy));
+    stream_ = std::make_unique<Http::AsyncStreamImpl>(
+        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
   }
+
+  void setRetryPolicy(const std::string& yaml_config) {
+    envoy::config::route::v3::RetryPolicy proto_policy;
+
+    TestUtility::loadFromYaml(yaml_config, proto_policy);
+    Upstream::RetryExtensionFactoryContextImpl factory_context(client_.singleton_manager_);
+    retry_policy_ = Router::RetryPolicyImpl(
+        proto_policy, ProtobufMessage::getNullValidationVisitor(), factory_context);
+
+    stream_ = std::make_unique<Http::AsyncStreamImpl>(
+        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy_));
+  }
+
+  const Router::RouteEntry& getRouteFromStream() { return *(stream_->route_->routeEntry()); }
 };
 
 // Test the extended fake route that AsyncClient uses.
@@ -1928,7 +1942,7 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
 }
 
-TEST_F(AsyncClientImplUnitTest, RouteImplInitTestWithRetryPolicy) {
+TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithProtoRetryPolicy) {
   const std::string yaml = R"EOF(
 per_try_timeout: 30s
 num_retries: 10
@@ -1938,9 +1952,32 @@ retry_back_off:
   max_interval: 30s
 )EOF";
 
-  setupRouteImpl(yaml);
+  setProtoRetryPolicy(yaml);
 
-  auto& route_entry = *(route_impl_->routeEntry());
+  auto& route_entry = getRouteFromStream();
+
+  EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
+  EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
+  EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
+                Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET,
+            route_entry.retryPolicy().retryOn());
+
+  EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
+  EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+}
+
+TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithRetryPolicy) {
+  const std::string yaml = R"EOF(
+per_try_timeout: 30s
+num_retries: 10
+retry_on: 5xx,gateway-error,connect-failure,reset
+retry_back_off:
+  base_interval: 0.01s
+  max_interval: 30s
+)EOF";
+
+  setRetryPolicy(yaml);
+  auto& route_entry = getRouteFromStream();
 
   EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
   EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
