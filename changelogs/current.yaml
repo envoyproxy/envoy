@@ -40,6 +40,9 @@ bug_fixes:
     fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
     ``propagate_response_headers`` and retry configurations are enabled at the same time, and an upstream
     request is retried multiple times.
+- area: tracing
+  change: |
+    Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
