@@ -296,7 +296,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
       tls_context_, mock_factory_ctx);
   EXPECT_TRUE(server_context_config.isReady());
   EXPECT_NO_THROW(context_manager_->createSslServerContext(
-      *stats_store_.rootScope(), server_context_config, std::vector<std::string>{}));
+      *stats_store_.rootScope(), server_context_config, std::vector<std::string>{}, nullptr));
 }
 
 } // namespace
