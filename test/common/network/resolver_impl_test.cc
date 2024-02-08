@@ -73,9 +73,8 @@ TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
 TEST(ResolverTest, UninitializedInternalAddressFromProtoAddress) {
   envoy::config::core::v3::Address internal_address;
   internal_address.mutable_envoy_internal_address();
-  EXPECT_THROW_WITH_MESSAGE(
-      resolveProtoAddress(internal_address).IgnoreError(), EnvoyException,
-      fmt::format("Failed to resolve address:{}", internal_address.DebugString()));
+  EXPECT_EQ(resolveProtoAddress(internal_address).status().message(),
+            fmt::format("Failed to resolve address:{}", internal_address.DebugString()));
 }
 
 // Validate correct handling of ipv4_compat field.
@@ -171,8 +170,7 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address).IgnoreError(), EnvoyException,
-                            "Address must be set: ");
+  EXPECT_EQ(resolveProtoAddress(address).status().message(), "Address must be set: ");
 }
 
 TEST(ResolverTest, NoSuchResolver) {
@@ -181,8 +179,8 @@ TEST(ResolverTest, NoSuchResolver) {
   socket->set_address("foo");
   socket->set_port_value(5);
   socket->set_resolver_name("envoy.test.resolver");
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address).IgnoreError(), EnvoyException,
-                            "Unknown address resolver: envoy.test.resolver");
+  EXPECT_EQ(resolveProtoAddress(address).status().message(),
+            "Unknown address resolver: envoy.test.resolver");
 }
 
 } // namespace

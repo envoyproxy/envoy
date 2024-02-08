@@ -24,13 +24,12 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
-#include "library/common/main_interface.h"
 
 namespace Envoy {
 namespace Platform {
@@ -267,6 +266,11 @@ EngineBuilder& EngineBuilder::addQuicHint(std::string host, int port) {
 
 EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
   quic_suffixes_.emplace_back(std::move(suffix));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enablePortMigration(bool enable_port_migration) {
+  enable_port_migration_ = enable_port_migration;
   return *this;
 }
 
@@ -738,6 +742,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           ->add_canonical_suffixes(suffix);
     }
 
+    if (enable_port_migration_) {
+      alpn_options.mutable_auto_config()
+          ->mutable_http3_protocol_options()
+          ->mutable_quic_protocol_options()
+          ->mutable_num_timeouts_to_trigger_port_migration()
+          ->set_value(4);
+    }
+
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -830,15 +842,15 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  Envoy::Engine* envoy_engine =
-      new Envoy::Engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+  Envoy::InternalEngine* envoy_engine =
+      new Envoy::InternalEngine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
     if (!Api::External::retrieveApi(name, true)) {
       auto* api = new envoy_kv_store();
       *api = store->asEnvoyKeyValueStore();
-      register_platform_api(name.c_str(), api);
+      Envoy::Api::External::registerApi(name.c_str(), api);
     }
   }
 
@@ -847,7 +859,7 @@ EngineSharedPtr EngineBuilder::build() {
     if (!Api::External::retrieveApi(name, true)) {
       auto* api = new envoy_string_accessor();
       *api = StringAccessor::asEnvoyStringAccessor(accessor);
-      register_platform_api(name.c_str(), api);
+      Envoy::Api::External::registerApi(name.c_str(), api);
     }
   }
 

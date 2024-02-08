@@ -46,6 +46,11 @@ public:
 
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; };
 
+  RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  ProtobufMessage::ValidationVisitor& validator);
+
 private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 

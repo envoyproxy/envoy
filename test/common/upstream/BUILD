@@ -168,7 +168,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    deps = ["//source/common/upstream:scheduler_lib"],
+    deps = [
+        "//source/common/upstream:scheduler_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -563,6 +566,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",
