@@ -436,6 +436,9 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   });
   initialize();
 
+  // Make sure worker threads are established (#32237).
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
 
   // std::cout << "tag_extracted_counter_map = {";
