@@ -76,7 +76,7 @@ void DecoderImpl::initialize() {
   BE_known_msgs['D'] = MessageProcessor{"DataRow", BODY_FORMAT(Array<VarByteN>), {}};
   BE_known_msgs['I'] = MessageProcessor{"EmptyQueryResponse", NO_BODY, {}};
   BE_known_msgs['E'] = MessageProcessor{
-      "ErrorResponse", BODY_FORMAT(Byte1, String), {&DecoderImpl::decodeBackendErrorResponse}};
+      "ErrorResponse", BODY_FORMAT(ZeroTCodes<String>), {&DecoderImpl::decodeBackendErrorResponse}};
   BE_known_msgs['V'] = MessageProcessor{"FunctionCallResponse", BODY_FORMAT(VarByteN), {}};
   BE_known_msgs['v'] = MessageProcessor{"NegotiateProtocolVersion", BODY_FORMAT(ByteN), {}};
   BE_known_msgs['n'] = MessageProcessor{"NoData", NO_BODY, {}};

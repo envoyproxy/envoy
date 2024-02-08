@@ -1196,6 +1196,66 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeaders) {
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(header_value));
 }
 
+TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeadersWithRetry) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    proxy_config.mutable_tunneling_config()->set_propagate_response_headers(true);
+    proxy_config.mutable_max_connect_attempts()->set_value(2);
+
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
+    access_log_config.set_path(access_log_filename);
+    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Send invalid response headers.
+  default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
+  const std::string header_value = "secret-value";
+  default_response_headers_.addCopy("test-header-name", header_value);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // The TCP proxy will create another request since the first failed and a retry is configured.
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // The connection should be fully closed, but the client has no way of knowing
+  // that. Ensure the FIN is read and clean up state.
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
+
+  // Verify response header value is in the access log.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(header_value));
+}
+
 TEST_P(TcpTunnelingIntegrationTest, CopyResponseTrailers) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;

@@ -40,11 +40,6 @@ constexpr char SESSION_TOKEN[] = "SessionToken";
 constexpr char WEB_IDENTITY_RESPONSE_ELEMENT[] = "AssumeRoleWithWebIdentityResponse";
 constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult";
 
-constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
-constexpr char AWS_PROFILE[] = "AWS_PROFILE";
-constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "/.aws/credentials";
-constexpr char DEFAULT_AWS_PROFILE[] = "default";
-
 constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
 constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
 constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
@@ -186,28 +181,13 @@ bool CredentialsFileCredentialsProvider::needsRefresh() {
   return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
-std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
-                                            const std::string& default_value) {
-  const char* value = getenv(variable_name.c_str());
-  return (value != nullptr) && (value[0] != '\0') ? value : default_value;
-}
-
 void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
-  // Default path plus current home directory. Will fall back to / if HOME environment variable does
-  // not exist
+  auto credentials_file = Utility::getCredentialFilePath();
+  auto profile = Utility::getCredentialProfileName();
 
-  const auto home = getEnvironmentVariableOrDefault("HOME", "");
-  const auto default_credentials_file_path =
-      absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
-
-  const auto credentials_file =
-      getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE, default_credentials_file_path);
-
-  const auto profile = getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
-
-  ENVOY_LOG(debug, "Credentials file path = {}, profile = {}", credentials_file, profile);
+  ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credentials_file, profile);
 
   extractCredentials(credentials_file, profile);
 }
@@ -221,48 +201,17 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   // exist).
   last_updated_ = api_.timeSource().systemTime();
 
-  std::ifstream file(credentials_file);
-  if (!file) {
-    ENVOY_LOG(debug, "Error opening credentials file {}", credentials_file);
-    return;
-  }
-
   std::string access_key_id, secret_access_key, session_token;
-  const auto profile_start = absl::StrFormat("[%s]", profile);
 
-  bool found_profile = false;
-  std::string line;
-  while (std::getline(file, line)) {
-    line = std::string(StringUtil::trim(line));
-    if (line.empty()) {
-      continue;
-    }
-
-    if (line == profile_start) {
-      found_profile = true;
-      continue;
-    }
-
-    if (found_profile) {
-      // Stop reading once we find the start of the next profile.
-      if (absl::StartsWith(line, "[")) {
-        break;
-      }
-
-      std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
-      if (parts.size() == 2) {
-        const auto key = StringUtil::toUpper(StringUtil::trim(parts[0]));
-        const auto val = StringUtil::trim(parts[1]);
-        if (key == AWS_ACCESS_KEY_ID) {
-          access_key_id = val;
-        } else if (key == AWS_SECRET_ACCESS_KEY) {
-          secret_access_key = val;
-        } else if (key == AWS_SESSION_TOKEN) {
-          session_token = val;
-        }
-      }
-    }
-  }
+  absl::flat_hash_map<std::string, std::string> elements = {
+      {AWS_ACCESS_KEY_ID, ""}, {AWS_SECRET_ACCESS_KEY, ""}, {AWS_SESSION_TOKEN, ""}};
+  absl::flat_hash_map<std::string, std::string>::iterator it;
+  Utility::resolveProfileElements(credentials_file, profile, elements);
+  // if profile file fails to load, or these elements are not found in the profile, their values
+  // will remain blank when retrieving them from the hash map
+  access_key_id = elements.find(AWS_ACCESS_KEY_ID)->second;
+  secret_access_key = elements.find(AWS_SECRET_ACCESS_KEY)->second;
+  session_token = elements.find(AWS_SESSION_TOKEN)->second;
 
   ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
             profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
