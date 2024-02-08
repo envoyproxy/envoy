@@ -356,6 +356,7 @@ envoy_cc_test_binary(
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/transport_sockets/tls:config",
     ],
 )
 
