@@ -122,9 +122,13 @@ void Span::setSampled(bool sampled) {
     return;
   }
 
-  auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
-                                           : datadog::tracing::SamplingPriority::USER_DROP);
-  span_->trace_segment().override_sampling_priority(priority);
+  // Ignore the override if a sampling decision has already been made.
+  // Otherwise, treat the override as a user-specified sampling decision.
+  if (!span_->trace_segment().sampling_decision().has_value()) {
+    auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
+                                             : datadog::tracing::SamplingPriority::USER_DROP);
+    span_->trace_segment().override_sampling_priority(priority);
+  }
 }
 
 std::string Span::getBaggage(absl::string_view) {
