@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/network/address.h"
@@ -293,7 +294,6 @@ protected:
       ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_headers());
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -3431,7 +3431,6 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 #if defined(USE_CEL_PARSER)
 TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_request_attributes()->Add("request.path");
@@ -3447,7 +3446,11 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
 
   // Handle request headers message.
   processGenericMessage(
-      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse&) {
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_request_headers()) = headers_resp;
+
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
@@ -3461,19 +3464,15 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         return true;
       });
 
-  // Handle request trailers message, making sure we did not send request attributes again.
-  processGenericMessage(*grpc_upstreams_[0], false,
-                        [](const ProcessingRequest& req, ProcessingResponse&) {
-                          EXPECT_TRUE(req.has_request_trailers());
-                          EXPECT_TRUE(req.attributes().empty());
-                          return true;
-                        });
-
-  handleUpstreamRequest();
+  handleUpstreamRequestWithTrailer();
 
   // Handle response headers message.
   processGenericMessage(
-      *grpc_upstreams_[0], false, [](const ProcessingRequest& req, ProcessingResponse&) {
+      *grpc_upstreams_[0], false, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_response_headers()) = headers_resp;
+
         EXPECT_TRUE(req.has_response_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
@@ -3492,7 +3491,11 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   // Handle response trailers message, making sure we did not send request or response attributes
   // again.
   processGenericMessage(*grpc_upstreams_[0], false,
-                        [](const ProcessingRequest& req, ProcessingResponse&) {
+                        [](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Add something to the response so the message isn't seen as spurious
+                          envoy::service::ext_proc::v3::TrailersResponse trailer_resp;
+                          *(resp.mutable_response_trailers()) = trailer_resp;
+
                           EXPECT_TRUE(req.has_response_trailers());
                           EXPECT_TRUE(req.attributes().empty());
                           return true;

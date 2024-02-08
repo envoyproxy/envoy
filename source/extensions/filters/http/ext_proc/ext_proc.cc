@@ -766,7 +766,7 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
       &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
       state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
       dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
-  auto attributes = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
+  auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
 
   state.setSentAttributes(true);
   (*req.mutable_attributes())[FilterName] = attributes;

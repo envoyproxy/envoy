@@ -211,6 +211,10 @@ public:
 
   void setSentAttributes(bool sent) { attributes_sent_ = sent; }
 
+  virtual ProtobufWkt::Struct
+  evaluateAttributes(const ExpressionManager& mgr,
+                     const Filters::Common::Expr::Activation& activation) const PURE;
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
@@ -345,6 +349,11 @@ public:
   }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return nullptr; }
+  ProtobufWkt::Struct
+  evaluateAttributes(const ExpressionManager& mgr,
+                     const Filters::Common::Expr::Activation& activation) const override {
+    return mgr.evaluateRequestAttributes(activation);
+  }
 
 private:
   void setProcessingModeInternal(
@@ -431,6 +440,12 @@ public:
   }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return headers_; }
+
+  ProtobufWkt::Struct
+  evaluateAttributes(const ExpressionManager& mgr,
+                     const Filters::Common::Expr::Activation& activation) const override {
+    return mgr.evaluateResponseAttributes(activation);
+  }
 
 private:
   void setProcessingModeInternal(
