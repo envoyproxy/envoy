@@ -41,114 +41,115 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 27, "A flag has been added. Fix this code.");
+  static_assert(StreamInfo::CoreResponseFlag::LastFlag == 27,
+                "A flag has been added. Fix this code.");
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck)) {
     common_access_log.mutable_response_flags()->set_failed_local_healthcheck(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream)) {
     common_access_log.mutable_response_flags()->set_no_healthy_upstream(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout)) {
     common_access_log.mutable_response_flags()->set_upstream_request_timeout(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::LocalReset)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::LocalReset)) {
     common_access_log.mutable_response_flags()->set_local_reset(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRemoteReset)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset)) {
     common_access_log.mutable_response_flags()->set_upstream_remote_reset(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure)) {
     common_access_log.mutable_response_flags()->set_upstream_connection_failure(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionTermination)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionTermination)) {
     common_access_log.mutable_response_flags()->set_upstream_connection_termination(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow)) {
     common_access_log.mutable_response_flags()->set_upstream_overflow(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoRouteFound)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound)) {
     common_access_log.mutable_response_flags()->set_no_route_found(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DelayInjected)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected)) {
     common_access_log.mutable_response_flags()->set_delay_injected(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected)) {
     common_access_log.mutable_response_flags()->set_fault_injected(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimited)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::RateLimited)) {
     common_access_log.mutable_response_flags()->set_rate_limited(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
         envoy::data::accesslog::v3::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::RateLimitServiceError)) {
     common_access_log.mutable_response_flags()->set_rate_limit_service_error(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination)) {
     common_access_log.mutable_response_flags()->set_downstream_connection_termination(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded)) {
     common_access_log.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout)) {
     common_access_log.mutable_response_flags()->set_stream_idle_timeout(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders)) {
     common_access_log.mutable_response_flags()->set_invalid_envoy_request_headers(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
     common_access_log.mutable_response_flags()->set_downstream_protocol_error(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamMaxStreamDurationReached)) {
     common_access_log.mutable_response_flags()->set_upstream_max_stream_duration_reached(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::ResponseFromCacheFilter)) {
     common_access_log.mutable_response_flags()->set_response_from_cache_filter(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoFilterConfigFound)) {
     common_access_log.mutable_response_flags()->set_no_filter_config_found(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DurationTimeout)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DurationTimeout)) {
     common_access_log.mutable_response_flags()->set_duration_timeout(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
     common_access_log.mutable_response_flags()->set_upstream_protocol_error(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoClusterFound)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound)) {
     common_access_log.mutable_response_flags()->set_no_cluster_found(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::OverloadManager)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager)) {
     common_access_log.mutable_response_flags()->set_overload_manager(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DnsResolutionFailed)) {
     common_access_log.mutable_response_flags()->set_dns_resolution_failure(true);
   }
 }

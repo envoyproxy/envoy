@@ -34,7 +34,7 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], reposito
 # envoy_mobile_android_test.
 def jvm_flags(lib_name):
     return [
-        "-Djava.library.path=library/common/jni:test/common/jni",
+        "-Djava.library.path=library/jni:test/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
         "-Xcheck:jni",
     ] + select({

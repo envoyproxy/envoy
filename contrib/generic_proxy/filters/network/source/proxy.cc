@@ -31,15 +31,15 @@ Tracing::Decision tracingDecision(const Tracing::ConnectionManagerTracingConfig&
   return {Tracing::Reason::NotTraceable, false};
 }
 
-StreamInfo::ResponseFlag
+StreamInfo::CoreResponseFlag
 responseFlagFromDownstreamReasonReason(DownstreamStreamResetReason reason) {
   switch (reason) {
   case DownstreamStreamResetReason::ConnectionTermination:
-    return StreamInfo::ResponseFlag::DownstreamConnectionTermination;
+    return StreamInfo::CoreResponseFlag::DownstreamConnectionTermination;
   case DownstreamStreamResetReason::LocalConnectionTermination:
-    return StreamInfo::ResponseFlag::LocalReset;
+    return StreamInfo::CoreResponseFlag::LocalReset;
   case DownstreamStreamResetReason::ProtocolError:
-    return StreamInfo::ResponseFlag::DownstreamProtocolError;
+    return StreamInfo::CoreResponseFlag::DownstreamProtocolError;
   }
   PANIC("Unknown reset reason");
 }

@@ -187,7 +187,7 @@ envoy_status_t InternalEngine::terminate() {
 
 bool InternalEngine::isTerminated() const { return terminated_; }
 
-InternalEngine::InternalEngine() {
+InternalEngine::~InternalEngine() {
   if (!terminated_) {
     terminate();
   }
