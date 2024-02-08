@@ -1260,7 +1260,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     sendLocalReply(
         Http::Code::ServiceUnavailable, "envoy overloaded",
         [this](Http::ResponseHeaderMap& headers) {
-          if (connection_manager_.config_.appendLocalOverloadAppend()) {
+          if (connection_manager_.config_.appendLocalOverload()) {
             headers.addReference(Http::Headers::get().EnvoyLocalOverloaded,
                                  Http::Headers::get().EnvoyOverloadedValues.True);
           }

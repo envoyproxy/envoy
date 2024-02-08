@@ -128,7 +128,6 @@ public:
   }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
-  bool skipLocalOverloadAppend() const override { return true; }
   const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
@@ -173,6 +172,7 @@ public:
   ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
     return header_validator_factory_.createServerHeaderValidator(protocol, header_validator_stats_);
   }
+  bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;

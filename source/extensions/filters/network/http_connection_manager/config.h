@@ -263,7 +263,7 @@ public:
     return nullptr;
 #endif
   }
-  bool appendLocalOverloadAppend() const override { return append_local_overload_append_; }
+  bool appendLocalOverload() const override { return append_local_overload_; }
   bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
@@ -360,7 +360,7 @@ private:
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
-  const bool append_local_overload_append_;
+  const bool append_local_overload_;
   const bool append_x_forwarded_port_;
   const bool add_proxy_protocol_connection_state_;
 };

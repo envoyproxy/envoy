@@ -442,7 +442,7 @@ x-envoy-local-overloaded
 
 Envoy will set this header on the downstream response
 if a request was dropped due to :ref:`overload manager<arch_overview_overload_manager>` and
-:ref:`configuration option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload_append>`
+:ref:`configuration option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>`
 is set to true.
 
 .. _config_http_conn_man_headers_x-request-id:

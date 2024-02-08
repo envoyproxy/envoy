@@ -889,7 +889,7 @@ message HttpConnectionManager {
 
   // Append the :ref:`config_http_conn_man_headers_x-envoy-local-overloaded` HTTP header in the scenario where
   // the Overload Manager has been triggered.
-  bool append_local_overload_append = 57;
+  bool append_local_overload = 57;
 
   // Whether the HCM will add ProxyProtocolFilterState to the Connection lifetime filter state. Defaults to ``true``.
   // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the
