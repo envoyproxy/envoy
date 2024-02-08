@@ -209,7 +209,6 @@ public:
   }
   uint32_t xffNumTrustedHops() const override { return xff_num_trusted_hops_; }
   bool skipXffAppend() const override { return skip_xff_append_; }
-  bool skipLocalOverloadAppend() const override { return skip_local_overload_append_; }
   const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
@@ -264,6 +263,7 @@ public:
     return nullptr;
 #endif
   }
+  bool appendLocalOverloadAppend() const override { return append_local_overload_append_; }
   bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
@@ -300,7 +300,6 @@ private:
   const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
   const uint32_t xff_num_trusted_hops_;
   const bool skip_xff_append_;
-  const bool skip_local_overload_append_;
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
@@ -361,6 +360,7 @@ private:
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const bool append_local_overload_append_;
   const bool append_x_forwarded_port_;
   const bool add_proxy_protocol_connection_state_;
 };

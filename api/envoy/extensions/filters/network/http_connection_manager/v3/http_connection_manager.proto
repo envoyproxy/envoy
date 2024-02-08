@@ -665,11 +665,6 @@ message HttpConnectionManager {
   // information about internal/external addresses.
   InternalAddressConfig internal_address_config = 25;
 
-  // If set, Envoy will not append the
-  // :ref:`config_http_conn_man_headers_x-envoy-local-overloaded` HTTP header in the scenario where
-  // the Overload Manager has been triggered. This defaults to true.
-  bool skip_local_overload_append = 57;
-
   // If set, Envoy will not append the remote address to the
   // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header. This may be used in
   // conjunction with HTTP filters that explicitly manipulate XFF after the HTTP connection manager
@@ -891,6 +886,10 @@ message HttpConnectionManager {
   // Append the ``x-forwarded-port`` header with the port value client used to connect to Envoy. It
   // will be ignored if the ``x-forwarded-port`` header has been set by any trusted proxy in front of Envoy.
   bool append_x_forwarded_port = 51;
+
+  // Append the :ref:`config_http_conn_man_headers_x-envoy-local-overloaded` HTTP header in the scenario where
+  // the Overload Manager has been triggered.
+  bool append_local_overload_append = 57;
 
   // Whether the HCM will add ProxyProtocolFilterState to the Connection lifetime filter state. Defaults to ``true``.
   // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the

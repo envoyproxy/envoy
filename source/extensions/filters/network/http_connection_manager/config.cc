@@ -332,8 +332,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
-      skip_xff_append_(config.skip_xff_append()),
-      skip_local_overload_append_(config.skip_local_overload_append()), via_(config.via()),
+      skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
@@ -399,6 +398,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                      config.proxy_status_config())
                                : nullptr),
       header_validator_factory_(createHeaderValidatorFactory(config, context)),
+      append_local_overload_append_(config.append_local_overload_append()),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {

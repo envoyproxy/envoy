@@ -174,7 +174,6 @@ public:
   }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
-  bool skipLocalOverloadAppend() const override { return true; }
   const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() const override {
     return Http::ForwardClientCertType::Sanitize;
@@ -236,6 +235,7 @@ public:
     return nullptr;
 #endif
   }
+  bool appendLocalOverloadAppend() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
 

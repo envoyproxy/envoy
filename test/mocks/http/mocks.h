@@ -647,7 +647,6 @@ public:
   MOCK_METHOD(bool, unixSocketInternal, ());
   MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
   MOCK_METHOD(bool, skipXffAppend, (), (const));
-  MOCK_METHOD(bool, skipLocalOverloadAppend, (), (const));
   MOCK_METHOD(const std::string&, via, (), (const));
   MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));
   MOCK_METHOD(const std::vector<Http::ClientCertDetailsType>&, setCurrentClientCertDetails, (),
@@ -678,6 +677,7 @@ public:
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(ServerHeaderValidatorPtr, makeHeaderValidator, (Protocol protocol));
+  MOCK_METHOD(bool, appendLocalOverloadAppend, (), (const));
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
   MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
 
