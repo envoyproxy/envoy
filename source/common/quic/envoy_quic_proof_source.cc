@@ -34,6 +34,7 @@ void EnvoyQuicProofSource::signPayload(
     callback->Run(false, "", nullptr);
     return;
   }
+
   // Verify the signature algorithm is as expected.
   std::string error_details;
   int sign_alg =

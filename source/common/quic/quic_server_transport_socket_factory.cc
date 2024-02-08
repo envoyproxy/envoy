@@ -100,9 +100,8 @@ std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
           std::shared_ptr<quic::CertificatePrivateKey>>
 QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
                                                           bool* cert_matched_sni) const {
-  // onSecretUpdated() could be invoked in the middle of checking the existence of ssl_ctx and
-  // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
-  // use the same ssl_ctx to create SslSocket.
+  // onSecretUpdated() could be invoked in the middle of checking the existence of , and using,
+  // ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and use the same ssl_ctx.
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
   {
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
