@@ -51,6 +51,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
       .addQuicCanonicalSuffix(".xyz.com")
+      .enablePortMigration(true)
 #endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
@@ -85,6 +86,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "hostname: \"www.def.com\"",
       "canonical_suffixes: \".opq.com\"",
       "canonical_suffixes: \".xyz.com\"",
+      "num_timeouts_to_trigger_port_migration { value: 4 }",
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",

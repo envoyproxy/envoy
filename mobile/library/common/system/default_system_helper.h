@@ -1,6 +1,6 @@
 #pragma once
 
-#include "library/common/common/system_helper.h"
+#include "library/common/system/system_helper.h"
 
 namespace Envoy {
 
