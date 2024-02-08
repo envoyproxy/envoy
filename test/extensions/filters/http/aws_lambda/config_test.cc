@@ -159,6 +159,14 @@ TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
   EXPECT_EQ(InvocationMode::Asynchronous, filter_settings_ptr->invocationMode());
 }
 
+TEST(AwsLambdaFilterConfigTest, UpstreamFactoryTest) {
+
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.aws_lambda");
+  ASSERT_NE(factory, nullptr);
+}
+
 } // namespace
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters
