@@ -75,6 +75,7 @@ protected:
     case IoUringSocketType::Server:
       return "server";
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   Io::IoUringWorkerFactory& io_uring_worker_factory_;
