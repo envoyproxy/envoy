@@ -753,8 +753,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     alpn_options.mutable_auto_config()
         ->mutable_http3_protocol_options()
         ->mutable_quic_protocol_options()
-        ->mutable_idle_timeout_seconds()
-        ->set_value(30);
+        ->mutable_idle_network_timeout()
+        ->set_seconds(30);
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())

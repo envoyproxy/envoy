@@ -200,7 +200,7 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   config.mutable_initial_connection_window_size()->set_value(50);
   config.set_connection_options("5RTO,ACKD");
   config.set_client_connection_options("6RTO,AKD4");
-  config.mutable_idle_timeout_seconds()->set_value(30);
+  config.mutable_idle_network_timeout()->set_seconds(30);
   convertQuicConfig(config, quic_config);
   EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
   EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
