@@ -94,7 +94,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.removeUpgrade();
 
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
-      if (request_headers.TE() != Http::Headers::get().TEValues.Trailers) {
+      if (request_headers.getTEValue() != Http::Headers::get().TEValues.Trailers) {
         request_headers.removeTE();
       }
     }
