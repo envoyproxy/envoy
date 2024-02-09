@@ -510,11 +510,20 @@ void UpstreamRequest::setupPerTryTimeout() {
 
 void UpstreamRequest::onPerTryIdleTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream per try idle timeout", *parent_.callbacks());
+  if (per_try_timeout_) {
+    // Disable the per try idle timer, so it does not trigger further retries
+    per_try_timeout_->disableTimer();
+  }
   stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   parent_.onPerTryIdleTimeout(*this);
 }
 
 void UpstreamRequest::onPerTryTimeout() {
+  if (per_try_idle_timeout_) {
+    // Delete the per try idle timer, so it does not trigger further retries.
+    // The timer has to be deleted to prevent data flow from re-arming it.
+    per_try_idle_timeout_.reset();
+  }
   // If we've sent anything downstream, ignore the per try timeout and let the response continue
   // up to the global timeout
   if (!parent_.downstreamResponseStarted()) {
