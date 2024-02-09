@@ -74,8 +74,8 @@ private:
       }
 
       if (cookie.expires() != 0) {
-        std::chrono::seconds expiry_time(cookie.expires());
-        auto now = std::chrono::duration_cast<std::chrono::seconds>(
+        const std::chrono::seconds expiry_time(cookie.expires());
+        const auto now = std::chrono::duration_cast<std::chrono::seconds>(
             (time_source_.monotonicTime()).time_since_epoch());
         if (now > expiry_time) {
           // Ignore the address extracted from the cookie. This will cause
