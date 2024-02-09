@@ -54,6 +54,10 @@ load(
     _envoy_sh_test = "envoy_sh_test",
 )
 load(
+    ":envoy_internal.bzl",
+    _envoy_linkstatic = "envoy_linkstatic",
+)
+load(
     ":envoy_mobile_defines.bzl",
     _envoy_mobile_defines = "envoy_mobile_defines",
 )
