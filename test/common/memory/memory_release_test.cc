@@ -63,8 +63,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   auto a = std::make_unique<unsigned char[]>(MB);
   auto b = std::make_unique<unsigned char[]>(MB);
   if (Stats::totalCurrentlyAllocated() - initial_allocated_bytes <= 0) {
-    // Cannot measure memory usage precisely on this platform.
-    return;
+    GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
@@ -111,8 +110,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   auto a = std::make_unique<uint32_t[]>(512 * MB);
   auto b = std::make_unique<uint32_t[]>(512 * MB);
   if (Stats::totalCurrentlyAllocated() - initial_allocated_bytes <= 0) {
-    // Cannot measure memory usage precisely on this platform.
-    return;
+    GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
