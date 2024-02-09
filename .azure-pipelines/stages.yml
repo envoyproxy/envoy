@@ -117,6 +117,7 @@ stages:
     RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
     PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
     PUBLISH_DOCKERHUB: $[stageDependencies.env.repo.outputs['publish.dockerhub']]
+    PUBLISH_DOCKERHUB_IMAGES: $[stageDependencies.env.repo.outputs['publish.dockerhubImages']]
   jobs:
   - template: stage/publish.yml
     parameters:
@@ -135,6 +136,7 @@ stages:
       runDocker: variables['RUN_DOCKER']
       runPackaging: variables['RUN_PACKAGING']
       publishDockerhub: variables['PUBLISH_DOCKERHUB']
+      publishDockerhubImages: variables['PUBLISH_DOCKERHUB_IMAGES']
       publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
 
 - stage: verify

@@ -61,7 +61,7 @@ fi
 # Only push images for main builds, and non-dev release branch builds
 if [[ -n "$DOCKER_LOAD_IMAGES" ]]; then
     LOAD_IMAGES=1
-elif [[ -n "$DOCKERHUB_USERNAME" ]] && [[ -n "$DOCKERHUB_PASSWORD" ]]; then
+elif [[ -n "$DOCKERHUB_USERNAME" ]] && [[ -n "$DOCKERHUB_PASSWORD" ]] && [[ "$ENVOY_DOCKER_PUSH" != "false" ]]; then
     if [[ "${CI_BRANCH}" == "${MAIN_BRANCH}" ]]; then
         echo "Pushing images for main."
         PUSH_IMAGES_TO_REGISTRY=1
