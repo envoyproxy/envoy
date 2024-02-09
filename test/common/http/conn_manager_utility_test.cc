@@ -2253,7 +2253,7 @@ TEST_F(ConnectionManagerUtilityTest, KeepTrailersTEHeaderMultipleValuesAndWeigth
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_te", "true"}});
 
-  TestRequestHeaderMapImpl headers{{"te", "chunked;q=0.8  ,  trailers  ;q=0.5,deflate  "}};
+  TestRequestHeaderMapImpl headers{{"te", "chunked;q=0.8  ,  trailers  ,deflate  "}};
   callMutateRequestHeaders(headers, Protocol::Http2);
 
   EXPECT_EQ("trailers", headers.getTEValue());

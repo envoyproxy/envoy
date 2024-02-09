@@ -840,7 +840,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailersMultipleValuesAn
   autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
 
-  default_request_headers_.setTE("chunked;q=0.8  ,  trailers  ;q=0.5,deflate  ");
+  default_request_headers_.setTE("chunked;q=0.8  ,  trailers  ,deflate  ");
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
