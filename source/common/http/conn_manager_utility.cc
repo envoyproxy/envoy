@@ -292,7 +292,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 }
 
 void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
     return;
   }
 
