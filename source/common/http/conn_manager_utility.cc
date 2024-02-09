@@ -296,14 +296,14 @@ void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_header
     return;
   }
 
-  std::string te_header = request_headers.getTEValue();
+  absl::string_view te_header = request_headers.getTEValue();
   if (te_header.empty()) {
     return;
   }
 
   // If the TE header contains the "trailers" value, set the TE header to "trailers" only.
-  std::vector<std::string> te_values = absl::StrSplit(te_header, ',');
-  for (const std::string& te_value : te_values) {
+  std::vector<absl::string_view> te_values = absl::StrSplit(te_header, ',');
+  for (const absl::string_view& te_value : te_values) {
     bool is_trailers = absl::StripAsciiWhitespace(te_value) == Http::Headers::get().TEValues.Trailers;
 
     if (is_trailers) {
