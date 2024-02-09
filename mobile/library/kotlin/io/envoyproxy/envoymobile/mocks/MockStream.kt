@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
  * Mock implementation of `Stream` that also provides an interface for sending mocked responses
  * through to the stream's callbacks. Created via `MockStreamPrototype`.
  */
-class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) :
+class MockStream(underlyingStream: MockEnvoyHTTPStream) :
   Stream(underlyingStream, useByteBufferPosition = false) {
   private val mockStream: MockEnvoyHTTPStream = underlyingStream
 
