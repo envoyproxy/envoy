@@ -301,21 +301,19 @@ void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_header
     return;
   }
 
-  bool has_trailers_te = false;
-
+  // If the TE header contains the "trailers" value, set the TE header to "trailers" only.
   std::vector<std::string> te_values = absl::StrSplit(te_header, ',');
   for (const auto& teValue : te_values) {
-    if (absl::StripAsciiWhitespace(teValue) == Http::Headers::get().TEValues.Trailers) {
-      has_trailers_te = true;
-      break;
+    bool has_trailers_te = absl::StripAsciiWhitespace(teValue) == Http::Headers::get().TEValues.Trailers;
+
+    if (has_trailers_te) {
+      request_headers.setTE(Http::Headers::get().TEValues.Trailers);
+      return;
     }
   }
 
-  if (has_trailers_te) {
-    request_headers.setTE(Http::Headers::get().TEValues.Trailers);
-  } else {
-    request_headers.removeTE();
-  }
+  // If the TE header does not contain the "trailers" value, remove the TE header.
+  request_headers.removeTE();
 }
 
 void ConnectionManagerUtility::cleanInternalHeaders(
