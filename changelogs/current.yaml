@@ -24,6 +24,11 @@ minor_behavior_changes:
     Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
     is degrading. Can be manually turned on via
     :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: aws
+  change: |
+    AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
+    grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
+    xDS region will take preference. aws_request_signer documentation now reflects the region chain.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
