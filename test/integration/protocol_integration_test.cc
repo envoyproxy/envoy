@@ -809,7 +809,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
   EXPECT_EQ("", upstream_headers->getTEValue());
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationGrpc) {
+TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailers) {
   if (downstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
@@ -817,8 +817,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationGrpc) {
   autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
 
-  default_request_headers_.setTE("gzip");
-  default_request_headers_.setContentType("application/grpc");
+  default_request_headers_.setTE("trailers");
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

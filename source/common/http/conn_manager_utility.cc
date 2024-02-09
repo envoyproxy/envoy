@@ -94,9 +94,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.removeUpgrade();
 
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
-      if (Grpc::Common::isGrpcRequestHeaders(request_headers)) {
-        request_headers.setTE(Http::Headers::get().TEValues.Trailers);
-      } else {
+      if (request_headers.TE() != Http::Headers::get().TEValues.Trailers) {
         request_headers.removeTE();
       }
     }
