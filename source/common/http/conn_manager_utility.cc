@@ -94,23 +94,23 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.removeUpgrade();
 
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
-      auto teHeader = request_headers.getTEValue();
+      std::string te_header = request_headers.getTEValue();
 
-      if (!teHeader.empty()) {
-        auto hasTrailersTE = false;
+      if (!te_header.empty()) {
+        bool has_trailers_te = false;
 
-        auto teValues = absl::StrSplit(, ",");
-        for (const auto& teValue : teValues) {
-          auto parts = absl::StrSplit(teValue, ";"); // Handles cases like "chunked, trailers;q=0.5"
-          auto value = absl::StripAsciiWhitespace(parts[0]);
+        std::vector<std::string> te_values = absl::StrSplit(, ",");
+        for (const auto& teValue : te_values) {
+          std::vector<std::string> parts = absl::StrSplit(teValue, ";"); // Handles cases like "chunked, trailers;q=0.5"
+          std::string value = absl::StripAsciiWhitespace(parts[0]);
 
           if (value == Http::Headers::get().TEValues.Trailers) {
-            hasTrailersTE = true;
+            has_trailers_te = true;
             break;
           }
         }
 
-        if (hasTrailersTE) {
+        if (has_trailers_te) {
           request_headers.setTE(Http::Headers::get().TEValues.Trailers);
         } else {
           request_headers.removeTE();
