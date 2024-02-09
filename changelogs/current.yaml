@@ -135,6 +135,9 @@ new_features:
     metadata may be sent to the server. If
     :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
     is defined, returned metadata may be written to the specified allowed namespaces.
+- area: wasm
+  change: |
+    added ``verify_signature`` foreign function to verify cryptographic signatures.
 - area: monitoring
   change: |
     Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is
