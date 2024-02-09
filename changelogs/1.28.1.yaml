@@ -1,0 +1,53 @@
+date: February 9, 2024
+
+behavior_changes:
+- area: listener
+  change: |
+    undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
+
+bug_fixes:
+- area: buffer
+  change: |
+    Fixed a bug (https://github.com/envoyproxy/envoy/issues/28760) that the internal listener causes an undefined
+    behavior due to the unintended release of the buffer memory.
+- area: grpc
+  change: |
+    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: tracing
+  change: |
+    Fixed a bug where Datadog spans tagged as errors would not have the appropriate error property set.
+- area: tracing
+  change: |
+    Fixed a bug where child spans produced by the Datadog tracer would have an incorrect operation name.
+- area: tracing
+  change: |
+    Fixed a bug that caused the Datadog tracing extension to drop traces that
+    should be kept on account of an extracted sampling decision.
+- area: quic
+  change: |
+    Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
+    The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
+- area: proxy protocol
+  change: |
+    Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
+- area: proxy_protocol
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in a proxy protocol header. Connections will instead be dropped/reset.
+- area: proxy_protocol
+  change: |
+    Fixed a bug where TLVs with non utf8 characters were inserted as protobuf values into filter metadata circumventing
+    ext_authz checks when ``failure_mode_allow`` is set to ``true``.
+- area: tls
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
+    ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: http
+  change: |
+    Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: url matching
+  change: |
+    Fixed excessive CPU utilization when using regex URL template matcher.

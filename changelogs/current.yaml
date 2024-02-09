@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: February 9, 2024
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: tracing
   change: |
     Added support for configuring resource detectors on the OpenTelemetry tracer.
@@ -36,12 +29,7 @@ bug_fixes:
     ``%DOWNSTREAM_PEER_IP_SAN%``.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: postgres proxy
   change: |
     Fix a race condition that may result from upstream servers refusing to switch to TLS/SSL.
     This fix first appeared in ``v1.29.0`` release.
-
-new_features:
-
-deprecated:
