@@ -162,5 +162,8 @@ new_features:
     Envoy will select the host with the fewest active requests from the entire host set rather than
     :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     random choices.
+- area: redis
+  change: |
+    Added support for the ``ECHO`` command.
 
 deprecated:
