@@ -303,8 +303,8 @@ void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_header
 
   // If the TE header contains the "trailers" value, set the TE header to "trailers" only.
   std::vector<std::string> te_values = absl::StrSplit(te_header, ',');
-  for (const auto& teValue : te_values) {
-    bool has_trailers_te = absl::StripAsciiWhitespace(teValue) == Http::Headers::get().TEValues.Trailers;
+  for (const auto& te_value : te_values) {
+    bool has_trailers_te = absl::StripAsciiWhitespace(te_value) == Http::Headers::get().TEValues.Trailers;
 
     if (has_trailers_te) {
       request_headers.setTE(Http::Headers::get().TEValues.Trailers);
