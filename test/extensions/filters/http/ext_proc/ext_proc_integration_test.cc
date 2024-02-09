@@ -3437,6 +3437,7 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_request_attributes()->Add("request.method");
   proto_config_.mutable_request_attributes()->Add("request.scheme");
   proto_config_.mutable_request_attributes()->Add("connection.mtls");
+  proto_config_.mutable_request_attributes()->Add("response.code");
   proto_config_.mutable_response_attributes()->Add("response.code");
   proto_config_.mutable_response_attributes()->Add("response.code_details");
 
@@ -3458,6 +3459,9 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
         EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
         EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
+        // Make sure we did not include the attribute which was not yet available.
+        EXPECT_EQ(proto_struct.fields().size(), 4);
+        EXPECT_FALSE(proto_struct.fields().contains("response.code"));
 
         // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
         EXPECT_TRUE(req.request_headers().attributes().empty());
