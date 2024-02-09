@@ -10,6 +10,7 @@
 #include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -31,12 +32,15 @@ class WasmAccessLogConfigTest
     : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmAccessLogConfigTest() : api_(Api::createApiForTest(stats_store_)) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(context_, scope()).WillByDefault(ReturnRef(scope_));
-    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
+    ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
     ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
-    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.server_factory_context_, clusterManager())
+        .WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(log_stream_info_, requestComplete())
         .WillByDefault(Return(std::chrono::milliseconds(30)));
   }
@@ -52,6 +56,7 @@ protected:
     }));
   }
 
+  NiceMock<Network::MockListenerInfo> listener_info_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& scope_{*stats_store_.rootScope()};
@@ -71,9 +76,8 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -88,9 +92,8 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
 }
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog config;
@@ -121,23 +124,20 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
-  instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
-                AccessLog::AccessLogType::NotSet);
+  instance->log({&request_header, &response_header, &response_trailer}, log_stream_info_);
 
   filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(config, std::move(filter), context_);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
-                       AccessLog::AccessLogType::NotSet);
+  filter_instance->log({&request_header, &response_header, &response_trailer}, log_stream_info_);
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   const std::string invalid_yaml =
@@ -182,8 +182,7 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(proto_config, nullptr, context_);
   filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_,
-                       AccessLog::AccessLogType::NotSet);
+  filter_instance->log({}, log_stream_info_);
 }
 
 TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
@@ -228,8 +227,7 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
           }));
   AccessLog::InstanceSharedPtr filter_instance =
       factory.createAccessLogInstance(proto_config, nullptr, context_);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_,
-                       AccessLog::AccessLogType::NotSet);
+  filter_instance->log({}, log_stream_info_);
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
@@ -237,17 +235,15 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   response->body().add(code);
   async_callbacks->onSuccess(request, std::move(response));
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
-  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info_,
-                       AccessLog::AccessLogType::NotSet);
+  filter_instance->log({}, log_stream_info_);
 }
 
 TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          "envoy.access_loggers.wasm");
+  auto factory = Registry::FactoryRegistry<AccessLog::AccessLogInstanceFactory>::getFactory(
+      "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
@@ -269,7 +265,7 @@ TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_CALL(context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
+  EXPECT_CALL(context_.server_factory_context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
   threadlocal.registered_ = true;
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(proto_config, nullptr, context_);
@@ -279,13 +275,11 @@ TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
 
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
-                       AccessLog::AccessLogType::NotSet);
+  filter_instance->log({&request_header, &response_header, &response_trailer}, log_stream_info_);
   // Even if the thread local plugin handle returns nullptr, `log` should not raise error or
   // exception.
   threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
-  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info_,
-                       AccessLog::AccessLogType::NotSet);
+  filter_instance->log({&request_header, &response_header, &response_trailer}, log_stream_info_);
 }
 
 } // namespace Wasm

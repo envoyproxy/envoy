@@ -9,6 +9,7 @@ import io.envoyproxy.envoymobile.XdsBuilder
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.TestJni
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import org.junit.After
 import org.junit.Before
@@ -28,7 +29,8 @@ class XdsTest {
 
   @Before
   fun setUp() {
-    TestJni.startHttp2TestServer()
+    val upstreamCert: String =
+      File("../envoy/test/config/integration/certs/upstreamcacert.pem").readText()
     TestJni.initXdsTestServer()
     val latch = CountDownLatch(1)
     engine =
@@ -40,6 +42,7 @@ class XdsTest {
               TestJni.getXdsTestServerHost(),
               TestJni.getXdsTestServerPort(),
             )
+            .setSslRootCerts(upstreamCert)
             .addClusterDiscoveryService()
         )
         .build()
@@ -50,7 +53,6 @@ class XdsTest {
   @After
   fun tearDown() {
     engine.terminate()
-    TestJni.shutdownTestServer()
     TestJni.shutdownXdsTestServer()
   }
 
@@ -66,15 +68,6 @@ class XdsTest {
         name: my_cluster
         type: STATIC
         connect_timeout: 5s
-        load_assignment:
-          cluster_name: xds_cluster
-          endpoints:
-            - lb_endpoints:
-                - endpoint:
-                    address:
-                      socket_address:
-                        address: ${TestJni.getServerHost()}
-                        port_value: ${TestJni.getServerPort()}
         typed_extension_protocol_options:
           envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
             "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -86,7 +79,7 @@ class XdsTest {
     """
         .trimIndent()
     TestJni.sendDiscoveryResponse(cdsResponse)
-    // There are now 3 clusters: base, base_cluster, and xds_cluster.
+    // There are now 3 clusters: base, base_cluster, and my_cluster.
     engine.waitForStatGe("cluster_manager.cluster_added", 3)
   }
 }

@@ -51,6 +51,7 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
+  ENVOY_DOCKER_SOURCE_DIR="${ENVOY_DOCKER_SOURCE_DIR:-${SOURCE_DIR_MOUNT_DEST}}"
   START_COMMAND=(
       "/bin/bash"
       "-lc"
@@ -59,7 +60,7 @@ else
           && usermod -a -G pcap envoybuild \
           && chown envoybuild:envoygroup /build \
           && chown envoybuild /proc/self/fd/2 \
-          && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+          && sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR} && $*'")
 fi
 
 if [[ -n "$ENVOY_DOCKER_PLATFORM" ]]; then
@@ -91,6 +92,10 @@ VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
 
+if ! is_windows; then
+    export BUILD_DIR="${BUILD_DIR_MOUNT_DEST}"
+fi
+
 if [[ -n "$ENVOY_DOCKER_IN_DOCKER" || -n "$ENVOY_SHARED_TMP_DIR" ]]; then
     # Create a "shared" directory that has the same path in/outside the container
     # This allows the host docker engine to see artefacts using a temporary path created inside the container,
@@ -111,6 +116,7 @@ fi
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
+       -e BUILD_DIR \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
@@ -126,6 +132,7 @@ docker run --rm \
        -e CI_TARGET_BRANCH \
        -e DOCKERHUB_USERNAME \
        -e DOCKERHUB_PASSWORD \
+       -e ENVOY_DOCKER_SAVE_IMAGE \
        -e ENVOY_STDLIB \
        -e BUILD_REASON \
        -e BAZEL_REMOTE_INSTANCE \

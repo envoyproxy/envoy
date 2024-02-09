@@ -24,7 +24,7 @@ Network::FilterFactoryCb RocketmqProxyFilterConfigFactory::createFilterFactoryFr
   std::shared_ptr<ConfigImpl> filter_config = std::make_shared<ConfigImpl>(proto_config, context);
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.mainThreadDispatcher().timeSource()));
+        *filter_config, context.serverFactoryContext().mainThreadDispatcher().timeSource()));
   };
 }
 
@@ -41,7 +41,7 @@ ConfigImpl::ConfigImpl(const RocketmqProxyConfig& config,
                                                              TransientObjectLifeSpan)) {}
 
 std::string ConfigImpl::proxyAddress() {
-  const LocalInfo::LocalInfo& localInfo = context_.getServerFactoryContext().localInfo();
+  const LocalInfo::LocalInfo& localInfo = context_.serverFactoryContext().localInfo();
   Network::Address::InstanceConstSharedPtr address = localInfo.address();
   if (address->type() == Network::Address::Type::Ip) {
     const std::string& ip = address->ip()->addressAsString();

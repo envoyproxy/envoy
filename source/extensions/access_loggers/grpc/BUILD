@@ -52,6 +52,7 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",
         "//source/common/tracing:custom_tag_lib",
+        "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
     ],
@@ -100,7 +101,7 @@ envoy_cc_extension(
     hdrs = ["http_config.h"],
     deps = [
         ":config_utils",
-        "//envoy/server:access_log_config_interface",
+        "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
@@ -116,7 +117,7 @@ envoy_cc_extension(
     hdrs = ["tcp_config.h"],
     deps = [
         ":config_utils",
-        "//envoy/server:access_log_config_interface",
+        "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",

@@ -15,10 +15,12 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
@@ -63,6 +65,16 @@ namespace {
 class MockInternalListenerManager : public InternalListenerManager {
 public:
   MOCK_METHOD(InternalListenerOptRef, findByAddress, (const Address::InstanceConstSharedPtr&), ());
+};
+
+class NoopConnectionExecutionContext : public ExecutionContext {
+public:
+  NoopConnectionExecutionContext() = default;
+  ~NoopConnectionExecutionContext() override = default;
+
+protected:
+  void activate() override {}
+  void deactivate() override {}
 };
 
 TEST(RawBufferSocket, TestBasics) {
@@ -160,8 +172,10 @@ protected:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(address);
     NiceMock<Network::MockListenerConfig> listener_config;
     Server::ThreadLocalOverloadStateOptRef overload_state;
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config,
-                                            overload_state);
+    listener_ = std::make_unique<Network::TcpListenerImpl>(
+        *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
         createTransportSocket(), socket_options_, transport_socket_options_);
@@ -328,6 +342,27 @@ TEST_P(ConnectionImplTest, SetSslConnection) {
   EXPECT_EQ(ssl_info, client_connection_->ssl());
   EXPECT_EQ(ssl_info, client_connection_->connectionInfoProvider().sslConnection());
   disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, SetGetExecutionContextFilterState) {
+  setUpBasicConnection();
+  connect();
+
+  EXPECT_EQ(getConnectionExecutionContext(*client_connection_), nullptr);
+
+  const StreamInfo::FilterStateSharedPtr& filter_state =
+      client_connection_->streamInfo().filterState();
+  auto connection_execution_context = std::make_unique<NoopConnectionExecutionContext>();
+  const NoopConnectionExecutionContext* context_pointer =
+      connection_execution_context.get(); // Not owned.
+  auto filter_state_object = std::make_shared<ConnectionExecutionContextFilterState>(
+      std::move(connection_execution_context));
+  filter_state->setData(kConnectionExecutionContextFilterStateName, filter_state_object,
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::Connection);
+
+  EXPECT_EQ(getConnectionExecutionContext(*client_connection_), context_pointer);
+  disconnect(true);
 }
 
 TEST_P(ConnectionImplTest, GetCongestionWindow) {
@@ -637,6 +672,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test that connection is AbortReset closed during callback.
 TEST_P(ConnectionImplTest, ClientAbortResetDuringCallback) {
   Network::ClientConnectionPtr upstream_connection_;
@@ -783,6 +819,7 @@ TEST_P(ConnectionImplTest, ServerResetCloseRuntimeDisabled) {
   server_connection_->close(ConnectionCloseType::AbortReset);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 struct MockConnectionStats {
   Connection::ConnectionStats toBufferStats() {
@@ -1108,6 +1145,7 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test normal RST close without readDisable.
 TEST_P(ConnectionImplTest, RstCloseOnNotReadDisabledConnection) {
   setUpBasicConnection();
@@ -1185,6 +1223,7 @@ TEST_P(ConnectionImplTest, RstCloseOnReadEarlyCloseDisabledThenWrite) {
   client_connection_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 // Test that connection half-close is sent and received properly.
 TEST_P(ConnectionImplTest, HalfClose) {
@@ -1226,6 +1265,7 @@ TEST_P(ConnectionImplTest, HalfClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test that connection is immediately closed when RST is detected even
 // half-close is enabled
 TEST_P(ConnectionImplTest, HalfCloseResetClose) {
@@ -1343,7 +1383,6 @@ TEST_P(ConnectionImplTest, HalfCloseThenResetClose) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-#if !defined(WIN32)
 // Test that no remote close event will be propagated back to peer, when a connection is
 // half-closed and then the connection is RST closed. Writing data to the half closed and then
 // reset connection will lead to broken pipe error rather than reset error.
@@ -1868,8 +1907,10 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
   NiceMock<Network::MockListenerConfig> listener_config;
   Server::ThreadLocalOverloadStateOptRef overload_state;
-  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config,
-                                          overload_state);
+  listener_ = std::make_unique<Network::TcpListenerImpl>(
+      *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
+      listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), source_address_,
@@ -3420,8 +3461,10 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     NiceMock<Network::MockListenerConfig> listener_config;
     Server::ThreadLocalOverloadStateOptRef overload_state;
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config,
-                                            overload_state);
+    listener_ = std::make_unique<Network::TcpListenerImpl>(
+        *dispatcher_, api_->randomGenerator(), runtime_, socket_, listener_callbacks_,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->connectionInfoProvider().localAddress(),

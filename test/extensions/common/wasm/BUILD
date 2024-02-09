@@ -21,6 +21,7 @@ envoy_cc_test(
     data = envoy_select_wasm_rust_tests([
         "//test/extensions/common/wasm/test_data:test_rust.wasm",
     ]),
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
         "//test/extensions/common/wasm:wasm_runtime",
@@ -40,6 +41,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
     external_deps = ["abseil_optional"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
@@ -63,6 +65,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "plugin_test",
     srcs = ["plugin_test.cc"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
         "//test/test_common:environment_lib",
@@ -76,6 +79,7 @@ envoy_cc_test_binary(
         "abseil_optional",
         "benchmark",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/extensions/common/wasm:wasm_lib",
@@ -90,6 +94,7 @@ envoy_cc_test_library(
     name = "wasm_runtime",
     srcs = ["wasm_runtime.cc"],
     hdrs = ["wasm_runtime.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/wasm_runtime/null:config",
         "//source/extensions/wasm_runtime/v8:config",
@@ -102,6 +107,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "wasm_runtime_factory_test",
     srcs = ["wasm_runtime_factory_test.cc"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
@@ -112,6 +118,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/common:base_includes",
         "//source/extensions/common/wasm:wasm_lib",
@@ -130,6 +137,7 @@ envoy_cc_test(
             "-DWASM_USE_CEL_PARSER",
         ],
     }),
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/tcp_proxy",

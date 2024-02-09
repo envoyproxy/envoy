@@ -117,8 +117,9 @@ public:
    * @param config supplies the protobuf configuration for the filter
    * @param validation_visitor message validation visitor instance.
    * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
+   * or an error message.
    */
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  virtual absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsConfig(const Protobuf::Message& config,
                               ProtocolOptionsFactoryContext& factory_context) {
     UNREFERENCED_PARAMETER(config);
@@ -279,9 +280,10 @@ public:
    * configuration.
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
-   * @return Http::FilterFactoryCb the factory creation function.
+   * @return  absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
+   * creation fails.
    */
-  virtual Http::FilterFactoryCb
+  virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
@@ -316,7 +318,7 @@ public:
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual Http::FilterFactoryCb
+  virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) PURE;
 };

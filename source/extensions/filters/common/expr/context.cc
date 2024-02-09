@@ -164,7 +164,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Trailers) {
     return CelValue::CreateMap(&trailers_);
   } else if (value == Flags) {
-    return CelValue::CreateInt64(info_.responseFlags());
+    return CelValue::CreateInt64(info_.legacyResponseFlags());
   } else if (value == GrpcStatus) {
     auto const& optional_status = Grpc::Common::getGrpcStatus(
         trailers_.value_ ? *trailers_.value_ : *Http::StaticEmptyHeaders::get().response_trailers,
@@ -208,6 +208,11 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   } else if (value == ConnectionTerminationDetails) {
     if (info_.connectionTerminationDetails().has_value()) {
       return CelValue::CreateString(&info_.connectionTerminationDetails().value());
+    }
+    return {};
+  } else if (value == DownstreamTransportFailureReason) {
+    if (!info_.downstreamTransportFailureReason().empty()) {
+      return CelValue::CreateStringView(info_.downstreamTransportFailureReason());
     }
     return {};
   }
@@ -298,6 +303,7 @@ public:
   // Default stubs.
   int size() const override { return 0; }
   bool empty() const override { return true; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return &WrapperFields::get().Empty;
   }
@@ -351,35 +357,54 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
     return {};
   }
   auto value = key.StringOrDie().value();
+  if (value == Node) {
+    if (local_info_) {
+      return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
+    }
+    return {};
+  }
+  if (info_ == nullptr) {
+    return {};
+  }
   if (value == ClusterName) {
-    const auto cluster_info = info_.upstreamClusterInfo();
+    const auto cluster_info = info_->upstreamClusterInfo();
     if (cluster_info && cluster_info.value()) {
       return CelValue::CreateString(&cluster_info.value()->name());
     }
   } else if (value == ClusterMetadata) {
-    const auto cluster_info = info_.upstreamClusterInfo();
+    const auto cluster_info = info_->upstreamClusterInfo();
     if (cluster_info && cluster_info.value()) {
       return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(), &arena_);
     }
   } else if (value == RouteName) {
-    if (info_.route()) {
-      return CelValue::CreateString(&info_.route()->routeName());
+    if (info_->route()) {
+      return CelValue::CreateString(&info_->route()->routeName());
     }
   } else if (value == RouteMetadata) {
-    if (info_.route()) {
-      return CelProtoWrapper::CreateMessage(&info_.route()->metadata(), &arena_);
+    if (info_->route()) {
+      return CelProtoWrapper::CreateMessage(&info_->route()->metadata(), &arena_);
     }
   } else if (value == UpstreamHostMetadata) {
-    const auto upstream_info = info_.upstreamInfo();
+    const auto upstream_info = info_->upstreamInfo();
     if (upstream_info && upstream_info->upstreamHost()) {
       return CelProtoWrapper::CreateMessage(upstream_info->upstreamHost()->metadata().get(),
                                             &arena_);
     }
   } else if (value == FilterChainName) {
-    const auto filter_chain_info = info_.downstreamAddressProvider().filterChainInfo();
+    const auto filter_chain_info = info_->downstreamAddressProvider().filterChainInfo();
     const absl::string_view filter_chain_name =
         filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
     return CelValue::CreateStringView(filter_chain_name);
+  } else if (value == ListenerMetadata) {
+    const auto listener_info = info_->downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &arena_);
+    }
+  } else if (value == ListenerDirection) {
+    const auto listener_info = info_->downstreamAddressProvider().listenerInfo();
+    if (listener_info) {
+      return CelValue::CreateInt64(listener_info->direction());
+    }
   }
   return {};
 }

@@ -73,10 +73,16 @@ public:
   };
 
   explicit ProcessorState(Filter& filter,
-                          envoy::config::core::v3::TrafficDirection traffic_direction)
+                          envoy::config::core::v3::TrafficDirection traffic_direction,
+                          const std::vector<std::string>& untyped_forwarding_namespaces,
+                          const std::vector<std::string>& typed_forwarding_namespaces,
+                          const std::vector<std::string>& untyped_receiving_namespaces)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        partial_body_processed_(false), traffic_direction_(traffic_direction) {}
+        partial_body_processed_(false), traffic_direction_(traffic_direction),
+        untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
+        typed_forwarding_namespaces_(&typed_forwarding_namespaces),
+        untyped_receiving_namespaces_(&untyped_receiving_namespaces) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -100,6 +106,28 @@ public:
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) PURE;
+
+  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
+    return *untyped_forwarding_namespaces_;
+  };
+  void setUntypedForwardingMetadataNamespaces(const std::vector<std::string>& ns) {
+    untyped_forwarding_namespaces_ = &ns;
+  };
+
+  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
+    return *typed_forwarding_namespaces_;
+  };
+  void setTypedForwardingMetadataNamespaces(const std::vector<std::string>& ns) {
+    typed_forwarding_namespaces_ = &ns;
+  };
+
+  const std::vector<std::string>& untypedReceivingMetadataNamespaces() const {
+    return *untyped_receiving_namespaces_;
+  };
+  void setUntypedReceivingMetadataNamespaces(const std::vector<std::string>& ns) {
+    untyped_receiving_namespaces_ = &ns;
+  };
+
   bool sendHeaders() const { return send_headers_; }
   bool sendTrailers() const { return send_trailers_; }
   envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode bodyMode() const {
@@ -143,6 +171,21 @@ public:
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
+  bool shouldRemoveContentLength() const {
+    // Always remove the content length in 3 cases below:
+    // 1) STREAMED BodySendMode
+    // 2) BUFFERED_PARTIAL BodySendMode
+    // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
+    // In these modes, ext_proc filter can not guarantee to set the content length correctly if
+    // body is mutated by external processor later.
+    // In http1 codec, removing content length will enable chunked encoding whenever feasible.
+    return (
+        body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED ||
+        body_mode_ ==
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED_PARTIAL ||
+        (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED &&
+         !send_headers_));
+  }
 
   virtual Http::HeaderMap* addTrailers() PURE;
 
@@ -156,6 +199,8 @@ public:
   mutableBody(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
   virtual envoy::service::ext_proc::v3::HttpTrailers*
   mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
+
+  virtual Http::StreamFilterCallbacks* callbacks() const PURE;
 
 protected:
   void setBodyMode(
@@ -201,6 +246,10 @@ protected:
   absl::optional<MonotonicTime> call_start_time_ = absl::nullopt;
   const envoy::config::core::v3::TrafficDirection traffic_direction_;
 
+  const std::vector<std::string>* untyped_forwarding_namespaces_{};
+  const std::vector<std::string>* typed_forwarding_namespaces_{};
+  const std::vector<std::string>* untyped_receiving_namespaces_{};
+
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
 };
@@ -208,8 +257,13 @@ private:
 class DecodingProcessorState : public ProcessorState {
 public:
   explicit DecodingProcessorState(
-      Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
-      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND) {
+      Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
+      const std::vector<std::string>& untyped_forwarding_namespaces,
+      const std::vector<std::string>& typed_forwarding_namespaces,
+      const std::vector<std::string>& untyped_receiving_namespaces)
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
+                       untyped_forwarding_namespaces, typed_forwarding_namespaces,
+                       untyped_receiving_namespaces) {
     setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
@@ -268,6 +322,8 @@ public:
   void requestWatermark() override;
   void clearWatermark() override;
 
+  Http::StreamFilterCallbacks* callbacks() const override { return decoder_callbacks_; }
+
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
@@ -281,8 +337,13 @@ private:
 class EncodingProcessorState : public ProcessorState {
 public:
   explicit EncodingProcessorState(
-      Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
-      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND) {
+      Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode,
+      const std::vector<std::string>& untyped_forwarding_namespaces,
+      const std::vector<std::string>& typed_forwarding_namespaces,
+      const std::vector<std::string>& untyped_receiving_namespaces)
+      : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
+                       untyped_forwarding_namespaces, typed_forwarding_namespaces,
+                       untyped_receiving_namespaces) {
     setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
@@ -340,6 +401,8 @@ public:
 
   void requestWatermark() override;
   void clearWatermark() override;
+
+  Http::StreamFilterCallbacks* callbacks() const override { return encoder_callbacks_; }
 
 private:
   void setProcessingModeInternal(

@@ -110,7 +110,8 @@ TEST_P(MySQLIntegrationTest, MySQLLoginTest) {
  * - correct number of attempts
  * - no failures
  */
-TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
+// TODO(https://github.com/envoyproxy/envoy/issues/30852) enable
+TEST_P(MySQLIntegrationTest, DISABLED_MySQLUnitTestMultiClientsLoop) {
   int idx;
   std::string rcvd_data;
 

@@ -93,7 +93,7 @@ public:
     Network::ReadFilterCallbacks* read_callbacks_{};
   };
 
-  // Helper read filter inserted into downstream filter chain. The filter reacts to
+  // Helper read filter inserted into downstream network filter chain. The filter reacts to
   // SwitchViaFilterManager string and signals to the filter manager to signal to the terminal
   // filter to switch upstream connection to secure mode.
   struct DownstreamReadFilter : public Network::ReadFilter {
@@ -180,8 +180,8 @@ public:
       // Inject two filters into downstream connection: first is helper read filter and then
       // terminal filter.
       filter_manager.addReadFilter(std::make_shared<StartTlsSwitchFilter::DownstreamReadFilter>());
-      filter_manager.addReadFilter(
-          StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
+      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(
+          context.serverFactoryContext().clusterManager(), upstream_callbacks_));
     };
   }
 

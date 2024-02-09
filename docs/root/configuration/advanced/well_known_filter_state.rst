@@ -3,7 +3,7 @@
 Well Known Filter State Objects
 ===============================
 
-The following list of filter state objects are consumed by Envoy extensions:
+The following lists the filter state object keys used by the Envoy extensions:
 
 ``envoy.network.upstream_server_name``
   Sets the transport socket option to override the `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ in
@@ -56,6 +56,12 @@ The following list of filter state objects are consumed by Envoy extensions:
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` to disable tunneling on a
   per-connection bases. Accepts values "true" and "false".
 
+``envoy.filters.network.http_connection_manager.local_reply_owner``
+  Shared filter status for logging which filter config name in the HTTP filter chain sent the local reply.
+
+``envoy.string``
+  A special generic string object factory, to be used as a :ref:`factory lookup key
+  <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
 
 Filter state object fields
 --------------------------

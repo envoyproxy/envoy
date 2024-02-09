@@ -13,7 +13,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/region_provider_impl.h"
-#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
@@ -44,13 +44,35 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
+
+        std::string region;
+        region = config.region();
+
+        if (region.empty()) {
+          auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+          absl::optional<std::string> regionOpt = region_provider->getRegion();
+          if (!regionOpt.has_value()) {
+            throw EnvoyException(
+                "Region string cannot be retrieved from configuration, environment or "
+                "profile/config files.");
+          }
+          region = regionOpt.value();
+        }
+
+        // TODO(suniltheta): Due to the reasons explained in
+        // https://github.com/envoyproxy/envoy/issues/27586 this aws iam plugin is not able to
+        // utilize http async client to fetch AWS credentials. For time being this is still using
+        // libcurl to fetch the credentials. To fully get rid of curl, need to address the below
+        // usage of AWS credentials common utils. Until then we are setting nullopt for server
+        // factory context.
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            api, Common::Aws::Utility::fetchMetadata);
-        auto signer = std::make_unique<Common::Aws::SignerImpl>(
-            config.service_name(), getRegion(config), credentials_provider, api.timeSource(),
+            api, absl::nullopt /*Empty factory context*/, region,
+            Common::Aws::Utility::fetchMetadata);
+        auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
+            config.service_name(), region, credentials_provider, api.timeSource(),
             // TODO: extend API to allow specifying header exclusion. ref:
             // https://github.com/envoyproxy/envoy/pull/18998
-            Common::Aws::AwsSigV4HeaderExclusionVector{});
+            Common::Aws::AwsSigningHeaderExclusionVector{});
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer)));
         if (call_creds == nullptr) {
@@ -74,24 +96,6 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
   return creds;
 }
 
-std::string AwsIamGrpcCredentialsFactory::getRegion(
-    const envoy::config::grpc_credential::v3::AwsIamConfig& config) {
-  Common::Aws::RegionProviderPtr region_provider;
-  if (!config.region().empty()) {
-    region_provider = std::make_unique<Common::Aws::StaticRegionProvider>(config.region());
-  } else {
-    region_provider = std::make_unique<Common::Aws::EnvironmentRegionProvider>();
-  }
-
-  if (!region_provider->getRegion().has_value()) {
-    throw EnvoyException("Could not determine AWS region. "
-                         "If you are not running Envoy in EC2 or ECS, "
-                         "provide the region in the plugin configuration.");
-  }
-
-  return *region_provider->getRegion();
-}
-
 grpc::Status
 AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::string_ref method_name,
                                        const grpc::AuthContext&,
@@ -101,7 +105,9 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
                                     absl::string_view(method_name.data(), method_name.length()));
 
   TRY_NEEDS_AUDIT { signer_->sign(message, false); }
-  END_TRY catch (const EnvoyException& e) { return {grpc::StatusCode::INTERNAL, e.what()}; }
+  END_TRY catch (const EnvoyException& e) {
+    return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
+  }
 
   signedHeadersToMetadata(message.headers(), *metadata);
 

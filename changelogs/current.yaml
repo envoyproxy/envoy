@@ -10,32 +10,129 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: adaptive concurrency filter stats
+  change: |
+    Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+- area: dns
+  change: |
+    Allowing <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>` to go as low as 1s.
+- area: upstream
+  change: |
+    Upstream now excludes hosts set to ``DRAINING`` state via EDS from load balancing and panic routing
+    threshold calculation. This feature can be disabled by setting
+    ``envoy.reloadable_features.exclude_host_in_eds_status_draining`` to false.
+- area: golang
+  change: |
+    Change ``RegisterHttpFilterConfigFactoryAndParser`` to ``RegisterHttpFilterFactoryAndConfigParser``.
+- area: QUIC
+  change: |
+    Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
+    is degrading. Can be manually turned on via
+    :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: aws
+  change: |
+    AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
+    grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
+    xDS region will take preference. aws_request_signer documentation now reflects the region chain.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: xds
+- area: tracers
   change: |
-    Fixed a bug (https://github.com/envoyproxy/envoy/issues/27702) that caused ADS initialization
-    to fail on the first attempt and set a back-off retry interval of up to 1 second, if ADS is
-    using an Envoy Cluster for the backend. The issue was fixed to ensure that ADS initialization
-    happens after the Envoy Cluster it depends upon has been properly initialized. ADS that does
-    not depend on an Envoy Cluster (i.e. GoogleGrpc) is not affected by this change.
-- area: grpc
+    use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
+- area: load balancing
   change: |
-    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+    Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
+    a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.edf_lb_locality_scheduler_init_fix`` to false.
+- area: UDP and TCP tunneling
+  change: |
+    fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
+    ``propagate_response_headers`` and retry configurations are enabled at the same time, and an upstream
+    request is retried multiple times.
+- area: tracing
+  change: |
+    Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-- area: router
+- area: http
   change: |
-    Removed the deprecated ``envoy.reloadable_features.prohibit_route_refresh_after_response_headers_sent``
-    runtime flag and legacy code path.
-
-- area: upstream
+    Removed ``envoy.reloadable_features.allow_absolute_url_with_mixed_scheme`` runtime flag and legacy code paths.
+- area: active health check
   change: |
-    Removed the deprecated ``envoy.reloadable_features.validate_detailed_override_host_statuses``
-    runtime flag and legacy code path.
+    Removed ``envoy.reloadable_features.keep_endpoint_active_hc_status_on_locality_update`` runtime flag and legacy code paths.
+- area: http1
+  change: |
+    Removed ``envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers`` runtime flag and legacy code paths.
+- area: overload manager
+  change: |
+    removed ``envoy.reloadable_features.overload_manager_error_unknown_action`` and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy_reloadable_features_append_xfh_idempotent`` runtime flag and legacy code paths.
+- area: resource_monitors
+  change: |
+    removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` runtime flag  and legacy code paths.
 
 new_features:
+- area: aws_request_signing
+  change: |
+    Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: aws_lambda
+  change: |
+    Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
+    signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: grpc reverse bridge
+  change: |
+    Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter
+    to preserve HTTP 1.1 responses.  This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` to false.
+- area: quic
+  change: |
+    Added QUIC protocol option :ref:`send_disable_active_migration
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to make the server send clients a transport
+    parameter to discourage client endpoints from active migration.
+- area: ext_proc
+  change: |
+    implemented
+    :ref:`request_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.request_attributes>`
+    and
+    :ref:`response_attributes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.response_attributes>`
+    config APIs to enable sending and receiving attributes to/from the external processing server.
+- area: access log
+  change: |
+    added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
+    identifier.
+- area: aws_lambda
+  change: |
+    Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
+    during signature.
+- area: ext_proc
+  change: |
+    added
+    :ref:`metadata_options <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.metadata_options>`
+    config API to enable sending and receiving metadata from/to the external processing server. Both typed and untyped dynamic
+    metadata may be sent to the server. If
+    :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
+    is defined, returned metadata may be written to the specified allowed namespaces.
+- area: monitoring
+  change: |
+    Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is
+    disabled by default, it can be enabled by runtime feature flag ``envoy.restart_features.enable_execution_context``. For more details,
+    please see https://github.com/envoyproxy/envoy/issues/32012.
+- area: rbac
+  change: |
+    Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
+    :ref:`UriTemplateMatchConfig<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>`
+    to allow use of glob patterns for URI path matching in RBAC.
+- area: upstream
+  change: |
+    Added :ref:`selection_method <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    option to the least request load balancer. If set to ``FULL_SCAN``,
+    Envoy will select the host with the fewest active requests from the entire host set rather than
+    :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    random choices.
 
 deprecated:

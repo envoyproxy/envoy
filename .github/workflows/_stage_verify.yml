@@ -6,48 +6,84 @@ permissions:
 on:
   workflow_call:
     inputs:
+      request:
+        type: string
+        required: true
       trusted:
         type: boolean
-        default: false
-      repo_ref:
-        type: string
-      given_ref:
-        type: string
+        required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-verify
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.event.workflow.id }}-verify
   cancel-in-progress: true
+
 
 jobs:
   verify:
+    permissions:
+      contents: read
+      packages: read
     name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_run.yml
+    with:
+      cache-build-image:
+      container-command:
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
+      runs-on: envoy-x64-small
+      steps-pre: ${{ matrix.steps-pre }}
+      source: ${{ matrix.source }}
+      target: ${{ matrix.target }}
+      trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
       matrix:
         include:
-        - target: verify_examples
-          name: examples
-          rbe: false
-          managed: true
-          cache_build_image: ""
-          command_prefix: ""
-          diskspace_hack: true
-          run_pre: ./.github/actions/verify/examples/setup
-          run_pre_with: |
-            bucket: envoy-${{ inputs.trusted && 'postsubmit' || 'pr' }}
-            ref: ${{ inputs.given_ref }}
-          env: |
+        - name: examples
+          target: verify_examples
+          source: |
             export NO_BUILD_SETUP=1
-    uses: ./.github/workflows/_ci.yml
-    with:
-      target: ${{ matrix.target }}
-      rbe: ${{ matrix.rbe }}
-      managed: ${{ matrix.managed }}
-      cache_build_image: ${{ matrix.cache_build_image }}
-      diskspace_hack: ${{ matrix.diskspace_hack }}
-      command_prefix: ${{ matrix.command_prefix }}
-      run_pre: ${{ matrix.run_pre }}
-      run_pre_with: ${{ matrix.run_pre_with }}
-      env: ${{ matrix.env }}
-      trusted: ${{ inputs.trusted }}
-      repo_ref: ${{ inputs.repo_ref }}
+          rbe: false
+          steps-pre: |
+            - id: url
+              uses: envoyproxy/toolshed/gh-actions/jq@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+              with:
+                options: -Rr
+                input: >-
+                  ${{ inputs.trusted
+                      && fromJSON(inputs.request).request.sha
+                      || fromJSON(inputs.request).request.ref }}
+                filter: |
+                  .[:7] as $sha
+                  | if ${{ inputs.trusted }} then
+                      "envoy-postsubmit"
+                    else
+                      "envoy-pr"
+                    end
+                  | . as $bucket
+                  | "https://storage.googleapis.com/\($bucket)/\($sha)"
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+              with:
+                url: %{{ steps.url.outputs.value }}/docker/envoy.tar
+                variant: dev
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+              with:
+                url: %{{ steps.url.outputs.value }}/docker/envoy-contrib.tar
+                variant: contrib-dev
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+              with:
+                url: %{{ steps.url.outputs.value }}/docker/envoy-google-vrp.tar
+                variant: google-vrp-dev
+            - run: docker images | grep envoy
+              shell: bash
+            - run: |
+                # Install expected host packages
+                export DEBIAN_FRONTEND=noninteractive
+                sudo apt-get -qq update -y
+                sudo apt-get -qq install -y --no-install-recommends expect gettext whois
+                pip install -r ./.github/workflows/verify-requirements.txt
+              shell: bash

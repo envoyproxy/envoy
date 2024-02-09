@@ -44,6 +44,7 @@
 #include "source/common/http/user_agent.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -126,6 +127,7 @@ public:
   // prematurely closed.
   static const absl::string_view PrematureResetMinStreamLifetimeSecondsKey;
   static const absl::string_view MaxRequestsPerIoCycle;
+  static const absl::string_view OptionallyDelayClose;
 
 private:
   struct ActiveStream;
@@ -179,6 +181,13 @@ private:
                               public DownstreamStreamFilterCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
+
+    // Event::DeferredDeletable
+    void deleteIsPending() override {
+      // The stream should not be accessed once deferred delete has been called.
+      still_alive_.reset();
+    }
+
     void completeRequest();
 
     const Network::Connection* connection();
@@ -227,6 +236,10 @@ private:
     }
 
     // ScopeTrackedObject
+    ExecutionContext* executionContext() const override {
+      return getConnectionExecutionContext(connection_manager_.read_callbacks_->connection());
+    }
+
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_);
@@ -472,8 +485,6 @@ private:
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
 
-    const bool expand_agnostic_stream_lifetime_;
-
     // Snapshot of the route configuration at the time of request is started. This is used to ensure
     // that the same route configuration is used throughout the lifetime of the request. This
     // snapshot will be cleared when the cached route is blocked. Because after that we will not
@@ -522,6 +533,7 @@ private:
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
+    std::queue<MetadataMapPtr> deferred_metadata_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -575,7 +587,7 @@ private:
    */
   void doEndStream(ActiveStream& stream, bool check_for_deferred_close = true);
 
-  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
+  void resetAllStreams(absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                        absl::string_view details);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
@@ -583,11 +595,11 @@ private:
   void startDrainSequence();
   Tracing::Tracer& tracer() { return *config_.tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
-                            StreamInfo::ResponseFlag response_flag);
+                            StreamInfo::CoreResponseFlag response_flag);
   void handleCodecError(absl::string_view error);
   void handleCodecOverloadError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
-                         absl::optional<StreamInfo::ResponseFlag> response_flag,
+                         absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than

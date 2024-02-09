@@ -46,9 +46,9 @@ public:
   void TearDown();
 
 protected:
-  envoy_engine_t& rawEngine() {
+  envoy_engine_t rawEngine() {
     absl::MutexLock l(&engine_lock_);
-    return engine_->engine_;
+    return reinterpret_cast<envoy_engine_t>(engine_->engine_);
   }
   virtual void initialize() override;
   void createEnvoy() override;
@@ -79,7 +79,6 @@ protected:
   Platform::EngineSharedPtr engine_ ABSL_GUARDED_BY(engine_lock_);
   Thread::ThreadPtr envoy_thread_;
   bool explicit_flow_control_ = false;
-  uint64_t min_delivery_size_ = 10;
   bool expect_dns_ = true;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;

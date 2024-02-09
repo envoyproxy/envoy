@@ -41,6 +41,8 @@ public:
   IoUringResult prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                               off_t offset, Request* user_data) override;
   IoUringResult prepareClose(os_fd_t fd, Request* user_data) override;
+  IoUringResult prepareCancel(Request* cancelling_user_data, Request* user_data) override;
+  IoUringResult prepareShutdown(os_fd_t fd, int how, Request* user_data) override;
   IoUringResult submit() override;
   void injectCompletion(os_fd_t fd, Request* user_data, int32_t result) override;
   void removeInjectedCompletion(os_fd_t fd) override;
@@ -50,21 +52,6 @@ private:
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
   std::list<InjectedCompletion> injected_completions_;
-};
-
-class IoUringFactoryImpl : public IoUringFactory {
-public:
-  IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                     ThreadLocal::SlotAllocator& tls);
-
-  // IoUringFactory
-  IoUring& getOrCreate() const override;
-  void onServerInitialized() override;
-
-private:
-  const uint32_t io_uring_size_{};
-  const bool use_submission_queue_polling_{};
-  ThreadLocal::TypedSlot<IoUringImpl> tls_;
 };
 
 } // namespace Io

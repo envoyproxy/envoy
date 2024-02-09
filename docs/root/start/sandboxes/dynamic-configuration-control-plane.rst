@@ -202,6 +202,12 @@ is configured to proxy to ``service2``:
    :language: json
    :emphasize-lines: 3, 11, 19-20
 
+.. note::
+   In this example we increment the version for simplicity.
+
+   Any change to the version will trigger an update in Envoy, and ordering is not significant
+   (see :ref:`xDS protocol docs for further information about updates <xds_ack_nack>`).
+
 .. seealso::
 
    :ref:`Dynamic configuration (control plane) quick start guide <start_quick_start_dynamic_control_plane>`

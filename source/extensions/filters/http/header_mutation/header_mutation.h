@@ -29,15 +29,14 @@ public:
       : request_mutations_(config.request_mutations()),
         response_mutations_(config.response_mutations()) {}
 
-  void mutateRequestHeaders(Http::RequestHeaderMap& request_headers,
+  void mutateRequestHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
                             const StreamInfo::StreamInfo& stream_info) const;
-  void mutateResponseHeaders(const Http::RequestHeaderMap& request_headers,
-                             Http::ResponseHeaderMap& response_headers,
+  void mutateResponseHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
                              const StreamInfo::StreamInfo& stream_info) const;
 
 private:
-  Http::HeaderMutations request_mutations_;
-  Http::HeaderMutations response_mutations_;
+  const Http::HeaderMutations request_mutations_;
+  const Http::HeaderMutations response_mutations_;
 };
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
@@ -57,8 +56,11 @@ public:
 
   const Mutations& mutations() const { return mutations_; }
 
+  bool mostSpecificHeaderMutationsWins() const { return most_specific_header_mutations_wins_; }
+
 private:
   Mutations mutations_;
+  const bool most_specific_header_mutations_wins_;
 };
 using HeaderMutationConfigSharedPtr = std::shared_ptr<HeaderMutationConfig>;
 
@@ -74,7 +76,8 @@ public:
 
 private:
   HeaderMutationConfigSharedPtr config_{};
-  const PerRouteHeaderMutation* route_config_{};
+  // The lifetime of route config pointers is same as the matched route.
+  absl::InlinedVector<const PerRouteHeaderMutation*, 3> route_configs_{};
 };
 
 } // namespace HeaderMutation

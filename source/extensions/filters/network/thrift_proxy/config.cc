@@ -46,10 +46,13 @@ SINGLETON_MANAGER_REGISTRATION(thrift_route_config_provider_manager);
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
+
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(thrift_route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+      server_context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(thrift_route_config_provider_manager),
+          [&server_context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(server_context.admin());
           });
 
   std::shared_ptr<Config> filter_config(
@@ -60,8 +63,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
   return [route_config_provider_manager, filter_config,
           &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.api().randomGenerator(),
-        context.mainThreadDispatcher().timeSource(), context.drainDecision()));
+        *filter_config, context.serverFactoryContext().api().randomGenerator(),
+        context.serverFactoryContext().mainThreadDispatcher().timeSource(),
+        context.drainDecision()));
   };
 }
 
@@ -110,10 +114,10 @@ ConfigImpl::ConfigImpl(
       }
     }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
-        config.trds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
+        config.trds(), context_.serverFactoryContext(), stats_prefix_, context_.initManager());
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context_.getServerFactoryContext());
+        config.route_config(), context_.serverFactoryContext());
   }
 
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {

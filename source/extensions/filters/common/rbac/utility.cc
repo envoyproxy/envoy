@@ -12,7 +12,7 @@ namespace RBAC {
 
 RoleBasedAccessControlFilterStats
 generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + "rbac.";
+  const std::string final_prefix = Envoy::statPrefixJoin(prefix, "rbac.");
   return {ENFORCE_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))
               SHADOW_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix + shadow_prefix))};
 }

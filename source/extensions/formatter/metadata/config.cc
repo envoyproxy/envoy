@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Formatter {
 
 ::Envoy::Formatter::CommandParserPtr MetadataFormatterFactory::createCommandParserFromProto(
-    const Protobuf::Message&, Server::Configuration::CommonFactoryContext&) {
+    const Protobuf::Message&, Server::Configuration::GenericFactoryContext&) {
   return std::make_unique<MetadataFormatterCommandParser>();
 }
 

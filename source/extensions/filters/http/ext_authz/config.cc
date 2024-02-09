@@ -23,9 +23,11 @@ namespace ExtAuthz {
 Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
+
   const auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, context.scope(), context.runtime(), context.httpContext(), stats_prefix,
-      context.getServerFactoryContext().bootstrap());
+      proto_config, context.scope(), server_context.runtime(), server_context.httpContext(),
+      stats_prefix, server_context.bootstrap());
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
@@ -38,9 +40,9 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
             proto_config, timeout_ms, proto_config.http_service().path_prefix());
     callback = [filter_config, client_config,
-                &context](Http::FilterChainFactoryCallbacks& callbacks) {
+                &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
-          context.clusterManager(), client_config);
+          server_context.clusterManager(), client_config);
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
   } else {
@@ -54,8 +56,10 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     callback = [&context, filter_config, timeout_ms,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
-              config_with_hash_key, context.scope(), true),
+          context.serverFactoryContext()
+              .clusterManager()
+              .grpcAsyncClientManager()
+              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true),
           std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };

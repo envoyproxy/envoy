@@ -150,7 +150,7 @@ public:
                                Server::Configuration::UpstreamFactoryContext& context) override {
     const auto& config = MessageUtil::downcastAndValidate<
         const test::integration::filters::TestDrainerUpstreamNetworkFilterConfig&>(
-        proto_config, context.getServerFactoryContext().messageValidationVisitor());
+        proto_config, context.serverFactoryContext().messageValidationVisitor());
     return [config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addWriteFilter(std::make_shared<TestDrainerUpstreamNetworkFilter>(config));
     };

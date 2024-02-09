@@ -50,6 +50,8 @@ public:
 
   void registerGeoDbStats(const std::string& db_type);
 
+  Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
+
 private:
   absl::optional<std::string> city_db_path_;
   absl::optional<std::string> isp_db_path_;
@@ -66,9 +68,8 @@ private:
   absl::optional<std::string> anon_tor_header_;
   absl::optional<std::string> anon_proxy_header_;
 
-  Stats::Scope& scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_hit_;
   void incCounter(Stats::StatName name);
 };

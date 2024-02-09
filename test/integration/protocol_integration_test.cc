@@ -201,15 +201,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
     EXPECT_EQ("301", response->headers().getStatusValue());
     EXPECT_EQ("https://www.redirect.com/foo",
               response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
-    if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(69, 30, 69, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    } else {
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                           BytesCountExpectation(0, 30, 0, 30),
-                                           BytesCountExpectation(0, 30, 0, 30));
-    }
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
+                                         BytesCountExpectation(69, 30, 69, 30),
+                                         BytesCountExpectation(0, 30, 0, 30));
   } else {
     // All QUIC requests use https, and should not be redirected. (Even those sent with http scheme
     // will be overridden to https by HCM.)
@@ -261,11 +255,13 @@ TEST_P(DownstreamProtocolIntegrationTest, AddInvalidEncodedData) {
         initialize();
         codec_client_ = makeHttpConnection(lookupPort("http"));
         default_request_headers_.setCopy(Envoy::Http::LowerCaseString("invalid-encode"), "yes");
-        auto response = std::move((codec_client_->startRequest(default_request_headers_)).second);
+        auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+        auto response = std::move(encoder_decoder.second);
         ASSERT_TRUE(response->waitForEndStream());
         EXPECT_EQ("502", response->headers().getStatusValue());
         EXPECT_THAT(waitForAccessLog(access_log_name_),
                     HasSubstr("filter_added_invalid_response_data"));
+        cleanupUpstreamAndDownstream();
       },
       "Invalid response data");
 }
@@ -717,15 +713,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(40, 58, 40, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  } else {
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
-  }
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 88, 71, 54),
+                                       BytesCountExpectation(40, 58, 40, 58),
+                                       BytesCountExpectation(7, 10, 7, 8));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
@@ -794,6 +784,29 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesC
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1152, 90, 81),
                                        BytesCountExpectation(0, 58, 0, 58),
                                        BytesCountExpectation(7, 10, 7, 8));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
+
+  default_request_headers_.setTE("gzip");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ("", upstream_headers->getTEValue());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
@@ -1107,6 +1120,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("507", response->headers().getStatusValue());
   test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+  cleanupUpstreamAndDownstream();
 }
 
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
@@ -2975,6 +2989,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_TRUE(response->complete());
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
@@ -3456,6 +3474,7 @@ TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeData) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 // Verify that when a filter decodeData callback overflows request buffer in filter manager the
@@ -3602,7 +3621,8 @@ TEST_P(
   constexpr uint32_t window_size = 65535;
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions());
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
   http2_options.mutable_initial_stream_window_size()->set_value(window_size);
   http2_options.mutable_initial_connection_window_size()->set_value(window_size);
 
@@ -3685,7 +3705,8 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
 
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions());
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
   http2_options.mutable_initial_stream_window_size()->set_value(65535);
   http2_options.mutable_initial_connection_window_size()->set_value(65535);
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);

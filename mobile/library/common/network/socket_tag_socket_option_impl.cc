@@ -5,7 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 
-#include "library/common/jni/android_jni_utility.h"
+#include "library/jni/android_jni_utility.h"
 
 namespace Envoy {
 namespace Network {
@@ -27,7 +27,7 @@ bool SocketTagSocketOptionImpl::setOption(
   // Further, this only works for sockets which have a raw fd and will be a no-op
   // otherwise.
   int fd = socket.ioHandle().fdDoNotUse();
-  tag_socket(fd, uid_, traffic_stats_tag_);
+  JNI::tagSocket(fd, uid_, traffic_stats_tag_);
   return true;
 }
 

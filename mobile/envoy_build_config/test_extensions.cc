@@ -1,5 +1,6 @@
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/filters/http/buffer/config.h"
+#include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #include "test/common/http/filters/assertion/config.h"
 #include "test/common/http/filters/route_cache_reset/config.h"
@@ -36,6 +37,7 @@ void register_test_extensions() {
   Envoy::Extensions::HttpFilters::TestLogger::forceRegisterFactory();
   Envoy::Extensions::HttpFilters::TestRemoteResponse::
       forceRegisterTestRemoteResponseFilterFactory();
+  Envoy::Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
   Envoy::HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
 

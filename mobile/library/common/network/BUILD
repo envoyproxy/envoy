@@ -1,8 +1,8 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "connectivity_manager_lib",
@@ -46,7 +46,7 @@ envoy_cc_library(
     hdrs = ["socket_tag_socket_option_impl.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/jni:android_jni_utility_lib",
+        "//library/jni:android_jni_utility_lib",
         "@envoy//envoy/network:address_interface",
         "@envoy//source/common/common:scalar_to_byte_vector_lib",
         "@envoy//source/common/network:socket_option_lib",

@@ -163,7 +163,7 @@ function bazel_binary_build() {
     # The COMPILE_TYPE variable is redundant in this case and is only here for
     # readability. It is already set in the .bazelrc config for sizeopt.
     COMPILE_TYPE="opt"
-    CONFIG_ARGS="--config=sizeopt"
+    CONFIG_ARGS=("--config=sizeopt")
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
     COMPILE_TYPE="fastbuild"
   fi
@@ -181,7 +181,7 @@ function bazel_binary_build() {
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
@@ -191,14 +191,14 @@ function bazel_binary_build() {
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" "${CONFIG_ARGS[@]}"
     # Copy the debug information
     cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
   # Validation tools for the tools image.
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/schema_validator:schema_validator_tool ${CONFIG_ARGS}
+    //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
@@ -278,9 +278,7 @@ case $CI_TARGET in
         ;&
 
     api.go)
-        if [[ -z "$NO_BUILD_SETUP" ]]; then
-            setup_clang_toolchain
-        fi
+        setup_clang_toolchain
         GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
         GO_TARGETS=(@envoy_api//...)
         read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
@@ -307,6 +305,16 @@ case $CI_TARGET in
             # echo "Copying go files ${INPUT_DIR} -> ${OUTPUT_DIR}"
             while read -r GO_FILE; do
                 cp -a "$GO_FILE" "$OUTPUT_DIR"
+                if [[ "$GO_FILE" = *.validate.go ]]; then
+                    sed -i '1s;^;//go:build !disable_pgv\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                fi
+                # TODO(https://github.com/planetscale/vtprotobuf/pull/122) do this directly in the generator.
+                # Make vtprotobuf opt-in as it has some impact on binary sizes
+                if [[ "$GO_FILE" = *_vtproto.pb.go ]]; then
+                    if ! grep -q 'package ignore' "$GO_FILE"; then
+                        sed -i '1s;^;//go:build vtprotobuf\n// +build vtprotobuf\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+                    fi
+                fi
             done <<< "$(find "$INPUT_DIR" -name "*.go")"
         done
         ;;
@@ -516,6 +524,7 @@ case $CI_TARGET in
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+              --//tools/dependency:preload_cve_data \
               --action_env=TODAY_DATE \
               -- -v warn \
                  -c cves release_dates releases
@@ -626,7 +635,7 @@ case $CI_TARGET in
         fi
         PLATFORMS="$(IFS=, ; echo "${_PLATFORMS[*]}")"
         export DOCKER_PLATFORM="$PLATFORMS"
-        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 ]]; then
+        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 && -z $ENVOY_DOCKER_SAVE_IMAGE ]]; then
             # if you are not pushing the images and there is only one platform
             # then load to Docker (ie local build)
             export DOCKER_LOAD_IMAGES=1
@@ -790,6 +799,7 @@ case $CI_TARGET in
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
         PUBLISH_ARGS=(
             --publish-commitish="$ENVOY_COMMIT"
@@ -800,7 +810,8 @@ case $CI_TARGET in
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               @envoy_repo//:publish \
-              -- "${PUBLISH_ARGS[@]}"
+              -- --repo="$ENVOY_REPO" \
+                 "${PUBLISH_ARGS[@]}"
         ;;
 
     release|release.server_only)

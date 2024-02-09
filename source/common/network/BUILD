@@ -79,6 +79,7 @@ envoy_cc_library(
     srcs = ["connection_impl_base.cc"],
     hdrs = ["connection_impl_base.h"],
     deps = [
+        ":common_connection_filter_states_lib",
         ":connection_socket_lib",
         ":filter_manager_lib",
         "//envoy/common:scope_tracker_interface",
@@ -134,6 +135,7 @@ envoy_cc_library(
         ":connection_lib",
         ":multi_connection_base_impl_lib",
         "//envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
@@ -243,11 +245,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "default_socket_interface_lib",
     srcs = [
+        "io_socket_handle_base_impl.cc",
         "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
     ],
     hdrs = [
+        "io_socket_handle_base_impl.h",
         "io_socket_handle_impl.h",
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
@@ -272,6 +276,7 @@ envoy_cc_library(
     srcs = ["socket_impl.cc"],
     hdrs = ["socket_impl.h"],
     deps = [
+        "//envoy/network:listener_interface",
         "//envoy/network:socket_interface",
         "//envoy/network:socket_interface_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -346,6 +351,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/event:dispatcher_includes",
+        "//source/common/runtime:runtime_keys_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -596,5 +602,16 @@ envoy_cc_library(
     hdrs = ["generic_listener_filter_impl_base.h"],
     deps = [
         "//envoy/network:filter_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "common_connection_filter_states_lib",
+    srcs = ["common_connection_filter_states.cc"],
+    hdrs = ["common_connection_filter_states.h"],
+    deps = [
+        "//envoy/common:execution_context",
+        "//envoy/network:connection_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )

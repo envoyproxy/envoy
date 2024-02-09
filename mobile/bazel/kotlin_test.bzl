@@ -34,11 +34,14 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], reposito
 # envoy_mobile_android_test.
 def jvm_flags(lib_name):
     return [
-        "-Djava.library.path=library/common/jni:test/common/jni",
+        "-Djava.library.path=library/jni:test/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
         "-Xcheck:jni",
     ] + select({
         "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
+        "//conditions:default": [],
+    }) + select({
+        "@envoy//bazel:disable_envoy_mobile_xds": ["-Denvoy_jni_envoy_mobile_xds_disabled=true"],
         "//conditions:default": [],
     })
 

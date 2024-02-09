@@ -85,6 +85,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
+  uint32_t concurrency_;
 
   GolangFilterStats stats_;
 
@@ -170,9 +171,10 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
-  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib)
-      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this) {
-  }
+  explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib,
+                  uint32_t worker_id)
+      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
+        worker_id_(worker_id) {}
 
   // Http::StreamFilterBase
   void onDestroy() ABSL_LOCKS_EXCLUDED(mutex_) override;
@@ -204,11 +206,8 @@ public:
   }
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info,
-           Envoy::AccessLog::AccessLogType access_log_type) override;
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info) override;
 
   void onStreamComplete() override {}
 
@@ -317,6 +316,10 @@ private:
 
   // the filter enter encoding phase
   bool enter_encoding_{false};
+
+  // The ID of the worker that is processing this request, this enables the go filter to dedicate
+  // memory to each worker and not require locks
+  uint32_t worker_id_ = 0;
 };
 
 // Go code only touch the fields in httpRequest

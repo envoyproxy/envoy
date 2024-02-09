@@ -1,77 +1,93 @@
-name: ios_tests
+name: Mobile/iOS tests
 
 permissions:
   contents: read
 
 on:
-  push:
-    branches:
-    - main
-  pull_request:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
 
-concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
-  cancel-in-progress: true
 
 jobs:
-  env:
-    if: ${{ github.repository == 'envoyproxy/envoy' }}
-    uses: ./.github/workflows/_env.yml
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
     permissions:
+      actions: read
       contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      cache-docker: false
+      check-name: mobile-ios-tests
 
-  swifttests:
-    if: ${{ needs.env.outputs.mobile_ios_tests == 'true' }}
-    needs: env
+  tests:
     permissions:
       contents: read
       packages: read
-    name: swift_tests
-    runs-on: macos-12
-    timeout-minutes: 120
-    steps:
-    - uses: actions/checkout@v4
-    - name: 'Install dependencies'
-      run: |
-        cd mobile
-        ./ci/mac_ci_setup.sh
-    - name: 'Run swift library tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # runs with the listener enabled due to IdleTimeoutTest not setting up a test backend.
-      run: |
-        cd mobile
-        ./bazelw test \
-            --experimental_ui_max_stdouterr_bytes=10485760 \
-            --config=ios \
-            --define envoy_mobile_listener=enabled \
-            --build_tests_only \
-            --config=mobile-remote-ci-macos \
+    uses: ./.github/workflows/_run.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-ios-tests }}
+    needs: load
+    name: ios-tests
+    with:
+      args: ${{ matrix.args }}
+      command: ./bazelw
+      container-command:
+      request: ${{ needs.load.outputs.request }}
+      runs-on: macos-12
+      source: |
+        # TODO(fredyw): A workaround since mobile/WORKSPACE requires Android SDK to be available
+        # and the GitHub Action runner image no longer includes Android SDK 30:
+        # https://github.com/actions/runner-images/issues/8952
+        ./ci/mac_ci_setup.sh --android
+      steps-post: ${{ matrix.steps-post }}
+      target: ${{ matrix.target }}
+      timeout-minutes: ${{ matrix.timeout-minutes }}
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Run swift library tests
+          args: >-
+            test
+            --config=mobile-remote-ci-macos-ios-swift
             //test/swift/...
-
-  objctests:
-    if: ${{ needs.env.outputs.mobile_ios_tests == 'true' }}
-    needs: env
-    permissions:
-      contents: read
-      packages: read
-    name: c_and_objc_tests
-    runs-on: macos-12
-    timeout-minutes: 120
-    steps:
-    - uses: actions/checkout@v4
-    - name: 'Install dependencies'
-      run: |
-        cd mobile
-        ./ci/mac_ci_setup.sh
-    - name: 'Run Objective-C library tests'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        cd mobile
-        ./bazelw test \
-            --config=ios \
-            --build_tests_only \
-            --config=mobile-remote-ci-macos \
-            //test/objective-c/...  \
+          target: swift-tests
+          timeout-minutes: 120
+        - name: Run Objective-C library tests
+          args: >-
+            test
+            --config=mobile-remote-ci-macos-ios-obj-c
+            //test/objective-c/...
             //test/cc/unit:envoy_config_test
+          target: c-and-objc-tests
+          timeout-minutes: 120
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-ios-tests }}
+    needs:
+    - load
+    - tests
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

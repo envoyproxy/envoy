@@ -122,7 +122,6 @@ envoy_cc_library(
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/server:factory_context_base_impl_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -250,8 +249,10 @@ envoy_cc_library(
     srcs = ["host_utility.cc"],
     hdrs = ["host_utility.h"],
     deps = [
+        "//envoy/stats:primitive_stats_interface",
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/config:well_known_names",
         "//source/common/runtime:runtime_lib",
     ],
 )
@@ -617,4 +618,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
+    # Ensure this factory in the source is always linked in.
+    alwayslink = 1,
 )

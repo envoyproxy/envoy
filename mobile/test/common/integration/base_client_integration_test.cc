@@ -9,9 +9,8 @@
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
 #include "library/cc/log_level.h"
-#include "library/common/engine.h"
-#include "library/common/engine_handle.h"
 #include "library/common/http/header_utility.h"
+#include "library/common/internal_engine.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -142,7 +141,7 @@ void BaseClientIntegrationTest::initialize() {
     cc_.terminal_callback->setReady();
   });
 
-  stream_ = (*stream_prototype_).start(explicit_flow_control_, min_delivery_size_);
+  stream_ = (*stream_prototype_).start(explicit_flow_control_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
@@ -222,16 +221,15 @@ uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
   uint64_t counter_value = 0UL;
   uint64_t* counter_value_ptr = &counter_value;
   absl::Notification counter_value_set;
-  EXPECT_EQ(ENVOY_SUCCESS,
-            EngineHandle::runOnEngineDispatcher(
-                rawEngine(), [counter_value_ptr, &name, &counter_value_set](Envoy::Engine& engine) {
-                  Stats::CounterSharedPtr counter =
-                      TestUtility::findCounter(engine.getStatsStore(), name);
-                  if (counter != nullptr) {
-                    *counter_value_ptr = counter->value();
-                  }
-                  counter_value_set.Notify();
-                }));
+  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
+  engine->dispatcher().post([&] {
+    Stats::CounterSharedPtr counter = TestUtility::findCounter(engine->getStatsStore(), name);
+    if (counter != nullptr) {
+      *counter_value_ptr = counter->value();
+    }
+    counter_value_set.Notify();
+  });
+
   EXPECT_TRUE(counter_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
   return counter_value;
 }
@@ -254,16 +252,14 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   uint64_t gauge_value = 0UL;
   uint64_t* gauge_value_ptr = &gauge_value;
   absl::Notification gauge_value_set;
-  EXPECT_EQ(ENVOY_SUCCESS,
-            EngineHandle::runOnEngineDispatcher(
-                rawEngine(), [gauge_value_ptr, &name, &gauge_value_set](Envoy::Engine& engine) {
-                  Stats::GaugeSharedPtr gauge =
-                      TestUtility::findGauge(engine.getStatsStore(), name);
-                  if (gauge != nullptr) {
-                    *gauge_value_ptr = gauge->value();
-                  }
-                  gauge_value_set.Notify();
-                }));
+  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
+  engine->dispatcher().post([&] {
+    Stats::GaugeSharedPtr gauge = TestUtility::findGauge(engine->getStatsStore(), name);
+    if (gauge != nullptr) {
+      *gauge_value_ptr = gauge->value();
+    }
+    gauge_value_set.Notify();
+  });
   EXPECT_TRUE(gauge_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
   return gauge_value;
 }

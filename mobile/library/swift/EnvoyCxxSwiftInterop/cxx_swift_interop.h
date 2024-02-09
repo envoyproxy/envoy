@@ -5,7 +5,6 @@
 #include "library/cc/engine_builder.h"
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
-#include "library/common/main_interface.h"
 #include "library/common/stats/utility.h"
 
 // This file exists in order to expose headers for Envoy's C++ libraries

@@ -18,7 +18,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",
         "//source/extensions/http/cache/file_system_http_cache:config",
         "//test/extensions/common/async_files:mocks",
-        "//test/extensions/filters/http/cache:common",
         "//test/extensions/filters/http/cache:http_cache_implementation_test_common_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",

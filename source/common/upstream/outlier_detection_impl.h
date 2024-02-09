@@ -34,7 +34,7 @@ namespace Outlier {
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr
+  static absl::StatusOr<DetectorSharedPtr>
   createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
                    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                    EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
@@ -372,7 +372,7 @@ private:
  */
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  static std::shared_ptr<DetectorImpl>
+  static absl::StatusOr<std::shared_ptr<DetectorImpl>>
   create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
@@ -493,9 +493,12 @@ class EventLoggerImpl : public EventLogger {
 public:
   EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
                   TimeSource& time_source)
-      : file_(log_manager.createAccessLog(
-            Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name})),
-        time_source_(time_source) {}
+      : time_source_(time_source) {
+    auto file_or_error = log_manager.createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    file_ = file_or_error.value();
+  }
 
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,

@@ -36,9 +36,12 @@
 
 using Envoy::Http::LowerCaseString;
 using testing::_;
+using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Key;
 using testing::NiceMock;
+using testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Values;
@@ -946,7 +949,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1001,7 +1004,7 @@ TEST_F(HttpFilterTest, ClearCache) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1048,7 +1051,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1092,7 +1095,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1136,7 +1139,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1181,7 +1184,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1219,7 +1222,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1506,6 +1509,174 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
 
   EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().count(
                    "not.selected.data"));
+}
+
+// Verifies that specified route metadata is passed along in the check request
+TEST_F(HttpFilterTest, RouteMetadataContext) {
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  route_metadata_context_namespaces:
+  - request.connection.route.have.data
+  - request.route.have.data
+  - connection.route.have.data
+  - route.has.data
+  - request.has.data
+  - untyped.and.typed.route.data
+  - typed.route.data
+  - untyped.route.data
+  route_typed_metadata_context_namespaces:
+  - untyped.and.typed.route.data
+  - typed.route.data
+  - untyped.route.data
+  metadata_context_namespaces:
+  - request.connection.route.have.data
+  - request.route.have.data
+  - connection.route.have.data
+  - connection.has.data
+  - route.has.data
+  )EOF");
+
+  const std::string route_yaml = R"EOF(
+  filter_metadata:
+    request.connection.route.have.data:
+      data: route
+    request.route.have.data:
+      data: route
+    connection.route.have.data:
+      data: route
+    route.has.data:
+      data: route
+    untyped.and.typed.route.data:
+      data: route_untyped
+    untyped.route.data:
+      data: route_untyped
+  typed_filter_metadata:
+    untyped.and.typed.route.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: route_typed
+    typed.route.data:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: route_typed
+  )EOF";
+
+  const std::string request_yaml = R"EOF(
+  filter_metadata:
+    request.connection.route.have.data:
+      data: request
+    request.route.have.data:
+      data: request
+  )EOF";
+
+  const std::string connection_yaml = R"EOF(
+  filter_metadata:
+    request.connection.route.have.data:
+      data: connection
+    connection.route.have.data:
+      data: connection
+    connection.has.data:
+      data: connection
+  )EOF";
+
+  prepareCheck();
+
+  envoy::config::core::v3::Metadata request_metadata, connection_metadata, route_metadata;
+  TestUtility::loadFromYaml(request_yaml, request_metadata);
+  TestUtility::loadFromYaml(connection_yaml, connection_metadata);
+  TestUtility::loadFromYaml(route_yaml, route_metadata);
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(request_metadata));
+  connection_.stream_info_.metadata_ = connection_metadata;
+  ON_CALL(*decoder_filter_callbacks_.route_, metadata()).WillByDefault(ReturnRef(route_metadata));
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+
+  filter_->decodeHeaders(request_headers_, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+
+  for (const auto& namespace_from_route : std::vector<std::string>{
+           "request.connection.route.have.data",
+           "request.route.have.data",
+           "connection.route.have.data",
+           "route.has.data",
+       }) {
+    ASSERT_THAT(check_request.attributes().route_metadata_context().filter_metadata(),
+                Contains(Key(namespace_from_route)));
+    EXPECT_EQ("route", check_request.attributes()
+                           .route_metadata_context()
+                           .filter_metadata()
+                           .at(namespace_from_route)
+                           .fields()
+                           .at("data")
+                           .string_value());
+  }
+  EXPECT_THAT(check_request.attributes().route_metadata_context().filter_metadata(),
+              Not(Contains(Key("request.has.data"))));
+
+  for (const auto& namespace_from_request :
+       std::vector<std::string>{"request.connection.route.have.data", "request.route.have.data"}) {
+    ASSERT_THAT(check_request.attributes().metadata_context().filter_metadata(),
+                Contains(Key(namespace_from_request)));
+    EXPECT_EQ("request", check_request.attributes()
+                             .metadata_context()
+                             .filter_metadata()
+                             .at(namespace_from_request)
+                             .fields()
+                             .at("data")
+                             .string_value());
+  }
+  for (const auto& namespace_from_connection :
+       std::vector<std::string>{"connection.route.have.data", "connection.has.data"}) {
+    ASSERT_THAT(check_request.attributes().metadata_context().filter_metadata(),
+                Contains(Key(namespace_from_connection)));
+    EXPECT_EQ("connection", check_request.attributes()
+                                .metadata_context()
+                                .filter_metadata()
+                                .at(namespace_from_connection)
+                                .fields()
+                                .at("data")
+                                .string_value());
+  }
+  EXPECT_THAT(check_request.attributes().metadata_context().filter_metadata(),
+              Not(Contains(Key("route.has.data"))));
+
+  for (const auto& namespace_from_route_untyped :
+       std::vector<std::string>{"untyped.and.typed.route.data", "untyped.route.data"}) {
+    ASSERT_THAT(check_request.attributes().route_metadata_context().filter_metadata(),
+                Contains(Key(namespace_from_route_untyped)));
+    EXPECT_EQ("route_untyped", check_request.attributes()
+                                   .route_metadata_context()
+                                   .filter_metadata()
+                                   .at(namespace_from_route_untyped)
+                                   .fields()
+                                   .at("data")
+                                   .string_value());
+  }
+  EXPECT_THAT(check_request.attributes().route_metadata_context().filter_metadata(),
+              Not(Contains(Key("typed.route.data"))));
+
+  for (const auto& namespace_from_route_typed :
+       std::vector<std::string>{"untyped.and.typed.route.data", "typed.route.data"}) {
+    ASSERT_THAT(check_request.attributes().route_metadata_context().typed_filter_metadata(),
+                Contains(Key(namespace_from_route_typed)));
+    helloworld::HelloRequest hello;
+    EXPECT_TRUE(check_request.attributes()
+                    .route_metadata_context()
+                    .typed_filter_metadata()
+                    .at(namespace_from_route_typed)
+                    .UnpackTo(&hello));
+    EXPECT_EQ("route_typed", hello.name());
+  }
+  EXPECT_THAT(check_request.attributes().route_metadata_context().typed_filter_metadata(),
+              Not(Contains(Key("untyped.route.data"))));
 }
 
 // Test that filter can be disabled via the filter_enabled field.
@@ -1992,7 +2163,7 @@ TEST_P(HttpFilterTestParam, OkResponse) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -2354,7 +2525,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2378,6 +2549,51 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
                     .value());
 }
 
+// Test that a denied response results in the connection closing with a 401 response to the client.
+TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  charge_cluster_response_stats:
+    value: false
+  )EOF");
+
+  InSequence s;
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Unauthorized;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.denied")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(0, decoder_filter_callbacks_.clusterInfo()
+                   ->statsScope()
+                   .counterFromString("upstream_rq_4xx")
+                   .value());
+}
+
 // Test that a denied response results in the connection closing with a 403 response to the client.
 TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
   InSequence s;
@@ -2390,7 +2606,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2601,7 +2817,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
@@ -2754,6 +2970,143 @@ TEST_P(HttpFilterTestParam, NoCluster) {
 
   // Engage the filter so that check is called.
   filter_->decodeHeaders(request_headers_, false);
+}
+
+// Check that config validation for per-route filter works as expected.
+TEST_F(HttpFilterTest, PerRouteCheckSettingsConfigCheck) {
+  // Set allow_partial_message to true and max_request_bytes to 5 on the per-route filter.
+  envoy::extensions::filters::http::ext_authz::v3::BufferSettings buffer_settings;
+  buffer_settings.set_max_request_bytes(5);        // Set the max_request_bytes value
+  buffer_settings.set_allow_partial_message(true); // Set the allow_partial_message value
+  // Set the per-route filter config.
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings;
+  check_settings.mutable_with_request_body()->CopyFrom(buffer_settings);
+  check_settings.set_disable_request_body_buffering(true);
+  // Initialize the route's per filter config.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
+  settings.mutable_check_settings()->CopyFrom(check_settings);
+
+  // Expect an exception while initializing the route's per filter config.
+  EXPECT_THROW_WITH_MESSAGE((FilterConfigPerRoute(settings)), EnvoyException,
+                            "Invalid configuration for check_settings. Only one of "
+                            "disable_request_body_buffering or with_request_body can be set.");
+}
+
+// Checks that the per-route filter can override the check_settings set on the main filter.
+TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
+  InSequence s;
+
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  )EOF");
+
+  // Set allow_partial_message to true and max_request_bytes to 5 on the per-route filter.
+  envoy::extensions::filters::http::ext_authz::v3::BufferSettings buffer_settings;
+  buffer_settings.set_max_request_bytes(5);        // Set the max_request_bytes value
+  buffer_settings.set_allow_partial_message(true); // Set the allow_partial_message value
+  // Set the per-route filter config.
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings;
+  check_settings.mutable_with_request_body()->CopyFrom(buffer_settings);
+  // Initialize the route's per filter config.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
+  settings.mutable_check_settings()->CopyFrom(check_settings);
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&auth_per_route));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
+
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer2, true));
+  data_.add(buffer2.toString());
+
+  Buffer::OwnedImpl buffer3("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer3, true));
+  data_.add(buffer3.toString());
+
+  Buffer::OwnedImpl buffer4("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer4, true));
+
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+}
+
+// Checks that the per-route filter can override the check_settings set on the main filter.
+TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
+  InSequence s;
+
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 1
+    allow_partial_message: false
+  )EOF");
+
+  // Set allow_partial_message to true and max_request_bytes to 10 on the per-route filter.
+  envoy::extensions::filters::http::ext_authz::v3::BufferSettings buffer_settings;
+  buffer_settings.set_max_request_bytes(10);       // Set the max_request_bytes value
+  buffer_settings.set_allow_partial_message(true); // Set the allow_partial_message value
+  // Set the per-route filter config.
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings;
+  check_settings.mutable_with_request_body()->CopyFrom(buffer_settings);
+  // Initialize the route's per filter config.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
+  settings.mutable_check_settings()->CopyFrom(check_settings);
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&auth_per_route));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+  data_.add(buffer1.toString());
+
+  Buffer::OwnedImpl buffer2("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
+  data_.add(buffer2.toString());
+
+  Buffer::OwnedImpl buffer3("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer3, true));
+  data_.add(buffer3.toString());
+
+  Buffer::OwnedImpl buffer4("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer4, true));
+
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 }
 
 // Verify that request body buffering can be skipped per route.

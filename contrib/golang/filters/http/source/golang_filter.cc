@@ -211,11 +211,10 @@ void Filter::onDestroy() {
 }
 
 // access_log is executed before the log of the stream filter
-void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&,
-                 Envoy::AccessLog::AccessLogType type) {
+void Filter::log(const Formatter::HttpFormatterContext& log_context,
+                 const StreamInfo::StreamInfo&) {
   // `log` may be called multiple times with different log type
-  switch (type) {
+  switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:
   case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
   case Envoy::AccessLog::AccessLogType::DownstreamEnd: {
@@ -226,12 +225,12 @@ void Filter::log(const Http::RequestHeaderMap* headers, const Http::ResponseHead
       initRequest(state);
 
       request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
-          const_cast<Http::RequestHeaderMap*>(headers));
+          const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
     }
 
     state.enterLog();
     req_->phase = static_cast<int>(state.phase());
-    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(type));
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
     state.leaveLog();
   } break;
   default:
@@ -1459,6 +1458,7 @@ void Filter::initRequest(ProcessorState& state) {
   req_->configId = getMergedConfigId(state);
   req_->plugin_name.data = config_->pluginName().data();
   req_->plugin_name.len = config_->pluginName().length();
+  req_->worker_id = worker_id_;
 }
 
 /* ConfigId */
@@ -1492,6 +1492,7 @@ FilterConfig::FilterConfig(
     Server::Configuration::FactoryContext& context)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
+      concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
       metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
 
@@ -1509,6 +1510,7 @@ void FilterConfig::newGoPluginConfig() {
   config_->config_ptr = buf_ptr;
   config_->config_len = buf.length();
   config_->is_route_config = 0;
+  config_->concurrency = concurrency_;
 
   config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 

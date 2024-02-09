@@ -85,7 +85,8 @@ public:
 
 class MockUpstreamLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
 public:
-  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, createLocalAddressSelector,
+  MOCK_METHOD(absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>,
+              createLocalAddressSelector,
               (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
                absl::optional<std::string> cluster_name),
               (const));
@@ -173,6 +174,7 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
+  MOCK_METHOD(bool, perEndpointStatsEnabled, (), (const));
   MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
               (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
@@ -201,7 +203,9 @@ public:
                Http::FilterChainManager& manager),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
-
+  MOCK_METHOD(const absl::optional<
+                  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
+              happyEyeballsConfig, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -268,6 +272,8 @@ public:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      happy_eyeballs_config_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
