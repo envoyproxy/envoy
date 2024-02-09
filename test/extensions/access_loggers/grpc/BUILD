@@ -32,15 +32,25 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "grpc_access_log_utils_test",
     srcs = ["grpc_access_log_utils_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows CEL build
+        "//conditions:default": [
+            "-DUSE_CEL",
+        ],
+    }),
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
         "//source/extensions/access_loggers/grpc:grpc_access_log_utils",
-        "//source/extensions/filters/common/expr:cel_state_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows CEL build
+        "//conditions:default": [
+            "//source/extensions/filters/common/expr:cel_state_lib",
+        ],
+    }),
 )
 
 envoy_extension_cc_test(
@@ -110,6 +120,12 @@ envoy_extension_cc_test(
     name = "tcp_grpc_access_log_integration_test",
     size = "large",
     srcs = ["tcp_grpc_access_log_integration_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows CEL build
+        "//conditions:default": [
+            "-DUSE_CEL",
+        ],
+    }),
     extension_names = ["envoy.access_loggers.tcp_grpc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -120,7 +136,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//source/extensions/filters/network/echo:config",
-        "//source/extensions/filters/network/rbac:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
@@ -135,5 +150,10 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/network/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/accesslog/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows CEL build
+        "//conditions:default": [
+            "//source/extensions/filters/network/rbac:config",
+        ],
+    }),
 )

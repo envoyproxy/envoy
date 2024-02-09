@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/router:string_accessor_lib",
@@ -38,6 +39,7 @@ envoy_extension_cc_test(
     name = "evaluator_test",
     srcs = ["evaluator_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//test/test_common:utility_lib",
@@ -58,6 +60,7 @@ envoy_cc_fuzz_test(
     name = "evaluator_fuzz_test",
     srcs = ["evaluator_fuzz_test.cc"],
     corpus = "evaluator_corpus",
+    tags = ["skip_on_windows"],
     deps = [
         ":evaluator_fuzz_proto_cc_proto",
         "//source/extensions/filters/common/expr:evaluator_lib",

@@ -151,11 +151,24 @@ TEST_P(DynamicForwardProxyIntegrationTest, BasicFlow) {
 
   // There is no buffering in this test, so the first message was dropped. Send another message
   // to verify that it's able to go through after the DNS resolution completed.
-  client.write("hello2", *listener_address);
+  // Since the DNS resolution is performed on the main thread, there's a chance that next UDP
+  // datagrams will also be dropped, until the DNS resolution is completed. Therefore, the attempt
+  // to send a datagram will be retried three times.
+  int index = 2;
+  while (true) {
+    std::string expected_message = "hello" + std::to_string(index);
+    client.write(expected_message, *listener_address);
 
-  Network::UdpRecvData request_datagram;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
-  EXPECT_EQ("hello2", request_datagram.buffer_->toString());
+    Network::UdpRecvData request_datagram;
+    if (fake_upstreams_[0]->waitForUdpDatagram(request_datagram)) {
+      EXPECT_EQ(expected_message, request_datagram.buffer_->toString());
+      break;
+    }
+
+    if (++index == 5) {
+      FAIL() << "expected UDP datagram was not received after multiple retries";
+    }
+  }
 }
 
 TEST_P(DynamicForwardProxyIntegrationTest, BasicFlowWithBuffering) {

@@ -251,6 +251,7 @@ public:
     if (with_tracing_) {
       EXPECT_CALL(mock_filter_callback_, tracingConfig())
           .WillOnce(Return(OptRef<const Tracing::Config>{tracing_config_}));
+      EXPECT_CALL(tracing_config_, spawnUpstreamSpan()).WillOnce(Return(true));
       EXPECT_CALL(active_span_, spawnChild_(_, "router observability_name egress", _))
           .WillOnce(Invoke([this](const Tracing::Config&, const std::string&, SystemTime) {
             child_span_ = new NiceMock<Tracing::MockSpan>();
@@ -352,8 +353,8 @@ TEST_P(RouterFilterTest, OnStreamDecodedAndNoRouteEntry) {
   setup();
 
   EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(nullptr));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "route_not_found");
       }));
 
@@ -374,8 +375,8 @@ TEST_P(RouterFilterTest, NoUpstreamCluster) {
   EXPECT_CALL(mock_route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name));
 
   // No upstream cluster.
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "cluster_not_found");
       }));
 
@@ -403,8 +404,8 @@ TEST_P(RouterFilterTest, UpstreamClusterMaintainMode) {
                    .cluster_.info_,
               maintenanceMode())
       .WillOnce(Return(true));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "cluster_maintain_mode");
       }));
 
@@ -432,8 +433,8 @@ TEST_P(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
               tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "no_healthy_upstream");
       }));
 
@@ -473,8 +474,8 @@ TEST_P(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
 
   expectCancelConnect();
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "local_reset");
       }));
@@ -491,6 +492,8 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
   kickOffNewUpstreamRequest();
 
   if (with_tracing_) {
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "overflow"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
@@ -501,8 +504,8 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
     EXPECT_CALL(*child_span_, finishSpan());
   }
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "overflow");
       }));
 
@@ -517,6 +520,8 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
   kickOffNewUpstreamRequest();
 
   if (with_tracing_) {
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().UpstreamAddress, _));
+    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().PeerAddress, _));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Error, "true"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().ErrorReason, "connection_failure"));
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().Component, "proxy"));
@@ -527,8 +532,8 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
     EXPECT_CALL(*child_span_, finishSpan());
   }
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(status.message(), "connection_failure");
       }));
 
@@ -586,8 +591,8 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
 
   EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "local_reset");
       }));
@@ -617,8 +622,8 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
 
   EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "connection_termination");
       }));
@@ -881,8 +886,8 @@ TEST_P(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
 
   EXPECT_NE(nullptr, upstream_request->generic_upstream_->connection().ptr());
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
+      .WillOnce(Invoke([this](Status status, absl::string_view, ResponseUpdateFunction) {
         EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         // Decoding error of bound upstream connection will not be notified to every requests
         // and will be treated as local reset.

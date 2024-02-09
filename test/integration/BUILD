@@ -1,4 +1,3 @@
-load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -8,11 +7,11 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
-    "envoy_py_test",
     "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
     "envoy_select_enable_yaml",
     "envoy_select_envoy_mobile_listener",
+    "envoy_select_linkstatic",
     "envoy_sh_test",
 )
 
@@ -84,6 +83,7 @@ envoy_cc_test(
     name = "alpn_integration_test",
     size = "large",
     srcs = ["alpn_integration_test.cc"],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -359,38 +359,19 @@ envoy_cc_test_binary(
     ],
 )
 
-envoy_py_test(
-    name = "hotrestart_handoff_test",
-    size = "medium",
-    srcs = select({
-        "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
-        "//conditions:default": ["hotrestart_handoff_test.py"],
-    }),
-    args = [
-        "--envoy-binary=$(location :hotrestart_main)",
-        "--h3-request=$(location //tools/h3_request)",
-        "--ca-certs=$(location //test/config/integration/certs:cacert.pem)",
-        "--ca-key=$(location //test/config/integration/certs:cakey.pem)",
+envoy_cc_test_binary(
+    name = "hotrestart_small_main",
+    srcs = ["hotrestart_main.cc"],
+    external_deps = [
+        "abseil_symbolize",
     ],
-    data = [
-        ":hotrestart_main",
-        "//test/config/integration/certs:cacert.pem",
-        "//test/config/integration/certs:cakey.pem",
-        "//tools/h3_request",
-    ],
-    main = select({
-        "//bazel:disable_hot_restart_or_admin": "null_test.py",
-        "//conditions:default": "hotrestart_handoff_test.py",
-    }),
-    # Hot restart does not apply on Windows.
-    # py_test doesn't do coverage.
-    tags = [
-        "nocoverage",
-        "skip_on_windows",
-    ],
+    linkstatic = envoy_select_linkstatic(),
     deps = [
-        requirement("aiohttp"),
-        requirement("cryptography"),
+        "//source/exe:main_common_lib",
+        "//source/exe:platform_impl_lib",
+        "//source/exe:process_wide_lib",
+        "//source/exe:stripped_main_base_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
     ],
 )
 
@@ -413,14 +394,15 @@ envoy_sh_test(
 )
 
 envoy_sh_test(
-    name = "run_envoy_test",
+    name = "run_envoy_small_test",
     size = "large",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = [":hotrestart_main"],
+    cc_binary = [":hotrestart_small_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cc_test(

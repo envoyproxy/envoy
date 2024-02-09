@@ -125,6 +125,7 @@ public:
   }
   int size() const override { return ListKeys().value()->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     if (value_ == nullptr) {
       return &WrapperFields::get().Empty;
@@ -158,6 +159,7 @@ class BaseWrapper : public google::api::expr::runtime::CelMap {
 public:
   BaseWrapper(Protobuf::Arena& arena) : arena_(arena) {}
   int size() const override { return 0; }
+  using CelMap::ListKeys;
   absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
     return absl::UnimplementedError("ListKeys() is not implemented");
   }
@@ -235,13 +237,13 @@ private:
 
 class XDSWrapper : public BaseWrapper {
 public:
-  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
+  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo* info,
              const LocalInfo::LocalInfo* local_info)
       : BaseWrapper(arena), info_(info), local_info_(local_info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const StreamInfo::StreamInfo& info_;
+  const StreamInfo::StreamInfo* info_;
   const LocalInfo::LocalInfo* local_info_;
 };
 

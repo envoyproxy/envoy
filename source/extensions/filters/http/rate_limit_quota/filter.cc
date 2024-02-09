@@ -143,11 +143,14 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   ASSERT(client_.rate_limit_client != nullptr);
 
   // Start the streaming on the first request.
+  // It will be a no-op if the stream is already active.
   auto status = client_.rate_limit_client->startStream(callbacks_->streamInfo());
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
     // TODO(tyxia) Check `NoAssignmentBehavior` behavior instead of fail-open here.
     return Envoy::Http::FilterHeadersStatus::Continue;
+  } else {
+    ENVOY_LOG(debug, "The gRPC stream is established and active");
   }
 
   initiating_call_ = true;
@@ -159,7 +162,8 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   ASSERT(client_.send_reports_timer != nullptr);
   // Set the reporting interval and enable the timer.
   const int64_t reporting_interval = PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
-  client_.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
+  client_.report_interval_ms = std::chrono::milliseconds(reporting_interval);
+  client_.send_reports_timer->enableTimer(client_.report_interval_ms);
 
   initiating_call_ = false;
   // TODO(tyxia) Revisit later.
@@ -193,7 +197,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
         // configured.
         callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt,
                                    "");
-        callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+        callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
         return Envoy::Http::FilterHeadersStatus::StopIteration;
       }
     }

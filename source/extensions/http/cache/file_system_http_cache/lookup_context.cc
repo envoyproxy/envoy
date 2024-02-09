@@ -1,10 +1,9 @@
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
-
-#include "cache_file_fixed_block.h"
 
 namespace Envoy {
 namespace Extensions {

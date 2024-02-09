@@ -21,7 +21,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       quic_transport.downstream_tls_context(), context);
   // TODO(RyanTheOptimist): support TLS client authentication.
   if (server_config->requireClientCertificate()) {
-    throwEnvoyExceptionOrPanic("TLS Client Authentication is not supported over QUIC");
+    throw EnvoyException("TLS Client Authentication is not supported over QUIC");
   }
 
   auto factory = std::make_unique<QuicServerTransportSocketFactory>(
@@ -34,6 +34,16 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
 ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>();
+}
+
+void QuicServerTransportSocketFactory::initialize() {
+  config_->setSecretUpdateCallback([this]() {
+    // The callback also updates config_ with the new secret.
+    onSecretUpdated();
+  });
+  if (!config_->alpnProtocols().empty()) {
+    supported_alpns_ = absl::StrSplit(config_->alpnProtocols(), ',');
+  }
 }
 
 REGISTER_FACTORY(QuicServerTransportSocketConfigFactory,

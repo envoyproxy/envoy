@@ -219,7 +219,8 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
       downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions());
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
   http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
 #ifdef ENVOY_ENABLE_QUIC
   if (downstream_protocol_ == Http::CodecType::HTTP3) {
@@ -2596,7 +2597,7 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Test that Envoy can clean-up deferred streams
   // Make the timeout longer to accommodate non optimized builds
   test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", kRequestsSentPerIOCycle,
-                                 TestUtility::DefaultTimeout * 3);
+                                 TestUtility::DefaultTimeout * 10);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,

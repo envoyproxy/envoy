@@ -409,7 +409,8 @@ public:
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagsGet(enumToInt(HealthFlag::FAILED_ACTIVE_HC) |
                        enumToInt(HealthFlag::FAILED_OUTLIER_CHECK) |
-                       enumToInt(HealthFlag::FAILED_EDS_HEALTH))) {
+                       enumToInt(HealthFlag::FAILED_EDS_HEALTH) |
+                       enumToInt(HealthFlag::EDS_STATUS_DRAINING))) {
       return Host::Health::Unhealthy;
     }
 
@@ -600,7 +601,7 @@ public:
 
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint64_t seed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
@@ -656,13 +657,18 @@ private:
   // @param locality_weights the weighting of each locality.
   // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
   // weight of a locality.
-  static void rebuildLocalityScheduler(
-      std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
-      std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
-      const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
-      HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-      HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-      LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
+  // @param seed a random number of initial picks to "invoke" on the locality scheduler. This
+  // allows to distribute the load between different localities across worker threads and a fleet
+  // of Envoys.
+  static void
+  rebuildLocalityScheduler(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+                           std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+                           const HostsPerLocality& eligible_hosts_per_locality,
+                           const HostVector& eligible_hosts,
+                           HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+                           HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
+                           LocalityWeightsConstSharedPtr locality_weights,
+                           uint32_t overprovisioning_factor, uint64_t seed);
 
   static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
 
@@ -700,7 +706,7 @@ public:
 
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint64_t seed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
@@ -759,7 +765,8 @@ private:
 
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                     const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
+                     const HostVector& hosts_removed, uint64_t seed,
+                     absl::optional<bool> weighted_priority_health,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
@@ -780,7 +787,7 @@ public:
   // PrioritySet
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint64_t seed,
                    absl::optional<bool> weighted_priority_health = absl::nullopt,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
@@ -1053,6 +1060,11 @@ public:
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
+  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  happyEyeballsConfig() const override {
+    return happy_eyeballs_config_;
+  }
+
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
@@ -1127,10 +1139,11 @@ private:
       common_lb_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   // TODO(ohadvano): http_filter_config_provider_manager_ and
-  // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as a
-  // singleton. This is currently not possible due to circular dependency (filter config provider
-  // manager depends on the ClusterManager object). The circular dependency can be resolved when the
-  // following issue is resolved: https://github.com/envoyproxy/envoy/issues/26653.
+  // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as
+  // a singleton. This is currently not possible due to circular dependency (filter config
+  // provider manager depends on the ClusterManager object). The circular dependency can be
+  // resolved when the following issue is resolved:
+  // https://github.com/envoyproxy/envoy/issues/26653.
   std::shared_ptr<Http::UpstreamFilterConfigProviderManager> http_filter_config_provider_manager_;
   std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
       network_filter_config_provider_manager_;
@@ -1155,6 +1168,8 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
+  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      happy_eyeballs_config_;
 };
 
 /**
@@ -1204,8 +1219,8 @@ public:
                     ExcludedHostVectorConstSharedPtr>
   partitionHostList(const HostVector& hosts);
 
-  // Partitions the provided list of hosts per locality into three new lists containing the healthy,
-  // degraded and excluded hosts respectively.
+  // Partitions the provided list of hosts per locality into three new lists containing the
+  // healthy, degraded and excluded hosts respectively.
   static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
@@ -1227,8 +1242,8 @@ protected:
                   ClusterFactoryContext& cluster_context);
 
   /**
-   * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
-   * query DNS, contact EDS, etc.
+   * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed.
+   * E.g., query DNS, contact EDS, etc.
    */
   virtual void startPreInit() PURE;
 
@@ -1241,8 +1256,8 @@ protected:
 
   /**
    * Called by every concrete cluster after all targets registered at init manager are
-   * initialized. At this point, shared init takes over and determines if there is an initial health
-   * check pass needed, etc.
+   * initialized. At this point, shared init takes over and determines if there is an initial
+   * health check pass needed, etc.
    */
   void onInitDone();
 
@@ -1251,13 +1266,13 @@ protected:
   absl::Status parseDropOverloadConfig(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
-  // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
-  // register with this init manager are expected to be for implementations of SdsApi (see
+  // This init manager is shared via TransportSocketFactoryContext. The initialization targets
+  // that register with this init manager are expected to be for implementations of SdsApi (see
   // SdsApi::init_target_).
   Init::ManagerImpl init_manager_;
 
-  // Once all targets are initialized (i.e. once all dynamic secrets are loaded), this watcher calls
-  // onInitDone() above.
+  // Once all targets are initialized (i.e. once all dynamic secrets are loaded), this watcher
+  // calls onInitDone() above.
   Init::WatcherImpl init_watcher_;
 
   Runtime::Loader& runtime_;
@@ -1270,6 +1285,7 @@ protected:
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_{};
 
 protected:
+  Random::RandomGenerator& random_;
   TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
 
@@ -1302,14 +1318,14 @@ using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
   PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
-                       PrioritySet::HostUpdateCb* update_cb);
+                       PrioritySet::HostUpdateCb* update_cb, Random::RandomGenerator& random);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void initializePriorityFor(
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint);
 
-  // Registers a host based on its address to the PriorityState based on the specified priority (the
-  // priority is specified by locality_lb_endpoint.priority()).
+  // Registers a host based on its address to the PriorityState based on the specified priority
+  // (the priority is specified by locality_lb_endpoint.priority()).
   //
   // The specified health_checker_flag is used to set the registered-host's health-flag when the
   // lb_endpoint health status is unhealthy, draining or timeout.
@@ -1339,6 +1355,7 @@ private:
   PriorityState priority_state_;
   const envoy::config::core::v3::Node& local_info_node_;
   PrioritySet::HostUpdateCb* update_cb_;
+  Random::RandomGenerator& random_;
 };
 
 using PriorityStateManagerPtr = std::unique_ptr<PriorityStateManager>;
@@ -1355,8 +1372,8 @@ protected:
    * with existing hosts.
    *
    * @param new_hosts the full lists of hosts in the new configuration.
-   * @param current_priority_hosts the full lists of hosts for the priority to be updated. The list
-   * will be modified to contain the updated list of hosts.
+   * @param current_priority_hosts the full lists of hosts for the priority to be updated. The
+   * list will be modified to contain the updated list of hosts.
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.

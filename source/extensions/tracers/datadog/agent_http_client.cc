@@ -24,9 +24,9 @@ namespace Datadog {
 
 AgentHTTPClient::AgentHTTPClient(Upstream::ClusterManager& cluster_manager,
                                  const std::string& cluster, const std::string& reference_host,
-                                 TracerStats& stats)
+                                 TracerStats& stats, TimeSource& time_source)
     : collector_cluster_(cluster_manager, cluster), cluster_(cluster),
-      reference_host_(reference_host), stats_(stats) {}
+      reference_host_(reference_host), stats_(stats), time_source_(time_source) {}
 
 AgentHTTPClient::~AgentHTTPClient() {
   for (const auto& [request_ptr, _] : handlers_) {
@@ -38,12 +38,10 @@ AgentHTTPClient::~AgentHTTPClient() {
 
 // datadog::tracing::HTTPClient
 
-datadog::tracing::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSetter set_headers,
-                                                       std::string body,
-                                                       ResponseHandler on_response,
-                                                       ErrorHandler on_error) {
-  ENVOY_LOG(debug, "flushing traces");
-
+datadog::tracing::Expected<void>
+AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string body,
+                      ResponseHandler on_response, ErrorHandler on_error,
+                      std::chrono::steady_clock::time_point deadline) {
   auto message = std::make_unique<Http::RequestMessageImpl>();
   Http::RequestHeaderMap& headers = message->headers();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
@@ -54,7 +52,23 @@ datadog::tracing::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSe
   set_headers(writer);
 
   message->body().add(body);
-  ENVOY_LOG(debug, "submitting trace(s) to {} with payload size {}", url.path, body.size());
+
+  const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+      deadline - time_source_.monotonicTime());
+  if (timeout.count() <= 0) {
+    std::string message = "request deadline expired already";
+    if (timeout.count() < 0) {
+      message += ' ';
+      message += std::to_string(-timeout.count());
+      message += " milliseconds ago";
+    }
+    stats_.reports_dropped_.inc();
+    return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
+                                   std::move(message)};
+  }
+
+  ENVOY_LOG(debug, "submitting data to {} with payload size {} and {} ms timeout", url.path,
+            body.size(), timeout.count());
 
   if (!collector_cluster_.threadLocalCluster().has_value()) {
     ENVOY_LOG(debug, "collector cluster '{}' does not exist", cluster_);
@@ -64,8 +78,7 @@ datadog::tracing::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSe
 
   Http::AsyncClient::Request* request =
       collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
-          std::move(message), *this,
-          Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000)));
+          std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
   if (!request) {
     stats_.reports_failed_.inc();
     return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,

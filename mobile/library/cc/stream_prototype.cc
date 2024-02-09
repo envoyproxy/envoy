@@ -1,6 +1,6 @@
 #include "stream_prototype.h"
 
-#include "library/common/main_interface.h"
+#include "library/common/internal_engine.h"
 
 namespace Envoy {
 namespace Platform {
@@ -10,9 +10,9 @@ StreamPrototype::StreamPrototype(EngineSharedPtr engine) : engine_(engine) {
 }
 
 StreamSharedPtr StreamPrototype::start(bool explicit_flow_control) {
-  auto envoy_stream = init_stream(engine_->engine_);
-  start_stream(engine_->engine_, envoy_stream, callbacks_->asEnvoyHttpCallbacks(),
-               explicit_flow_control);
+  auto envoy_stream = engine_->engine_->initStream();
+  engine_->engine_->startStream(envoy_stream, callbacks_->asEnvoyHttpCallbacks(),
+                                explicit_flow_control);
   return std::make_shared<Stream>(engine_->engine_, envoy_stream);
 }
 

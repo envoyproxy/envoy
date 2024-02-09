@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    tags = ["skip_on_windows"],
     deps = [
         ":engine_lib",
         "//envoy/stats:stats_macros",
@@ -27,6 +28,7 @@ envoy_cc_library(
         "matchers.h",
     ],
     external_deps = ["abseil_optional"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
@@ -36,6 +38,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/path/match/uri_template:uri_template_match_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -46,6 +49,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "engine_interface",
     hdrs = ["engine.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -57,6 +61,7 @@ envoy_cc_library(
     name = "engine_lib",
     srcs = ["engine_impl.cc"],
     hdrs = ["engine_impl.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",

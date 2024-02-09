@@ -51,6 +51,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
       .addQuicCanonicalSuffix(".xyz.com")
+      .enablePortMigration(true)
 #endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
@@ -85,6 +86,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "hostname: \"www.def.com\"",
       "canonical_suffixes: \".opq.com\"",
       "canonical_suffixes: \".xyz.com\"",
+      "num_timeouts_to_trigger_port_migration { value: 4 }",
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
@@ -442,7 +444,7 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   std::string data_string = "envoy string";
   auto accessor = std::make_shared<TestStringAccessor>(data_string);
   engine_builder.addStringAccessor(name, accessor);
-  EngineSharedPtr engine = engine_builder.build();
+  Platform::EngineSharedPtr engine = engine_builder.build();
   auto c_accessor = static_cast<envoy_string_accessor*>(Envoy::Api::External::retrieveApi(name));
   ASSERT_TRUE(c_accessor != nullptr);
   EXPECT_EQ(0, accessor->count());

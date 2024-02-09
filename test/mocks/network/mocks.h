@@ -88,7 +88,7 @@ public:
   MockAddressResolver();
   ~MockAddressResolver() override;
 
-  MOCK_METHOD(Address::InstanceConstSharedPtr, resolve,
+  MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, resolve,
               (const envoy::config::core::v3::SocketAddress&));
   MOCK_METHOD(std::string, name, (), (const));
 };
@@ -409,6 +409,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 
   IoHandlePtr io_handle_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
