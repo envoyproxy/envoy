@@ -303,13 +303,9 @@ void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_header
 
   bool has_trailers_te = false;
 
-  std::vector<std::string> te_values = absl::StrSplit(, ",");
+  std::vector<std::string> te_values = absl::StrSplit(te_header, ',');
   for (const auto& teValue : te_values) {
-    std::vector<std::string> parts =
-        absl::StrSplit(teValue, ";"); // Handles cases like "chunked, trailers;q=0.5"
-    std::string value = absl::StripAsciiWhitespace(parts[0]);
-
-    if (value == Http::Headers::get().TEValues.Trailers) {
+    if (absl::StripAsciiWhitespace(teValue) == Http::Headers::get().TEValues.Trailers) {
       has_trailers_te = true;
       break;
     }
