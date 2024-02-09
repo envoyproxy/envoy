@@ -26,12 +26,12 @@ REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
 REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
+  for (const auto& [short_string, long_string, flag] : ResponseFlagUtils::responseFlagsVec()) {
     NiceMock<MockStreamInfo> stream_info;
     stream_info.response_flags_.clear();
-    stream_info.response_flags_.push_back(flag_enum);
-    EXPECT_EQ(flag_strings.short_string_, ResponseFlagUtils::toShortString(stream_info));
-    EXPECT_EQ(flag_strings.long_string_, ResponseFlagUtils::toString(stream_info));
+    stream_info.response_flags_.push_back(flag);
+    EXPECT_EQ(short_string, ResponseFlagUtils::toShortString(stream_info));
+    EXPECT_EQ(long_string, ResponseFlagUtils::toString(stream_info));
   }
 
   // Custom flag.
@@ -43,8 +43,8 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
     EXPECT_EQ(ResponseFlagUtils::CORE_RESPONSE_FLAGS.size() + 2,
               ResponseFlagUtils::responseFlagsMap().size());
 
-    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF).value(), ResponseFlag::LastFlag + 1);
-    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2).value(), ResponseFlag::LastFlag + 2);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF).value(), CoreResponseFlag::LastFlag + 1);
+    EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF2).value(), CoreResponseFlag::LastFlag + 2);
 
     // Verify the custom flags are registered correctly.
     EXPECT_EQ(CUSTOM_RESPONSE_FLAG(CF), ResponseFlagUtils::responseFlagsMap().at("CF").flag_);
@@ -93,9 +93,9 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   {
     NiceMock<MockStreamInfo> stream_info;
     stream_info.response_flags_.clear();
-    stream_info.response_flags_.push_back(ResponseFlag::UpstreamRequestTimeout);
-    stream_info.response_flags_.push_back(ResponseFlag::DelayInjected);
-    stream_info.response_flags_.push_back(ResponseFlag::FaultInjected);
+    stream_info.response_flags_.push_back(CoreResponseFlag::UpstreamRequestTimeout);
+    stream_info.response_flags_.push_back(CoreResponseFlag::DelayInjected);
+    stream_info.response_flags_.push_back(CoreResponseFlag::FaultInjected);
 
     EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(stream_info));
     EXPECT_EQ("UpstreamRequestTimeout,DelayInjected,FaultInjected",
@@ -106,10 +106,10 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 
-  for (const auto& [flag_strings, flag_enum] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
-    auto response_flag = ResponseFlagUtils::toResponseFlag(flag_strings.short_string_);
+  for (const auto& [short_string, _, flag] : ResponseFlagUtils::CORE_RESPONSE_FLAGS) {
+    auto response_flag = ResponseFlagUtils::toResponseFlag(short_string);
     EXPECT_TRUE(response_flag.has_value());
-    EXPECT_EQ(flag_enum, response_flag.value().value());
+    EXPECT_EQ(flag, response_flag.value());
   }
 }
 
@@ -140,7 +140,7 @@ protected:
   void SetUp() override {
     proxy_status_config_.set_remove_details(false);
 
-    stream_info_.response_flags_.push_back(ResponseFlag::DelayInjected);
+    stream_info_.response_flags_.push_back(CoreResponseFlag::DelayInjected);
   }
 
   HttpConnectionManager::ProxyStatusConfig proxy_status_config_;
@@ -369,27 +369,29 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   for (const auto& [response_flag, proxy_status_error] :
-       std::vector<std::pair<ExtendedResponseFlag, ProxyStatusError>>{
-           {ResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
-           {ResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
-           {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
-           {ResponseFlag::LocalReset, ProxyStatusError::ConnectionTimeout},
-           {ResponseFlag::UpstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
-           {ResponseFlag::UpstreamConnectionFailure, ProxyStatusError::ConnectionRefused},
-           {ResponseFlag::UpstreamConnectionTermination, ProxyStatusError::ConnectionTerminated},
-           {ResponseFlag::UpstreamOverflow, ProxyStatusError::ConnectionLimitReached},
-           {ResponseFlag::NoRouteFound, ProxyStatusError::DestinationNotFound},
-           {ResponseFlag::RateLimited, ProxyStatusError::ConnectionLimitReached},
-           {ResponseFlag::RateLimitServiceError, ProxyStatusError::ConnectionLimitReached},
-           {ResponseFlag::UpstreamRetryLimitExceeded, ProxyStatusError::DestinationUnavailable},
-           {ResponseFlag::StreamIdleTimeout, ProxyStatusError::HttpResponseTimeout},
-           {ResponseFlag::InvalidEnvoyRequestHeaders, ProxyStatusError::HttpRequestError},
-           {ResponseFlag::DownstreamProtocolError, ProxyStatusError::HttpRequestError},
-           {ResponseFlag::UpstreamMaxStreamDurationReached, ProxyStatusError::HttpResponseTimeout},
-           {ResponseFlag::NoFilterConfigFound, ProxyStatusError::ProxyConfigurationError},
-           {ResponseFlag::UpstreamProtocolError, ProxyStatusError::HttpProtocolError},
-           {ResponseFlag::NoClusterFound, ProxyStatusError::DestinationUnavailable},
-           {ResponseFlag::DnsResolutionFailed, ProxyStatusError::DnsError}}) {
+       std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
+           {CoreResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
+           {CoreResponseFlag::LocalReset, ProxyStatusError::ConnectionTimeout},
+           {CoreResponseFlag::UpstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
+           {CoreResponseFlag::UpstreamConnectionFailure, ProxyStatusError::ConnectionRefused},
+           {CoreResponseFlag::UpstreamConnectionTermination,
+            ProxyStatusError::ConnectionTerminated},
+           {CoreResponseFlag::UpstreamOverflow, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::NoRouteFound, ProxyStatusError::DestinationNotFound},
+           {CoreResponseFlag::RateLimited, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::RateLimitServiceError, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::UpstreamRetryLimitExceeded, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::StreamIdleTimeout, ProxyStatusError::HttpResponseTimeout},
+           {CoreResponseFlag::InvalidEnvoyRequestHeaders, ProxyStatusError::HttpRequestError},
+           {CoreResponseFlag::DownstreamProtocolError, ProxyStatusError::HttpRequestError},
+           {CoreResponseFlag::UpstreamMaxStreamDurationReached,
+            ProxyStatusError::HttpResponseTimeout},
+           {CoreResponseFlag::NoFilterConfigFound, ProxyStatusError::ProxyConfigurationError},
+           {CoreResponseFlag::UpstreamProtocolError, ProxyStatusError::HttpProtocolError},
+           {CoreResponseFlag::NoClusterFound, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::DnsResolutionFailed, ProxyStatusError::DnsError}}) {
     NiceMock<MockStreamInfo> stream_info;
     ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
     EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);
@@ -401,7 +403,7 @@ TEST(ProxyStatusFromStreamInfo, TestUpstreamRequestTimeout) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "false"}});
   NiceMock<MockStreamInfo> stream_info;
-  ON_CALL(stream_info, hasResponseFlag(ExtendedResponseFlag(ResponseFlag::UpstreamRequestTimeout)))
+  ON_CALL(stream_info, hasResponseFlag(ResponseFlag(CoreResponseFlag::UpstreamRequestTimeout)))
       .WillByDefault(Return(true));
   EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), ProxyStatusError::ConnectionTimeout);
 }

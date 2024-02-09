@@ -228,6 +228,7 @@ def envoy_cc_test_binary(
         tags = [],
         deps = [],
         stamp = 0,
+        linkstatic = True,
         **kargs):
     envoy_cc_binary(
         name,
@@ -238,6 +239,7 @@ def envoy_cc_test_binary(
             "@envoy//test/test_common:test_version_linkstamp",
         ],
         stamp = stamp,
+        linkstatic = linkstatic,
         **kargs
     )
 

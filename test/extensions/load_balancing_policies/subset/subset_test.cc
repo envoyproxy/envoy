@@ -346,7 +346,7 @@ public:
             std::make_shared<HealthyHostVector>(*local_hosts_), local_hosts_per_locality_,
             std::make_shared<DegradedHostVector>(), HostsPerLocalityImpl::empty(),
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
-        {}, {}, {}, absl::nullopt);
+        {}, {}, {}, 0, absl::nullopt);
 
     auto child_lb_creator = std::make_unique<LegacyChildLoadBalancerCreatorImpl>(
         lb_type_, ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_,
@@ -501,7 +501,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, {}, remove, absl::nullopt);
+          {}, {}, remove, 0, absl::nullopt);
     }
 
     for (const auto& host : add) {
@@ -518,7 +518,7 @@ public:
             updateHostsParams(local_hosts_, local_hosts_per_locality_,
                               std::make_shared<HealthyHostVector>(*local_hosts_),
                               local_hosts_per_locality_),
-            {}, add, {}, absl::nullopt);
+            {}, add, {}, 0, absl::nullopt);
       }
     } else if (!add.empty() || !remove.empty()) {
       local_priority_set_.updateHosts(
@@ -526,7 +526,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, add, remove, absl::nullopt);
+          {}, add, remove, 0, absl::nullopt);
     }
   }
 
@@ -1706,6 +1706,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}}, local_locality)},
               {host_set_.hosts_[0]}, absl::optional<uint32_t>(0));
 
@@ -1836,6 +1837,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}}, local_locality)},
               {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
 
@@ -1962,6 +1964,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
 
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)},
               {host_set_.hosts_[1]}, absl::optional<uint32_t>(0));
 
@@ -2116,6 +2119,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
   envoy::config::core::v3::Locality locality_2;
   locality_2.set_zone("2");
 
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}}, local_locality)}, {},
               absl::optional<uint32_t>(0));
 

@@ -949,7 +949,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1004,7 +1004,7 @@ TEST_F(HttpFilterTest, ClearCache) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1051,7 +1051,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1095,7 +1095,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1139,7 +1139,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1184,7 +1184,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -1222,7 +1222,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -2163,7 +2163,7 @@ TEST_P(HttpFilterTestParam, OkResponse) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -2525,7 +2525,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2570,7 +2570,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith401NoClusterResponseCodeStats) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2606,7 +2606,7 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2817,7 +2817,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
       .Times(0);
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 

@@ -1,3 +1,24 @@
+diff --git a/eval/internal/interop.cc b/eval/internal/interop.cc
+index 3acde6c..20f8ea3 100644
+--- a/eval/internal/interop.cc
++++ b/eval/internal/interop.cc
+@@ -729,13 +729,14 @@ absl::StatusOr<CelValue> ToLegacyValue(google::protobuf::Arena* arena,
+         return CelValue::CreateMessageWrapper(
+             MessageWrapperAccess::Make(message, type_info));
+       }
+-      if (ProtoStructValueToMessageWrapper) {
++      // This weak symbol is never defined in Envoy, and checking it causes linker failures on macOS
++      /*if (ProtoStructValueToMessageWrapper) {
+         auto maybe_message_wrapper = ProtoStructValueToMessageWrapper(*value);
+         if (maybe_message_wrapper.has_value()) {
+           return CelValue::CreateMessageWrapper(
+               std::move(maybe_message_wrapper).value());
+         }
+-      }
++      }*/
+       return absl::UnimplementedError(
+           "only legacy struct types and values can be used for interop");
+     }
 diff --git a/eval/public/cel_value.cc b/eval/public/cel_value.cc
 index 6aeff6d..c43864c 100644
 --- a/eval/public/cel_value.cc
