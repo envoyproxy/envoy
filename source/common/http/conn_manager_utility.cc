@@ -94,8 +94,27 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.removeUpgrade();
 
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
-      if (request_headers.getTEValue() != Http::Headers::get().TEValues.Trailers) {
-        request_headers.removeTE();
+      auto teHeader = request_headers.getTEValue();
+
+      if (!teHeader.empty()) {
+        auto hasTrailersTE = false;
+
+        auto teValues = absl::StrSplit(, ",");
+        for (const auto& teValue : teValues) {
+          auto parts = absl::StrSplit(teValue, ";"); // Handles cases like "chunked, trailers;q=0.5"
+          auto value = absl::StripAsciiWhitespace(parts[0]);
+
+          if (value == Http::Headers::get().TEValues.Trailers) {
+            hasTrailersTE = true;
+            break;
+          }
+        }
+
+        if (hasTrailersTE) {
+          request_headers.setTE(Http::Headers::get().TEValues.Trailers);
+        } else {
+          request_headers.removeTE();
+        }
       }
     }
   }
