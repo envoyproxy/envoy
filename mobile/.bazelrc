@@ -269,7 +269,6 @@ build:mobile-remote-ci-cc-no-yaml --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci
 build:mobile-remote-ci-cc-no-exceptions --define=envoy_yaml=disabled
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
-build:mobile-remote-ci-cc-no-exceptions --copt=-fno-unwind-tables
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
 build:mobile-remote-ci-cc-no-exceptions --define=google_grpc=disabled
 build:mobile-remote-ci-cc-no-exceptions --define=envoy_mobile_xds=disabled
