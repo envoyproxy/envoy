@@ -135,6 +135,7 @@ private:
   }
 
   FilterStatus handleContainerEnd() {
+    ASSERT(steps_ > 0, "unmatched container end");
     steps_--;
     return FilterStatus::Continue;
   }
@@ -142,8 +143,8 @@ private:
   MetadataHandler& parent_;
   TrieSharedPtr node_;
   bool complete_{false};
-  absl::optional<int16_t> last_field_id_;
-  uint16_t steps_{0};
+  std::vector<int16_t> field_ids_;
+  int16_t steps_{0};
 };
 
 const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
