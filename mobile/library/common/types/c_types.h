@@ -211,7 +211,7 @@ typedef struct {
   uint64_t received_byte_count;
   // The final response flags for the stream. See
   // https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
-  // for the ResponseFlag enum.
+  // for the CoreResponseFlag enum.
   uint64_t response_flags;
   // The upstream protocol, if an upstream connection was established. Field
   // entries are based off of Envoy's Http::Protocol
@@ -221,6 +221,17 @@ typedef struct {
   // Http3 == 3
   int64_t upstream_protocol;
 } envoy_final_stream_intel;
+
+/** The log level for the Envoy logger. The values should match with `Logger::Levels`. */
+typedef enum {
+  ENVOY_LOG_LEVEL_TRACE = 0,
+  ENVOY_LOG_LEVEL_DEBUG = 1,
+  ENVOY_LOG_LEVEL_INFO = 2,
+  ENVOY_LOG_LEVEL_WARN = 3,
+  ENVOY_LOG_LEVEL_ERROR = 4,
+  ENVOY_LOG_LEVEL_CRITICAL = 5,
+  ENVOY_LOG_LEVEL_OFF = 6,
+} envoy_log_level;
 
 #ifdef __cplusplus
 extern "C" { // utility functions
@@ -418,11 +429,12 @@ typedef void (*envoy_on_engine_running_f)(void* context);
 /**
  * Called when envoy's logger logs data.
  *
+ * @param level the log level
  * @param data, the logged data.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*envoy_logger_log_f)(envoy_data data, const void* context);
+typedef void (*envoy_logger_log_f)(envoy_log_level level, envoy_data data, const void* context);
 
 /**
  * Called when Envoy is done with the logger.

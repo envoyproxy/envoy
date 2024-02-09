@@ -237,13 +237,13 @@ private:
 
 class XDSWrapper : public BaseWrapper {
 public:
-  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
+  XDSWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo* info,
              const LocalInfo::LocalInfo* local_info)
       : BaseWrapper(arena), info_(info), local_info_(local_info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const StreamInfo::StreamInfo& info_;
+  const StreamInfo::StreamInfo* info_;
   const LocalInfo::LocalInfo* local_info_;
 };
 

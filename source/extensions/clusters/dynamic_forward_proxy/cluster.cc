@@ -293,7 +293,7 @@ void Cluster::onDnsHostAddOrUpdate(
 
 void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
                                   const Upstream::HostVector& hosts_removed) {
-  Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
+  Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
   priority_state_manager.initializePriorityFor(dummy_locality_lb_endpoint_);
   {
     absl::ReaderMutexLock lock{&host_map_lock_};
