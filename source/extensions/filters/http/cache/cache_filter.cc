@@ -326,10 +326,23 @@ void CacheFilter::getBody() {
   // posted callback.
   CacheFilterWeakPtr self = weak_from_this();
 
+  // We don't want to request more than a buffer-size at a time from the cache.
+  uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
+  // If there is no buffer size limit, we probably still want *some* constraint,
+  // because reading a gigabyte of cache entry in one go is always going to cause
+  // some kind of problem. Everyone knows 64MB should be enough for anyone.
+  if (fetch_size_limit == 0) {
+    fetch_size_limit = 64 * 1024 * 1024;
+  }
+  AdjustedByteRange fetch_range = {remaining_ranges_[0].begin(),
+                                   (remaining_ranges_[0].length() > fetch_size_limit)
+                                       ? (remaining_ranges_[0].begin() + fetch_size_limit)
+                                       : remaining_ranges_[0].end()};
+
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(remaining_ranges_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
-                                             Buffer::InstancePtr&& body) {
+  lookup_->getBody(fetch_range, [self, &dispatcher = decoder_callbacks_->dispatcher()](
+                                    Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     dispatcher.post([self, body = std::move(body)]() mutable {
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
