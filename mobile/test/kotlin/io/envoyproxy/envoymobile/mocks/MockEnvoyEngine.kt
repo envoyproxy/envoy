@@ -1,4 +1,4 @@
-package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile.mocks
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
