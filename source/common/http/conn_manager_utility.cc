@@ -93,30 +93,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.removeConnection();
     request_headers.removeUpgrade();
 
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
-      std::string te_header = request_headers.getTEValue();
-
-      if (!te_header.empty()) {
-        bool has_trailers_te = false;
-
-        std::vector<std::string> te_values = absl::StrSplit(, ",");
-        for (const auto& teValue : te_values) {
-          std::vector<std::string> parts = absl::StrSplit(teValue, ";"); // Handles cases like "chunked, trailers;q=0.5"
-          std::string value = absl::StripAsciiWhitespace(parts[0]);
-
-          if (value == Http::Headers::get().TEValues.Trailers) {
-            has_trailers_te = true;
-            break;
-          }
-        }
-
-        if (has_trailers_te) {
-          request_headers.setTE(Http::Headers::get().TEValues.Trailers);
-        } else {
-          request_headers.removeTE();
-        }
-      }
-    }
+    sanitizeTEHeader(request_headers);
   }
 
   // Clean proxy headers.
@@ -312,6 +289,37 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return {final_remote_address, absl::nullopt};
+}
+
+void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
+    return;
+  }
+
+  std::string te_header = request_headers.getTEValue();
+  if (te_header.empty()) {
+    return;
+  }
+
+  bool has_trailers_te = false;
+
+  std::vector<std::string> te_values = absl::StrSplit(, ",");
+  for (const auto& teValue : te_values) {
+    std::vector<std::string> parts =
+        absl::StrSplit(teValue, ";"); // Handles cases like "chunked, trailers;q=0.5"
+    std::string value = absl::StripAsciiWhitespace(parts[0]);
+
+    if (value == Http::Headers::get().TEValues.Trailers) {
+      has_trailers_te = true;
+      break;
+    }
+  }
+
+  if (has_trailers_te) {
+    request_headers.setTE(Http::Headers::get().TEValues.Trailers);
+  } else {
+    request_headers.removeTE();
+  }
 }
 
 void ConnectionManagerUtility::cleanInternalHeaders(
