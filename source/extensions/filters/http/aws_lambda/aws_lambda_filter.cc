@@ -42,13 +42,16 @@ constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
 void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>& arn,
-                      InvocationMode mode) {
+                      InvocationMode mode, const std::string& host_rewrite) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
   if (mode == InvocationMode::Synchronous) {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
   } else {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "Event");
+  }
+  if (!host_rewrite.empty()) {
+    headers.setHost(host_rewrite);
   }
 }
 
@@ -133,9 +136,11 @@ void Filter::resolveSettings() {
     payload_passthrough_ = route_settings->payloadPassthrough();
     invocation_mode_ = route_settings->invocationMode();
     arn_ = std::move(route_settings)->arn();
+    host_rewrite_ = route_settings->hostRewrite();
   } else {
     payload_passthrough_ = settings_.payloadPassthrough();
     invocation_mode_ = settings_.invocationMode();
+    host_rewrite_ = settings_.hostRewrite();
   }
 }
 
@@ -161,7 +166,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (payload_passthrough_) {
-    setLambdaHeaders(headers, arn_, invocation_mode_);
+    setLambdaHeaders(headers, arn_, invocation_mode_, host_rewrite_);
     sigv4_signer_->signEmptyPayload(headers, arn_->region());
     return Http::FilterHeadersStatus::Continue;
   }
@@ -170,7 +175,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   jsonizeRequest(headers, nullptr, json_buf);
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
-  setLambdaHeaders(headers, arn_, invocation_mode_);
+  setLambdaHeaders(headers, arn_, invocation_mode_, host_rewrite_);
   headers.setContentLength(json_buf.length());
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
@@ -230,7 +235,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 
-  setLambdaHeaders(*request_headers_, arn_, invocation_mode_);
+  setLambdaHeaders(*request_headers_, arn_, invocation_mode_, host_rewrite_);
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
   sigv4_signer_->sign(*request_headers_, hash, arn_->region());
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());

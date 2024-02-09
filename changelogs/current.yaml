@@ -19,6 +19,16 @@ minor_behavior_changes:
 - area: golang
   change: |
     Change ``RegisterHttpFilterConfigFactoryAndParser`` to ``RegisterHttpFilterFactoryAndConfigParser``.
+- area: QUIC
+  change: |
+    Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
+    is degrading. Can be manually turned on via
+    :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: aws
+  change: |
+    AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
+    grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
+    xDS region will take preference. aws_request_signer documentation now reflects the region chain.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -35,6 +45,9 @@ bug_fixes:
     fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
     ``propagate_response_headers`` and retry configurations are enabled at the same time, and an upstream
     request is retried multiple times.
+- area: tracing
+  change: |
+    Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -87,6 +100,10 @@ new_features:
   change: |
     added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
     identifier.
+- area: aws_lambda
+  change: |
+    Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
+    during signature.
 - area: ext_proc
   change: |
     added
@@ -105,5 +122,12 @@ new_features:
     Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
     :ref:`UriTemplateMatchConfig<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>`
     to allow use of glob patterns for URI path matching in RBAC.
+- area: upstream
+  change: |
+    Added :ref:`selection_method <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    option to the least request load balancer. If set to ``FULL_SCAN``,
+    Envoy will select the host with the fewest active requests from the entire host set rather than
+    :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    random choices.
 
 deprecated:

@@ -58,7 +58,7 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
   FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
-                                 proto_config.payload_passthrough()};
+                                 proto_config.payload_passthrough(), proto_config.host_rewrite()};
 
   FilterStats stats = generateStats(stats_prefix, dual_info.scope);
   return [stats, signer, filter_settings, dual_info](Http::FilterChainFactoryCallbacks& cb) {
@@ -79,7 +79,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
   }
   return std::make_shared<const FilterSettings>(
       FilterSettings{*arn, getInvocationMode(proto_config.invoke_config()),
-                     proto_config.invoke_config().payload_passthrough()});
+                     proto_config.invoke_config().payload_passthrough(),
+                     proto_config.invoke_config().host_rewrite()});
 }
 
 /*
