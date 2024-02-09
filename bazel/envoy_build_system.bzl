@@ -62,10 +62,6 @@ load(
     _envoy_mobile_defines = "envoy_mobile_defines",
 )
 load(
-    ":envoy_internal.bzl",
-    _envoy_linkstatic = "envoy_linkstatic",
-)
-load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
