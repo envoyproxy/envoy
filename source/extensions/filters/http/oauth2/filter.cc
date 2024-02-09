@@ -239,9 +239,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   secret_.assign(secret.begin(), secret.end());
 }
 
-bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const {
-  return !refresh_token_.empty();
-}
+bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const { return !refresh_token_.empty(); }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
   return (

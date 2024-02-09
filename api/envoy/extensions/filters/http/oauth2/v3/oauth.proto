@@ -138,7 +138,7 @@ message OAuth2Config {
   // the authorization server or the OAuth flow will fail.
   google.protobuf.Duration default_expires_in = 13;
 
-  // The default lifetime in seconds of the refresh token, if the exp claim is ommitted in the refresh token
+  // The default lifetime in seconds of the refresh token, if the exp claim is omitted in the refresh token
   //
   // If this value is not set, it will default to ``0s``. In this case, the refresh token will be expired
   // instantly and the access token is not updated using by the refresh token.

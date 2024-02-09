@@ -111,7 +111,8 @@ public:
   getConfig(bool forward_bearer_token = true, bool use_refresh_token = false,
             ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type =
                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                    OAuth2Config_AuthType_URL_ENCODED_BODY, int default_refresh_token_expires_in = 0) {
+                    OAuth2Config_AuthType_URL_ENCODED_BODY,
+            int default_refresh_token_expires_in = 0) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -1794,9 +1795,13 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token) {
                                    std::chrono::seconds(600));
 }
 
-TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token_and_default_refresh_token_expires_in) {
-  
-  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */, ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */, 1200 /* default_refresh_token_type */));
+TEST_P(OAuth2Test,
+       OAuthAccessTokenSucessWithTokens_use_refresh_token_and_default_refresh_token_expires_in) {
+
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
+                 1200 /* default_refresh_token_type */));
   TestScopedRuntime scoped_runtime;
   if (GetParam() == 1) {
     scoped_runtime.mergeValues({
@@ -1844,14 +1849,19 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token_and_defaul
 }
 
 /**
- * Scenario: The Oauth filter saves cookies with tokens after sucessufull receipt of the tokens 
+ * Scenario: The Oauth filter saves cookies with tokens after successful receipt of the tokens
  *
- * Expected behavior: The lifetime of the refresh token cookie is taken from the exp claim of the refresh token.
+ * Expected behavior: The lifetime of the refresh token cookie is taken from the exp claim of the
+ * refresh token.
  */
 
-TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token_and_refresh_token_expires_in_from_jwt) {
-  
-  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */, ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */, 1200 /* default_refresh_token_type */));
+TEST_P(OAuth2Test,
+       OAuthAccessTokenSucessWithTokens_use_refresh_token_and_refresh_token_expires_in_from_jwt) {
+
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
+                 1200 /* default_refresh_token_type */));
   TestScopedRuntime scoped_runtime;
   if (GetParam() == 1) {
     scoped_runtime.mergeValues({
@@ -1876,7 +1886,11 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token_and_refres
   };
   filter_->decodeHeaders(request_headers, false);
 
-  const std::string refreshToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFsZXhjZWk4OCIsInN1YiI6ImFsZXhjZWk4OCIsImp0aSI6IjQ5ZTFjMzc1IiwiYXVkIjoidGVzdCIsIm5iZiI6MTcwNzQxNDYzNSwiZXhwIjoyNTU0NDE2MDAwLCJpYXQiOjE3MDc0MTQ2MzYsImlzcyI6ImRvdG5ldC11c2VyLWp3dHMifQ.LaGOw6x0-m7r-WzxgCIdPnAfp0O1hy6mW4klq9Vs2XM";
+  const std::string refreshToken =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJ1bmlxdWVfbmFtZSI6ImFsZXhjZWk4OCIsInN1YiI6ImFsZXhjZWk4OCIsImp0aSI6IjQ5ZTFjMzc1IiwiYXVkIjoi"
+      "dGVzdCIsIm5iZiI6MTcwNzQxNDYzNSwiZXhwIjoyNTU0NDE2MDAwLCJpYXQiOjE3MDc0MTQ2MzYsImlzcyI6ImRvdG5l"
+      "dC11c2VyLWp3dHMifQ.LaGOw6x0-m7r-WzxgCIdPnAfp0O1hy6mW4klq9Vs2XM";
 
   // Expected response after the callback is complete.
   Http::TestRequestHeaderMapImpl expected_headers{
