@@ -40,7 +40,8 @@ public:
 
   /**
    * Connect to a remote host. Errors or connection events are reported via the
-   * event callback registered via setAsyncTcpClientCallbacks().
+   * event callback registered via setAsyncTcpClientCallbacks(). We need to set the
+   * callbacks again to recall connect().
    */
   virtual bool connect() PURE;
 
