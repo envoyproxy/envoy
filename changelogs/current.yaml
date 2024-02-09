@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: February 9, 2024
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: buffer
   change: |
     Fixed a bug (https://github.com/envoyproxy/envoy/issues/28760) that the internal listener causes an undefined
@@ -33,10 +26,3 @@ bug_fixes:
 - area: url matching
   change: |
     Fixed excessive CPU utilization when using regex URL template matcher.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
