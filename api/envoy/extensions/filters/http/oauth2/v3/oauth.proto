@@ -142,7 +142,7 @@ message OAuth2Config {
   //
   // If this value is not set, it will default to ``0s``. In this case, the refresh token will be expired
   // instantly and the access token is not updated using by the refresh token.
-  google.protobuf.Duration refresh_token_expires_in = 14;
+  google.protobuf.Duration default_refresh_token_expires_in = 14;
 }
 
 // Filter config.

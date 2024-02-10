@@ -126,7 +126,7 @@ public:
 
     auto* useRefreshToken = p.mutable_use_refresh_token();
     useRefreshToken->set_value(use_refresh_token);
-    auto* refresh_token_expires_in = p.mutable_refresh_token_expires_in();
+    auto* refresh_token_expires_in = p.mutable_default_refresh_token_expires_in();
     refresh_token_expires_in->set_seconds(default_refresh_token_expires_in);
 
     p.set_auth_type(auth_type);

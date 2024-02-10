@@ -202,8 +202,8 @@ FilterConfig::FilterConfig(
       auth_type_(getAuthType(proto_config.auth_type())),
       use_refresh_token_(proto_config.use_refresh_token().value()),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
-      refresh_token_default_expires_in_(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, refresh_token_expires_in, 0)) {
+      default_refresh_token_expires_in_(
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 0)) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -553,13 +553,13 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
 
     ::google::jwt_verify::Jwt jwt;
     if (jwt.parseFromString(refresh_token) == ::google::jwt_verify::Status::Ok) {
-      const std::chrono::seconds expirationTimeFromJwt = std::chrono::seconds{jwt.exp_};
+      const std::chrono::seconds expirationFromJwt = std::chrono::seconds{jwt.exp_};
       const std::chrono::seconds now =
           std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
               .time_since_epoch();
 
-      if (now < expirationTimeFromJwt) {
-        const auto expiration_epoch = expirationTimeFromJwt - now;
+      if (now < expirationFromJwt) {
+        const auto expiration_epoch = expirationFromJwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
         ENVOY_LOG(debug, "An expiration time in the refresh token is less of the current time");

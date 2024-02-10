@@ -161,7 +161,7 @@ public:
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
-    return refresh_token_default_expires_in_;
+    return default_refresh_token_expires_in_;
   }
 
 private:
@@ -186,7 +186,7 @@ private:
   const AuthType auth_type_;
   const bool use_refresh_token_{};
   const std::chrono::seconds default_expires_in_;
-  const std::chrono::seconds refresh_token_default_expires_in_;
+  const std::chrono::seconds default_refresh_token_expires_in_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
