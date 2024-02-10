@@ -2264,7 +2264,7 @@ TEST_F(ConnectionManagerUtilityTest, DiscardTEHeaderWithoutTrailers) {
 
 // Verify when TE header is present, the value should be kept if the reloadable feature
 // "sanitize_te" is enabled.
-TEST_F(ConnectionManagerUtilityTest, KeepTrailersTEHeaderSimple) {
+TEST_F(ConnectionManagerUtilityTest, KeepTrailersTEHeaderReloadableFeatureDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_te", "false"}});
 
