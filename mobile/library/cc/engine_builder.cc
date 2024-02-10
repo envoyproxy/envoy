@@ -771,7 +771,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     // usually too small for QUIC.
     // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
     // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
-    // cluster, meaning H2 TCP connections buffer size would also be set to 1MB.
+    // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
+    // we've tested, IPPROTO_UDP cannot be used as a level for the SO_RCVBUF option.
     envoy::config::core::v3::SocketOption* sock_opt =
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
     sock_opt->set_name(SO_RCVBUF);
