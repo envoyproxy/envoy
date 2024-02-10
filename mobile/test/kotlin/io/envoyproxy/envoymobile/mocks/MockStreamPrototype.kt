@@ -1,5 +1,7 @@
-package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile.mocks
 
+import io.envoyproxy.envoymobile.Stream
+import io.envoyproxy.envoymobile.StreamPrototype
 import java.util.concurrent.Executor
 
 /**

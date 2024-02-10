@@ -1,5 +1,11 @@
-package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile.mocks
 
+import io.envoyproxy.envoymobile.EnvoyError
+import io.envoyproxy.envoymobile.RequestHeaders
+import io.envoyproxy.envoymobile.RequestTrailers
+import io.envoyproxy.envoymobile.ResponseHeaders
+import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.Stream
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import java.nio.ByteBuffer

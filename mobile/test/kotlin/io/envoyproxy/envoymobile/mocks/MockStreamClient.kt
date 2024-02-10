@@ -1,4 +1,7 @@
-package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile.mocks
+
+import io.envoyproxy.envoymobile.StreamClient
+import io.envoyproxy.envoymobile.StreamPrototype
 
 /**
  * Mock implementation of `StreamClient` which produces `MockStreamPrototype` values.

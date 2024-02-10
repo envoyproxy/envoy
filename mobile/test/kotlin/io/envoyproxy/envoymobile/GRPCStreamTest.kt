@@ -1,6 +1,8 @@
 package io.envoyproxy.envoymobile
 
 import com.google.common.truth.Truth.assertThat
+import io.envoyproxy.envoymobile.mocks.MockStream
+import io.envoyproxy.envoymobile.mocks.MockStreamClient
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
