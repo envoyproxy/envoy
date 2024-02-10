@@ -20,7 +20,7 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], reposito
         srcs = srcs + dep_srcs,
         deps = [
             repository + "//bazel:envoy_mobile_test_suite",
-            "@maven//:org_assertj_assertj_core",
+            "@maven//:com_google_truth_truth",
             "@maven//:junit_junit",
             "@maven//:org_mockito_mockito_inline",
             "@maven//:org_mockito_mockito_core",
@@ -102,7 +102,6 @@ def envoy_mobile_android_test(name, srcs, native_lib_name, deps = [], native_dep
             "@maven//:androidx_test_rules",
             "@maven//:org_robolectric_robolectric",
             "@robolectric//bazel:android-all",
-            "@maven//:org_assertj_assertj_core",
             "@maven//:junit_junit",
             "@maven//:org_mockito_mockito_inline",
             "@maven//:org_mockito_mockito_core",

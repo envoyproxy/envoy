@@ -1,7 +1,7 @@
 package org.chromium.net.impl;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
@@ -53,9 +53,9 @@ public class CronetBidirectionalStateTest {
   @Test
   public void userStart_twice() {
     mCronetBidirectionalState.nextAction(Event.USER_START);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_START))
-        .isExactlyInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("already started");
+    IllegalStateException exception = assertThrows(
+        IllegalStateException.class, () -> mCronetBidirectionalState.nextAction(Event.USER_START));
+    assertThat(exception).hasMessageThat().contains("already started");
   }
 
   // ================= STREAM_READY_CALLBACK_DONE =================
@@ -100,26 +100,29 @@ public class CronetBidirectionalStateTest {
   @Test
   public void userWrite_afterStartReadOnly() {
     mCronetBidirectionalState.nextAction(Event.USER_START_READ_ONLY);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_WRITE))
-        .isExactlyInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Write after writing end of stream");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+                     () -> mCronetBidirectionalState.nextAction(Event.USER_WRITE));
+    assertThat(exception).hasMessageThat().contains("Write after writing end of stream");
   }
 
   @Test
   public void userWrite_afterStartWithHeadersReadOnly() {
     mCronetBidirectionalState.nextAction(Event.USER_START_WITH_HEADERS_READ_ONLY);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_WRITE))
-        .isExactlyInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Write after writing end of stream");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+                     () -> mCronetBidirectionalState.nextAction(Event.USER_WRITE));
+    assertThat(exception).hasMessageThat().contains("Write after writing end of stream");
   }
 
   @Test
   public void userWrite_afterLastWrite() {
     mCronetBidirectionalState.nextAction(Event.USER_START);
     mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_WRITE))
-        .isExactlyInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Write after writing end of stream");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+                     () -> mCronetBidirectionalState.nextAction(Event.USER_WRITE));
+    assertThat(exception).hasMessageThat().contains("Write after writing end of stream");
   }
 
   @Test
@@ -158,17 +161,19 @@ public class CronetBidirectionalStateTest {
   @Test
   public void userLastWrite_afterStartReadOnly() {
     mCronetBidirectionalState.nextAction(Event.USER_START_READ_ONLY);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE))
-        .isExactlyInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Write after writing end of stream");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+                     () -> mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE));
+    assertThat(exception).hasMessageThat().contains("Write after writing end of stream");
   }
 
   @Test
   public void userLastWrite_afterStartWithHeadersReadOnly() {
     mCronetBidirectionalState.nextAction(Event.USER_START_WITH_HEADERS_READ_ONLY);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE))
-        .isExactlyInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Write after writing end of stream");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+                     () -> mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE));
+    assertThat(exception).hasMessageThat().contains("Write after writing end of stream");
   }
 
   @Test
@@ -182,9 +187,10 @@ public class CronetBidirectionalStateTest {
   public void userLastWrite_afterLastWrite() {
     mCronetBidirectionalState.nextAction(Event.USER_START);
     mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE))
-        .isExactlyInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Write after writing end of stream");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+                     () -> mCronetBidirectionalState.nextAction(Event.USER_LAST_WRITE));
+    assertThat(exception).hasMessageThat().contains("Write after writing end of stream");
   }
 
   @Test
@@ -264,9 +270,9 @@ public class CronetBidirectionalStateTest {
   public void userRead_beforeOnHeaders_afterAnotherRead() {
     mCronetBidirectionalState.nextAction(Event.USER_START_WITH_HEADERS_READ_ONLY);
     mCronetBidirectionalState.nextAction(Event.USER_READ);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_READ))
-        .isExactlyInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Unexpected read");
+    IllegalStateException exception = assertThrows(
+        IllegalStateException.class, () -> mCronetBidirectionalState.nextAction(Event.USER_READ));
+    assertThat(exception).hasMessageThat().contains("Unexpected read");
   }
 
   @Test
@@ -281,9 +287,9 @@ public class CronetBidirectionalStateTest {
     mCronetBidirectionalState.nextAction(Event.USER_START_WITH_HEADERS_READ_ONLY);
     mCronetBidirectionalState.nextAction(Event.ON_HEADERS);
     mCronetBidirectionalState.nextAction(Event.USER_READ);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_READ))
-        .isExactlyInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Unexpected read");
+    IllegalStateException exception = assertThrows(
+        IllegalStateException.class, () -> mCronetBidirectionalState.nextAction(Event.USER_READ));
+    assertThat(exception).hasMessageThat().contains("Unexpected read");
   }
 
   @Test
@@ -305,16 +311,16 @@ public class CronetBidirectionalStateTest {
     mCronetBidirectionalState.nextAction(Event.READY_TO_START_POSTPONED_READ_IF_ANY);
     mCronetBidirectionalState.nextAction(Event.ON_COMPLETE);
     mCronetBidirectionalState.nextAction(Event.USER_READ);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_READ))
-        .isExactlyInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Unexpected read");
+    IllegalStateException exception = assertThrows(
+        IllegalStateException.class, () -> mCronetBidirectionalState.nextAction(Event.USER_READ));
+    assertThat(exception).hasMessageThat().contains("Unexpected read");
   }
 
   @Test
   public void userRead_beforeUserStart() {
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_READ))
-        .isExactlyInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Unexpected read");
+    IllegalStateException exception = assertThrows(
+        IllegalStateException.class, () -> mCronetBidirectionalState.nextAction(Event.USER_READ));
+    assertThat(exception).hasMessageThat().contains("Unexpected read");
   }
 
   @Test
@@ -336,9 +342,9 @@ public class CronetBidirectionalStateTest {
     mCronetBidirectionalState.nextAction(Event.USER_READ);
     mCronetBidirectionalState.nextAction(Event.ON_DATA_END_STREAM);
     mCronetBidirectionalState.nextAction(Event.LAST_READ_COMPLETED);
-    assertThatThrownBy(() -> mCronetBidirectionalState.nextAction(Event.USER_READ))
-        .isExactlyInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Unexpected read");
+    IllegalStateException exception = assertThrows(
+        IllegalStateException.class, () -> mCronetBidirectionalState.nextAction(Event.USER_READ));
+    assertThat(exception).hasMessageThat().contains("Unexpected read");
   }
 
   // ================= USER_CANCEL =================
