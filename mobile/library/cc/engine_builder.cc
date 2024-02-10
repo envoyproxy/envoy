@@ -1,5 +1,9 @@
 #include "engine_builder.h"
 
+#include <stdint.h>
+#include <sys/socket.h>
+
+#include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
@@ -33,6 +37,14 @@
 
 namespace Envoy {
 namespace Platform {
+
+namespace {
+
+// This is the same value Cronet uses:
+// https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
+const int32_t QuicSocketReceiveBufferSize = 1024 * 1024; // 1MB
+
+} // namespace
 
 #ifdef ENVOY_MOBILE_XDS
 XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
@@ -754,6 +766,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*base_cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
             .PackFrom(alpn_options);
+
+    // Set the upstream connections UDP socket receive buffer size. The operating system defaults
+    // are usually too small for QUIC.
+    envoy::config::core::v3::SocketOption* sock_opt =
+        base_cluster->mutable_upstream_bind_config()->add_socket_options();
+    sock_opt->set_name(SO_RCVBUF);
+    sock_opt->set_level(IPPROTO_UDP);
+    sock_opt->set_int_value(QuicSocketReceiveBufferSize);
+    sock_opt->set_description(
+        absl::StrCat("UDP SO_RCVBUF = ", QuicSocketReceiveBufferSize, " bytes"));
   }
 
   // Set up stats.
