@@ -42,7 +42,7 @@ namespace {
 
 // This is the same value Cronet uses:
 // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
-const int32_t QuicSocketReceiveBufferSize = 1024 * 1024; // 1MB
+constexpr int32_t QuicSocketReceiveBufferSize = 1024 * 1024; // 1MB
 
 } // namespace
 
