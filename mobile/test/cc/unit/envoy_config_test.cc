@@ -327,7 +327,7 @@ TEST(TestConfig, QuicSocketReceiveBufferSize) {
 
   // When using an H3 cluster, the UDP receive buffer size option should always be set.
   ASSERT_THAT(rcv_buf_option, NotNull());
-  EXPECT_EQ(rcv_buf_option->level(), IPPROTO_UDP);
+  EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
   EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
 }
 #endif
