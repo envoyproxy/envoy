@@ -104,24 +104,24 @@ absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& l
 // Replaces all entries with the same name or append one.
 void mergeHeaderValues(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
                        const envoy::config::core::v3::HeaderValue& header) {
-  bool count = false;
+  bool has_key = false;
   for (auto& dest : metadata) {
     if (dest.key() == header.key()) {
       dest.CopyFrom(header);
-      count = true;
+      has_key = true;
     }
   }
-  if (!count) {
+  if (!has_key) {
     metadata.emplace_back(header);
   }
 }
 
 std::vector<envoy::config::core::v3::HeaderValue>
-mergeMetadata(const FilterConfigPerRoute& less_specific,
-              const FilterConfigPerRoute& more_specific) {
-  std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.grpcMetadata());
+mergeGrpcInitialMetadata(const FilterConfigPerRoute& less_specific,
+                         const FilterConfigPerRoute& more_specific) {
+  std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.grpcInitialMetadata());
 
-  for (const auto& header : more_specific.grpcMetadata()) {
+  for (const auto& header : more_specific.grpcInitialMetadata()) {
     mergeHeaderValues(metadata, header);
   }
 
@@ -132,14 +132,14 @@ mergeMetadata(const FilterConfigPerRoute& less_specific,
 void mergeHeaderValuesField(
     Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
     const envoy::config::core::v3::HeaderValue& header) {
-  bool count = false;
+  bool has_key = false;
   for (auto& dest : metadata) {
     if (dest.key() == header.key()) {
       dest.CopyFrom(header);
-      count = true;
+      has_key = true;
     }
   }
-  if (!count) {
+  if (!has_key) {
     metadata.Add()->CopyFrom(header);
   }
 }
@@ -238,8 +238,8 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
-      grpc_metadata_(config.overrides().grpc_metadata().begin(),
-                     config.overrides().grpc_metadata().end()),
+      grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
+                             config.overrides().grpc_initial_metadata().end()),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)) {}
@@ -250,7 +250,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       processing_mode_(mergeProcessingMode(less_specific, more_specific)),
       grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
                                                             : less_specific.grpcService()),
-      grpc_metadata_(mergeMetadata(less_specific, more_specific)),
+      grpc_initial_metadata_(mergeGrpcInitialMetadata(less_specific, more_specific)),
       untyped_forwarding_namespaces_(more_specific.untypedForwardingMetadataNamespaces().has_value()
                                          ? more_specific.untypedForwardingMetadataNamespaces()
                                          : less_specific.untypedForwardingMetadataNamespaces()),
@@ -1132,12 +1132,12 @@ void Filter::mergePerRouteConfig() {
     grpc_service_ = *merged_config->grpcService();
     config_with_hash_key_.setConfig(*merged_config->grpcService());
   }
-  if (!merged_config->grpcMetadata().empty()) {
-    ENVOY_LOG(trace, "Overriding metadata from per-route configuration");
+  if (!merged_config->grpcInitialMetadata().empty()) {
+    ENVOY_LOG(trace, "Overriding grpc initial metadata from per-route configuration");
     envoy::config::core::v3::GrpcService config = config_with_hash_key_.config();
     auto ptr = config.mutable_initial_metadata();
-    for (const auto& header : merged_config->grpcMetadata()) {
-      ENVOY_LOG(trace, "Setting metadata {} = {}", header.key(), header.value());
+    for (const auto& header : merged_config->grpcInitialMetadata()) {
+      ENVOY_LOG(trace, "Setting grpc initial metadata {} = {}", header.key(), header.value());
       mergeHeaderValuesField(*ptr, header);
     }
     config_with_hash_key_.setConfig(config);

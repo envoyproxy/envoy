@@ -109,7 +109,7 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
 TEST(HttpExtProcConfigTest, CorrectRouteMetadataOnlyConfig) {
   std::string yaml = R"EOF(
   overrides:
-    grpc_metadata:
+    grpc_initial_metadata:
       - key: "a"
         value: "a"
   )EOF";

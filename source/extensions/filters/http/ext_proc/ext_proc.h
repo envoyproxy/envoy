@@ -247,8 +247,8 @@ public:
   const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
-  const std::vector<envoy::config::core::v3::HeaderValue>& grpcMetadata() const {
-    return grpc_metadata_;
+  const std::vector<envoy::config::core::v3::HeaderValue>& grpcInitialMetadata() const {
+    return grpc_initial_metadata_;
   }
 
   const absl::optional<const std::vector<std::string>>&
@@ -267,7 +267,7 @@ private:
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
-  std::vector<envoy::config::core::v3::HeaderValue> grpc_metadata_;
+  std::vector<envoy::config::core::v3::HeaderValue> grpc_initial_metadata_;
 
   const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;

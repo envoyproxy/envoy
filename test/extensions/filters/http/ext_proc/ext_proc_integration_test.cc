@@ -2592,8 +2592,10 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadata) {
     auto* route = vh->mutable_routes()->Mutable(0);
     route->mutable_match()->set_path("/foo");
     ExtProcPerRoute per_route;
-    *per_route.mutable_overrides()->mutable_grpc_metadata()->Add() = makeHeaderValue("b", "c");
-    *per_route.mutable_overrides()->mutable_grpc_metadata()->Add() = makeHeaderValue("c", "c");
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("b", "c");
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("c", "c");
     setPerRouteConfig(route, per_route);
   });
 
