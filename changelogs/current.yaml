@@ -75,7 +75,7 @@ bug_fixes:
   change: |
     The refresh token and the access token are not expired simultaneously so the access token can be updated using by the refresh token. 
     The expiration time of the refresh token is taken from the exp claim of jwt by default. If the claim is ommited in the jwt then
-    :ref:`default_refrehs_token_expires_in <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_refrehs_token_expires_in>`
+    :ref:`default_refresh_token_expires_in <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_refresh_token_expires_in>`
     specifies the lifetime of the refresh token.
 
 
