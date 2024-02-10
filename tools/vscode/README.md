@@ -22,7 +22,7 @@ For developers in China, you might need to set `http_proxy`, `https_proxy`, `all
 
 If you see the following error message: 
 ```
-ERROR: vscode@docker-desktop:/workspaces/siddharth-envoy$ tools/vscode/refresh_compdb.sh
+ERROR: vscode@docker-desktop:/workspaces/<your-username>$ tools/vscode/refresh_compdb.sh
 /usr/bin/env: ‘bash\r’: No such file or directory
 
 It would be happening due to the following reason:
