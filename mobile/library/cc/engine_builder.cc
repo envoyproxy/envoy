@@ -40,9 +40,9 @@ namespace Platform {
 
 namespace {
 
-// This is the same value Cronet uses:
+// This is the same value Cronet uses for QUIC:
 // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
-constexpr int32_t QuicSocketReceiveBufferSize = 1024 * 1024; // 1MB
+constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
 
 } // namespace
 
@@ -767,18 +767,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
             .PackFrom(alpn_options);
 
-    // Set the upstream connections UDP socket receive buffer size. The operating system defaults
-    // are usually too small for QUIC.
+    // Set the upstream connections socket receive buffer size. The operating system defaults are
+    // usually too small for QUIC.
     // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
     // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
     // cluster, meaning H2 TCP connections buffer size would also be set to 1MB.
     envoy::config::core::v3::SocketOption* sock_opt =
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
     sock_opt->set_name(SO_RCVBUF);
-    sock_opt->set_level(SOL_SOCKET);
-    sock_opt->set_int_value(QuicSocketReceiveBufferSize);
-    sock_opt->set_description(
-        absl::StrCat("UDP SO_RCVBUF = ", QuicSocketReceiveBufferSize, " bytes"));
+    sock_opt->set_level(IPPROTO_UDP);
+    sock_opt->set_int_value(SocketReceiveBufferSize);
+    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", SocketReceiveBufferSize, " bytes"));
   }
 
   // Set up stats.
