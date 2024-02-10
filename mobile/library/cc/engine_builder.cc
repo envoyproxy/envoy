@@ -769,6 +769,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
     // Set the upstream connections UDP socket receive buffer size. The operating system defaults
     // are usually too small for QUIC.
+    // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
+    // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
+    // cluster, meaning H2 TCP connections buffer size would also be set to 1MB.
     envoy::config::core::v3::SocketOption* sock_opt =
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
     sock_opt->set_name(SO_RCVBUF);
