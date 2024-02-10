@@ -561,8 +561,10 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
       if (now < expirationTimeFromJwt) {
         const auto expiration_epoch = expirationTimeFromJwt - now;
         return std::to_string(expiration_epoch.count());
-      } else
-        ENVOY_LOG(error, "An expiration time in the refresh token less than the current time");
+      } else {
+        ENVOY_LOG(debug, "An expiration time in the refresh token is less of the current time");
+        return "0";
+      }
     }
     const std::chrono::seconds default_refresh_token_expires_in =
         config_->defaultRefreshTokenExpiresIn();
