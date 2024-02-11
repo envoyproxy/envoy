@@ -12,17 +12,20 @@ namespace Fluentd {
 using MessagePackBuffer = msgpack::sbuffer;
 using MessagePackPacker = msgpack::packer<msgpack::sbuffer>;
 
-FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(
-    Tcp::AsyncTcpClientPtr client, Event::Dispatcher& dispatcher, const FluentdAccessLogConfig& config,
-    Stats::Scope& parent_scope)
-    : tag_(config.tag()), id_(dispatcher.name()), stats_scope_(parent_scope.createScope(config.stat_prefix())),
-      fluentd_stats_({ACCESS_LOG_FLUENTD_STATS(POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_))}),
+FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Tcp::AsyncTcpClientPtr client,
+                                                 Event::Dispatcher& dispatcher,
+                                                 const FluentdAccessLogConfig& config,
+                                                 Stats::Scope& parent_scope)
+    : tag_(config.tag()), id_(dispatcher.name()),
+      stats_scope_(parent_scope.createScope(config.stat_prefix())),
+      fluentd_stats_(
+          {ACCESS_LOG_FLUENTD_STATS(POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_))}),
       client_(std::move(client)),
       buffer_flush_interval_msec_(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
       max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)),
       flush_timer_(dispatcher.createTimer([this]() {
-          flush();
-          flush_timer_->enableTimer(buffer_flush_interval_msec_);
+        flush();
+        flush_timer_->enableTimer(buffer_flush_interval_msec_);
       })) {
   client_->setAsyncTcpClientCallbacks(*this);
   flush_timer_->enableTimer(buffer_flush_interval_msec_);
@@ -33,8 +36,8 @@ void FluentdAccessLoggerImpl::onEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::Connected) {
     flush();
-  } else if (event == Network::ConnectionEvent::LocalClose
-             || event == Network::ConnectionEvent::RemoteClose) {
+  } else if (event == Network::ConnectionEvent::LocalClose ||
+             event == Network::ConnectionEvent::RemoteClose) {
     ENVOY_LOG(debug, "upstream connection was closed");
     // TODO(ohadvano): add an option to reconnect to the upstream, if configured
 
@@ -105,16 +108,17 @@ void FluentdAccessLoggerImpl::clearBuffer() {
 }
 
 FluentdAccessLoggerCacheImpl::FluentdAccessLoggerCacheImpl(
-    Upstream::ClusterManager& cluster_manager, Stats::Scope& parent_scope, ThreadLocal::SlotAllocator& tls)
-    : cluster_manager_(cluster_manager), stats_scope_(parent_scope.createScope("access_logs.fluentd")),
+    Upstream::ClusterManager& cluster_manager, Stats::Scope& parent_scope,
+    ThreadLocal::SlotAllocator& tls)
+    : cluster_manager_(cluster_manager),
+      stats_scope_(parent_scope.createScope("access_logs.fluentd")),
       tls_slot_(tls.allocateSlot()) {
-  tls_slot_->set([](Event::Dispatcher& dispatcher) {
-    return std::make_shared<ThreadLocalCache>(dispatcher);
-  });
+  tls_slot_->set(
+      [](Event::Dispatcher& dispatcher) { return std::make_shared<ThreadLocalCache>(dispatcher); });
 }
 
-FluentdAccessLoggerSharedPtr FluentdAccessLoggerCacheImpl::getOrCreateLogger(
-    const FluentdAccessLogConfigSharedPtr config) {
+FluentdAccessLoggerSharedPtr
+FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigSharedPtr config) {
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
   const auto cache_key = MessageUtil::hash(*config);
   const auto it = cache.access_loggers_.find(cache_key);
@@ -122,8 +126,9 @@ FluentdAccessLoggerSharedPtr FluentdAccessLoggerCacheImpl::getOrCreateLogger(
     return it->second;
   }
 
-  auto client = cluster_manager_.getThreadLocalCluster(config->cluster())->tcpAsyncClient(
-      nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
+  auto client =
+      cluster_manager_.getThreadLocalCluster(config->cluster())
+          ->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
 
   const auto logger = std::make_shared<FluentdAccessLoggerImpl>(
       std::move(client), cache.dispatcher_, *config, *stats_scope_);
@@ -131,9 +136,10 @@ FluentdAccessLoggerSharedPtr FluentdAccessLoggerCacheImpl::getOrCreateLogger(
   return logger;
 }
 
-FluentdAccessLog::FluentdAccessLog(
-    AccessLog::FilterPtr&& filter, FluentdFormatterPtr&& formatter, const FluentdAccessLogConfigSharedPtr config,
-    ThreadLocal::SlotAllocator& tls, FluentdAccessLoggerCacheSharedPtr access_logger_cache)
+FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatterPtr&& formatter,
+                                   const FluentdAccessLogConfigSharedPtr config,
+                                   ThreadLocal::SlotAllocator& tls,
+                                   FluentdAccessLoggerCacheSharedPtr access_logger_cache)
     : ImplBase(std::move(filter)), formatter_(std::move(formatter)), tls_slot_(tls.allocateSlot()),
       config_(config), access_logger_cache_(std::move(access_logger_cache)) {
   tls_slot_->set(
@@ -146,8 +152,10 @@ void FluentdAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) {
   auto msgpack = formatter_->format(context, stream_info);
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(
-      stream_info.timeSource().systemTime().time_since_epoch()).count();
-  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::make_unique<Entry>(time, std::move(msgpack)));
+                       stream_info.timeSource().systemTime().time_since_epoch())
+                       .count();
+  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(
+      std::make_unique<Entry>(time, std::move(msgpack)));
 }
 
 } // namespace Fluentd

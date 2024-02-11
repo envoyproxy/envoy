@@ -29,14 +29,16 @@ getAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& conte
       });
 }
 
-AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr
+FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                                 AccessLog::FilterPtr&& filter,
+                                                 Server::Configuration::FactoryContext& context) {
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  absl::Status status = context.serverFactoryContext().clusterManager().checkActiveStaticCluster(proto_config.cluster());
+  absl::Status status = context.serverFactoryContext().clusterManager().checkActiveStaticCluster(
+      proto_config.cluster());
   if (!status.ok()) {
     throw EnvoyException(fmt::format("cluster {} not found", proto_config.cluster()));
   }
@@ -52,10 +54,11 @@ AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
   FluentdFormatterPtr fluentd_formatter =
       std::make_unique<FluentdFormatterImpl>(std::move(json_formatter));
 
-  return std::make_shared<FluentdAccessLog>(std::move(filter), std::move(fluentd_formatter),
-                                            std::make_shared<FluentdAccessLogConfig>(proto_config),
-                                            context.serverFactoryContext().threadLocal(),
-                                            getAccessLoggerCacheSingleton(context.serverFactoryContext()));
+  return std::make_shared<FluentdAccessLog>(
+      std::move(filter), std::move(fluentd_formatter),
+      std::make_shared<FluentdAccessLogConfig>(proto_config),
+      context.serverFactoryContext().threadLocal(),
+      getAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr FluentdAccessLogFactory::createEmptyConfigProto() {

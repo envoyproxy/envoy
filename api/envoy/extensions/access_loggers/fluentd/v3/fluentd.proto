@@ -17,11 +17,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Fluentd access log]
 
-// Configuration for the *envoy.access_loggers.fluentd* :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`.
+// Configuration for the *envoy.access_loggers.fluentd* :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`.
 // This access log extension will send the emitted access logs over a TCP connection to an upstream that is accepting
 // the Fluentd Forward Protocol as described in: `Fluentd Forward Protocol Specification
 // <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 // [#extension: envoy.access_loggers.fluentd]
+// [#next-free-field: 7]
 message FluentdAccessLogConfig {
   // The upstream cluster to connect to for streaming the Fluentd messages.
   string cluster = 1 [(validate.rules).string = {min_len: 1}];
