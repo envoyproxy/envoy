@@ -40,7 +40,7 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
   absl::Status status = context.serverFactoryContext().clusterManager().checkActiveStaticCluster(
       proto_config.cluster());
   if (!status.ok()) {
-    throw EnvoyException(fmt::format("cluster {} not found", proto_config.cluster()));
+    throw EnvoyException(fmt::format("cluster '{}' was not found", proto_config.cluster()));
   }
 
   // Supporting nested object serialization is more complex with MessagePack.

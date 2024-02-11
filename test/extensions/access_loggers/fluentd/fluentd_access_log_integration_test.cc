@@ -133,7 +133,7 @@ public:
 };
 
 TEST_F(FluentdAccessLogIntegrationTest, UnknownCluster) {
-  EXPECT_DEATH(init("unknown_cluster"), "Unknown gRPC client cluster 'unknown_cluster'");
+  EXPECT_DEATH(init("unknown_cluster"), "cluster 'unknown_cluster' was not found");
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
