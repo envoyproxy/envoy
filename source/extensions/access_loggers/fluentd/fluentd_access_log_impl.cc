@@ -111,8 +111,7 @@ FluentdAccessLoggerCacheImpl::FluentdAccessLoggerCacheImpl(
     Upstream::ClusterManager& cluster_manager, Stats::Scope& parent_scope,
     ThreadLocal::SlotAllocator& tls)
     : cluster_manager_(cluster_manager),
-      stats_scope_(parent_scope.createScope("access_logs.fluentd")),
-      tls_slot_(tls.allocateSlot()) {
+      stats_scope_(parent_scope.createScope("access_logs.fluentd")), tls_slot_(tls.allocateSlot()) {
   tls_slot_->set(
       [](Event::Dispatcher& dispatcher) { return std::make_shared<ThreadLocalCache>(dispatcher); });
 }
@@ -152,8 +151,8 @@ void FluentdAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) {
   auto msgpack = formatter_->format(context, stream_info);
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(
-                       stream_info.timeSource().systemTime().time_since_epoch())
-                       .count();
+                      stream_info.timeSource().systemTime().time_since_epoch())
+                      .count();
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(
       std::make_unique<Entry>(time, std::move(msgpack)));
 }
