@@ -31,7 +31,8 @@ public:
 
   MOCK_METHOD(RouteEntryConstSharedPtr, routeEntry, (const Request& request), (const));
 
-  std::shared_ptr<const MockRouteEntry> route_entry_{std::make_shared<MockRouteEntry>()};
+  std::shared_ptr<const testing::NiceMock<MockRouteEntry>> route_entry_{
+      std::make_shared<testing::NiceMock<MockRouteEntry>>()};
 };
 
 } // namespace GenericProxy

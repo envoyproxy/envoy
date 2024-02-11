@@ -49,6 +49,8 @@ func (f *filterFactory) CreateFilter(cb api.ConnectionCallback) api.DownstreamFi
 }
 
 type downFilter struct {
+	api.EmptyDownstreamFilter
+
 	cb       api.ConnectionCallback
 	upAddr   string
 	upFilter *upFilter
@@ -85,6 +87,8 @@ func (f *downFilter) OnWrite(buffer []byte, endOfStream bool) api.FilterStatus {
 }
 
 type upFilter struct {
+	api.EmptyUpstreamFilter
+
 	cb         api.ConnectionCallback
 	downFilter *downFilter
 	ch         chan []byte

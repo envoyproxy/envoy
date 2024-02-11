@@ -18,13 +18,14 @@ public:
   Secret::SecretManager& secretManager() override { return *(secret_manager_); }
 
   MOCK_METHOD(OptRef<Admin>, admin, ());
+  MOCK_METHOD(void, run, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, ());
-  MOCK_METHOD(void, drainListeners, ());
+  MOCK_METHOD(void, drainListeners, (OptRef<const Network::ExtraShutdownListenerOptions> options));
   MOCK_METHOD(DrainManager&, drainManager, ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(void, failHealthcheck, (bool fail));

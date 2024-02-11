@@ -14,12 +14,9 @@ public interface EnvoyEngine {
    *
    * @param callbacks The callbacks for receiving callbacks from the stream.
    * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
-   * @param minDeliverySize If nonzero, indicates the smallest number of response body bytes which
-   *     should be delivered sans end stream.
    * @return A stream that may be used for sending data.
    */
-  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl,
-                              long minDeliverySize);
+  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl);
 
   /**
    * Terminates the running engine.
@@ -69,13 +66,6 @@ public interface EnvoyEngine {
 
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
 
-  /**
-   * Flush the stats sinks outside of a flushing interval.
-   * Note: stat flushing is done asynchronously, this function will never block.
-   * This is a noop if called before the underlying EnvoyEngine has started.
-   */
-  void flushStats();
-
   String dumpStats();
 
   /**
@@ -99,4 +89,16 @@ public interface EnvoyEngine {
    * @param port The proxy port.
    */
   void setProxySettings(String host, int port);
+
+  /*
+   * These are the available log levels for Envoy Mobile.
+   */
+  public enum LogLevel { TRACE, DEBUG, INFO, WARN, ERR, CRITICAL, OFF }
+
+  /**
+   * Set the log level for Envoy mobile
+   *
+   * @param log_level the verbosity of logging Envoy should use.
+   */
+  public void setLogLevel(LogLevel log_level);
 }

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "headers.h"
+#include "library/cc/headers.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {

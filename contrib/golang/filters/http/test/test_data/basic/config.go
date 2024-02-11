@@ -9,14 +9,14 @@ const Name = "basic"
 
 func init() {
 	api.LogCritical("init")
-	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, nil)
+	api.LogCritical(api.GetLogLevel().String())
+
+	http.RegisterHttpFilterFactoryAndConfigParser(Name, filterFactory, http.NullParser)
 }
 
-func ConfigFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &filter{
-			callbacks: callbacks,
-		}
+func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
+	return &filter{
+		callbacks: callbacks,
 	}
 }
 

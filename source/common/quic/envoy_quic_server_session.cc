@@ -2,12 +2,12 @@
 
 #include <iterator>
 #include <memory>
+#include <type_traits>
 
 #include "source/common/common/assert.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
-
-#include "quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -207,6 +207,29 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
       self_address == connection()->sent_server_preferred_address()) {
     connection_stats_.num_packets_rx_on_preferred_address_.inc();
   }
+  maybeApplyDelayedClose();
+}
+
+std::vector<absl::string_view>::const_iterator
+EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) const {
+  if (!position_.has_value()) {
+    return quic::QuicServerSessionBase::SelectAlpn(alpns);
+  }
+  const std::vector<absl::string_view>& configured_alpns =
+      dynamic_cast<const QuicServerTransportSocketFactory&>(
+          position_->filter_chain_.transportSocketFactory())
+          .supportedAlpnProtocols();
+  if (configured_alpns.empty()) {
+    return quic::QuicServerSessionBase::SelectAlpn(alpns);
+  }
+
+  for (absl::string_view configured_alpn : configured_alpns) {
+    auto it = absl::c_find(alpns, configured_alpn);
+    if (it != alpns.end()) {
+      return it;
+    }
+  }
+  return alpns.end();
 }
 
 } // namespace Quic

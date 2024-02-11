@@ -17,18 +17,21 @@ namespace Tap {
 
 class SocketTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactory {
 public:
-  SocketTapConfigFactoryImpl(TimeSource& time_source) : time_source_(time_source) {}
+  SocketTapConfigFactoryImpl(TimeSource& time_source,
+                             Server::Configuration::TransportSocketFactoryContext& context)
+      : time_source_(time_source), factory_context_(context) {}
 
   // TapConfigFactory
   Extensions::Common::Tap::TapConfigSharedPtr
   createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
     return std::make_shared<SocketTapConfigImpl>(std::move(proto_config), admin_streamer,
-                                                 time_source_);
+                                                 time_source_, factory_context_);
   }
 
 private:
   TimeSource& time_source_;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
 Network::UpstreamTransportSocketFactoryPtr
@@ -49,7 +52,7 @@ UpstreamTapSocketConfigFactory::createTransportSocketFactory(
   return std::make_unique<TapSocketFactory>(
       outer_config,
       std::make_unique<SocketTapConfigFactoryImpl>(
-          server_context.mainThreadDispatcher().timeSource()),
+          server_context.mainThreadDispatcher().timeSource(), context),
       server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
       server_context.mainThreadDispatcher(), std::move(inner_transport_factory));
 }
@@ -72,7 +75,7 @@ DownstreamTapSocketConfigFactory::createTransportSocketFactory(
   return std::make_unique<DownstreamTapSocketFactory>(
       outer_config,
       std::make_unique<SocketTapConfigFactoryImpl>(
-          server_context.mainThreadDispatcher().timeSource()),
+          server_context.mainThreadDispatcher().timeSource(), context),
       server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
       server_context.mainThreadDispatcher(), std::move(inner_transport_factory));
 }

@@ -1,9 +1,13 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/message.h"
 
 #include "source/common/common/matchers.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -81,6 +85,14 @@ public:
   joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
 
   /**
+   * Get the Security Token Service endpoint for a given region: sts.<region>.amazonaws.com
+   * See: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region
+   * @param region An AWS region.
+   * @return an sts endpoint url.
+   */
+  static std::string getSTSEndpoint(absl::string_view region);
+
+  /**
    * Fetch AWS instance or task metadata.
    *
    * @param message An HTTP request.
@@ -92,6 +104,78 @@ public:
    * gRPC auth plugins that are able to schedule blocking plugins on a different thread.
    */
   static absl::optional<std::string> fetchMetadata(Http::RequestMessage& message);
+
+  /**
+   * @brief Adds a static cluster towards a credentials provider
+   *        to fetch the credentials using http async client.
+   *
+   * @param cm cluster manager
+   * @param cluster_name a name for credentials provider cluster
+   * @param cluster_type STATIC or STRICT_DNS or LOGICAL_DNS etc
+   * @param uri provider's IP (STATIC cluster) or URL (STRICT_DNS). Will use port 80 if the port is
+   * not specified in the uri or no matching cluster is found.
+   * @return true if successfully added the cluster or if a cluster with the cluster_name already
+   * exists.
+   * @return false if failed to add the cluster
+   */
+  static bool
+  addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
+                           const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
+                           absl::string_view uri);
+
+  /**
+   * @brief Retrieve an environment variable if set, otherwise return default_value
+   *
+   * @param variable_name Environment variable.
+   * @param default_value Value to be returned if environment variable is not set.
+   * @return The evaluation result.
+   */
+  static std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                                     const std::string& default_value);
+
+  /**
+   * @brief Given a profile name and a file containing profile elements, such as config or
+   * credentials, retrieve all elements in the elements map
+   *
+   * @param profile_file path to the file to search for elements.
+   * @param profile_name the profile section to search.
+   * @param elements a hash map of elements to search for. values will be replaced if found.
+   * @return true if profile file could be read and searched.
+   * @return false if profile file could not be read.
+   */
+  static bool resolveProfileElements(const std::string& profile_file,
+                                     const std::string& profile_name,
+                                     absl::flat_hash_map<std::string, std::string>& elements);
+
+  /**
+   * @brief Return the path of AWS credential file, following environment variable expansions
+   *
+   * @return File path of the AWS credential file.
+   */
+  static std::string getCredentialFilePath();
+
+  /**
+   * @brief Return the path of AWS config file, following environment variable expansions
+   *
+   * @return File path of the AWS config file.
+   */
+  static std::string getConfigFilePath();
+
+  /**
+   * @brief Return the AWS profile string within a config file, following environment variable
+   * expansions
+   *
+   * @return Name of the profile string.
+   */
+  static std::string getConfigProfileName();
+
+  /**
+   * @brief Return the AWS profile string within a credentials file, following environment variable
+   * expansions
+   *
+   * @return Name of the profile string.
+   */
+  static std::string getCredentialProfileName();
 };
 
 } // namespace Aws

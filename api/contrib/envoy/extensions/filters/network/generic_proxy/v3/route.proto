@@ -11,7 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.v3";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/generic_proxy/v3;generic_proxyv3";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/generic_proxy/v3;generic_proxyv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
@@ -43,7 +43,7 @@ message VirtualHost {
   xds.type.matcher.v3.Matcher routes = 3 [(validate.rules).message = {required: true}];
 }
 
-// The generic proxy makes use of the `xds matching API` for routing configurations.
+// The generic proxy makes use of the xDS matching API for routing configurations.
 //
 // In the below example, we combine a top level tree matcher with a linear matcher to match
 // the incoming requests, and send the matching requests to v1 of the upstream service.

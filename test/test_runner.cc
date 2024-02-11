@@ -75,7 +75,7 @@ bool isDeathTestChild(int argc, char** argv) {
 
 } // namespace
 
-int TestRunner::RunTests(int argc, char** argv) {
+int TestRunner::runTests(int argc, char** argv) {
   const bool is_death_test_child = isDeathTestChild(argc, argv);
   ::testing::InitGoogleMock(&argc, argv);
   // We hold on to process_wide to provide RAII cleanup of process-wide

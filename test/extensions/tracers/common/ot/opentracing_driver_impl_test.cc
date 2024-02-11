@@ -183,9 +183,8 @@ public:
   }
 
   const std::string operation_name_{"test"};
-  Http::TestRequestHeaderMapImpl request_headers_{
+  Tracing::TestTraceContextImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   std::unique_ptr<TestDriver> driver_;
@@ -317,7 +316,8 @@ TEST_F(OpenTracingDriverTest, InjectFailure) {
 
     const auto span_context_injection_error_count =
         stats_.counter("tracing.opentracing.span_context_injection_error").value();
-    EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
+    EXPECT_FALSE(
+        request_headers_.context_map_.contains(Http::CustomHeaders::get().OtSpanContext.get()));
     span->injectContext(request_headers_, nullptr);
 
     EXPECT_EQ(span_context_injection_error_count + 1,
@@ -365,7 +365,7 @@ TEST_F(OpenTracingDriverTest, ExtractUsingForeach) {
                      {Tracing::Reason::Sampling, true});
 
   for (const auto& [key, value] : extracted_headers) {
-    EXPECT_EQ(value, request_headers_.getByKey(key));
+    EXPECT_EQ(value, request_headers_.get(key));
   }
 }
 

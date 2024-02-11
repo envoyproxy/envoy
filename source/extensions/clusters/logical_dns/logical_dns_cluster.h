@@ -18,6 +18,9 @@
 namespace Envoy {
 namespace Upstream {
 
+class LogicalDnsClusterFactory;
+class LogicalDnsClusterTest;
+
 /**
  * The LogicalDnsCluster is a type of cluster that creates a single logical host that wraps
  * an async DNS resolver. The DNS resolver will continuously resolve, and swap in the first IP
@@ -33,15 +36,18 @@ namespace Upstream {
  */
 class LogicalDnsCluster : public ClusterImplBase {
 public:
-  LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
-
   ~LogicalDnsCluster() override;
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
+  friend class LogicalDnsClusterFactory;
+  friend class LogicalDnsClusterTest;
+
+  LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
+
   const envoy::config::endpoint::v3::LocalityLbEndpoints& localityLbEndpoint() const {
     // This is checked in the constructor, i.e. at config load time.
     ASSERT(load_assignment_.endpoints().size() == 1);
@@ -81,7 +87,8 @@ public:
   LogicalDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+  friend class LogicalDnsClusterTest;
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 };

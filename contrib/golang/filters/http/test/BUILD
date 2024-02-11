@@ -16,7 +16,6 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
     ],
-    env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",
@@ -31,7 +30,6 @@ envoy_cc_test(
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
-    env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:golang_filter_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -52,15 +50,20 @@ envoy_cc_test(
     name = "golang_integration_test",
     srcs = ["golang_integration_test.cc"],
     data = [
+        "//contrib/golang/filters/http/test/test_data/access_log:filter.so",
+        "//contrib/golang/filters/http/test/test_data/action:filter.so",
         "//contrib/golang/filters/http/test/test_data/basic:filter.so",
+        "//contrib/golang/filters/http/test/test_data/buffer:filter.so",
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
+        "//contrib/golang/filters/http/test/test_data/metric:filter.so",
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
+        "//contrib/golang/filters/http/test/test_data/property:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
-    env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//source/exe:main_common_lib",
+        "//source/extensions/filters/http/lua:config",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",

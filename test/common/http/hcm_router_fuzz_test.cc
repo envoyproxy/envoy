@@ -273,16 +273,13 @@ public:
     return upstreams_[idx].get();
   }
 
-  void addDirectResponse(Http::Code code, const std::string& body, const std::string& new_uri,
-                         const std::string& route_name) {
+  void addDirectResponse(Http::Code code, const std::string& body, const std::string& new_uri) {
     direct_response_entry_ = std::make_unique<Router::MockDirectResponseEntry>();
-    route_name_ = route_name;
     direct_response_body_ = body;
     ON_CALL(*direct_response_entry_, responseCode()).WillByDefault(Return(code));
     ON_CALL(*direct_response_entry_, responseBody())
         .WillByDefault(ReturnRef(direct_response_body_));
     ON_CALL(*direct_response_entry_, newUri(_)).WillByDefault(Return(new_uri));
-    ON_CALL(*direct_response_entry_, routeName()).WillByDefault(ReturnRef(route_name_));
     ON_CALL(*mock_route_, directResponseEntry())
         .WillByDefault(Return(direct_response_entry_.get()));
   }
@@ -324,7 +321,6 @@ public:
   std::vector<std::unique_ptr<FuzzUpstream>> upstreams_;
   std::unique_ptr<Router::MockDirectResponseEntry> direct_response_entry_{};
 
-  std::string route_name_{};
   std::string direct_response_body_{};
 };
 
@@ -344,7 +340,9 @@ public:
     clusters_.push_back(std::move(default1));
 
     FuzzClusterPtr default2 = std::make_unique<FuzzCluster>(cfg, "/default2");
-    default2->addDirectResponse(Code::Found, "", "/default0", "/default0");
+
+    default2->mock_route_->route_name_ = "default0";
+    default2->addDirectResponse(Code::Found, "", "/default0");
     clusters_.push_back(std::move(default2));
   }
 
@@ -355,6 +353,16 @@ public:
   FuzzCluster* selectClusterByName(absl::string_view name) {
     for (auto& cluster : clusters_) {
       if (cluster->path_ == name) {
+        return cluster.get();
+      }
+    }
+    return nullptr;
+  }
+
+  FuzzCluster*
+  selectClusterByThreadLocalCluster(Upstream::ThreadLocalCluster& thread_local_cluster) {
+    for (auto& cluster : clusters_) {
+      if (&cluster->tlc_ == &thread_local_cluster) {
         return cluster.get();
       }
     }
@@ -397,15 +405,14 @@ public:
   std::string name() const override { return "envoy.filters.connection_pools.http.generic"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster&,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        const Router::RouteEntry& route_entry,
-                        absl::optional<Envoy::Http::Protocol> protocol,
+                        Upstream::ResourcePriority, absl::optional<Envoy::Http::Protocol> protocol,
                         Upstream::LoadBalancerContext*) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       return nullptr;
     }
-    FuzzCluster* cluster = cluster_manager_.selectClusterByName(route_entry.clusterName());
+    FuzzCluster* cluster = cluster_manager_.selectClusterByThreadLocalCluster(thread_local_cluster);
     if (cluster == nullptr) {
       return nullptr;
     }

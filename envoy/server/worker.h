@@ -32,10 +32,11 @@ public:
    * @param completion supplies the completion to call when the listener has been added (or not) on
    *                   the worker.
    * @param runtime, supplies the runtime for the server
+   * @param random, supplies a random number generator
    */
   virtual void addListener(absl::optional<uint64_t> overridden_listener,
                            Network::ListenerConfig& listener, AddListenerCompletion completion,
-                           Runtime::Loader& runtime) PURE;
+                           Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   /**
    * @return uint64_t the number of connections across all listeners that the worker owns.
@@ -44,10 +45,10 @@ public:
 
   /**
    * Start the worker thread.
-   * @param guard_dog supplies the guard dog to use for thread watching.
+   * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param cb a callback to run when the worker thread starts running.
    */
-  virtual void start(GuardDog& guard_dog, const std::function<void()>& cb) PURE;
+  virtual void start(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) PURE;
 
   /**
    * Initialize stats for this worker's dispatcher, if available. The worker will output
@@ -84,11 +85,13 @@ public:
   /**
    * Stop a listener from accepting new connections. This is used for server draining.
    * @param listener supplies the listener to stop.
+   * @param options additional options to be passed through to shutdownListener.
    * @param completion supplies the completion to be called when the listener has stopped
    * accepting new connections. This completion is called on the worker thread. No locking is
    * performed by the worker.
    */
   virtual void stopListener(Network::ListenerConfig& listener,
+                            const Network::ExtraShutdownListenerOptions& options,
                             std::function<void()> completion) PURE;
 };
 

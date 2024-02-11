@@ -4,6 +4,9 @@ services:
     build:
       context: .
       dockerfile: ../shared/envoy/Dockerfile
+      target: envoy-admin
+      args:
+        ENVOY_ADMIN_PORT: 9901
     depends_on:
       service:
         condition: service_healthy

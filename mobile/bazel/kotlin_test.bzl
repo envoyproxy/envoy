@@ -3,7 +3,7 @@ load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_local_test")
 load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_test")
 load("//bazel:kotlin_lib.bzl", "native_lib_name")
 
-def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], repository = "", exec_properties = {}):
+def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], repository = "", exec_properties = {}, associates = []):
     # This is to work around the issue where we have specific implementation functionality which
     # we want to avoid consumers to use but we want to unit test
     dep_srcs = []
@@ -20,7 +20,7 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], reposito
         srcs = srcs + dep_srcs,
         deps = [
             repository + "//bazel:envoy_mobile_test_suite",
-            "@maven//:org_assertj_assertj_core",
+            "@maven//:com_google_truth_truth",
             "@maven//:junit_junit",
             "@maven//:org_mockito_mockito_inline",
             "@maven//:org_mockito_mockito_core",
@@ -28,29 +28,36 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], reposito
         data = data,
         jvm_flags = jvm_flags,
         exec_properties = exec_properties,
+        associates = associates,
     )
 
 # A simple macro to define the JVM flags that are common for envoy_mobile_jni_kt_test and
 # envoy_mobile_android_test.
 def jvm_flags(lib_name):
     return [
-        "-Djava.library.path=library/common/jni:test/common/jni",
+        "-Djava.library.path=library/jni:test/jni",
         "-Denvoy_jni_library_name={}".format(lib_name),
         "-Xcheck:jni",
-    ]
+    ] + select({
+        "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
+        "//conditions:default": [],
+    }) + select({
+        "@envoy//bazel:disable_envoy_mobile_xds": ["-Denvoy_jni_envoy_mobile_xds_disabled=true"],
+        "//conditions:default": [],
+    })
 
 # A basic macro to make it easier to declare and run kotlin tests which depend on a JNI lib
 # This will create the native .so binary (for linux) and a .jnilib (for macOS) look up
-def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = [], repository = "", exec_properties = {}):
-    lib_name = native_lib_name(native_deps[0])[3:]
+def envoy_mobile_jni_kt_test(name, srcs, native_lib_name, native_deps = [], deps = [], repository = "", exec_properties = {}, associates = []):
     _internal_kt_test(
         name,
         srcs,
         deps,
         data = native_deps,
-        jvm_flags = jvm_flags(lib_name),
+        jvm_flags = jvm_flags(native_lib_name),
         repository = repository,
         exec_properties = exec_properties,
+        associates = associates,
     )
 
 # A basic macro to make it easier to declare and run kotlin tests
@@ -69,12 +76,11 @@ def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = [], repository
 #         "ExampleTest.kt",
 #     ],
 # )
-def envoy_mobile_kt_test(name, srcs, deps = [], repository = "", exec_properties = {}):
-    _internal_kt_test(name, srcs, deps, repository = repository, exec_properties = exec_properties)
+def envoy_mobile_kt_test(name, srcs, deps = [], repository = "", exec_properties = {}, associates = []):
+    _internal_kt_test(name, srcs, deps, repository = repository, exec_properties = exec_properties, associates = associates)
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repository = "", exec_properties = {}):
-    lib_name = native_lib_name(native_deps[0])[3:]
+def envoy_mobile_android_test(name, srcs, native_lib_name, deps = [], native_deps = [], repository = "", exec_properties = {}, associates = []):
     android_library(
         name = name + "_test_lib",
         custom_package = "io.envoyproxy.envoymobile.test",
@@ -98,7 +104,6 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
             "@maven//:androidx_test_rules",
             "@maven//:org_robolectric_robolectric",
             "@robolectric//bazel:android-all",
-            "@maven//:org_assertj_assertj_core",
             "@maven//:junit_junit",
             "@maven//:org_mockito_mockito_inline",
             "@maven//:org_mockito_mockito_core",
@@ -111,6 +116,7 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
         manifest = repository + "//bazel:test_manifest.xml",
         custom_package = "io.envoyproxy.envoymobile.tests",
         test_class = "io.envoyproxy.envoymobile.bazel.EnvoyMobileTestSuite",
-        jvm_flags = jvm_flags(lib_name),
+        jvm_flags = jvm_flags(native_lib_name),
         exec_properties = exec_properties,
+        associates = associates,
     )

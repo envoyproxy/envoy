@@ -26,7 +26,7 @@ std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint
                                 const uint16_t query_id) {
   Random::RandomGeneratorImpl random_;
   struct DnsHeader query {};
-  uint16_t id = (query_id ? query_id : random_.random() & 0xFFFF);
+  uint16_t id = query_id ? query_id : (random_.random() % 0xFFFF) + 1;
 
   // Generate a random query ID
   query.id = id;
@@ -375,7 +375,7 @@ DnsAnswerRecordPtr DnsResponseValidator::parseDnsAnswerRecord(const Buffer::Inst
   offset += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
-  // TODO(abaptiste): Support Extension Mechanisms for DNS (RFC2671)
+  // TODO(suniltheta): Support Extension Mechanisms for DNS (RFC2671)
   //
   // We may see optional records indicating DNS extension support. We need to skip
   // these records until we have proper support. Encountering one of these records

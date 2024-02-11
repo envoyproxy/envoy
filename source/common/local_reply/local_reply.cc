@@ -19,11 +19,11 @@ namespace LocalReply {
 class BodyFormatter {
 public:
   BodyFormatter()
-      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
+      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%", false)),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
-                Server::Configuration::CommonFactoryContext& context)
+                Server::Configuration::GenericFactoryContext& context)
       : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context)),
         content_type_(
             !config.content_type().empty() ? config.content_type()
@@ -37,8 +37,8 @@ public:
               const Http::ResponseTrailerMap& response_trailers,
               const StreamInfo::StreamInfo& stream_info, std::string& body,
               absl::string_view& content_type) const {
-    body = formatter_->format(request_headers, response_headers, response_trailers, stream_info,
-                              body, AccessLog::AccessLogType::NotSet);
+    body = formatter_->formatWithContext(
+        {&request_headers, &response_headers, &response_trailers, body}, stream_info);
     content_type = content_type_;
   }
 
@@ -61,7 +61,7 @@ public:
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
     if (config.has_body()) {
-      body_ = Config::DataSource::read(config.body(), true, context.api());
+      body_ = Config::DataSource::read(config.body(), true, context.serverFactoryContext().api());
     }
 
     if (config.has_body_format_override()) {
@@ -78,8 +78,8 @@ public:
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
     if (filter_ == nullptr ||
-        !filter_->evaluate(stream_info, request_headers, response_headers, response_trailers,
-                           AccessLog::AccessLogType::NotSet)) {
+        !filter_->evaluate({&request_headers, &response_headers, &response_trailers},
+                           stream_info)) {
       return false;
     }
 
@@ -87,7 +87,7 @@ public:
       body = body_.value();
     }
 
-    header_parser_->evaluateHeaders(response_headers, request_headers, response_headers,
+    header_parser_->evaluateHeaders(response_headers, {&request_headers, &response_headers},
                                     stream_info);
 
     if (status_code_.has_value() && code != status_code_.value()) {

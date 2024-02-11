@@ -5,7 +5,6 @@ package envoy.extensions.common.matching.v3;
 import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/extension.proto";
 
-import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -24,8 +23,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // decorating an existing extension with a matcher, which can be used to match against
 // relevant protocol data.
 message ExtensionWithMatcher {
-  option (xds.annotations.v3.message_status).work_in_progress = true;
-
   // The associated matcher. This is deprecated in favor of xds_matcher.
   config.common.matcher.v3.Matcher matcher = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];

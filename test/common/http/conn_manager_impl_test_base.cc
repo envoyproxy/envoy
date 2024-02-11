@@ -17,7 +17,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
       access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
-          Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
                                       POOL_GAUGE(*fake_stats_.rootScope()),
@@ -78,6 +78,7 @@ void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_n
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());
+
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
   if (tracing) {
@@ -115,7 +116,7 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
                           this](FilterChainManager& manager) -> bool {
           bool applied_filters = false;
-          if (log_handler_.get()) {
+          if (log_handler_) {
             auto factory = createLogHandlerFactoryCb(log_handler_);
             manager.applyFilterFactoryCb({}, factory);
             applied_filters = true;
@@ -230,8 +231,8 @@ void HttpConnectionManagerImplMixin::sendRequestHeadersAndData() {
 }
 
 ResponseHeaderMap* HttpConnectionManagerImplMixin::sendResponseHeaders(
-    ResponseHeaderMapPtr&& response_headers, absl::optional<StreamInfo::ResponseFlag> response_flag,
-    std::string response_code_details) {
+    ResponseHeaderMapPtr&& response_headers,
+    absl::optional<StreamInfo::CoreResponseFlag> response_flag, std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
@@ -393,6 +394,24 @@ void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
         }
         return header_validator;
       }));
+}
+
+Event::MockSchedulableCallback*
+HttpConnectionManagerImplMixin::enableStreamsPerIoLimit(uint32_t limit) {
+  EXPECT_CALL(runtime_.snapshot_, getInteger("http.max_requests_per_io_cycle", _))
+      .WillOnce(Return(limit));
+
+  // Expect HCM to create and set schedulable callback
+  auto* deferred_request_callback =
+      new Event::MockSchedulableCallback(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*deferred_request_callback, enabled())
+      .WillRepeatedly(
+          Invoke([deferred_request_callback]() { return deferred_request_callback->enabled_; }));
+  EXPECT_CALL(*deferred_request_callback, scheduleCallbackNextIteration())
+      .WillRepeatedly(
+          Invoke([deferred_request_callback]() { deferred_request_callback->enabled_ = true; }));
+
+  return deferred_request_callback;
 }
 
 } // namespace Http

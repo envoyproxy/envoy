@@ -45,7 +45,10 @@ envoy_sh_test(
     #    curl: (3) URL using bad/illegal format or missing URL
     #
     # This seems fixable, if someone is so inclined.
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocoverage",
+        "skip_on_windows",
+    ],
 )
 
 filegroup(

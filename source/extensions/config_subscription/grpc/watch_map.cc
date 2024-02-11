@@ -77,7 +77,7 @@ WatchMap::updateWatchInterest(Watch* watch,
       eds_resources_cache_->removeResource(resource_name);
     }
   }
-  return AddedRemoved(std::move(added_resources), std::move(removed_resources));
+  return {std::move(added_resources), std::move(removed_resources)};
 }
 
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
@@ -95,7 +95,9 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
     // This is not very efficient; it is possible to canonicalize etc. much faster with raw string
     // operations, but this implementation provides a reference for later optimization while we
     // adopt xdstp://.
-    xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
+    auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
+    THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+    xdstp_resource = resource_or_error.value();
   }
   auto watches_interested = watch_interest_.find(
       is_xdstp ? XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options) : resource_name);
@@ -171,11 +173,11 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
       // 3) Otherwise, we can skip onConfigUpdate for this watch.
       if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
         watch->state_of_the_world_empty_ = true;
-        watch->callbacks_.onConfigUpdate({}, version_info);
+        THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, version_info));
       }
     } else {
       watch->state_of_the_world_empty_ = false;
-      watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info));
     }
   }
 
@@ -257,10 +259,12 @@ void WatchMap::onConfigUpdate(
     const auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
-      cur_watch->callbacks_.onConfigUpdate(resource_to_add, {}, system_version_info);
+      THROW_IF_NOT_OK(
+          cur_watch->callbacks_.onConfigUpdate(resource_to_add, {}, system_version_info));
     } else {
       // both additions and removals
-      cur_watch->callbacks_.onConfigUpdate(resource_to_add, removed->second, system_version_info);
+      THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate(resource_to_add, removed->second,
+                                                           system_version_info));
       // Drop the removals now, so the final removals-only pass won't use them.
       per_watch_removed.erase(removed);
     }
@@ -270,12 +274,13 @@ void WatchMap::onConfigUpdate(
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
       continue;
     }
-    cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info);
+    THROW_IF_NOT_OK(
+        cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
   }
   // notify empty update
   if (added_resources.empty() && removed_resources.empty()) {
     for (auto& cur_watch : wildcard_watches_) {
-      cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info);
+      THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
     }
   }
 
@@ -284,8 +289,8 @@ void WatchMap::onConfigUpdate(
     for (const auto& resource : decoded_resources) {
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
           dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-              resource.get()->resource());
-      eds_resources_cache_->setResource(resource.get()->name(), cluster_load_assignment);
+              resource->resource());
+      eds_resources_cache_->setResource(resource->name(), cluster_load_assignment);
     }
     // No need to remove resources from the cache, as currently only non-collection
     // subscriptions are supported, and these resources are removed in the call

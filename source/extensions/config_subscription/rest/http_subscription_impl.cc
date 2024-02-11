@@ -92,7 +92,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
   TRY_ASSERT_MAIN_THREAD {
     const auto decoded_resources =
         DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
-    callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
+    THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info()));
     request_.set_version_info(message.version_info());
     stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
@@ -147,6 +147,22 @@ void HttpSubscriptionImpl::disableInitFetchTimeoutTimer() {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();
   }
+}
+
+std::chrono::milliseconds HttpSubscriptionFactory::apiConfigSourceRefreshDelay(
+    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+  if (!api_config_source.has_refresh_delay()) {
+    throwEnvoyExceptionOrPanic("refresh_delay is required for REST API configuration sources");
+  }
+
+  return std::chrono::milliseconds(
+      DurationUtil::durationToMilliseconds(api_config_source.refresh_delay()));
+}
+
+std::chrono::milliseconds HttpSubscriptionFactory::apiConfigSourceRequestTimeout(
+    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+  return std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
 REGISTER_FACTORY(HttpSubscriptionFactory, ConfigSubscriptionFactory);

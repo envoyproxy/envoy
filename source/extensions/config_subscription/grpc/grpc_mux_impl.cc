@@ -47,7 +47,9 @@ bool isXdsTpWildcard(const std::string& resource_name) {
 // Must only be called on XdsTp resource names.
 std::string convertToWildcard(const std::string& resource_name) {
   ASSERT(XdsResourceIdentifier::hasXdsTpScheme(resource_name));
-  xds::core::v3::ResourceName xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
+  auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
+  THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+  xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
   const auto pos = xdstp_resource.id().find_last_of('/');
   xdstp_resource.set_id(
       pos == std::string::npos ? "*" : absl::StrCat(xdstp_resource.id().substr(0, pos), "/*"));
@@ -67,14 +69,14 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
-      target_xds_authority_(grpc_mux_context.target_xds_authority_), first_stream_request_(true),
+      target_xds_authority_(grpc_mux_context.target_xds_authority_),
       dispatcher_(grpc_mux_context.dispatcher_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
                 onDynamicContextUpdate(resource_type_url);
               })) {
-  Config::Utility::checkLocalInfo("ads", local_info_);
+  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", local_info_));
   AllMuxes::get().insert(this);
 }
 
@@ -91,7 +93,14 @@ void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
   queueDiscoveryRequest(resource_type_url);
 }
 
-void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
+void GrpcMuxImpl::start() {
+  ASSERT(!started_);
+  if (started_) {
+    return;
+  }
+  started_ = true;
+  grpc_stream_.establishNewStream();
+}
 
 void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   if (shutdown_) {
@@ -127,6 +136,15 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   // clear error_detail after the request is sent if it exists.
   if (apiStateFor(type_url).request_.has_error_detail()) {
     apiStateFor(type_url).request_.clear_error_detail();
+  }
+}
+
+void GrpcMuxImpl::clearNonce() {
+  // Iterate over all api_states (for each type_url), and clear its nonce.
+  for (auto& [type_url, api_state] : api_state_) {
+    if (api_state) {
+      api_state->request_.clear_response_nonce();
+    }
   }
 }
 
@@ -368,8 +386,9 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     all_resource_refs.emplace_back(*resource);
     if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
       // Sort the context params of an xdstp resource, so we can compare them easily.
-      xds::core::v3::ResourceName xdstp_resource =
-          XdsResourceIdentifier::decodeUrn(resource->name());
+      auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
+      THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+      xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
       XdsResourceIdentifier::EncodeOptions options;
       options.sort_context_params_ = true;
       resource_ref_map.emplace(XdsResourceIdentifier::encodeUrn(xdstp_resource, options),
@@ -389,7 +408,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     // Listener) even if the message does not have resources so that update_empty stat
     // is properly incremented and state-of-the-world semantics are maintained.
     if (watch->resources_.empty()) {
-      watch->callbacks_.onConfigUpdate(all_resource_refs, version_info);
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(all_resource_refs, version_info));
       continue;
     }
     std::vector<DecodedResourceRef> found_resources;
@@ -416,7 +435,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     // onConfigUpdate should be called only on watches(clusters/listeners) that have
     // updates in the message for EDS/RDS.
     if (!found_resources.empty()) {
-      watch->callbacks_.onConfigUpdate(found_resources, version_info);
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(found_resources, version_info));
       // Resource cache is only used for EDS resources.
       if (eds_resources_cache_ &&
           (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
@@ -451,6 +470,7 @@ void GrpcMuxImpl::onWriteable() { drainRequests(); }
 void GrpcMuxImpl::onStreamEstablished() {
   first_stream_request_ = true;
   grpc_stream_.maybeUpdateQueueSizeStat(0);
+  clearNonce();
   request_queue_ = std::make_unique<std::queue<std::string>>();
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
@@ -513,7 +533,7 @@ void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
       }
     }
 
-    watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, "");
+    THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, ""));
   }
 }
 

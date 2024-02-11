@@ -7,27 +7,17 @@ if [[ -z "${GCS_ARTIFACT_BUCKET}" ]]; then
     exit 1
 fi
 
-if [[ -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
+read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
+
+if [[ ! -s "${GCP_SERVICE_ACCOUNT_KEY_PATH}" ]]; then
     echo "GCP key is not set, not uploading artifacts."
     exit 1
 fi
 
-read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTION_LIST:-}"
-read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
-
-remove_key () {
-    rm -rf "$KEYFILE"
-}
-
-trap remove_key EXIT
-
-# Fail when service account key is not specified
-KEYFILE="$(mktemp)"
-bash -c 'echo ${GCP_SERVICE_ACCOUNT_KEY}' | base64 --decode > "$KEYFILE"
-
 cat <<EOF > ~/.boto
 [Credentials]
-gs_service_key_file=${KEYFILE}
+gs_service_key_file=${GCP_SERVICE_ACCOUNT_KEY_PATH}
 EOF
 
 SOURCE_DIRECTORY="$1"

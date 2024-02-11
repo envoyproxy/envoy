@@ -11,10 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "dns_factory_test",
     srcs = ["dns_factory_test.cc"],
-    args = [
-        # Force creation of c-ares DnsResolverImpl when running test on macOS.
-        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
-    ],
     deps = [
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/extensions/network/dns_resolver/cares:config",

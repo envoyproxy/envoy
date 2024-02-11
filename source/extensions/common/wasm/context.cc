@@ -36,11 +36,22 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#endif
+
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/field_access.h"
 #include "eval/public/containers/field_backed_list_impl.h"
 #include "eval/public/containers/field_backed_map_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "include/proxy-wasm/pairs_util.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
@@ -456,6 +467,11 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   // In order to delegate to the StreamActivation method, we have to set the
   // context properties to match the Wasm context properties in all callbacks
   // (e.g. onLog or onEncodeHeaders) for the duration of the call.
+  if (root_local_info_) {
+    local_info_ = root_local_info_;
+  } else if (plugin_) {
+    local_info_ = &plugin()->localInfo();
+  }
   activation_info_ = info;
   activation_request_headers_ = request_headers_ ? request_headers_ : access_log_request_headers_;
   activation_response_headers_ =
@@ -1125,6 +1141,29 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
   return WasmResult::Ok;
 }
 
+WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view value,
+                                        StreamInfo::FilterState::LifeSpan life_span) {
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(path);
+  if (!factory) {
+    return WasmResult::NotFound;
+  }
+
+  auto object = factory->createFromBytes(value);
+  if (!object) {
+    return WasmResult::BadArgument;
+  }
+
+  auto* stream_info = getRequestStreamInfo();
+  if (!stream_info) {
+    return WasmResult::NotFound;
+  }
+
+  stream_info->filterState()->setData(path, std::move(object),
+                                      StreamInfo::FilterState::StateType::Mutable, life_span);
+  return WasmResult::Ok;
+}
+
 WasmResult
 Context::declareProperty(std::string_view path,
                          Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype) {
@@ -1453,10 +1492,8 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
   network_write_filter_callbacks_ = &callbacks;
 }
 
-void Context::log(const Http::RequestHeaderMap* request_headers,
-                  const Http::ResponseHeaderMap* response_headers,
-                  const Http::ResponseTrailerMap* response_trailers,
-                  const StreamInfo::StreamInfo& stream_info, AccessLog::AccessLogType) {
+void Context::log(const Formatter::HttpFormatterContext& log_context,
+                  const StreamInfo::StreamInfo& stream_info) {
   // `log` may be called multiple times due to mid-request logging -- we only want to run on the
   // last call.
   if (!stream_info.requestComplete().has_value()) {
@@ -1472,10 +1509,10 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
   }
 
   access_log_phase_ = true;
-  access_log_request_headers_ = request_headers;
+  access_log_request_headers_ = &log_context.requestHeaders();
   // ? request_trailers  ?
-  access_log_response_headers_ = response_headers;
-  access_log_response_trailers_ = response_trailers;
+  access_log_response_headers_ = &log_context.responseHeaders();
+  access_log_response_trailers_ = &log_context.responseTrailers();
   access_log_stream_info_ = &stream_info;
 
   onLog();

@@ -27,10 +27,9 @@ ReqWithoutQuery::ReqWithoutQuery(const std::string& main_header,
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
 absl::optional<std::string>
-ReqWithoutQuery::format(const Http::RequestHeaderMap& request, const Http::ResponseHeaderMap&,
-                        const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                        absl::string_view, AccessLog::AccessLogType) const {
-  const Http::HeaderEntry* header = findHeader(request);
+ReqWithoutQuery::formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+                                   const StreamInfo::StreamInfo&) const {
+  const Http::HeaderEntry* header = findHeader(context.requestHeaders());
   if (!header) {
     return absl::nullopt;
   }
@@ -41,12 +40,10 @@ ReqWithoutQuery::format(const Http::RequestHeaderMap& request, const Http::Respo
   return val;
 }
 
-ProtobufWkt::Value ReqWithoutQuery::formatValue(const Http::RequestHeaderMap& request,
-                                                const Http::ResponseHeaderMap&,
-                                                const Http::ResponseTrailerMap&,
-                                                const StreamInfo::StreamInfo&, absl::string_view,
-                                                AccessLog::AccessLogType) const {
-  const Http::HeaderEntry* header = findHeader(request);
+ProtobufWkt::Value
+ReqWithoutQuery::formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+                                        const StreamInfo::StreamInfo&) const {
+  const Http::HeaderEntry* header = findHeader(context.requestHeaders());
   if (!header) {
     return ValueUtil::nullValue();
   }
@@ -74,8 +71,8 @@ ReqWithoutQueryCommandParser::parse(const std::string& command, const std::strin
   if (command == "REQ_WITHOUT_QUERY") {
     std::string main_header, alternative_header;
 
-    Envoy::Formatter::SubstitutionFormatParser::parseSubcommandHeaders(subcommand, main_header,
-                                                                       alternative_header);
+    Envoy::Formatter::SubstitutionFormatUtils::parseSubcommandHeaders(subcommand, main_header,
+                                                                      alternative_header);
     return std::make_unique<ReqWithoutQuery>(main_header, alternative_header, max_length);
   }
 

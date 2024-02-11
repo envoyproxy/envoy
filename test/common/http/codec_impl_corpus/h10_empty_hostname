@@ -1,0 +1,33 @@
+h1_settings {
+  server {
+    accept_http_10: true
+    default_host_for_http_10: "\000\000\000\000\000\000\000\000"
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+    end_stream: true
+  }
+}
+actions {
+  mutate {
+    offset: 5
+    value: 48
+  }
+}
+actions {
+  mutate {
+    offset: 48
+    value: 48
+  }
+}

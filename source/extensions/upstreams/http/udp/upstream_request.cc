@@ -18,7 +18,6 @@
 
 #include "quiche/common/masque/connect_udp_datagram_payload.h"
 #include "quiche/common/simple_buffer_allocator.h"
-#include "quiche/quic/core/http/quic_spdy_stream.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,15 +26,34 @@ namespace Http {
 namespace Udp {
 
 void UdpConnPool::newStream(Router::GenericConnectionPoolCallbacks* callbacks) {
-  Router::UpstreamToDownstream& upstream_to_downstream = callbacks->upstreamToDownstream();
-  Network::SocketPtr socket = createSocket(host_);
+  Envoy::Network::SocketPtr socket = createSocket(host_);
+  auto source_address_selector = host_->cluster().getUpstreamLocalAddressSelector();
+  auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
+      host_->address(), /*socket_options=*/nullptr);
+  if (!Envoy::Network::Socket::applyOptions(upstream_local_address.socket_options_, *socket,
+                                            envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+    callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                             "Failed to apply socket option for UDP upstream", host_);
+    return;
+  }
+  if (upstream_local_address.address_) {
+    Envoy::Api::SysCallIntResult bind_result = socket->bind(upstream_local_address.address_);
+    if (bind_result.return_value_ < 0) {
+      callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                               "Failed to bind for UDP upstream", host_);
+      return;
+    }
+  }
+
   const Network::ConnectionInfoProvider& connection_info_provider =
       socket->connectionInfoProvider();
+  Router::UpstreamToDownstream& upstream_to_downstream = callbacks->upstreamToDownstream();
   ASSERT(upstream_to_downstream.connection().has_value());
   Event::Dispatcher& dispatcher = upstream_to_downstream.connection()->dispatcher();
   auto upstream =
       std::make_unique<UdpUpstream>(&upstream_to_downstream, std::move(socket), host_, dispatcher);
   StreamInfo::StreamInfoImpl stream_info(dispatcher.timeSource(), nullptr);
+
   callbacks->onPoolReady(std::move(upstream), host_, connection_info_provider, stream_info, {});
 }
 

@@ -137,11 +137,14 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
 
   addHostInfo(*host, hostname, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
               "tcp://1.2.3.5:90", 5, 6);
+  // Adding drop_overload config.
+  ON_CALL(cluster, dropOverload()).WillByDefault(Return(UnitFloat(0.00035)));
 
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
   std::string output = response.toString();
+
   const std::string expected_json = R"EOF({
  "configs": [
   {
@@ -178,6 +181,15 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
        }
       ],
       "policy": {
+       "drop_overloads": [
+        {
+         "category": "drop_overload",
+         "drop_percentage": {
+          "numerator": 350,
+          "denominator": "MILLION"
+         }
+        }
+       ],
        "overprovisioning_factor": 140
       }
      }
@@ -200,44 +212,44 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
 
+  const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string empty_hostname_for_healthcheck = "";
+
+  envoy::config::core::v3::Locality locality_1;
+
   Upstream::MockHostSet* host_set_1 = cluster.priority_set_.getMockHostSet(0);
   auto host_1 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_1);
+  const std::string hostname_1 = "coo.com";
 
-  envoy::config::core::v3::Locality locality_1;
-  locality_1.set_region("oceania");
-  locality_1.set_zone("hello");
-  locality_1.set_sub_zone("world");
+  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.8:8", locality_1, empty_hostname_for_healthcheck,
+              "tcp://1.2.3.8:8", 3, 4);
 
-  const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
-  const std::string hostname_1 = "foo.com";
-
-  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.4:80", locality_1, hostname_for_healthcheck,
-              "tcp://1.2.3.5:90", 5, 6);
-
+  const std::string hostname_2 = "foo.com";
   auto host_2 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_2);
-  const std::string empty_hostname_for_healthcheck = "";
-  const std::string hostname_2 = "boo.com";
-
-  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.7:8", locality_1, empty_hostname_for_healthcheck,
-              "tcp://1.2.3.7:8", 3, 6);
 
   envoy::config::core::v3::Locality locality_2;
+  locality_2.set_region("oceania");
+  locality_2.set_zone("hello");
+  locality_2.set_sub_zone("world");
+
+  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.4:80", locality_2, hostname_for_healthcheck,
+              "tcp://1.2.3.5:90", 5, 6);
 
   auto host_3 = std::make_shared<NiceMock<Upstream::MockHost>>();
   host_set_1->hosts_.emplace_back(host_3);
-  const std::string hostname_3 = "coo.com";
+  const std::string hostname_3 = "boo.com";
 
-  addHostInfo(*host_3, hostname_3, "tcp://1.2.3.8:8", locality_2, empty_hostname_for_healthcheck,
-              "tcp://1.2.3.8:8", 3, 4);
+  addHostInfo(*host_3, hostname_3, "tcp://1.2.3.7:8", locality_2, empty_hostname_for_healthcheck,
+              "tcp://1.2.3.7:8", 3, 6);
 
   std::vector<Upstream::HostVector> locality_hosts = {
-      {Upstream::HostSharedPtr(host_1), Upstream::HostSharedPtr(host_2)},
-      {Upstream::HostSharedPtr(host_3)}};
+      {Upstream::HostSharedPtr(host_1)},
+      {Upstream::HostSharedPtr(host_2), Upstream::HostSharedPtr(host_3)}};
   auto hosts_per_locality = new Upstream::HostsPerLocalityImpl(std::move(locality_hosts), false);
 
-  Upstream::LocalityWeightsConstSharedPtr locality_weights{new Upstream::LocalityWeights{1, 3}};
+  Upstream::LocalityWeightsConstSharedPtr locality_weights{new Upstream::LocalityWeights{3, 1}};
   ON_CALL(*host_set_1, hostsPerLocality()).WillByDefault(ReturnRef(*hosts_per_locality));
   ON_CALL(*host_set_1, localityWeights()).WillByDefault(Return(locality_weights));
 
@@ -246,7 +258,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   host_set_2->hosts_.emplace_back(host_4);
   const std::string hostname_4 = "doo.com";
 
-  addHostInfo(*host_4, hostname_4, "tcp://1.2.3.9:8", locality_1, empty_hostname_for_healthcheck,
+  addHostInfo(*host_4, hostname_4, "tcp://1.2.3.9:8", locality_2, empty_hostname_for_healthcheck,
               "tcp://1.2.3.9:8", 3, 2);
 
   Buffer::OwnedImpl response;
@@ -263,6 +275,28 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
       "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
       "cluster_name": "fake_cluster",
       "endpoints": [
+       {
+        "locality": {},
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.8",
+             "port_value": 8
+            }
+           },
+           "health_check_config": {},
+           "hostname": "coo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 3
+         }
+        ],
+        "load_balancing_weight": 3,
+        "priority": 4
+       },
        {
         "locality": {
          "region": "oceania",
@@ -306,28 +340,6 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
         ],
         "load_balancing_weight": 1,
         "priority": 6
-       },
-       {
-        "locality": {},
-        "lb_endpoints": [
-         {
-          "endpoint": {
-           "address": {
-            "socket_address": {
-             "address": "1.2.3.8",
-             "port_value": 8
-            }
-           },
-           "health_check_config": {},
-           "hostname": "coo.com"
-          },
-          "health_status": "HEALTHY",
-          "metadata": {},
-          "load_balancing_weight": 3
-         }
-        ],
-        "load_balancing_weight": 3,
-        "priority": 4
        },
        {
         "locality": {

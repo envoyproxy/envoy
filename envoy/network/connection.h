@@ -72,7 +72,18 @@ enum class ConnectionCloseType {
            // raise ConnectionEvent::LocalClose
   FlushWriteAndDelay, // Flush pending write data and delay raising a ConnectionEvent::LocalClose
                       // until the delayed_close_timeout expires
-  Abort // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
+  Abort, // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
+  AbortReset // Do not write/flush any pending data and immediately raise
+             // ConnectionEvent::LocalClose. Envoy will try to close the connection with RST flag.
+};
+
+/**
+ * Type of connection close which is detected from the socket.
+ */
+enum class DetectedCloseType {
+  Normal,      // The normal socket close from Envoy's connection perspective.
+  LocalReset,  // The local reset initiated from Envoy.
+  RemoteReset, // The peer reset detected by the connection.
 };
 
 /**
@@ -152,6 +163,11 @@ public:
    * @param details the reason the connection is being closed.
    */
   virtual void close(ConnectionCloseType type, absl::string_view details) PURE;
+
+  /**
+   * @return the detected close type from socket.
+   */
+  virtual DetectedCloseType detectedCloseType() const PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
@@ -271,7 +287,7 @@ public:
   virtual bool connecting() const PURE;
 
   /**
-   * Write data to the connection. Will iterate through downstream filters with the buffer if any
+   * Write data to the connection. Will iterate through network filters with the buffer if any
    * are installed.
    * @param data Supplies the data to write to the connection.
    * @param end_stream If true, this indicates that this is the last write to the connection. If

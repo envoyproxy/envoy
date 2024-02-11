@@ -128,7 +128,7 @@ std::string RandomGeneratorImpl::uuid() {
     uuid[2 * i + 5] = hex[d & 0x0f];
   }
 
-  return std::string(uuid, UUID_LENGTH);
+  return {uuid, UUID_LENGTH};
 }
 
 } // namespace Random

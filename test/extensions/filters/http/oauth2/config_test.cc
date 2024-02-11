@@ -62,14 +62,16 @@ config:
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
+  auto& secret_manager =
+      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
   ON_CALL(secret_manager,
           findStaticGenericSecretProvider(failed_secret_name == "token" ? "hmac" : "token"))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
-                            EnvoyException, exception_message);
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException, exception_message);
 }
 
 } // namespace
@@ -114,25 +116,27 @@ config:
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
-  Server::Configuration::MockFactoryContext context;
-  context.cluster_manager_.initializeClusters({"foo"}, {});
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
-  auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
+  auto& secret_manager =
+      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context.server_factory_context_, clusterManager());
   EXPECT_CALL(context, scope());
-  EXPECT_CALL(context, timeSource());
-  EXPECT_CALL(context, api());
+  EXPECT_CALL(context.server_factory_context_, timeSource());
+  EXPECT_CALL(context.server_factory_context_, api());
   EXPECT_CALL(context, initManager()).Times(2);
   EXPECT_CALL(context, getTransportSocketFactoryContext());
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -193,8 +197,9 @@ config:
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
-                          EnvoyException, "value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException, "value does not match regex pattern");
 }
 
 } // namespace Oauth2

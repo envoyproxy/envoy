@@ -23,6 +23,10 @@ message StatefulSession {
   //
   // [#extension-category: envoy.http.stateful_session]
   config.core.v3.TypedExtensionConfig session_state = 1;
+
+  // If set to True, the HTTP request must be routed to the requested destination.
+  // If the requested destination is not available, Envoy returns 503. Defaults to False.
+  bool strict = 2;
 }
 
 message StatefulSessionPerRoute {

@@ -35,8 +35,10 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
                                    const std::string& domain,
-                                   const std::vector<Envoy::RateLimit::Descriptor>& descriptors) {
+                                   const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                   uint32_t hits_addend) {
   request.set_domain(domain);
+  request.set_hits_addend(hits_addend);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
     envoy::extensions::common::ratelimit::v3::RateLimitDescriptor* new_descriptor =
         request.add_descriptors();
@@ -57,12 +59,13 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
+                           uint32_t hits_addend) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
-  createRequest(request, domain, descriptors);
+  createRequest(request, domain, descriptors, hits_addend);
 
   request_ =
       async_client_->send(service_method_, request, *this, parent_span,
@@ -120,13 +123,15 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const envoy::config::core::v3::GrpcService& grpc_service,
+                          const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                           const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
-      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true),
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true),
       timeout);
 }
 

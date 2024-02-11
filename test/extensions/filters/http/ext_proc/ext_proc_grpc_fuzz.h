@@ -1,3 +1,5 @@
+#pragma once
+
 // TODO(ikepolinsky): Major action items to improve this fuzzer
 // 1. Move external process from separate thread to have test all in one thread
 //    - Explore using fake gRPC client for this
@@ -227,8 +229,11 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
   FuzzedDataProvider downstream_provider(
       reinterpret_cast<const uint8_t*>(input.downstream_data().data()),
       input.downstream_data().size());
-  FuzzedDataProvider ext_proc_provider(
-      reinterpret_cast<const uint8_t*>(input.ext_proc_data().data()), input.ext_proc_data().size());
+  static std::unique_ptr<std::string> ext_proc_data = nullptr;
+  ext_proc_data = std::make_unique<std::string>(input.ext_proc_data());
+  static std::unique_ptr<FuzzedDataProvider> ext_proc_provider = nullptr;
+  ext_proc_provider = std::make_unique<FuzzedDataProvider>(
+      reinterpret_cast<const uint8_t*>(ext_proc_data->data()), ext_proc_data->size());
 
   static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
   static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
@@ -240,7 +245,7 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
         TestEnvironment::getIpVersionsForTest()[0], TestEnvironment::getsGrpcVersionsForTest()[0]);
   }
   // Initialize fuzz_helper.
-  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(&ext_proc_provider);
+  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(ext_proc_provider.get());
 
   // Initialize test server.
   if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode)) {
@@ -293,6 +298,8 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
   } else {
     fuzzer->tearDown(true);
   }
+  ext_proc_data.reset();
+  ext_proc_provider.reset();
   fuzz_helper.reset();
 }
 

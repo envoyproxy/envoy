@@ -95,8 +95,11 @@ absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
 
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context);
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+      status_or_cluster = createClusterImpl(cluster, context);
+  RETURN_IF_STATUS_NOT_OK(status_or_cluster);
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>& new_cluster_pair =
+      status_or_cluster.value();
 
   auto& server_context = context.serverFactoryContext();
 
@@ -112,12 +115,14 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     }
   }
 
-  new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
+  auto detector_or_error = Outlier::DetectorImplFactory::createForCluster(
       *new_cluster_pair.first, cluster, server_context.mainThreadDispatcher(),
       server_context.runtime(), context.outlierEventLogger(),
-      server_context.api().randomGenerator()));
+      server_context.api().randomGenerator());
+  RETURN_IF_STATUS_NOT_OK(detector_or_error);
+  new_cluster_pair.first->setOutlierDetector(detector_or_error.value());
 
-  return new_cluster_pair;
+  return status_or_cluster;
 }
 
 } // namespace Upstream

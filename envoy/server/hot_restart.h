@@ -50,6 +50,19 @@ public:
   virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) PURE;
 
   /**
+   * Registers a UdpListenerConfig as a possible receiver of udp packets forwarded from the
+   * parent process to the child process. This is used to forward QUIC packets that are not for
+   * connections belonging to the parent process during draining (in the absence of BPF delivery to
+   * the correct process), via its listenerWorkerRouter.
+   * The HotRestart instance is responsible for recognizing "any" addresses (e.g. "0.0.0.0").
+   * @param address supplies the address and port of the listening socket.
+   * @param listener_config is the UdpListenerConfig to receive packets forwarded for the given
+   * address.
+   */
+  virtual void
+  registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
+                                std::shared_ptr<Network::UdpListenerConfig> listener_config) PURE;
+  /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
    * new child has begun. The hot restart implementation needs to be created early to deal with
    * shared memory, logging, etc. so late initialization of needed interfaces is done here.

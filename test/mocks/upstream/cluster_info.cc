@@ -41,10 +41,9 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
     Network::Address::InstanceConstSharedPtr& address)
     : address_(address) {
-  ON_CALL(*this, getUpstreamLocalAddress(_, _))
+  ON_CALL(*this, getUpstreamLocalAddressImpl(_))
       .WillByDefault(
-          Invoke([&](const Network::Address::InstanceConstSharedPtr&,
-                     const Network::ConnectionSocket::OptionsSharedPtr&) -> UpstreamLocalAddress {
+          Invoke([&](const Network::Address::InstanceConstSharedPtr&) -> UpstreamLocalAddress {
             UpstreamLocalAddress ret;
             ret.address_ = address_;
             ret.socket_options_ = nullptr;
@@ -54,7 +53,8 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
 
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions())),
+                         envoy::config::core::v3::Http2ProtocolOptions())
+                         .value()),
       traffic_stat_names_(stats_store_.symbolTable()),
       config_update_stats_names_(stats_store_.symbolTable()),
       lb_stat_names_(stats_store_.symbolTable()), endpoint_stat_names_(stats_store_.symbolTable()),

@@ -3,13 +3,16 @@ package org.chromium.net.impl;
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_MOVED_TEMP;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
+
+import static org.junit.Assert.assertThrows;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.utilities.StatsUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -87,7 +90,15 @@ public class CronvoyEngineTest {
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+
+    // Do some basic stats accounting.
+    String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    Map<String, String> statsMap = StatsUtils.statsToList(stats);
+    assertThat(statsMap.containsKey("http.hcm.downstream_rq_2xx"));
+    assertThat(statsMap.containsKey("http.hcm.downstream_total"));
+    assertThat(statsMap.containsKey("runtime.load_success"));
+    assertThat(statsMap.get("runtime.load_success")).isEqualTo("1");
   }
 
   @Test
@@ -101,7 +112,7 @@ public class CronvoyEngineTest {
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEmpty();
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
   }
 
   @Test
@@ -122,7 +133,8 @@ public class CronvoyEngineTest {
     RequestScenario requestScenario = new RequestScenario().addResponseBuffers(11);
 
     // Message comes from Preconditions.checkHasRemaining()
-    assertThatThrownBy(() -> sendRequest(requestScenario)).hasMessageContaining("already full");
+    Exception exception = assertThrows(Exception.class, () -> sendRequest(requestScenario));
+    assertThat(exception).hasMessageThat().contains("already full");
   }
 
   @Test
@@ -146,7 +158,7 @@ public class CronvoyEngineTest {
     // The response will come in 3 chunks. The 4th read is the final read and shouldn't trigger
     // OnReadComplete() as no data is read.
     assertThat(testCallback.getNumOnReadCompleteCalled()).isEqualTo(3);
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
     assertThat(response.getBodyAsString()).isEqualTo("hello, world");
     assertThat(response.getNbResponseChunks()).isEqualTo(3); // 5 bytes, 5 bytes, and 2 bytes
   }
@@ -160,7 +172,7 @@ public class CronvoyEngineTest {
     Response response = sendRequest(requestScenario);
 
     assertThat(response.isCancelled()).isTrue();
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
     assertThat(response.getBodyAsString()).isEmpty();
   }
 
@@ -185,7 +197,7 @@ public class CronvoyEngineTest {
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEqualTo("This is the response Body");
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
   }
 
   @Test
@@ -212,7 +224,7 @@ public class CronvoyEngineTest {
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEqualTo("This is the response Body");
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
   }
 
   @Test
@@ -243,10 +255,10 @@ public class CronvoyEngineTest {
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
     assertThat(response.getUrlResponseInfo().getUrlChain())
-        .contains(mockWebServer.url("/get/flowers").toString(),
-                  mockWebServer.url("/get/chocolates").toString());
+        .containsExactly(mockWebServer.url("/get/flowers").toString(),
+                         mockWebServer.url("/get/chocolates").toString());
   }
 
   @Test
@@ -279,10 +291,10 @@ public class CronvoyEngineTest {
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
     assertThat(response.getUrlResponseInfo().getUrlChain())
-        .contains(mockWebServer.url("/get/flowers").toString(),
-                  mockWebServer.url("/get/chocolates").toString());
+        .containsExactly(mockWebServer.url("/get/flowers").toString(),
+                         mockWebServer.url("/get/chocolates").toString());
   }
 
   @Test
@@ -320,10 +332,10 @@ public class CronvoyEngineTest {
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
     assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
-    assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
+    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
     assertThat(response.getUrlResponseInfo().getUrlChain())
-        .contains(mockWebServer.url("/get/flowers").toString(),
-                  mockWebServer.url("/get/chocolates").toString());
+        .containsExactly(mockWebServer.url("/get/flowers").toString(),
+                         mockWebServer.url("/get/chocolates").toString());
   }
 
   private Response sendRequest(RequestScenario requestScenario) {

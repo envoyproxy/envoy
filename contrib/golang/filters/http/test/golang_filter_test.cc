@@ -120,6 +120,7 @@ public:
     config_ = std::make_shared<FilterConfig>(
         proto_config, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), "",
         context_);
+    config_->newGoPluginConfig();
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -130,7 +131,7 @@ public:
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
     filter_ = std::make_unique<TestFilter>(
-        config_, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name));
+        config_, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), 0);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

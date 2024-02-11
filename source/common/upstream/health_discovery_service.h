@@ -72,6 +72,8 @@ public:
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
   std::vector<HostSharedPtr> hosts() { return *hosts_; };
+  UnitFloat dropOverload() const override { return UnitFloat(0); }
+  void setDropOverload(UnitFloat) override {}
 
 protected:
   PrioritySetImpl priority_set_;
@@ -182,7 +184,7 @@ private:
   ThreadLocal::SlotAllocator& tls_;
 
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
-  uint64_t specifier_hash_;
+  uint64_t specifier_hash_{0};
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;

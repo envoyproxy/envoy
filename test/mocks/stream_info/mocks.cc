@@ -86,7 +86,10 @@ MockStreamInfo::MockStreamInfo()
       downstream_direct_remote_address);
 
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
-    response_flags_ |= response_flag;
+    auto iter = std::find(response_flags_.begin(), response_flags_.end(), response_flag);
+    if (iter == response_flags_.end()) {
+      response_flags_.push_back(response_flag);
+    }
   }));
   ON_CALL(*this, setResponseCode(_)).WillByDefault(Invoke([this](uint32_t code) {
     response_code_ = code;
@@ -100,6 +103,7 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnPointee(&ts_));
   ON_CALL(*this, currentDuration()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
@@ -137,25 +141,31 @@ MockStreamInfo::MockStreamInfo()
   }));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
   ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag flag) {
-    return response_flags_ & flag;
-  }));
-  ON_CALL(*this, intersectResponseFlags(_)).WillByDefault(Invoke([this](uint64_t response_flags) {
-    return (response_flags_ & response_flags) != 0;
+    auto iter = std::find(response_flags_.begin(), response_flags_.end(), flag);
+    return iter != response_flags_.end();
   }));
   ON_CALL(*this, hasAnyResponseFlag()).WillByDefault(Invoke([this]() {
-    return response_flags_ != 0;
+    return !response_flags_.empty();
   }));
-  ON_CALL(*this, responseFlags()).WillByDefault(Invoke([this]() -> uint64_t {
+  ON_CALL(*this, responseFlags()).WillByDefault(Invoke([this]() -> absl::Span<const ResponseFlag> {
     return response_flags_;
   }));
+  ON_CALL(*this, legacyResponseFlags()).WillByDefault(Invoke([this]() -> uint64_t {
+    uint64_t legacy_flags = 0;
+    for (ResponseFlag flag : response_flags_) {
+      if (flag.value() <= static_cast<uint16_t>(CoreResponseFlag::LastFlag)) {
+        ASSERT(flag.value() < 64, "Legacy response flag out of range");
+        legacy_flags |= (1UL << flag.value());
+      }
+    }
+    return legacy_flags;
+  }));
+
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(Const(*this), filterState()).WillByDefault(Invoke([this]() -> const FilterState& {
     return *filter_state_;
-  }));
-  ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
-    route_name_ = std::string(route_name);
   }));
   ON_CALL(*this, setVirtualClusterName(_))
       .WillByDefault(Invoke([this](const absl::optional<std::string>& virtual_cluster_name) {
@@ -165,11 +175,6 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setUpstreamInfo(_))
       .WillByDefault(Invoke([this](std::shared_ptr<UpstreamInfo> info) { upstream_info_ = info; }));
   ON_CALL(*this, virtualClusterName()).WillByDefault(ReturnRef(virtual_cluster_name_));
-  ON_CALL(*this, setFilterChainName(_))
-      .WillByDefault(Invoke([this](const absl::string_view filter_chain_name) {
-        filter_chain_name_ = std::string(filter_chain_name);
-      }));
-  ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
   ON_CALL(*this, setAttemptCount(_)).WillByDefault(Invoke([this](uint32_t attempt_count) {
     attempt_count_ = attempt_count;
   }));

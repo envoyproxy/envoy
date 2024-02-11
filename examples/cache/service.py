@@ -15,12 +15,11 @@ routes = web.RouteTableDef()
 # Etag fun lifted from https://github.com/zhangkaizhao/aiohttp-etag
 
 
-def _check_etag_header(request, response) -> bool:
-    computed_etag = response.headers.get("Etag", "")
+def _check_etag_header(request, computed_etag) -> bool:
     # Find all weak and strong etag values from If-None-Match header
     # because RFC 7232 allows multiple etag values in a single header.
     etags = re.findall(r'\*|(?:W/)?"[^"]*"', request.headers.get("If-None-Match", ""))
-    if not computed_etag or not etags:
+    if not etags:
         return False
 
     match = False
@@ -38,22 +37,14 @@ def _check_etag_header(request, response) -> bool:
     return match
 
 
-def _compute_etag(response) -> Optional[str]:
-    if hasattr(response, 'body'):
-        # The aiohttp.web.StreamResponse does not have ``body`` attribute.
-        body = response.body
-
-        hasher = hashlib.sha1()
-        hasher.update(body)
-        return f'"{hasher.hexdigest()}"'
-
-    return None
+def _compute_etag(body) -> str:
+    hasher = hashlib.sha1()
+    hasher.update(body.encode())
+    return f'"{hasher.hexdigest()}"'
 
 
-def _set_etag_header(response) -> None:
-    etag = _compute_etag(response)
-    if etag is not None:
-        response.headers["Etag"] = etag
+def _set_etag_header(response, computed_etag) -> None:
+    response.headers["Etag"] = computed_etag
 
 
 @routes.get("/service/{service_number}/{response_id}")
@@ -65,17 +56,23 @@ async def get(request):
     if stored_response is None:
         raise web.HTTPNotFound(reason="No response found with the given id")
 
+    # Etag is computed for every response, which only depends on the response body in
+    # the yaml file (i.e. the appended date is not taken into account).
+    body = stored_response.get('body')
+    computed_etag = _compute_etag(body)
+
+    if _check_etag_header(request, computed_etag):
+        return web.HTTPNotModified(headers={'ETag': computed_etag})
+
     request_date = datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
-    response = web.Response(
-        text=f"{stored_response.get('body')}\nResponse generated at: {request_date}\n")
+    response = web.Response(text=f"{body}\nResponse generated at: {request_date}\n")
 
     if stored_response.get('headers'):
         response.headers.update(stored_response.get('headers'))
 
-    _set_etag_header(response)
+    _set_etag_header(response, computed_etag)
 
-    return (
-        _check_etag_header(request, response) if request.headers.get("If-None-Match") else response)
+    return response
 
 
 if __name__ == "__main__":

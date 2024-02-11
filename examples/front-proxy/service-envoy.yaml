@@ -10,37 +10,38 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           codec_type: AUTO
-          stat_prefix: ingress_http
+          stat_prefix: service_envoy_1
           route_config:
             name: local_route
             virtual_hosts:
-            - name: service
+            - name: backend
               domains:
               - "*"
               routes:
               - match:
-                  prefix: "/service"
+                  prefix: "/service/1"
                 route:
-                  cluster: local_service
+                  cluster: service1
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
   clusters:
-  - name: local_service
+  - name: service1
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: local_service
+      cluster_name: service1
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: service1
                 port_value: 8080
 admin:
   address:
     socket_address:
       address: 0.0.0.0
-      port_value: 8081
+      port_value: 8001

@@ -1,5 +1,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
+#include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
+#include "source/extensions/common/wasm/ext/verify_signature.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
 #if defined(WASM_USE_CEL_PARSER)
@@ -8,6 +10,10 @@
 #include "parser/parser.h"
 #endif
 #include "zlib.h"
+#include "source/common/crypto/crypto_impl.h"
+#include "source/common/crypto/utility.h"
+
+#include "source/common/common/logger.h"
 
 using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;
@@ -23,6 +29,52 @@ template <typename T> WasmForeignFunction createFromClass() {
   auto c = std::make_shared<T>();
   return c->create(c);
 }
+
+inline StreamInfo::FilterState::LifeSpan
+toFilterStateLifeSpan(envoy::source::extensions::common::wasm::LifeSpan span) {
+  switch (span) {
+  case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
+    return StreamInfo::FilterState::LifeSpan::Request;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
+    return StreamInfo::FilterState::LifeSpan::Connection;
+  default:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  }
+}
+
+RegisterForeignFunction registerVerifySignatureForeignFunction(
+    "verify_signature",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
+      envoy::source::extensions::common::wasm::VerifySignatureArguments args;
+      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+        const auto& hash = args.hash_function();
+        auto key_str = args.public_key();
+        auto signature_str = args.signature();
+        auto text_str = args.text();
+
+        std::vector<uint8_t> key(key_str.begin(), key_str.end());
+        std::vector<uint8_t> signature(signature_str.begin(), signature_str.end());
+        std::vector<uint8_t> text(text_str.begin(), text_str.end());
+
+        auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
+
+        auto output = crypto_util.verifySignature(hash, *crypto_ptr, signature, text);
+
+        envoy::source::extensions::common::wasm::VerifySignatureResult verification_result;
+        verification_result.set_result(output.result_);
+        verification_result.set_error(output.error_message_);
+
+        auto size = verification_result.ByteSizeLong();
+        auto result = alloc_result(size);
+        verification_result.SerializeToArray(result, static_cast<int>(size));
+        return WasmResult::Ok;
+      }
+      return WasmResult::BadArgument;
+    });
 
 RegisterForeignFunction registerCompressForeignFunction(
     "compress",
@@ -59,6 +111,19 @@ RegisterForeignFunction registerUncompressForeignFunction(
         }
         dest_len = dest_len * 2;
       }
+    });
+
+RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
+    "set_envoy_filter_state",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>&) -> WasmResult {
+      envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
+      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+        auto context = static_cast<Context*>(proxy_wasm::current_context_);
+        return context->setEnvoyFilterState(args.path(), args.value(),
+                                            toFilterStateLifeSpan(args.span()));
+      }
+      return WasmResult::BadArgument;
     });
 
 #if defined(WASM_USE_CEL_PARSER)
@@ -242,21 +307,7 @@ public:
           // do nothing
           break;
         }
-        StreamInfo::FilterState::LifeSpan span = StreamInfo::FilterState::LifeSpan::FilterChain;
-        switch (args.span()) {
-        case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
-          span = StreamInfo::FilterState::LifeSpan::FilterChain;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
-          span = StreamInfo::FilterState::LifeSpan::Request;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
-          span = StreamInfo::FilterState::LifeSpan::Connection;
-          break;
-        default:
-          // do nothing
-          break;
-        }
+        StreamInfo::FilterState::LifeSpan span = toFilterStateLifeSpan(args.span());
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->declareProperty(
             args.name(), std::make_unique<const Filters::Common::Expr::CelStatePrototype>(

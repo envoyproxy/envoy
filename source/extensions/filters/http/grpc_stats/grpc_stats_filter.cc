@@ -93,7 +93,8 @@ private:
 struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
          Server::Configuration::FactoryContext& context)
-      : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
+      : context_(context.serverFactoryContext().grpcContext()),
+        emit_filter_state_(proto_config.emit_filter_state()),
         enable_upstream_stats_(proto_config.enable_upstream_stats()),
         replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()),
         stats_for_all_methods_(

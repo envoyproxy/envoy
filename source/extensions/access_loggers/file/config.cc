@@ -19,17 +19,10 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 
-AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+AccessLog::InstanceSharedPtr
+FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                              AccessLog::FilterPtr&& filter,
+                                              Server::Configuration::FactoryContext& context) {
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());
@@ -38,7 +31,7 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
   switch (fal_config.access_log_format_case()) {
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
     if (fal_config.format().empty()) {
-      formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
+      formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();
     } else {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
       sff_config.mutable_text_format_source()->set_inline_string(fal_config.format());
@@ -47,7 +40,7 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
     formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
-        fal_config.json_format(), false, false);
+        fal_config.json_format(), false, false, false);
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       kTypedJsonFormat: {
@@ -62,13 +55,13 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       ACCESS_LOG_FORMAT_NOT_SET:
-    formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
+    formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();
     break;
   }
 
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
   return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
-                                         context.accessLogManager());
+                                         context.serverFactoryContext().accessLogManager());
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
@@ -81,7 +74,7 @@ std::string FileAccessLogFactory::name() const { return "envoy.access_loggers.fi
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(FileAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+LEGACY_REGISTER_FACTORY(FileAccessLogFactory, AccessLog::AccessLogInstanceFactory,
                         "envoy.file_access_log");
 
 } // namespace File

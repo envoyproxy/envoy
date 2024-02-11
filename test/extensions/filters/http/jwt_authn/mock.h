@@ -35,8 +35,8 @@ public:
 
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
-              SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-              AuthenticatorCallback callback) override {
+              SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
+              ClearRouteCacheCallback) override {
     doVerify(headers, parent_span, &tokens, std::move(set_extracted_jwt_data_cb),
              std::move(callback));
   }
@@ -47,6 +47,7 @@ public:
 class MockVerifierCallbacks : public Verifier::Callbacks {
 public:
   MOCK_METHOD(void, setExtractedData, (const ProtobufWkt::Struct& payload));
+  MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(void, onComplete, (const Status& status));
 };
 

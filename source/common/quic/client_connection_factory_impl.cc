@@ -34,7 +34,8 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    quic::ConnectionIdGeneratorInterface& generator) {
+    quic::ConnectionIdGeneratorInterface& generator,
+    Network::UpstreamTransportSocketFactory& transport_socket_factory) {
   // TODO: Quic should take into account the set_local_interface_name_on_upstream_connections config
   // and call maybeSetInterfaceName based on that upon acquiring a local socket.
   // Similar to what is done in ClientConnectionImpl::onConnected().
@@ -59,10 +60,9 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
 
   // QUICHE client session always use the 1st version to start handshake.
   return std::make_unique<EnvoyQuicClientSession>(
-      config, quic_versions, std::move(connection), server_id, std::move(crypto_config),
-      &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
-      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope,
-      transport_socket_options);
+      config, quic_versions, std::move(connection), server_id, std::move(crypto_config), dispatcher,
+      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache,
+      scope, transport_socket_options, transport_socket_factory);
 }
 
 } // namespace Quic

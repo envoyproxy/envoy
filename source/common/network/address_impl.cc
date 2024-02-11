@@ -34,7 +34,7 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
 
 void throwOnError(absl::Status status) {
   if (!status.ok()) {
-    throw EnvoyException(status.ToString());
+    throwEnvoyExceptionOrPanic(status.ToString());
   }
 }
 
@@ -151,7 +151,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
   ip_.ipv4_.address_.sin_port = htons(port);
   int rc = inet_pton(AF_INET, address.c_str(), &ip_.ipv4_.address_.sin_addr);
   if (1 != rc) {
-    throw EnvoyException(fmt::format("invalid ipv4 address '{}'", address));
+    throwEnvoyExceptionOrPanic(fmt::format("invalid ipv4 address '{}'", address));
   }
 
   friendly_name_ = absl::StrCat(address, ":", port);
@@ -208,12 +208,23 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
       *--start = '.';
     }
   }
-  return std::string(start, str + BufferSize - start);
+  const std::string::size_type end = str + BufferSize - start;
+  return {start, end};
+}
+
+namespace {
+bool force_ipv4_unsupported_for_test = false;
+}
+
+Cleanup Ipv4Instance::forceProtocolUnsupportedForTest(bool new_val) {
+  bool old_val = force_ipv4_unsupported_for_test;
+  force_ipv4_unsupported_for_test = new_val;
+  return Cleanup([old_val]() { force_ipv4_unsupported_for_test = old_val; });
 }
 
 absl::Status Ipv4Instance::validateProtocolSupported() {
   static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET);
-  if (supported) {
+  if (supported && !force_ipv4_unsupported_for_test) {
     return absl::OkStatus();
   }
   return absl::FailedPreconditionError("IPv4 addresses are not supported on this machine");
@@ -295,7 +306,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
   addr_in.sin6_port = htons(port);
   if (!address.empty()) {
     if (1 != inet_pton(AF_INET6, address.c_str(), &addr_in.sin6_addr)) {
-      throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
+      throwEnvoyExceptionOrPanic(fmt::format("invalid ipv6 address '{}'", address));
     }
   } else {
     addr_in.sin6_addr = in6addr_any;
@@ -323,9 +334,19 @@ Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bo
   initHelper(address, v6only);
 }
 
+namespace {
+bool force_ipv6_unsupported_for_test = false;
+}
+
+Cleanup Ipv6Instance::forceProtocolUnsupportedForTest(bool new_val) {
+  bool old_val = force_ipv6_unsupported_for_test;
+  force_ipv6_unsupported_for_test = new_val;
+  return Cleanup([old_val]() { force_ipv6_unsupported_for_test = old_val; });
+}
+
 absl::Status Ipv6Instance::validateProtocolSupported() {
   static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6);
-  if (supported) {
+  if (supported && !force_ipv6_unsupported_for_test) {
     return absl::OkStatus();
   }
   return absl::FailedPreconditionError("IPv6 addresses are not supported on this machine");
@@ -343,7 +364,7 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t 
     : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
   if (address->sun_path[0] == '\0') {
 #if !defined(__linux__)
-    throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
+    throwEnvoyExceptionOrPanic("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
     RELEASE_ASSERT(static_cast<unsigned int>(ss_len) >= offsetof(struct sockaddr_un, sun_path) + 1,
                    "");
@@ -358,7 +379,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
   if (pipe_path.size() >= sizeof(pipe_.address_.sun_path)) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
                     sizeof(pipe_.address_.sun_path)));
   }
@@ -371,10 +392,10 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
     // be null terminated. The friendly name is the address path with embedded nulls replaced with
     // '@' for consistency with the first character.
 #if !defined(__linux__)
-    throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
+    throwEnvoyExceptionOrPanic("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
     if (mode != 0) {
-      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
+      throwEnvoyExceptionOrPanic("Cannot set mode for Abstract AF_UNIX sockets");
     }
     pipe_.abstract_namespace_ = true;
     pipe_.address_length_ = pipe_path.size();
@@ -388,7 +409,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
   } else {
     // Throw an error if the pipe path has an embedded null character.
     if (pipe_path.size() != strlen(pipe_path.c_str())) {
-      throw EnvoyException("UNIX domain socket pathname contains embedded null characters");
+      throwEnvoyExceptionOrPanic("UNIX domain socket pathname contains embedded null characters");
     }
     StringUtil::strlcpy(&pipe_.address_.sun_path[0], pipe_path.c_str(),
                         sizeof(pipe_.address_.sun_path));

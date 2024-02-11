@@ -118,8 +118,15 @@ int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint
   return as_child_.duplicateParentListenSocket(address, worker_index);
 }
 
+void HotRestartImpl::registerUdpForwardingListener(
+    Network::Address::InstanceConstSharedPtr address,
+    std::shared_ptr<Network::UdpListenerConfig> listener_config) {
+  as_child_.registerUdpForwardingListener(address, listener_config);
+}
+
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   as_parent_.initialize(dispatcher, server);
+  as_child_.initialize(dispatcher);
 }
 
 absl::optional<HotRestart::AdminShutdownResponse> HotRestartImpl::sendParentAdminShutdownRequest() {
@@ -141,7 +148,10 @@ HotRestartImpl::mergeParentStatsIfAny(Stats::StoreRoot& stats_store) {
   return response;
 }
 
-void HotRestartImpl::shutdown() { as_parent_.shutdown(); }
+void HotRestartImpl::shutdown() {
+  as_parent_.shutdown();
+  as_child_.shutdown();
+}
 
 uint32_t HotRestartImpl::baseId() { return base_id_; }
 std::string HotRestartImpl::version() { return hotRestartVersion(); }

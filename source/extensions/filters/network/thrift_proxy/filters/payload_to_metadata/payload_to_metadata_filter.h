@@ -70,6 +70,8 @@ public:
   const PayloadToMetadataRules& requestRules() const { return request_rules_; }
   TrieSharedPtr trieRoot() const { return trie_root_; };
 
+  friend class PayloadToMetadataTest;
+
 private:
   PayloadToMetadataRules request_rules_;
   TrieSharedPtr trie_root_;
@@ -124,6 +126,8 @@ public:
 private:
   template <typename NumberType> FilterStatus numberValue(NumberType value);
   FilterStatus handleString(std::string value);
+  void assertNode();
+  void assertLastFieldId();
 
   FilterStatus handleContainerBegin() {
     steps_++;
@@ -159,10 +163,6 @@ public:
   void handleOnMissing() override;
 
 private:
-  static TransportPtr createTransport(TransportType transport) {
-    return NamedTransportConfigFactory::getFactory(transport).createTransport();
-  }
-
   static ProtocolPtr createProtocol(ProtocolType protocol) {
     return NamedProtocolConfigFactory::getFactory(protocol).createProtocol();
   }

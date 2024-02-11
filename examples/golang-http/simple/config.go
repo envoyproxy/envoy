@@ -14,7 +14,7 @@ import (
 const Name = "simple"
 
 func init() {
-	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, &parser{})
+	http.RegisterHttpFilterFactoryAndConfigParser(Name, filterFactory, &parser{})
 }
 
 type config struct {
@@ -25,7 +25,9 @@ type config struct {
 type parser struct {
 }
 
-func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
+// Parse the filter configuration. We can call the ConfigCallbackHandler to control the filter's
+// behavior
+func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
 		return nil, err
@@ -45,6 +47,7 @@ func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
 	return conf, nil
 }
 
+// Merge configuration from the inherited parent configuration
 func (p *parser) Merge(parent interface{}, child interface{}) interface{} {
 	parentConfig := parent.(*config)
 	childConfig := child.(*config)
@@ -57,17 +60,14 @@ func (p *parser) Merge(parent interface{}, child interface{}) interface{} {
 	return &newConfig
 }
 
-func ConfigFactory(c interface{}) api.StreamFilterFactory {
+func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
 	conf, ok := c.(*config)
 	if !ok {
 		panic("unexpected config type")
 	}
-
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &filter{
-			callbacks: callbacks,
-			config:    conf,
-		}
+	return &filter{
+		callbacks: callbacks,
+		config:    conf,
 	}
 }
 

@@ -5,11 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.envoyproxy.envoymobile</groupId>
-    <artifactId>envoy</artifactId>
+    <artifactId>{pom_artifact_id}</artifactId>
     <version>{pom_version}</version>
     <packaging>aar</packaging>
     <dependencies>
         {generated_bzl_deps}
+        {pom_extra_dependencies}
     </dependencies>
 
     <name>Envoy Mobile</name>

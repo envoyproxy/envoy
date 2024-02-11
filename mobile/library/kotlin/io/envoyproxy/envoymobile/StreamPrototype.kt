@@ -8,15 +8,14 @@ import java.util.concurrent.Executors
 /**
  * A type representing a stream that has not yet been started.
  *
- * Constructed via `StreamClient`, and used to assign response callbacks
- * prior to starting an `Stream` by calling `start()`.
+ * Constructed via `StreamClient`, and used to assign response callbacks prior to starting an
+ * `Stream` by calling `start()`.
  *
  * @param engine Engine to use for starting streams.
  */
 open class StreamPrototype(private val engine: EnvoyEngine) {
   private val callbacks = StreamCallbacks()
   private var explicitFlowControl = false
-  private var minDeliverySize: Long = 0
   private var useByteBufferPosition = false
 
   /**
@@ -26,26 +25,9 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
    * @return The new stream.
    */
   open fun start(executor: Executor = Executors.newSingleThreadExecutor()): Stream {
-    val engineStream = engine.startStream(
-      createCallbacks(executor),
-      explicitFlowControl,
-      minDeliverySize
-    )
+    val engineStream = engine.startStream(createCallbacks(executor), explicitFlowControl)
     return Stream(engineStream, useByteBufferPosition)
   }
-
-  /**
-   * Sets min delivery: data will be buffered in the C++ layer until the min
-   * delivery length or end stream is read.
-   *
-   * @param value set the minimum delivery size fo for this stream
-   * @return This stream, for chaining syntax.
-   */
-  fun setMinDeliverySize(value: Long): StreamPrototype {
-    this.minDeliverySize = value
-    return this
-  }
-
 
   /**
    * Allows explicit flow control to be enabled. When flow control is enabled, the owner of a stream
@@ -75,11 +57,11 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
   }
 
   /**
-   * Specify a callback for when response headers are received by the stream.
-   * If `endStream` is `true`, the stream is complete, pending an onComplete callback.
+   * Specify a callback for when response headers are received by the stream. If `endStream` is
+   * `true`, the stream is complete, pending an onComplete callback.
    *
-   * @param closure Closure which will receive the headers and flag indicating if the stream
-   * is headers-only.
+   * @param closure Closure which will receive the headers and flag indicating if the stream is
+   *   headers-only.
    * @return This stream, for chaining syntax.
    */
   fun setOnResponseHeaders(
@@ -90,11 +72,11 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
   }
 
   /**
-   * Specify a callback for when a data frame is received by the stream.
-   * If `endStream` is `true`, the stream is complete, pending an onComplete callback.
+   * Specify a callback for when a data frame is received by the stream. If `endStream` is `true`,
+   * the stream is complete, pending an onComplete callback.
    *
-   * @param closure Closure which will receive the data and flag indicating whether this
-   * is the last data frame.
+   * @param closure Closure which will receive the data and flag indicating whether this is the last
+   *   data frame.
    * @return This stream, for chaining syntax.
    */
   fun setOnResponseData(
@@ -105,8 +87,8 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
   }
 
   /**
-   * Specify a callback for when trailers are received by the stream.
-   * If the closure is called, the stream is complete, pending an onComplete callback.
+   * Specify a callback for when trailers are received by the stream. If the closure is called, the
+   * stream is complete, pending an onComplete callback.
    *
    * @param closure Closure which will receive the trailers.
    * @return This stream, for chaining syntax.
@@ -119,62 +101,52 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
   }
 
   /**
-   * Specify a callback for when an internal Envoy exception occurs with the stream.
-   * If the closure is called, the stream is complete.
+   * Specify a callback for when an internal Envoy exception occurs with the stream. If the closure
+   * is called, the stream is complete.
    *
    * @param closure Closure which will be called when an error occurs.
    * @return This stream, for chaining syntax.
    */
   fun setOnError(
-    closure: (
-      error: EnvoyError,
-      finalStreamIntel: FinalStreamIntel
-    ) -> Unit
+    closure: (error: EnvoyError, finalStreamIntel: FinalStreamIntel) -> Unit
   ): StreamPrototype {
     callbacks.onError = closure
     return this
   }
 
-/**
-   * Specify a callback for when a stream is complete.
-   * If the closure is called, the stream is complete.
+  /**
+   * Specify a callback for when a stream is complete. If the closure is called, the stream is
+   * complete.
    *
    * @param closure Closure which will be called when an error occurs.
    * @return This stream, for chaining syntax.
    */
-  fun setOnComplete(
-    closure: (finalStreamIntel: FinalStreamIntel) -> Unit
-  ): StreamPrototype {
+  fun setOnComplete(closure: (finalStreamIntel: FinalStreamIntel) -> Unit): StreamPrototype {
     callbacks.onComplete = closure
     return this
   }
 
   /**
-   * Specify a callback for when the stream is canceled.
-   * If the closure is called, the stream is complete.
+   * Specify a callback for when the stream is canceled. If the closure is called, the stream is
+   * complete.
    *
    * @param closure Closure which will be called when the stream is canceled.
    * @return This stream, for chaining syntax.
    */
-  fun setOnCancel(
-    closure: (finalStreamIntel: FinalStreamIntel) -> Unit
-  ): StreamPrototype {
+  fun setOnCancel(closure: (finalStreamIntel: FinalStreamIntel) -> Unit): StreamPrototype {
     callbacks.onCancel = closure
     return this
   }
 
   /**
-   * Specify a callback for when additional send window becomes available.
-   * This is only ever called when the library is in explicit flow control mode. When enabled,
-   * the issuer should wait for this callback after calling sendData, before making another call
-   * to sendData.
+   * Specify a callback for when additional send window becomes available. This is only ever called
+   * when the library is in explicit flow control mode. When enabled, the issuer should wait for
+   * this callback after calling sendData, before making another call to sendData.
    *
    * @param closure Closure which will be called when additional send window becomes available.
    * @return This stream, for chaining syntax.
    */
-  fun setOnSendWindowAvailable(
-    closure: (streamIntel: StreamIntel) -> Unit
-  ): StreamPrototype {
+  fun setOnSendWindowAvailable(closure: (streamIntel: StreamIntel) -> Unit): StreamPrototype {
     callbacks.onSendWindowAvailable = closure
     return this
   }

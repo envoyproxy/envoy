@@ -17,41 +17,64 @@
 
 package api
 
-/*
-// ref https://github.com/golang/go/issues/25832
+import "fmt"
 
-#cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
-#cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
+func (c *commonCApiImpl) Log(level LogType, message string) {
+	panic("To implement")
+}
 
-#include <stdlib.h>
-#include <string.h>
-
-#include "api.h"
-
-*/
-import "C"
-import "unsafe"
+func (c *commonCApiImpl) LogLevel() LogType {
+	panic("To implement")
+}
 
 func LogTrace(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Trace), unsafe.Pointer(&message))
+	cAPI.Log(Trace, message)
 }
 
 func LogDebug(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Debug), unsafe.Pointer(&message))
+	cAPI.Log(Debug, message)
 }
 
 func LogInfo(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Info), unsafe.Pointer(&message))
+	cAPI.Log(Info, message)
 }
 
 func LogWarn(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Warn), unsafe.Pointer(&message))
+	cAPI.Log(Warn, message)
 }
 
 func LogError(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Error), unsafe.Pointer(&message))
+	cAPI.Log(Error, message)
 }
 
 func LogCritical(message string) {
-	C.envoyGoFilterLog(C.uint32_t(Critical), unsafe.Pointer(&message))
+	cAPI.Log(Critical, message)
+}
+
+func LogTracef(format string, v ...any) {
+	LogTrace(fmt.Sprintf(format, v...))
+}
+
+func LogDebugf(format string, v ...any) {
+	LogDebug(fmt.Sprintf(format, v...))
+}
+
+func LogInfof(format string, v ...any) {
+	LogInfo(fmt.Sprintf(format, v...))
+}
+
+func LogWarnf(format string, v ...any) {
+	LogWarn(fmt.Sprintf(format, v...))
+}
+
+func LogErrorf(format string, v ...any) {
+	LogError(fmt.Sprintf(format, v...))
+}
+
+func LogCriticalf(format string, v ...any) {
+	LogCritical(fmt.Sprintf(format, v...))
+}
+
+func GetLogLevel() LogType {
+	return cAPI.LogLevel()
 }

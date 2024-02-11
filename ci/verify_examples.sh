@@ -11,6 +11,10 @@ WARNINGS=()
 FLAKY_SANDBOXES=(
     # https://github.com/envoyproxy/envoy/issues/28542
     double-proxy
+    # https://github.com/envoyproxy/envoy/issues/31347
+    local_ratelimit
+    # https://github.com/envoyproxy/envoy/issues/31333
+    locality-load-balancing
     # https://github.com/envoyproxy/envoy/issues/28541
     wasm-cc
     # https://github.com/envoyproxy/envoy/issues/28546

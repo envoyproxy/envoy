@@ -35,7 +35,8 @@ invocation_mode: asynchronous
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
@@ -63,7 +64,8 @@ arn: "arn:aws:lambda:region:424242:function:fun"
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
@@ -110,8 +112,9 @@ arn: "arn:aws:lambda:region:424242:fun"
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-               EnvoyException);
+  EXPECT_THROW(
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException);
 }
 
 TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARNThrows) {
@@ -154,6 +157,14 @@ TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
       std::static_pointer_cast<const FilterSettings>(route_specific_config_ptr);
   EXPECT_FALSE(filter_settings_ptr->payloadPassthrough());
   EXPECT_EQ(InvocationMode::Asynchronous, filter_settings_ptr->invocationMode());
+}
+
+TEST(AwsLambdaFilterConfigTest, UpstreamFactoryTest) {
+
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.aws_lambda");
+  ASSERT_NE(factory, nullptr);
 }
 
 } // namespace

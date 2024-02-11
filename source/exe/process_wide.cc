@@ -31,7 +31,7 @@ ProcessWide::ProcessWide(bool validate_proto_descriptors) {
     // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
     // edge case where something does init/destroy/init/destroy.
     Event::Libevent::Global::initialize();
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     if (validate_proto_descriptors) {
       Envoy::Server::validateProtoDescriptors();
     }

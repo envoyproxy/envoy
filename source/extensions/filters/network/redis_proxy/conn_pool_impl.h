@@ -197,7 +197,7 @@ private:
      * clients_to_drain_ to the main data code path as this should only rarely be not empty.
      */
     Event::TimerPtr drain_timer_;
-    bool is_redis_cluster_;
+    bool is_redis_cluster_{false};
     Common::Redis::Client::ClientFactory& client_factory_;
     Common::Redis::Client::ConfigSharedPtr config_;
     Stats::ScopeSharedPtr stats_scope_;

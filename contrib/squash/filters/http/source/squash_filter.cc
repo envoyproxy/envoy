@@ -125,13 +125,12 @@ std::string SquashFilterConfig::replaceEnv(const std::string& attachment_templat
 }
 
 SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm)
-    : config_(config), is_squashing_(false), attachment_poll_period_timer_(nullptr),
-      attachment_timeout_timer_(nullptr), in_flight_request_(nullptr),
+    : config_(config), attachment_poll_period_timer_(nullptr), attachment_timeout_timer_(nullptr),
       create_attachment_callback_(std::bind(&SquashFilter::onCreateAttachmentSuccess, this, _1),
                                   std::bind(&SquashFilter::onCreateAttachmentFailure, this, _1)),
       check_attachment_callback_(std::bind(&SquashFilter::onGetAttachmentSuccess, this, _1),
                                  std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
-      cm_(cm), decoder_callbacks_(nullptr) {}
+      cm_(cm) {}
 
 SquashFilter::~SquashFilter() = default;
 

@@ -53,7 +53,7 @@ public:
   void sendRequestHeadersAndData();
   ResponseHeaderMap*
   sendResponseHeaders(ResponseHeaderMapPtr&& response_headers,
-                      absl::optional<StreamInfo::ResponseFlag> response_flag = absl::nullopt,
+                      absl::optional<StreamInfo::CoreResponseFlag> response_flag = absl::nullopt,
                       std::string response_code_details = "details");
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);
@@ -205,6 +205,8 @@ public:
   // This method sets-up expectation that UHV will be called and provides real default UHV to
   // validate headers.
   void expectCheckWithDefaultUhv();
+
+  Event::MockSchedulableCallback* enableStreamsPerIoLimit(uint32_t limit);
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;

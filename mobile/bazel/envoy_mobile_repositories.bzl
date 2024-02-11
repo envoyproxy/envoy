@@ -1,6 +1,4 @@
-load("@bazel_gazelle//:deps.bzl", "go_repository")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
 def envoy_mobile_repositories():
     http_archive(
@@ -28,21 +26,6 @@ def upstream_envoy_overrides():
 
 def swift_repos():
     http_archive(
-        name = "build_bazel_rules_apple",
-        sha256 = "687644bf48ccf91286f31c4ec26cf6591800b39bee8a630438626fc9bb4042de",
-        strip_prefix = "rules_apple-a0f8748ce89698a599149d984999eaefd834c004",
-        url = "https://github.com/bazelbuild/rules_apple/archive/a0f8748ce89698a599149d984999eaefd834c004.tar.gz",
-    )
-
-    # https://github.com/bazelbuild/rules_swift/pull/922
-    http_archive(
-        name = "build_bazel_rules_swift",
-        sha256 = "422558831da7719658ab0ffb3c994d92ddc6541e3610a751613a324bb5d10ffe",
-        strip_prefix = "rules_swift-e769f8d6a4adae93c244f244480a3ae740f24384",
-        url = "https://github.com/bazelbuild/rules_swift/archive/e769f8d6a4adae93c244f244480a3ae740f24384.tar.gz",
-    )
-
-    http_archive(
         name = "DrString",
         build_file_content = """exports_files(["drstring"])""",
         sha256 = "860788450cf9900613454a51276366ea324d5bfe71d1844106e9c1f1d7dfd82b",
@@ -65,10 +48,11 @@ def swift_repos():
 def kotlin_repos():
     http_archive(
         name = "rules_java",
-        sha256 = "19462d64b1586c0d4ea0e87f9325be2514f0eb84e56dbf3245450451b3701581",
-        strip_prefix = "rules_java-43243982abc76390ef64be62379a1353f9011771",
-        # TODO(jpsim): Switch back to bazelbuild repo when https://github.com/bazelbuild/rules_java/issues/64 is fixed
-        url = "https://github.com/jpsim/rules_java/archive/43243982abc76390ef64be62379a1353f9011771.tar.gz",
+        sha256 = "241822bf5fad614e3e1c42431002abd9af757136fa590a6a7870c6e0640a82e3",
+        strip_prefix = "rules_java-6.4.0",
+        url = "https://github.com/bazelbuild/rules_java/archive/6.4.0.tar.gz",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     http_archive(
@@ -80,8 +64,8 @@ def kotlin_repos():
 
     http_archive(
         name = "io_bazel_rules_kotlin",
-        sha256 = "f033fa36f51073eae224f18428d9493966e67c27387728b6be2ebbdae43f140e",
-        urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.7.0-RC-3/rules_kotlin_release.tgz"],
+        sha256 = "01293740a16e474669aba5b5a1fe3d368de5832442f164e4fbfc566815a8bc3a",
+        urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.8/rules_kotlin_release.tgz"],
     )
 
     http_archive(

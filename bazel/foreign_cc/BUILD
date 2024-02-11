@@ -1,5 +1,6 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cmake", "envoy_package")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
+load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,6 +16,15 @@ configure_make(
         "nocompdb",
         "skip_on_windows",
     ],
+)
+
+envoy_cc_library(
+    name = "liburing_linux",
+    srcs = [],
+    deps = select({
+        "//bazel:linux": [":liburing"],
+        "//conditions:default": [],
+    }),
 )
 
 # autotools packages are unusable on Windows as-is
@@ -50,13 +60,32 @@ cc_library(
     ],
 )
 
+make(
+    name = "lz4",
+    args = [
+        "MOREFLAGS='-fPIC'",
+        "BUILD_SHARED=no",
+    ],
+    lib_source = "@com_github_lz4_lz4//:all",
+    out_static_libs = [
+        "liblz4.a",
+    ],
+    tags = ["skip_on_windows"],
+    targets = [
+        "lib",
+        "install",
+    ],
+    visibility = ["//visibility:public"],
+    alwayslink = False,
+)
+
 # Kafka client dependency used by Kafka-mesh filter.
 # librdkafka build generates extra headers that need to be copied into source to get it to compile.
 configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
-    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
-    lib_source = "@edenhill_librdkafka//:all",
+    configure_options = ["--disable-ssl --disable-gssapi --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
+    lib_source = "@confluentinc_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
         "librdkafka++.a",
@@ -65,6 +94,7 @@ configure_make(
     targets = [
         "ARFLAGS='' libs install-subdirs",
     ],
+    deps = [":lz4"],
     alwayslink = True,
 )
 
@@ -110,7 +140,7 @@ configure_make(
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
-        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
     },
     lib_source = "@net_colm_open_source_colm//:all",
     out_binaries = ["colm"],
@@ -132,7 +162,7 @@ configure_make(
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
-        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+        "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
     },
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],
@@ -468,17 +498,24 @@ envoy_cmake(
 envoy_cmake(
     name = "wamr",
     cache_entries = {
+        # interp by default
+        # if want to gain more performance advantage with JIT or AOT
+        # please refer to https://github.com/proxy-wasm/proxy-wasm-cpp-host
         "WAMR_BUILD_AOT": "0",
         "WAMR_BUILD_FAST_INTERP": "1",
         "WAMR_BUILD_INTERP": "1",
         "WAMR_BUILD_JIT": "0",
+        # disable WASI
         "WAMR_BUILD_LIBC_WASI": "0",
-        "WAMR_BUILD_MULTI_MODULE": "0",
+        "WAMR_BUILD_LIBC_BUILTIN": "0",
+        # MVP
+        "WAMR_BUILD_BULK_MEMORY": "1",
+        "WAMR_BUILD_REF_TYPES": "1",
         "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_TAIL_CALL": "1",
+        # others
         "WAMR_BUILD_WASM_CACHE": "0",
-        "WAMR_DISABLE_HW_BOUND_CHECK": "0",
-        "WAMR_DISABLE_STACK_HW_BOUND_CHECK": "1",
+        "WAMR_BUILD_MULTI_MODULE": "0",
     },
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],
@@ -569,4 +606,29 @@ envoy_cmake(
         "//conditions:default": ["libzstd.a"],
     }),
     working_directory = "build/cmake",
+)
+
+envoy_cmake(
+    name = "maxmind",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
+        "BUILD_SHARED_LIBS": "off",
+        "BUILD_TESTING": "off",
+    },
+    defines = ["MAXMIND_STATICLIB"],
+    lib_source = "@com_github_maxmind_libmaxminddb//:all",
+    out_static_libs = ["libmaxminddb.a"],
+    tags = ["skip_on_windows"],
+)
+
+envoy_cc_library(
+    name = "maxmind_linux_darwin",
+    srcs = [],
+    deps = select({
+        "//bazel:linux": [":maxmind"],
+        "//bazel:darwin_any": [":maxmind"],
+        "//conditions:default": [],
+    }),
 )

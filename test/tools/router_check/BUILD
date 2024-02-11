@@ -4,9 +4,10 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_linkstatic",
 )
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,6 +16,7 @@ envoy_package()
 envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
+    linkstatic = envoy_select_linkstatic(),
     deps = [":router_check_main_lib"] + select({
         "//bazel:coverage_build": [],
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -27,8 +29,10 @@ envoy_cc_test_library(
     name = "router_check_main_lib",
     srcs = [
         "coverage.cc",
-        "coverage.h",
         "router.cc",
+    ],
+    hdrs = [
+        "coverage.h",
         "router.h",
     ],
     copts = ["-DHAVE_LONG_LONG"],

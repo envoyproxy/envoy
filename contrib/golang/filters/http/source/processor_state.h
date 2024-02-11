@@ -59,6 +59,8 @@ enum class FilterState {
   WaitingTrailer,
   // Processing trailer in Go
   ProcessingTrailer,
+  // Log in Go
+  Log,
   // All done
   Done,
 };
@@ -73,6 +75,7 @@ enum class Phase {
   EncodeHeader,
   EncodeData,
   EncodeTrailer,
+  Log,
   Done,
 };
 
@@ -103,7 +106,7 @@ public:
 
   bool isProcessingInGo() {
     return state_ == FilterState::ProcessingHeader || state_ == FilterState::ProcessingData ||
-           state_ == FilterState::ProcessingTrailer;
+           state_ == FilterState::ProcessingTrailer || state_ == FilterState::Log;
   }
   bool isProcessingHeader() { return state_ == FilterState::ProcessingHeader; }
   Http::StreamFilterCallbacks* getFilterCallbacks() { return filter_callbacks_; };
@@ -154,6 +157,15 @@ public:
     do_end_stream_ = true;
   }
 
+  void enterLog() {
+    prev_state_ = state_;
+    state_ = FilterState::Log;
+  }
+  void leaveLog() {
+    state_ = prev_state_;
+    prev_state_ = FilterState::Log;
+  }
+
   bool handleHeaderGolangStatus(const GolangStatus status);
   bool handleDataGolangStatus(const GolangStatus status);
   bool handleTrailerGolangStatus(const GolangStatus status);
@@ -180,6 +192,7 @@ protected:
   bool watermark_requested_{false};
   Buffer::InstancePtr data_buffer_{nullptr};
   FilterState state_{FilterState::WaitingHeader};
+  FilterState prev_state_{FilterState::Done};
   bool end_stream_{false};
   bool do_end_stream_{false};
   bool seen_trailers_{false};

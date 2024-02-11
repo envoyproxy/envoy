@@ -31,9 +31,10 @@ namespace {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 protected:
-  void initialize(bool upgrade_protobuf = false) {
+  void initialize(bool upgrade_protobuf = false, bool ignore_query_params = false) {
     envoy::extensions::filters::http::grpc_http1_bridge::v3::Config config;
     config.set_upgrade_protobuf_to_grpc(upgrade_protobuf);
+    config.set_ignore_query_parameters(ignore_query_params);
     filter_ = std::make_unique<Http1BridgeFilter>(context_, config);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -288,12 +289,22 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedHeaderSanitized) {
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
                                                  {"content-length", "5"},
                                                  {":path", "/v1/spotify.Concat/Concat"}};
-  Buffer::OwnedImpl data("hello");
 
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
   EXPECT_EQ("", request_headers.getContentLengthValue());
+}
+
+// Verifies that the query params in URL are removed when ignore_query_parameters is enabled
+TEST_F(GrpcHttp1BridgeFilterTest, QueryParamsIgnored) {
+  initialize(false, true);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/v1/spotify.Concat/Concat?timestamp=1701678591"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("/v1/spotify.Concat/Concat", request_headers.getPathValue());
 }
 
 } // namespace

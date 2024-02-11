@@ -1,6 +1,6 @@
 #pragma once
 
-#include "headers.h"
+#include "library/cc/headers.h"
 
 namespace Envoy {
 namespace Platform {

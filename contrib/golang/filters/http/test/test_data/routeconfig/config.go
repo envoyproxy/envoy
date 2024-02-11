@@ -13,19 +13,17 @@ import (
 const Name = "routeconfig"
 
 func init() {
-	http.RegisterHttpFilterConfigFactoryAndParser(Name, configFactory, &parser{})
+	http.RegisterHttpFilterFactoryAndConfigParser(Name, filterFactory, &parser{})
 }
 
-func configFactory(c interface{}) api.StreamFilterFactory {
+func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
 	conf, ok := c.(*config)
 	if !ok {
 		panic("unexpected config type")
 	}
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &filter{
-			config:    conf,
-			callbacks: callbacks,
-		}
+	return &filter{
+		config:    conf,
+		callbacks: callbacks,
 	}
 }
 
@@ -37,7 +35,7 @@ type config struct {
 type parser struct {
 }
 
-func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
+func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
 		return nil, err

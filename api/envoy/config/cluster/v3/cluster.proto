@@ -1236,6 +1236,26 @@ message UpstreamConnectionOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.UpstreamConnectionOptions";
 
+  enum FirstAddressFamilyVersion {
+    // respect the native ranking of destination ip addresses returned from dns
+    // resolution
+    DEFAULT = 0;
+
+    V4 = 1;
+
+    V6 = 2;
+  }
+
+  message HappyEyeballsConfig {
+    // Specify the IP address family to attempt connection first in happy
+    // eyeballs algorithm according to RFC8305#section-4.
+    FirstAddressFamilyVersion first_address_family_version = 1;
+
+    // Specify the number of addresses of the first_address_family_version being
+    // attempted for connection before the other address family.
+    google.protobuf.UInt32Value first_address_family_count = 2 [(validate.rules).uint32 = {gte: 1}];
+  }
+
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
   core.v3.TcpKeepalive tcp_keepalive = 1;
 
@@ -1243,6 +1263,11 @@ message UpstreamConnectionOptions {
   // This can be used by extensions during processing of requests. The association mechanism is
   // implementation specific. Defaults to false due to performance concerns.
   bool set_local_interface_name_on_upstream_connections = 2;
+
+  // Configurations for happy eyeballs algorithm.
+  // Add configs for first_address_family_version and first_address_family_count
+  // when sorting destination ip addresses.
+  HappyEyeballsConfig happy_eyeballs_config = 3;
 }
 
 message TrackClusterStats {
@@ -1257,4 +1282,19 @@ message TrackClusterStats {
   // <config_cluster_manager_cluster_stats_request_response_sizes>`  tracking header and body sizes
   // of requests and responses will be published.
   bool request_response_sizes = 2;
+
+  // If true, some stats will be emitted per-endpoint, similar to the stats in admin ``/clusters``
+  // output.
+  //
+  // This does not currently output correct stats during a hot-restart.
+  //
+  // This is not currently implemented by all stat sinks.
+  //
+  // These stats do not honor filtering or tag extraction rules in :ref:`StatsConfig
+  // <envoy_v3_api_msg_config.metrics.v3.StatsConfig>` (but fixed-value tags are supported). Admin
+  // endpoint filtering is supported.
+  //
+  // This may not be used at the same time as
+  // :ref:`load_stats_config <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.load_stats_config>`.
+  bool per_endpoint_stats = 3;
 }

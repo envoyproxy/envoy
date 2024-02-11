@@ -34,7 +34,7 @@ namespace Outlier {
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr
+  static absl::StatusOr<DetectorSharedPtr>
   createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
                    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                    EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
@@ -313,6 +313,9 @@ public:
   uint64_t enforcingLocalOriginSuccessRate() const { return enforcing_local_origin_success_rate_; }
   uint64_t maxEjectionTimeMs() const { return max_ejection_time_ms_; }
   uint64_t maxEjectionTimeJitterMs() const { return max_ejection_time_jitter_ms_; }
+  bool successfulActiveHealthCheckUnejectHost() const {
+    return successful_active_health_check_uneject_host_;
+  }
 
 private:
   const uint64_t interval_ms_;
@@ -337,6 +340,7 @@ private:
   const uint64_t enforcing_local_origin_success_rate_;
   const uint64_t max_ejection_time_ms_;
   const uint64_t max_ejection_time_jitter_ms_;
+  const bool successful_active_health_check_uneject_host_;
 
   static constexpr uint64_t DEFAULT_INTERVAL_MS = 10000;
   static constexpr uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
@@ -368,7 +372,7 @@ private:
  */
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  static std::shared_ptr<DetectorImpl>
+  static absl::StatusOr<std::shared_ptr<DetectorImpl>>
   create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
@@ -489,9 +493,12 @@ class EventLoggerImpl : public EventLogger {
 public:
   EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
                   TimeSource& time_source)
-      : file_(log_manager.createAccessLog(
-            Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name})),
-        time_source_(time_source) {}
+      : time_source_(time_source) {
+    auto file_or_error = log_manager.createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    file_ = file_or_error.value();
+  }
 
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,

@@ -32,7 +32,7 @@ struct RateLimitOnMatchActionContext {};
 
 // This class implements the on_match action behavior.
 class RateLimitOnMatchAction : public Matcher::ActionBase<BucketId>,
-                               public Logger::Loggable<Logger::Id::filter> {
+                               public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   explicit RateLimitOnMatchAction(RateLimitQuotaBucketSettings settings)
       : setting_(std::move(settings)) {}
@@ -40,6 +40,8 @@ public:
   absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
                                             Server::Configuration::FactoryContext& factory_context,
                                             RateLimitQuotaValidationVisitor& visitor) const;
+
+  const RateLimitQuotaBucketSettings& bucketSettings() const { return setting_; }
 
 private:
   RateLimitQuotaBucketSettings setting_;

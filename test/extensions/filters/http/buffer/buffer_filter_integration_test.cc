@@ -132,6 +132,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
@@ -147,7 +148,7 @@ ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.buffer"].PackFrom(buffer_per_route);
+        (*config)["buffer"].PackFrom(buffer_per_route);
       };
 }
 

@@ -206,7 +206,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
       *cert_chain, /*callback=*/nullptr,
       /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
-  EXPECT_EQ(Ssl::ClientValidationStatus::NotValidated, results.detailed_status);
+  EXPECT_EQ(Ssl::ClientValidationStatus::NoClientCertificate, results.detailed_status);
 }
 
 TEST(DefaultCertValidatorTest, NoSanInCert) {

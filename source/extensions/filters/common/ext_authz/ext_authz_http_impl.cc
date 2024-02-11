@@ -11,10 +11,10 @@
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
-#include "check_request_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -245,6 +245,11 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName())
                        .setSampled(absl::nullopt);
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_authz_http_send_original_xff")) {
+      options.setSendXff(false);
+    }
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }

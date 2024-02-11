@@ -1,4 +1,4 @@
-load("@envoy_api//bazel:utils.bzl", "json_data")
+load("@envoy_toolshed//:macros.bzl", "json_data")
 load(":contrib_build_config.bzl", "CONTRIB_EXTENSIONS")
 
 licenses(["notice"])  # Apache 2

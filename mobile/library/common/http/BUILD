@@ -1,8 +1,8 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "client_lib",
@@ -13,16 +13,15 @@ envoy_cc_library(
     deps = [
         "//library/common/bridge:utility_lib",
         "//library/common/buffer:bridge_fragment_lib",
-        "//library/common/common:system_helper_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/extensions/filters/http/local_error:local_error_filter_lib",
         "//library/common/extensions/filters/http/network_configuration:network_configuration_filter_lib",
         "//library/common/http:header_utility_lib",
-        "//library/common/jni:android_jni_utility_lib",
         "//library/common/network:connectivity_manager_lib",
         "//library/common/network:synthetic_address_lib",
         "//library/common/stream_info:extra_stream_info_lib",
+        "//library/common/system:system_helper_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/buffer:buffer_interface",
         "@envoy//envoy/common:scope_tracker_interface",

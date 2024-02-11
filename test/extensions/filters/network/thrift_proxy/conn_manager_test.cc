@@ -90,9 +90,9 @@ class ThriftConnectionManagerTest : public testing::Test {
 public:
   ThriftConnectionManagerTest()
       : stats_(ThriftFilterStats::generateStats("test.", *store_.rootScope())) {
-    route_config_provider_manager_ =
-        std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.admin_);
-    ON_CALL(*context_.access_log_manager_.file_, write(_))
+    route_config_provider_manager_ = std::make_unique<Router::RouteConfigProviderManagerImpl>(
+        context_.server_factory_context_.admin_);
+    ON_CALL(*context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
   ~ThriftConnectionManagerTest() override {

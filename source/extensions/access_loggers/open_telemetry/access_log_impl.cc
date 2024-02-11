@@ -62,7 +62,7 @@ AccessLog::AccessLog(
     : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
 
-  Envoy::Config::Utility::checkTransportVersion(config.common_config());
+  THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(config.common_config()));
   tls_slot_->set([this, config](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(
         access_logger_cache_->getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
@@ -76,11 +76,8 @@ AccessLog::AccessLog(
   attributes_formatter_ = std::make_unique<OpenTelemetryFormatter>(config.attributes());
 }
 
-void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
-                        const Http::ResponseHeaderMap& response_headers,
-                        const Http::ResponseTrailerMap& response_trailers,
-                        const StreamInfo::StreamInfo& stream_info,
-                        Envoy::AccessLog::AccessLogType access_log_type) {
+void AccessLog::emitLog(const Formatter::HttpFormatterContext& log_context,
+                        const StreamInfo::StreamInfo& stream_info) {
   opentelemetry::proto::logs::v1::LogRecord log_entry;
   log_entry.set_time_unix_nano(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                    stream_info.startTime().time_since_epoch())
@@ -88,14 +85,10 @@ void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
 
   // Unpacking the body "KeyValueList" to "AnyValue".
   if (body_formatter_) {
-    const auto formatted_body =
-        unpackBody(body_formatter_->format(request_headers, response_headers, response_trailers,
-                                           stream_info, absl::string_view(), access_log_type));
+    const auto formatted_body = unpackBody(body_formatter_->format(log_context, stream_info));
     *log_entry.mutable_body() = formatted_body;
   }
-  const auto formatted_attributes =
-      attributes_formatter_->format(request_headers, response_headers, response_trailers,
-                                    stream_info, absl::string_view(), access_log_type);
+  const auto formatted_attributes = attributes_formatter_->format(log_context, stream_info);
   *log_entry.mutable_attributes() = formatted_attributes.values();
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));

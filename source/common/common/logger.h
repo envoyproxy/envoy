@@ -39,6 +39,7 @@ const static bool should_log = true;
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
+  FUNCTION(basic_auth)                                                                             \
   FUNCTION(cache_filter)                                                                           \
   FUNCTION(client)                                                                                 \
   FUNCTION(config)                                                                                 \
@@ -54,6 +55,7 @@ const static bool should_log = true;
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
+  FUNCTION(geolocation)                                                                            \
   FUNCTION(grpc)                                                                                   \
   FUNCTION(happy_eyeballs)                                                                         \
   FUNCTION(hc)                                                                                     \
@@ -303,6 +305,9 @@ public:
    * Same as before, with boolean returned to use in log macros.
    */
   static bool useFineGrainLogger();
+
+  // Change the log level for all loggers (fine grained or otherwise) to the level provided.
+  static void changeAllLogLevels(spdlog::level::level_enum level);
 
   static void enableFineGrainLogger();
   static void disableFineGrainLogger();
@@ -563,22 +568,26 @@ public:
 #define ENVOY_TAGGED_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, CONNECTION, FORMAT, ...)              \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      TAGS.emplace("ConnectionId", std::to_string((CONNECTION).id()));                             \
-      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
-                          ##__VA_ARGS__);                                                          \
+      std::map<std::string, std::string> log_tags = TAGS;                                          \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      ENVOY_LOG_TO_LOGGER(                                                                         \
+          LOGGER, LEVEL,                                                                           \
+          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
+          ##__VA_ARGS__);                                                                          \
     }                                                                                              \
   } while (0)
 
 #define ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, STREAM, FORMAT, ...)                \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      TAGS.emplace("ConnectionId",                                                                 \
-                   (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0");     \
-      TAGS.emplace("StreamId", std::to_string((STREAM).streamId()));                               \
-      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
-                          ##__VA_ARGS__);                                                          \
+      std::map<std::string, std::string> log_tags = TAGS;                                          \
+      log_tags.emplace("ConnectionId",                                                             \
+                       (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
+      log_tags.emplace("StreamId", std::to_string((STREAM).streamId()));                           \
+      ENVOY_LOG_TO_LOGGER(                                                                         \
+          LOGGER, LEVEL,                                                                           \
+          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
+          ##__VA_ARGS__);                                                                          \
     }                                                                                              \
   } while (0)
 

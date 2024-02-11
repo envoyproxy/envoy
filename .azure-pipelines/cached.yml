@@ -1,26 +1,37 @@
 
 parameters:
-- name: name
-  type: string
-  default: envoy_build_image
-- name: version
-  type: string
-  default: ""
 - name: arch
   type: string
   default: ""
-- name: key
+- name: version
   type: string
-  default: ".devcontainer/Dockerfile"
-- name: tmpDirectory
-  type: string
-  default: /mnt/docker_cache
-- name: tmpNoTmpfs
+  default: $(cacheKeyVersion)
+- name: cacheName
   type: string
   default:
-- name: path
+
+- name: keyDocker
   type: string
-  default: /mnt/docker
+  default: $(cacheKeyDocker)
+- name: keyBazel
+  type: string
+  default: $(cacheKeyBazel)
+
+- name: pathTemp
+  type: string
+  default: $(pathCacheTemp)
+
+- name: tmpfsDisabled
+  type: string
+  default:
+- name: tmpfsDockerDisabled
+  type: string
+  default:
+
+- name: pathDockerBind
+  type: string
+  default: $(pathDockerBind)
+
 - name: cacheTimeoutWorkaround
   type: number
   default: 5
@@ -30,24 +41,49 @@ parameters:
 
 
 steps:
-- script: sudo .azure-pipelines/docker/prepare_cache.sh "${{ parameters.tmpDirectory }}" "${{ parameters.tmpNoTmpfs }}"
-  displayName: "Cache/prepare (${{ parameters.name }})"
+- script: sudo .azure-pipelines/docker/prepare_cache.sh "${{ parameters.pathTemp }}" "${{ parameters.tmpfsDisabled }}"
+  displayName: "Cache/prepare"
+
 - task: Cache@2
+  condition: and(not(canceled()), ne('${{ parameters.cacheName }}', ''))
   env:
     VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: "${{ parameters.cacheTimeoutWorkaround }}"
-  displayName: "Cache/fetch (${{ parameters.name }})"
+  displayName: "Cache (${{ parameters.cacheName }})"
   inputs:
-    key: '${{ parameters.name }} | "${{ parameters.version }}" | "${{ parameters.arch }}" | ${{ parameters.key }}'
-    path: "${{ parameters.tmpDirectory }}"
+    key: '${{ parameters.cacheName }} | "${{ parameters.version }}" | "${{ parameters.arch }}" | ${{ parameters.keyDocker }} | ${{ parameters.keyBazel }}'
+    path: "${{ parameters.pathTemp }}/all"
     cacheHitVar: CACHE_RESTORED
 
-# Prime the cache for all jobs
-- script: sudo .azure-pipelines/docker/prime_cache.sh "${{ parameters.tmpDirectory }}" "${{ parameters.arch }}"
-  displayName: "Cache/prime (${{ parameters.name }})"
-  # TODO(phlax): figure if there is a way to test cache without downloading it
-  condition: and(not(canceled()), eq(${{ parameters.prime }}, true), ne(variables.CACHE_RESTORED, 'true'))
+- task: Cache@2
+  condition: and(not(canceled()), not(failed()), or(ne(variables.CACHE_RESTORED, 'true'), eq('${{ parameters.cacheName }}', '')))
+  env:
+    VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: "${{ parameters.cacheTimeoutWorkaround }}"
+  displayName: "Cache (Docker)"
+  inputs:
+    key: '"${{ parameters.version }}" | "${{ parameters.arch }}" | ${{ parameters.keyDocker }} | docker'
+    path: "${{ parameters.pathTemp }}/docker"
+    cacheHitVar: DOCKER_CACHE_RESTORED
 
-# Load the cache for a job
-- script: sudo .azure-pipelines/docker/load_cache.sh "${{ parameters.tmpDirectory }}" "${{ parameters.path }}"
-  displayName: "Cache/restore (${{ parameters.name }})"
+- task: Cache@2
+  condition: and(not(canceled()), not(failed()), or(ne(variables.CACHE_RESTORED, 'true'), eq('${{ parameters.cacheName }}', '')))
+  env:
+    VSO_DEDUP_REDIRECT_TIMEOUT_IN_SEC: "${{ parameters.cacheTimeoutWorkaround }}"
+  displayName: "Cache (Bazel)"
+  inputs:
+    key: '"${{ parameters.version }}" | "${{ parameters.arch }}" | ${{ parameters.keyBazel }} | bazel'
+    path: "${{ parameters.pathTemp }}/bazel"
+    cacheHitVar: BAZEL_CACHE_RESTORED
+
+# Prime the caches for all jobs
+- script: .azure-pipelines/docker/prime_cache.sh "$(Build.StagingDirectory)" "${{ parameters.pathTemp }}" "${{ parameters.arch }}"
+  env:
+    DOCKER_RESTORED: $(DOCKER_CACHE_RESTORED)
+    BAZEL_RESTORED: $(BAZEL_CACHE_RESTORED)
+  displayName: "Cache/prime (Docker/Bazel)"
+  # TODO(phlax): figure if there is a way to test cache without downloading it
+  condition: and(not(canceled()), eq(${{ parameters.prime }}, true), eq('${{ parameters.cacheName }}', ''), or(ne(variables.DOCKER_CACHE_RESTORED, 'true'), ne(variables.BAZEL_CACHE_RESTORED, 'true')))
+
+# Load the caches for a job
+- script: sudo .azure-pipelines/docker/load_caches.sh "$(Build.StagingDirectory)" "${{ parameters.pathTemp }}" "${{ parameters.pathDockerBind }}" "${{ parameters.tmpfsDockerDisabled }}"
+  displayName: "Cache/restore"
   condition: and(not(canceled()), eq(${{ parameters.prime }}, false))

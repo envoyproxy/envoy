@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -241,7 +242,7 @@ public:
    * The "initialized callback" set in the method above is invoked when secondary and
    * dynamically provisioned clusters have finished initializing.
    */
-  virtual void
+  virtual absl::Status
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   using ClusterInfoMap = absl::flat_hash_map<std::string, std::reference_wrapper<const Cluster>>;
@@ -421,10 +422,10 @@ public:
   virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
 
   /**
-   * Check if the cluster is active and statically configured, and if not, throw exception.
+   * Check if the cluster is active and statically configured, and if not, return an error
    * @param cluster, the cluster to check.
    */
-  virtual void checkActiveStaticCluster(const std::string& cluster) PURE;
+  virtual absl::Status checkActiveStaticCluster(const std::string& cluster) PURE;
 
   /**
    * Allocates an on-demand CDS API provider from configuration proto or locator.
@@ -446,6 +447,11 @@ public:
   virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
   getCommonLbConfigPtr(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
+
+  /**
+   * Returns an EdsResourcesCache that is unique for the cluster manager.
+   */
+  virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

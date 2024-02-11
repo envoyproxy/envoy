@@ -105,7 +105,7 @@ TEST_F(FilterTest, WriteAndClose) {
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false));
   filter_->write(someData, false);
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, "go_downstream_close"));
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnDownstreamEvent(_, _));
   filter_->close(Network::ConnectionCloseType::NoFlush);
 

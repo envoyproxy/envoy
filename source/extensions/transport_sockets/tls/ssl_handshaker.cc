@@ -26,7 +26,7 @@ void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
   }
   extended_socket_info_->setCertificateValidationStatus(detailed_status);
   extended_socket_info_->setCertificateValidationAlert(tls_alert);
-  extended_socket_info_->onCertificateValidationCompleted(succeeded);
+  extended_socket_info_->onCertificateValidationCompleted(succeeded, true);
 }
 
 SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
@@ -44,14 +44,15 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
-void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded) {
+void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded, bool async) {
   cert_validation_result_ =
       succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
   if (cert_validate_result_callback_.has_value()) {
-    // This is an async cert validation.
     cert_validate_result_callback_.reset();
     // Resume handshake.
-    ssl_handshaker_.handshakeCallbacks()->onAsynchronousCertValidationComplete();
+    if (async) {
+      ssl_handshaker_.handshakeCallbacks()->onAsynchronousCertValidationComplete();
+    }
   }
 }
 
@@ -66,7 +67,7 @@ Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCa
 SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                                      Ssl::HandshakeCallbacks* handshake_callbacks)
     : ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks),
-      state_(Ssl::SocketState::PreHandshake), extended_socket_info_(*this) {
+      extended_socket_info_(*this) {
   SSL_set_ex_data(ssl_.get(), ssl_extended_socket_info_index, &(this->extended_socket_info_));
 }
 
@@ -98,12 +99,6 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
-    case SSL_ERROR_SYSCALL:
-      // By default, when SSL_ERROR_SYSCALL occurred, the underlying transport does not participate
-      // in the error queue. Therefore, setting `syscall_error_occurred` to true to report the error
-      // in `drainErrorQueue`.
-      handshake_callbacks_->onFailure(/*syscall_error_occurred=*/true);
-      return PostIoAction::Close;
     default:
       handshake_callbacks_->onFailure();
       return PostIoAction::Close;

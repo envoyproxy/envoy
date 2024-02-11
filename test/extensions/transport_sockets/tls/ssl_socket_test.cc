@@ -13,6 +13,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -125,9 +126,7 @@ public:
   TestUtilOptions(const std::string& client_ctx_yaml, const std::string& server_ctx_yaml,
                   bool expect_success, Network::Address::IpVersion version)
       : TestUtilOptionsBase(expect_success, version), client_ctx_yaml_(client_ctx_yaml),
-        server_ctx_yaml_(server_ctx_yaml), expect_no_cert_(false), expect_no_cert_chain_(false),
-        expect_private_key_method_(false),
-        expected_server_close_event_(Network::ConnectionEvent::RemoteClose) {
+        server_ctx_yaml_(server_ctx_yaml) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake");
     } else {
@@ -305,11 +304,11 @@ private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
 
-  bool expect_no_cert_;
-  bool expect_no_cert_chain_;
-  bool expect_private_key_method_;
+  bool expect_no_cert_{false};
+  bool expect_no_cert_chain_{false};
+  bool expect_private_key_method_{false};
   NiceMock<Runtime::MockLoader> runtime_;
-  Network::ConnectionEvent expected_server_close_event_;
+  Network::ConnectionEvent expected_server_close_event_{Network::ConnectionEvent::RemoteClose};
   std::string expected_sha256_digest_;
   std::string expected_sha1_digest_;
   std::vector<std::string> expected_local_uri_;
@@ -328,6 +327,17 @@ private:
   int expected_verify_error_code_{-1};
   std::string expected_sni_;
 };
+
+Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
+                                    Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                    const Network::ListenerConfig& listener_config,
+                                    Server::ThreadLocalOverloadStateOptRef overload_state,
+                                    Random::RandomGenerator& rng, Event::Dispatcher& dispatcher) {
+  return std::make_unique<Network::TcpListenerImpl>(
+      dispatcher, rng, runtime, socket, cb, listener_config.bindToPort(),
+      listener_config.ignoreGlobalConnLimit(),
+      listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
+}
 
 void testUtil(const TestUtilOptions& options) {
   Event::SimulatedTimeSystem time_system;
@@ -368,8 +378,10 @@ void testUtil(const TestUtilOptions& options) {
       Network::Test::getCanonicalLoopbackAddress(options.version()));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher->createListener(socket, callbacks, runtime, listener_config);
+      createListener(socket, callbacks, runtime, listener_config, overload_state,
+                     server_api->randomGenerator(), *dispatcher);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
@@ -573,8 +585,10 @@ public:
   TestUtilOptionsV2(
       const envoy::config::listener::v3::Listener& listener,
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto,
-      bool expect_success, Network::Address::IpVersion version)
-      : TestUtilOptionsBase(expect_success, version), listener_(listener),
+      bool expect_success, Network::Address::IpVersion version,
+      bool skip_server_failure_reason_check = false)
+      : TestUtilOptionsBase(expect_success, version),
+        skip_server_failure_reason_check_(skip_server_failure_reason_check), listener_(listener),
         client_ctx_proto_(client_ctx_proto), transport_socket_options_(nullptr) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake").setExpectedClientStats("ssl.handshake");
@@ -584,6 +598,7 @@ public:
     }
   }
 
+  bool skipServerFailureReasonCheck() const { return skip_server_failure_reason_check_; }
   const envoy::config::listener::v3::Listener& listener() const { return listener_; }
   const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& clientCtxProto() const {
     return client_ctx_proto_;
@@ -675,6 +690,7 @@ public:
   }
 
 private:
+  bool skip_server_failure_reason_check_;
   const envoy::config::listener::v3::Listener& listener_;
   const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto_;
   std::string expected_client_stats_;
@@ -721,8 +737,10 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       Network::Test::getCanonicalLoopbackAddress(options.version()));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher->createListener(socket, callbacks, runtime, listener_config);
+      createListener(socket, callbacks, runtime, listener_config, overload_state,
+                     server_api->randomGenerator(), *dispatcher);
 
   Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
@@ -879,7 +897,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   } else {
     EXPECT_THAT(std::string(client_connection->transportFailureReason()),
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
-    EXPECT_NE("", server_connection->transportFailureReason());
+    if (!options.skipServerFailureReasonCheck()) {
+      EXPECT_NE("", server_connection->transportFailureReason());
+    }
   }
 }
 
@@ -957,6 +977,17 @@ protected:
   void testClientSessionResumption(const std::string& server_ctx_yaml,
                                    const std::string& client_ctx_yaml, bool expect_reuse,
                                    const Network::Address::IpVersion version);
+
+  Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
+                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
+                                      const Network::ListenerConfig& listener_config,
+                                      Server::ThreadLocalOverloadStateOptRef overload_state,
+                                      Event::Dispatcher& dispatcher) {
+    return std::make_unique<Network::TcpListenerImpl>(
+        dispatcher, api_->randomGenerator(), runtime, std::move(socket), cb,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
+  }
 
   NiceMock<Runtime::MockLoader> runtime_;
   Event::DispatcherPtr dispatcher_;
@@ -3052,8 +3083,9 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -3110,8 +3142,9 @@ TEST_P(SslSocketTest, HalfClose) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, runtime_, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
+                                                 listener_config, overload_state, *dispatcher_);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -3194,8 +3227,9 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, runtime_, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
+                                                 listener_config, overload_state, *dispatcher_);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -3284,8 +3318,9 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks listener_callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, runtime_, listener_config);
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
+                                                 listener_config, overload_state, *dispatcher_);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -3390,8 +3425,9 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -3492,10 +3528,13 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener1 =
-      dispatcher->createListener(socket1, callbacks, runtime, listener_config);
+      createListener(socket1, callbacks, runtime, listener_config, overload_state,
+                     server_api->randomGenerator(), *dispatcher);
   Network::ListenerPtr listener2 =
-      dispatcher->createListener(socket2, callbacks, runtime, listener_config);
+      createListener(socket2, callbacks, runtime, listener_config, overload_state,
+                     server_api->randomGenerator(), *dispatcher);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
@@ -3612,10 +3651,10 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
 }
 
-void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml,
-                                              const std::string& client_ctx_yaml,
-                                              bool expect_support,
-                                              const Network::Address::IpVersion ip_version) {
+void testSupportForSessionResumption(const std::string& server_ctx_yaml,
+                                     const std::string& client_ctx_yaml, bool expect_stateless,
+                                     bool expect_stateful,
+                                     const Network::Address::IpVersion ip_version) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
 
@@ -3637,9 +3676,11 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
       Network::Test::getCanonicalLoopbackAddress(ip_version));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener =
-      dispatcher->createListener(tcp_socket, callbacks, runtime, listener_config);
+      createListener(tcp_socket, callbacks, runtime, listener_config, overload_state,
+                     server_api->randomGenerator(), *dispatcher);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
@@ -3675,10 +3716,16 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
             dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
         SSL* server_ssl_socket = ssl_socket->ssl();
         SSL_CTX* server_ssl_context = SSL_get_SSL_CTX(server_ssl_socket);
-        if (expect_support) {
+        if (expect_stateless) {
           EXPECT_EQ(0, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
         } else {
           EXPECT_EQ(SSL_OP_NO_TICKET, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
+        }
+        if (expect_stateful) {
+          EXPECT_EQ(SSL_SESS_CACHE_SERVER,
+                    (SSL_CTX_get_session_cache_mode(server_ssl_context) & SSL_SESS_CACHE_SERVER));
+        } else {
+          EXPECT_EQ(SSL_SESS_CACHE_OFF, SSL_CTX_get_session_cache_mode(server_ssl_context));
         }
       }));
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
@@ -4138,6 +4185,25 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
                               version_);
 }
 
+TEST_P(SslSocketTest, SessionResumptionDisabled) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+  disable_stateless_session_resumption: true
+  disable_stateful_session_resumption: true
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  testSupportForSessionResumption(server_ctx_yaml, client_ctx_yaml, false, false, version_);
+}
+
 TEST_P(SslSocketTest, StatelessSessionResumptionDisabled) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -4153,10 +4219,28 @@ TEST_P(SslSocketTest, StatelessSessionResumptionDisabled) {
     common_tls_context:
   )EOF";
 
-  testSupportForStatelessSessionResumption(server_ctx_yaml, client_ctx_yaml, false, version_);
+  testSupportForSessionResumption(server_ctx_yaml, client_ctx_yaml, false, true, version_);
 }
 
-TEST_P(SslSocketTest, SatelessSessionResumptionEnabledExplicitly) {
+TEST_P(SslSocketTest, StatefulSessionResumptionDisabled) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+  disable_stateful_session_resumption: true
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  testSupportForSessionResumption(server_ctx_yaml, client_ctx_yaml, true, false, version_);
+}
+
+TEST_P(SslSocketTest, SessionResumptionEnabledExplicitly) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -4165,16 +4249,17 @@ TEST_P(SslSocketTest, SatelessSessionResumptionEnabledExplicitly) {
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   disable_stateless_session_resumption: false
+  disable_stateful_session_resumption: false
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
     common_tls_context:
   )EOF";
 
-  testSupportForStatelessSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_);
+  testSupportForSessionResumption(server_ctx_yaml, client_ctx_yaml, true, true, version_);
 }
 
-TEST_P(SslSocketTest, StatelessSessionResumptionEnabledByDefault) {
+TEST_P(SslSocketTest, SessionResumptionEnabledByDefault) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -4188,7 +4273,7 @@ TEST_P(SslSocketTest, StatelessSessionResumptionEnabledByDefault) {
     common_tls_context:
   )EOF";
 
-  testSupportForStatelessSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_);
+  testSupportForSessionResumption(server_ctx_yaml, client_ctx_yaml, true, true, version_);
 }
 
 // Test that if two listeners use the same cert and session ticket key, but
@@ -4242,10 +4327,11 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
   Network::ListenerPtr listener2 =
-      dispatcher_->createListener(socket2, callbacks, runtime_, listener_config);
+      createListener(socket2, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -4366,8 +4452,9 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   NiceMock<Network::MockListenerConfig> listener_config;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher->createListener(socket, callbacks, runtime_, listener_config);
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher);
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
@@ -4629,8 +4716,9 @@ TEST_P(SslSocketTest, SslError) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -5160,8 +5248,9 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
       Network::Test::getCanonicalLoopbackAddress(version_));
   Network::MockTcpListenerCallbacks callbacks;
   NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
   Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, callbacks, runtime_, listener_config);
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -5863,8 +5952,9 @@ protected:
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
     NiceMock<Network::MockListenerConfig> listener_config;
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, runtime_, listener_config);
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    listener_ = createListener(socket_, listener_callbacks_, runtime_, listener_config,
+                               overload_state, *dispatcher_);
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
     auto client_cfg =
@@ -6288,6 +6378,47 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
             expected_operation: decrypt
             sync_mode: true
             mode: rsa
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - TLS_RSA_WITH_AES_128_GCM_SHA256
+)EOF";
+
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
+                                          version_);
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+}
+
+// Test fallback for key provider.
+TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - TLS_RSA_WITH_AES_128_GCM_SHA256
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+      private_key_provider:
+        provider_name: test
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+            expected_operation: decrypt
+            sync_mode: true
+            mode: rsa
+            is_available: false
+        fallback: true
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -6733,6 +6864,46 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
                .setExpectedServerStats("ssl.connection_error"));
 }
 
+// Test private key provider and cert validation can work together.
+TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem"
+      private_key_provider:
+        provider_name: test
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setPrivateKeyMethodExpected(true)
+               .setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+}
+
 TEST_P(SslSocketTest, TestStaplesOcspResponseSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -7147,11 +7318,12 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 
   // Enable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
-  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_);
-  // Client connection is failed with key_usage_mismatch, which is expected.
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
+                                 /*skip_server_failure_reason_check=*/true);
+  // Client connection is failed with key_usage_mismatch.
   test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
-  // Server connection failed with connection error.
-  test_options.setExpectedServerStats("ssl.connection_error");
+  // Server connection error was not populated in this case.
+  test_options.setExpectedServerStats("");
   testUtilV2(test_options);
 }
 

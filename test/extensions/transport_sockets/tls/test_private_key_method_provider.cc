@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
 
-void TestPrivateKeyConnection::delayed_op() {
+void TestPrivateKeyConnection::delayedOp() {
   const std::chrono::milliseconds timeout_0ms{0};
 
   timer_ = dispatcher_.createTimer([this]() -> void {
@@ -84,7 +84,7 @@ static ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size
 
   ops->output_.assign(out, out + out_len_unsigned);
   // Tell SSL socket that the operation is ready to be called again.
-  ops->delayed_op();
+  ops->delayedOp();
 
   return ssl_private_key_retry;
 }
@@ -160,7 +160,7 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
   }
 
   ops->output_.assign(out, out + *out_len);
-  ops->delayed_op();
+  ops->delayedOp();
 
   return ssl_private_key_retry;
 }
@@ -197,7 +197,7 @@ static ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, siz
   }
 
   ops->output_.assign(out, out + *out_len);
-  ops->delayed_op();
+  ops->delayedOp();
 
   return ssl_private_key_retry;
 }
@@ -256,6 +256,8 @@ bool TestPrivateKeyMethodProvider::checkFips() {
   }
   return true;
 }
+
+bool TestPrivateKeyMethodProvider::isAvailable() { return test_options_.is_available_; }
 
 TestPrivateKeyConnection::TestPrivateKeyConnection(
     Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher,
@@ -333,6 +335,9 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     if (value_it.first == "method_error" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
       test_options_.method_error_ = value.bool_value();
     }
+    if (value_it.first == "is_available" && value.kind_case() == ProtobufWkt::Value::kBoolValue) {
+      test_options_.is_available_ = value.bool_value();
+    }
     if (value_it.first == "async_method_error" &&
         value.kind_case() == ProtobufWkt::Value::kBoolValue) {
       test_options_.async_method_error_ = value.bool_value();
@@ -350,8 +355,15 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     }
   }
 
-  std::string private_key =
-      factory_context.serverFactoryContext().api().fileSystem().fileReadToEnd(private_key_path);
+  if (!test_options_.is_available_) {
+    return;
+  }
+
+  std::string private_key = factory_context.serverFactoryContext()
+                                .api()
+                                .fileSystem()
+                                .fileReadToEnd(private_key_path)
+                                .value();
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));

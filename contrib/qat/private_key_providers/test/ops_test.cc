@@ -44,7 +44,8 @@ public:
 class FakeSingletonManager : public Singleton::Manager {
 public:
   FakeSingletonManager(LibQatCryptoSharedPtr libqat) : libqat_(libqat) {}
-  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb,
+                                   bool) override {
     return std::make_shared<QatManager>(libqat_);
   }
 
@@ -241,9 +242,9 @@ TEST_F(QatProviderRsaTest, TestQatDeviceInit) {
 
   // no device found
   libqat_->icpSalUserStart_return_value_ = CPA_STATUS_FAIL;
-  EXPECT_THROW_WITH_REGEX(
-      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
-      EnvoyException, "Failed to start QAT device.");
+  Ssl::PrivateKeyMethodProviderSharedPtr provider =
+      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_);
+  EXPECT_EQ(provider->isAvailable(), false);
   delete private_key;
 }
 

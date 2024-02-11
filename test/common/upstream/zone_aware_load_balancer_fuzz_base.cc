@@ -17,7 +17,7 @@ void ZoneAwareLoadBalancerFuzzBase::initializeASingleHostSet(
     const MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
     const HostVector empty_host_vector;
     local_priority_set_->updateHosts(0, HostSetImpl::updateHostsParams(host_set), {},
-                                     empty_host_vector, empty_host_vector, absl::nullopt);
+                                     empty_host_vector, empty_host_vector, 123, absl::nullopt);
   }
 }
 
@@ -34,7 +34,7 @@ void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
     const MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
     const HostVector empty_host_vector;
     local_priority_set_->updateHosts(0, HostSetImpl::updateHostsParams(host_set), {},
-                                     empty_host_vector, empty_host_vector, absl::nullopt);
+                                     empty_host_vector, empty_host_vector, 123, absl::nullopt);
   }
 }
 

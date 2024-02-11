@@ -36,63 +36,97 @@ using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
 namespace StreamInfo {
 
-enum ResponseFlag {
+enum CoreResponseFlag : uint16_t {
   // Local server healthcheck failed.
-  FailedLocalHealthCheck = 0x1,
+  FailedLocalHealthCheck,
   // No healthy upstream.
-  NoHealthyUpstream = 0x2,
+  NoHealthyUpstream,
   // Request timeout on upstream.
-  UpstreamRequestTimeout = 0x4,
+  UpstreamRequestTimeout,
   // Local codec level reset was sent on the stream.
-  LocalReset = 0x8,
+  LocalReset,
   // Remote codec level reset was received on the stream.
-  UpstreamRemoteReset = 0x10,
+  UpstreamRemoteReset,
   // Local reset by a connection pool due to an initial connection failure.
-  UpstreamConnectionFailure = 0x20,
+  UpstreamConnectionFailure,
   // If the stream was locally reset due to connection termination.
-  UpstreamConnectionTermination = 0x40,
+  UpstreamConnectionTermination,
   // The stream was reset because of a resource overflow.
-  UpstreamOverflow = 0x80,
+  UpstreamOverflow,
   // No route found for a given request.
-  NoRouteFound = 0x100,
+  NoRouteFound,
   // Request was delayed before proxying.
-  DelayInjected = 0x200,
+  DelayInjected,
   // Abort with error code was injected.
-  FaultInjected = 0x400,
+  FaultInjected,
   // Request was ratelimited locally by rate limit filter.
-  RateLimited = 0x800,
+  RateLimited,
   // Request was unauthorized by external authorization service.
-  UnauthorizedExternalService = 0x1000,
+  UnauthorizedExternalService,
   // Unable to call Ratelimit service.
-  RateLimitServiceError = 0x2000,
+  RateLimitServiceError,
   // If the stream was reset due to a downstream connection termination.
-  DownstreamConnectionTermination = 0x4000,
+  DownstreamConnectionTermination,
   // Exceeded upstream retry limit.
-  UpstreamRetryLimitExceeded = 0x8000,
+  UpstreamRetryLimitExceeded,
   // Request hit the stream idle timeout, triggering a 408.
-  StreamIdleTimeout = 0x10000,
+  StreamIdleTimeout,
   // Request specified x-envoy-* header values that failed strict header checks.
-  InvalidEnvoyRequestHeaders = 0x20000,
+  InvalidEnvoyRequestHeaders,
   // Downstream request had an HTTP protocol error
-  DownstreamProtocolError = 0x40000,
+  DownstreamProtocolError,
   // Upstream request reached to user defined max stream duration.
-  UpstreamMaxStreamDurationReached = 0x80000,
+  UpstreamMaxStreamDurationReached,
   // True if the response was served from an Envoy cache filter.
-  ResponseFromCacheFilter = 0x100000,
+  ResponseFromCacheFilter,
   // Filter config was not received within the permitted warming deadline.
-  NoFilterConfigFound = 0x200000,
+  NoFilterConfigFound,
   // Request or connection exceeded the downstream connection duration.
-  DurationTimeout = 0x400000,
+  DurationTimeout,
   // Upstream response had an HTTP protocol error
-  UpstreamProtocolError = 0x800000,
+  UpstreamProtocolError,
   // No cluster found for a given request.
-  NoClusterFound = 0x1000000,
+  NoClusterFound,
   // Overload Manager terminated the stream.
-  OverloadManager = 0x2000000,
+  OverloadManager,
   // DNS resolution failed.
-  DnsResolutionFailed = 0x4000000,
+  DnsResolutionFailed,
+  // Drop certain percentage of overloaded traffic.
+  DropOverLoad,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DnsResolutionFailed,
+  LastFlag = DropOverLoad,
+};
+
+class ResponseFlagUtils;
+
+class ResponseFlag {
+public:
+  constexpr ResponseFlag() = default;
+
+  /**
+   * Construct a response flag from the core response flag enum. The integer
+   * value of the enum is used as the raw integer value of the flag.
+   * @param flag the core response flag enum.
+   */
+  constexpr ResponseFlag(CoreResponseFlag flag) : value_(flag) {}
+
+  /**
+   * Get the raw integer value of the flag.
+   * @return uint16_t the raw integer value.
+   */
+  uint16_t value() const { return value_; }
+
+  bool operator==(const ResponseFlag& other) const { return value_ == other.value_; }
+
+private:
+  friend class ResponseFlagUtils;
+
+  // This private constructor is used to create extended response flags from
+  // uint16_t values. This can only be used by ResponseFlagUtils to ensure
+  // only validated values are used.
+  ResponseFlag(uint16_t value) : value_(value) {}
+
+  uint16_t value_{};
 };
 
 /**
@@ -156,6 +190,8 @@ struct ResponseCodeDetailValues {
   const std::string ClusterNotFound = "cluster_not_found";
   // The request was rejected by the router filter because the cluster was in maintenance mode.
   const std::string MaintenanceMode = "maintenance_mode";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
+  const std::string DropOverload = "drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.
@@ -231,6 +267,8 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_remote_close";
   const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
       "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamResetClose =
+      "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
 };
@@ -339,6 +377,9 @@ public:
   absl::optional<MonotonicTime> lastDownstreamAckReceived() const {
     return last_downstream_ack_received_;
   }
+  absl::optional<MonotonicTime> lastDownstreamHeaderRxByteReceived() const {
+    return last_downstream_header_rx_byte_received_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -360,6 +401,10 @@ public:
     ASSERT(!last_downstream_ack_received_);
     last_downstream_ack_received_ = time_source.monotonicTime();
   }
+  void onLastDownstreamHeaderRxByteReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_header_rx_byte_received_);
+    last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
+  }
 
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
@@ -373,6 +418,8 @@ private:
   absl::optional<MonotonicTime> downstream_handshake_complete_;
   // The time the final ack was received from the client.
   absl::optional<MonotonicTime> last_downstream_ack_received_;
+  // The time when the last header byte was received.
+  absl::optional<MonotonicTime> last_downstream_header_rx_byte_received_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -603,19 +650,8 @@ public:
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
   /**
-   * @param response_flags the response_flags to intersect with.
-   * @return true if the intersection of the response_flags argument and the currently set response
-   * flags is non-empty.
-   */
-  virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
-
-  /**
-   * @param std::string name denotes the name of the route.
-   */
-  virtual void setRouteName(absl::string_view name) PURE;
-
-  /**
-   * @return std::string& the name of the route.
+   * @return std::string& the name of the route. The name is get from the route() and it is
+   *         empty if there is no route.
    */
   virtual const std::string& getRouteName() const PURE;
 
@@ -696,6 +732,11 @@ public:
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
+   * @return returns the time source.
+   */
+  virtual TimeSource& timeSource() const PURE;
+
+  /**
    * Sets the upstream information for this stream.
    */
   virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;
@@ -750,9 +791,15 @@ public:
   virtual bool hasAnyResponseFlag() const PURE;
 
   /**
-   * @return response flags encoded as an integer.
+   * @return all response flags that are set.
    */
-  virtual uint64_t responseFlags() const PURE;
+  virtual absl::Span<const ResponseFlag> responseFlags() const PURE;
+
+  /**
+   * @return response flags encoded as an integer. Every bit of the integer is used to represent a
+   * flag. Only flags that are declared in the enum CoreResponseFlag type are supported.
+   */
+  virtual uint64_t legacyResponseFlags() const PURE;
 
   /**
    * @return whether the request is a health check request or not.
@@ -842,16 +889,6 @@ public:
   virtual Tracing::Reason traceReason() const PURE;
 
   /**
-   * @param filter_chain_name Network filter chain name of the downstream connection.
-   */
-  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
-
-  /**
-   * @return Network filter chain name of the downstream connection.
-   */
-  virtual const std::string& filterChainName() const PURE;
-
-  /**
    * @param attempt_count, the number of times the request was attempted upstream.
    */
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
@@ -910,6 +947,20 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * Checked by streams after finishing serving the request.
+   * @return bool true if the connection should be drained once this stream has
+   * finished sending and receiving.
+   */
+  virtual bool shouldDrainConnectionUponCompletion() const PURE;
+
+  /**
+   * Called if the connection decides to drain itself after serving this request.
+   * @param should_drain true to close the connection once this stream has
+   * finished sending and receiving.
+   */
+  virtual void setShouldDrainConnectionUponCompletion(bool should_drain) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

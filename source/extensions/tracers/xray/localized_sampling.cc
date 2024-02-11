@@ -31,8 +31,8 @@ void fail(absl::string_view msg) {
   ENVOY_LOG_TO_LOGGER(logger, error, "Failed to parse sampling rules - {}", msg);
 }
 
-bool is_valid_rate(double n) { return n >= 0 && n <= 1.0; }
-bool is_valid_fixed_target(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
+bool isValidRate(double n) { return n >= 0 && n <= 1.0; }
+bool isValidFixedTarget(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
 
 bool validateRule(const ProtobufWkt::Struct& rule) {
   using ProtobufWkt::Value;
@@ -61,7 +61,7 @@ bool validateRule(const ProtobufWkt::Struct& rule) {
   const auto fixed_target_it = rule.fields().find(FixedTargetJsonKey);
   if (fixed_target_it == rule.fields().end() ||
       fixed_target_it->second.kind_case() != Value::KindCase::kNumberValue ||
-      !is_valid_fixed_target(fixed_target_it->second.number_value())) {
+      !isValidFixedTarget(fixed_target_it->second.number_value())) {
     fail("fixed target is missing or not a valid positive integer");
     return false;
   }
@@ -69,7 +69,7 @@ bool validateRule(const ProtobufWkt::Struct& rule) {
   const auto rate_it = rule.fields().find(RateJsonKey);
   if (rate_it == rule.fields().end() ||
       rate_it->second.kind_case() != Value::KindCase::kNumberValue ||
-      !is_valid_rate(rate_it->second.number_value())) {
+      !isValidRate(rate_it->second.number_value())) {
     fail("rate is missing or not a valid positive floating number");
     return false;
   }

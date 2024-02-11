@@ -33,8 +33,10 @@ import "C"
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -45,41 +47,70 @@ import (
 
 var (
 	configNumGenerator uint64
-	configCache        = &sync.Map{} // uint64 -> *anypb.Any
+	configCache        = &sync.Map{} // uint64 -> config(interface{})
+	// From get a cached merged_config_id_ in getMergedConfigId on the C++ side,
+	// to get the merged config by the id on the Go side, 2 seconds should be long enough.
+	delayDeleteTime = time.Second * 2 // 2s
 )
 
-//export envoyGoFilterNewHttpPluginConfig
-func envoyGoFilterNewHttpPluginConfig(namePtr, nameLen, configPtr, configLen uint64) uint64 {
-	if !api.CgoCheckDisabled() {
-		cAPI.HttpLog(api.Error, "The Envoy Golang filter requires the `GODEBUG=cgocheck=0` environment variable set.")
-		return 0
-	}
+func configFinalize(c *httpConfig) {
+	c.Finalize()
+}
 
-	buf := utils.BytesToSlice(configPtr, configLen)
+func createConfig(c *C.httpConfig) *httpConfig {
+	config := &httpConfig{
+		config: c,
+	}
+	// NP: make sure httpConfig will be deleted.
+	runtime.SetFinalizer(config, configFinalize)
+
+	return config
+}
+
+//export envoyGoFilterNewHttpPluginConfig
+func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
+	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
 
+	Requests.initialize(uint32(c.concurrency))
+
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
 
-	name := utils.BytesToString(namePtr, nameLen)
+	name := utils.BytesToString(uint64(c.plugin_name_ptr), uint64(c.plugin_name_len))
 	configParser := getHttpFilterConfigParser(name)
-	if configParser != nil {
-		parsedConfig, err := configParser.Parse(&any)
-		if err != nil {
-			cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
-			return 0
-		}
-		configCache.Store(configNum, parsedConfig)
+
+	var parsedConfig interface{}
+	var err error
+	if c.is_route_config == 1 {
+		parsedConfig, err = configParser.Parse(&any, nil)
 	} else {
-		configCache.Store(configNum, &any)
+		config := createConfig(c)
+		parsedConfig, err = configParser.Parse(&any, config)
 	}
+	if err != nil {
+		cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
+		return 0
+	}
+	configCache.Store(configNum, parsedConfig)
 
 	return configNum
 }
 
 //export envoyGoFilterDestroyHttpPluginConfig
-func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
-	configCache.Delete(id)
+func envoyGoFilterDestroyHttpPluginConfig(id uint64, needDelay int) {
+	if needDelay == 1 {
+		// there is a concurrency race in the c++ side:
+		// 1. when A envoy worker thread is using the cached merged_config_id_ and it will call into Go after some time.
+		// 2. while B envoy worker thread may update the merged_config_id_ in getMergedConfigId, that will delete the id.
+		// so, we delay deleting the id in the Go side.
+		time.AfterFunc(delayDeleteTime, func() {
+			configCache.Delete(id)
+		})
+	} else {
+		// there is no race for non-merged config.
+		configCache.Delete(id)
+	}
 }
 
 //export envoyGoFilterMergeHttpPluginConfig
@@ -87,23 +118,17 @@ func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint
 	name := utils.BytesToString(namePtr, nameLen)
 	configParser := getHttpFilterConfigParser(name)
 
-	if configParser != nil {
-		parent, ok := configCache.Load(parentId)
-		if !ok {
-			panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
-		}
-		child, ok := configCache.Load(childId)
-		if !ok {
-			panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
-		}
-
-		new := configParser.Merge(parent, child)
-		configNum := atomic.AddUint64(&configNumGenerator, 1)
-		configCache.Store(configNum, new)
-		return configNum
-
-	} else {
-		// child override parent by default
-		return childId
+	parent, ok := configCache.Load(parentId)
+	if !ok {
+		panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
 	}
+	child, ok := configCache.Load(childId)
+	if !ok {
+		panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
+	}
+
+	new := configParser.Merge(parent, child)
+	configNum := atomic.AddUint64(&configNumGenerator, 1)
+	configCache.Store(configNum, new)
+	return configNum
 }

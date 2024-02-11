@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/extensions/filters/network/redis_proxy/conn_pool.h"
 
@@ -45,7 +46,7 @@ class Route {
 public:
   virtual ~Route() = default;
 
-  virtual ConnPool::InstanceSharedPtr upstream() const PURE;
+  virtual ConnPool::InstanceSharedPtr upstream(const std::string& command) const PURE;
 
   virtual const MirrorPolicies& mirrorPolicies() const PURE;
 };
@@ -63,11 +64,11 @@ public:
    * Returns a connection pool that matches a given route. When no match is found, the catch all
    * pool is used. When remove prefix is set to true, the prefix will be removed from the key.
    * @param key mutable reference to the key of the current command.
+   * @param stream_info reference to the stream info used for formatting the key.
    * @return a handle to the connection pool.
    */
-  virtual RouteSharedPtr upstreamPool(std::string& key) PURE;
-
-  virtual void setReadFilterCallback(Network::ReadFilterCallbacks* callbacks) PURE;
+  virtual RouteSharedPtr upstreamPool(std::string& key,
+                                      const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using RouterPtr = std::unique_ptr<Router>;

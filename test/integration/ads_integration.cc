@@ -135,8 +135,6 @@ void AdsIntegrationTest::makeSingleRequest() {
 void AdsIntegrationTest::initialize() { initializeAds(false); }
 
 void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
-                                    oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
   config_helper_.addConfigModifier([this, &rate_limiting](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();

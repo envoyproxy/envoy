@@ -772,23 +772,6 @@ TEST_F(OverloadManagerImplTest, UnknownActionShouldError) {
                           "Unknown Overload Manager Action .*");
 }
 
-TEST_F(OverloadManagerImplTest, LegacyUnknownActionShouldSilentlyFail) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.overload_manager_error_unknown_action", "false"}});
-  const std::string config = R"EOF(
-    resource_monitors:
-      - name: "envoy.resource_monitors.fake_resource1"
-    actions:
-      - name: "envoy.overload_actions.not_a_valid_action"
-        triggers:
-          - name: "envoy.resource_monitors.fake_resource1"
-            threshold:
-              value: 0.9
-  )EOF";
-
-  auto overload_manager = createOverloadManager(config);
-}
-
 TEST_F(OverloadManagerImplTest, UnknownTrigger) {
   const std::string config = R"EOF(
     actions:
@@ -864,6 +847,10 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   bool resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   EXPECT_TRUE(resource_allocated);
+  auto monitor = manager->getThreadLocalOverloadState().getProactiveResourceMonitorForTest(
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections);
+  EXPECT_NE(absl::nullopt, monitor);
+  EXPECT_EQ(1, monitor->currentResourceUsage());
   resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 3);
   EXPECT_FALSE(resource_allocated);

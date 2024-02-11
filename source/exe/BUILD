@@ -10,8 +10,8 @@ load(
     "envoy_select_enable_http3",
     "envoy_select_signal_trace",
 )
+load("//bazel:repositories.bzl", "NO_HTTP3_SKIP_TARGETS", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 
 licenses(["notice"])  # Apache 2
 
@@ -33,19 +33,20 @@ envoy_cc_binary(
 )
 
 envoy_cc_library(
-    name = "envoy_common_lib",
+    name = "all_extensions_lib",
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server:drain_manager_lib",
-        "//source/server:options_lib",
-        "//source/server:server_lib",
         "//source/server:listener_hooks_lib",
+        "//source/server:options_base",
+        "//source/server:server_base_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:disable_http3": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -60,6 +61,7 @@ envoy_cc_library(
         ":envoy_main_common_lib",
         ":platform_impl_lib",
         ":scm_impl_lib",
+        "//source/server:options_lib",
     ],
 )
 
@@ -68,16 +70,24 @@ envoy_cc_library(
     srcs = ["stripped_main_base.cc"],
     hdrs = ["stripped_main_base.h"],
     deps = [
-        ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
-        "//source/common/thread_local:thread_local_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/event:libevent_lib",
+        "//source/common/event:real_time_system_lib",
         "//source/common/grpc:google_grpc_context_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
+        "//source/server:drain_manager_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:listener_hooks_lib",
+        "//source/server:options_base",
+        "//source/server:server_base_lib",
     ] + envoy_select_signal_trace([
         "//source/common/signal:sigaction_lib",
         ":terminate_handler_lib",
@@ -88,39 +98,56 @@ envoy_cc_library(
     name = "main_common_lib",
     srcs = [
         "main_common.cc",
-        "stripped_main_base.cc",
     ],
     hdrs = [
         "main_common.h",
-        "stripped_main_base.h",
     ],
     deps = [
-        ":envoy_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
+        ":stripped_main_base_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:options_lib",
         "//source/server/config_validation:server_lib",
-    ] + envoy_select_signal_trace([
-        "//source/common/signal:sigaction_lib",
-        ":terminate_handler_lib",
-    ]),
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "main_common_with_all_extensions_lib",
+    deps = [
+        ":all_extensions_lib",
+        ":main_common_lib",
+        ":platform_impl_lib",
+        ":process_wide_lib",
+        ":stripped_main_base_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
+        "//source/server:options_lib",
+        "//source/server/config_validation:server_lib",
+    ],
 )
 
 # provides a library target for Envoy server builds with the versioning information set up correctly.
 envoy_cc_library(
     name = "envoy_main_common_lib",
     deps = [
-        ":main_common_lib",
+        ":main_common_with_all_extensions_lib",
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
         # Envoy requires them.
-        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
+        "//source/server:options_lib",
     ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 
@@ -134,51 +161,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_common_with_core_extensions_lib",
+    name = "envoy_main_common_with_core_extensions_lib",
     deps = [
-               "//source/common/event:libevent_lib",
-               "//source/common/network:utility_lib",
-               "//source/common/stats:stats_lib",
-               "//source/common/stats:thread_local_store_lib",
-               "//source/server:drain_manager_lib",
+               ":main_common_lib",
+               ":platform_impl_lib",
+               ":process_wide_lib",
+               ":stripped_main_base_lib",
+               "//envoy/server:platform_interface",
+               "//source/common/api:os_sys_calls_lib",
+               "//source/common/common:compiler_requirements_lib",
+               "//source/common/common:perf_annotation_lib",
+               "//source/common/grpc:google_grpc_context_lib",
+               "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+               "//source/server:hot_restart_lib",
+               "//source/server:hot_restart_nop_lib",
                "//source/server:options_lib",
                "//source/server:server_lib",
-               "//source/server:listener_hooks_lib",
+               "//source/server/config_validation:server_lib",
            ] + envoy_all_core_extensions() +
            # TODO(rojkov): drop io_uring dependency when it's fully integrated.
            select({
                "//bazel:linux": ["//source/common/io:io_uring_impl_lib"],
                "//conditions:default": [],
            }),
-)
-
-envoy_cc_library(
-    name = "envoy_main_common_with_core_extensions_lib",
-    srcs = [
-        "main_common.cc",
-        "stripped_main_base.cc",
-    ],
-    hdrs = [
-        "main_common.h",
-        "stripped_main_base.h",
-    ],
-    deps = [
-        ":envoy_common_with_core_extensions_lib",
-        ":platform_impl_lib",
-        ":process_wide_lib",
-        "//envoy/server:platform_interface",
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:compiler_requirements_lib",
-        "//source/common/common:perf_annotation_lib",
-        "//source/common/grpc:google_grpc_context_lib",
-        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
-        "//source/server:hot_restart_lib",
-        "//source/server:hot_restart_nop_lib",
-        "//source/server/config_validation:server_lib",
-    ] + envoy_select_signal_trace([
-        "//source/common/signal:sigaction_lib",
-        ":terminate_handler_lib",
-    ]),
 )
 
 envoy_cc_library(
@@ -263,12 +268,13 @@ envoy_cc_library(
     }),
     deps = select({
         "//bazel:windows_x86_64": [
-            ":main_common_lib",
+            ":main_common_with_all_extensions_lib",
             "//source/common/buffer:buffer_lib",
             "//source/common/common:assert_lib",
-            "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/common:thread_lib",
+            "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/event:signal_lib",
+            "//source/server:options_lib",
         ],
         "//conditions:default": [],
     }),

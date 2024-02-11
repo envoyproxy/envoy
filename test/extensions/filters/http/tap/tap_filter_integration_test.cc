@@ -1,5 +1,3 @@
-#include <memory>
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
@@ -1121,6 +1119,90 @@ typed_config:
   EXPECT_TRUE(traces[3].http_streamed_trace_segment().has_response_headers());
   EXPECT_EQ("world", traces[4].http_streamed_trace_segment().response_body_chunk().as_bytes());
   EXPECT_TRUE(traces[5].http_streamed_trace_segment().has_response_trailers());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+}
+
+// Verify option record_headers_received_time
+// when a request header is matched in a static configuration
+TEST_P(TapIntegrationTest, StaticFilePerHttpBufferTraceTapForRequest) {
+  constexpr absl::string_view filter_config =
+      R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      match:
+        http_request_headers_match:
+          headers:
+            - name: foo
+              string_match:
+                exact: bar
+      output_config:
+        sinks:
+          - format: PROTO_BINARY_LENGTH_DELIMITED
+            file_per_tap:
+              path_prefix: {}
+  record_headers_received_time: true
+)EOF";
+
+  const std::string path_prefix = getTempPathPrefix();
+  initializeFilter(fmt::format(filter_config, path_prefix));
+
+  // Initial request/response with tap.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
+              {"world"}, &response_trailers_);
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
+  ASSERT_EQ(1, traces.size());
+  EXPECT_TRUE(traces[0].has_http_buffered_trace());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+}
+
+// Verify option record_downstream_connection
+// when a request header is matched in a static configuration
+TEST_P(TapIntegrationTest, StaticFilePerHttpBufferTraceTapDownstreamConnection) {
+  constexpr absl::string_view filter_config =
+      R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      match:
+        http_request_headers_match:
+          headers:
+            - name: foo
+              string_match:
+                exact: bar
+      output_config:
+        sinks:
+          - format: PROTO_BINARY_LENGTH_DELIMITED
+            file_per_tap:
+              path_prefix: {}
+  record_downstream_connection: true
+)EOF";
+
+  const std::string path_prefix = getTempPathPrefix();
+  initializeFilter(fmt::format(filter_config, path_prefix));
+
+  // Initial request/response with tap.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
+              {"world"}, &response_trailers_);
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
+  ASSERT_EQ(1, traces.size());
+  EXPECT_TRUE(traces[0].has_http_buffered_trace());
 
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
 }

@@ -678,8 +678,7 @@ TEST_P(WasmHttpFilterTest, AccessLog) {
   StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete())
       .WillRepeatedly(testing::Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, &response_headers, &response_trailers, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers, &response_headers, &response_trailers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -698,8 +697,7 @@ TEST_P(WasmHttpFilterTest, AccessLogClientDisconnected) {
   StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete())
       .WillRepeatedly(testing::Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, nullptr, nullptr, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -716,8 +714,7 @@ TEST_P(WasmHttpFilterTest, AccessLogDisabledForIncompleteStream) {
 
   StreamInfo::MockStreamInfo log_stream_info;
   EXPECT_CALL(log_stream_info, requestComplete()).WillRepeatedly(testing::Return(absl::nullopt));
-  filter().log(&request_headers, nullptr, nullptr, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -733,8 +730,7 @@ TEST_P(WasmHttpFilterTest, AccessLogCreate) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
-  filter().log(&request_headers, &response_headers, &response_trailers, log_stream_info,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers, &response_headers, &response_trailers}, log_stream_info);
   filter().onDestroy();
 }
 
@@ -1763,8 +1759,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
 
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 
   const auto* result =
       request_stream_info_.filterState()->getDataReadOnly<Filters::Common::Expr::CelState>(
@@ -1780,14 +1775,13 @@ TEST_P(WasmHttpFilterTest, Property) {
     // TODO(PiotrSikora): test not yet implemented using Rust SDK.
     return;
   }
-  setupTest("", "property");
-  setupFilter();
   envoy::config::core::v3::Node node_data;
   ProtobufWkt::Value node_val;
   node_val.set_string_value("sample_data");
   (*node_data.mutable_metadata()->mutable_fields())["istio.io/metadata"] = node_val;
   EXPECT_CALL(local_info_, node()).WillRepeatedly(ReturnRef(node_data));
-
+  setupTest("", "property");
+  setupFilter();
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
           "envoy.filters.http.wasm",
@@ -1831,8 +1825,7 @@ TEST_P(WasmHttpFilterTest, Property) {
   request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   EXPECT_CALL(request_stream_info_, requestComplete())
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 }
 
 TEST_P(WasmHttpFilterTest, ClusterMetadata) {
@@ -1863,16 +1856,14 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 
   // If upstream host is empty, fallback to upstream cluster info for cluster metadata.
   request_stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
   EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
-  filter().log(&request_headers, nullptr, nullptr, request_stream_info_,
-               AccessLog::AccessLogType::NotSet);
+  filter().log({&request_headers}, request_stream_info_);
 }
 
 TEST_P(WasmHttpFilterTest, SharedData) {
@@ -2124,6 +2115,24 @@ TEST_P(WasmHttpFilterTest, CloseResponse) {
   // Create in-VM context.
   filter().onCreate();
   EXPECT_EQ(proxy_wasm::FilterHeadersStatus::Continue, filter().onResponseHeaders(0, false));
+}
+
+TEST_P(WasmHttpFilterTest, VerifySignature) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(patricio78): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "verify_signature");
+  setupFilter();
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info, Eq(absl::string_view("signature is valid"))));
+
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::err, Eq(absl::string_view("unknown is not supported."))));
+  EXPECT_CALL(rootContext(), log_(spdlog::level::err,
+                                  Eq(absl::string_view("Failed to initialize digest verify."))))
+      .Times(2);
+  rootContext().onTick(0);
 }
 
 } // namespace Wasm

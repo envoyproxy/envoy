@@ -791,6 +791,8 @@ downstreamLocalAddress()
 Returns the string representation of :repo:`downstream local address <envoy/stream_info/stream_info.h>`
 used by the current request.
 
+.. _config_http_filters_lua_stream_info_downstream_direct_remote_address:
+
 downstreamDirectRemoteAddress()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -800,6 +802,19 @@ downstreamDirectRemoteAddress()
 
 Returns the string representation of :repo:`downstream directly connected address <envoy/stream_info/stream_info.h>`
 used by the current request. This is equivalent to the address of the physical connection.
+
+.. _config_http_filters_lua_stream_info_downstream_remote_address:
+
+downstreamRemoteAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamRemoteAddress()
+
+Returns the string representation of the downstream remote address for the current request. This may differ from
+:ref:`downstreamDirectRemoteAddress() <config_http_filters_lua_stream_info_downstream_direct_remote_address>` depending upon the setting of
+:ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
 
 dynamicMetadata()
 ^^^^^^^^^^^^^^^^^
@@ -930,11 +945,21 @@ peerCertificateValidated()
 
 .. code-block:: lua
 
-  if downstreamSslConnection:peerCertificateVaidated() then
-    print("peer certificate is valiedated")
+  if downstreamSslConnection:peerCertificateValidated() then
+    print("peer certificate is validated")
   end
 
 Returns bool whether the peer certificate was validated.
+
+.. warning::
+
+   Client certificate validation is not currently performed upon TLS session resumption. For a
+   resumed TLS session this method will return false, regardless of whether the peer certificate is
+   valid.
+
+   The only known workaround for this issue is to disable TLS session resumption entirely, by
+   setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+   and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
 
 uriSanLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^

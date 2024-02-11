@@ -1,35 +1,43 @@
 #!/bin/bash -e
 
-DOCKER_CACHE_PATH="$1"
-NO_MOUNT_TMPFS="${2:-}"
+set -o pipefail
+ENVOY_DOCKER_BUILD_DIR="$1"
+CACHE_PATH="$2"
+NO_MOUNT_TMPFS="${3:-}"
+CACHE_BAZEL="${4:-}"
 
-if [[ -z "$DOCKER_CACHE_PATH" ]]; then
+if [[ -z "$CACHE_PATH" ]]; then
     echo "prime_docker_cache called without path arg" >&2
     exit 1
 fi
 
-if [[ -e /tmp/DOCKER_CACHE_RESTORED ]]; then
-    echo "Not saving cache as it was restored"
-    exit 0
-fi
-
-DOCKER_CACHE_TARBALL="${DOCKER_CACHE_PATH}/docker.tar.zst"
+DOCKER_CACHE_TARBALL="${CACHE_PATH}/docker.tar.zst"
+BAZEL_CACHE_TARBALL="${CACHE_PATH}/bazel.tar.zst"
 
 docker images
 
 echo "Stopping Docker ..."
-systemctl stop docker
+systemctl stop docker docker.socket
 
-echo "Creating directory to save tarball: ${DOCKER_CACHE_PATH}"
-mkdir -p "$DOCKER_CACHE_PATH"
+echo "Creating directory to save tarball: ${CACHE_PATH}"
+mkdir -p "$CACHE_PATH"
 
 if [[ -z "$NO_MOUNT_TMPFS" ]]; then
-    echo "Mount tmpfs directory: ${DOCKER_CACHE_PATH}"
-    mount -t tmpfs none "$DOCKER_CACHE_PATH"
+    echo "Mount tmpfs directory: ${CACHE_PATH}"
+    mount -t tmpfs none "$CACHE_PATH"
 fi
 
-echo "Creating tarball: /var/lib/docker -> ${DOCKER_CACHE_TARBALL}"
-tar cf - -C /var/lib/docker . | zstd - -T0 -o "$DOCKER_CACHE_TARBALL"
+./.azure-pipelines/docker/create_cache.sh \
+    "${DOCKER_CACHE_TARBALL}" \
+    . \
+    /var/lib/docker
 
-echo "Docker cache tarball created: ${DOCKER_CACHE_TARBALL}"
-ls -lh "$DOCKER_CACHE_TARBALL"
+if [[ "$CACHE_BAZEL" == "true" ]]; then
+    ./.azure-pipelines/docker/create_cache.sh \
+        "${BAZEL_CACHE_TARBALL}" \
+        "${ENVOY_DOCKER_BUILD_DIR}" \
+        .cache \
+        bazel_root/install \
+        bazel_root/base/external \
+        repository_cache
+fi

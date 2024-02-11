@@ -138,7 +138,7 @@ message RedisProxy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes";
 
-    // [#next-free-field: 6]
+    // [#next-free-field: 7]
     message Route {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route";
@@ -168,6 +168,11 @@ message RedisProxy {
         bool exclude_read_commands = 3;
       }
 
+      // ReadCommandPolicy specifies that Envoy should route read commands to another cluster.
+      message ReadCommandPolicy {
+        string cluster = 1 [(validate.rules).string = {min_len: 1}];
+      }
+
       // String prefix that must match the beginning of the keys. Envoy will always favor the
       // longest match.
       string prefix = 1 [(validate.rules).string = {max_bytes: 1000}];
@@ -184,6 +189,9 @@ message RedisProxy {
       // Indicates how redis key should be formatted. To substitute redis key into the formatting
       // expression, use %KEY% as a string replacement command.
       string key_formatter = 5;
+
+      // Indicates that the route has a read command policy
+      ReadCommandPolicy read_command_policy = 6;
     }
 
     reserved 3;
@@ -230,7 +238,7 @@ message RedisProxy {
   // from client reconnection storm.
   message ConnectionRateLimit {
     // Reconnection rate per sec. Rate limiting is implemented with TokenBucket.
-    uint32 connection_rate_limit_per_sec = 1;
+    uint32 connection_rate_limit_per_sec = 1 [(validate.rules).uint32 = {gt: 0}];
   }
 
   reserved 2;

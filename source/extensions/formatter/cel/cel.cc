@@ -15,22 +15,22 @@ namespace Formatter {
 
 namespace Expr = Filters::Common::Expr;
 
-CELFormatter::CELFormatter(Expr::BuilderInstanceSharedPtr expr_builder,
+CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
+                           Expr::BuilderInstanceSharedPtr expr_builder,
                            const google::api::expr::v1alpha1::Expr& input_expr,
                            absl::optional<size_t>& max_length)
-    : expr_builder_(expr_builder), parsed_expr_(input_expr), max_length_(max_length) {
+    : local_info_(local_info), expr_builder_(expr_builder), parsed_expr_(input_expr),
+      max_length_(max_length) {
   compiled_expr_ = Expr::createExpression(expr_builder_->builder(), parsed_expr_);
 }
 
-absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& request_headers,
-                                                 const Http::ResponseHeaderMap& response_headers,
-                                                 const Http::ResponseTrailerMap& response_trailers,
-                                                 const StreamInfo::StreamInfo& stream_info,
-                                                 absl::string_view,
-                                                 AccessLog::AccessLogType) const {
+absl::optional<std::string>
+CELFormatter::formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+                                const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(*compiled_expr_, arena, stream_info, &request_headers,
-                                    &response_headers, &response_trailers);
+  auto eval_status =
+      Expr::evaluate(*compiled_expr_, arena, &local_info_, stream_info, &context.requestHeaders(),
+                     &context.responseHeaders(), &context.responseTrailers());
   if (!eval_status.has_value() || eval_status.value().IsError()) {
     return absl::nullopt;
   }
@@ -42,13 +42,10 @@ absl::optional<std::string> CELFormatter::format(const Http::RequestHeaderMap& r
   return result;
 }
 
-ProtobufWkt::Value CELFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
-                                             const Http::ResponseHeaderMap& response_headers,
-                                             const Http::ResponseTrailerMap& response_trailers,
-                                             const StreamInfo::StreamInfo& stream_info,
-                                             absl::string_view, AccessLog::AccessLogType) const {
-  auto result = format(request_headers, response_headers, response_trailers, stream_info, "",
-                       AccessLog::AccessLogType::NotSet);
+ProtobufWkt::Value
+CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+                                     const StreamInfo::StreamInfo& stream_info) const {
+  auto result = formatWithContext(context, stream_info);
   if (!result.has_value()) {
     return ValueUtil::nullValue();
   }
@@ -66,7 +63,8 @@ CELFormatterCommandParser::parse(const std::string& command, const std::string& 
                            parse_status.status().ToString());
     }
 
-    return std::make_unique<CELFormatter>(expr_builder_, parse_status.value().expr(), max_length);
+    return std::make_unique<CELFormatter>(local_info_, expr_builder_, parse_status.value().expr(),
+                                          max_length);
   }
 
   return nullptr;

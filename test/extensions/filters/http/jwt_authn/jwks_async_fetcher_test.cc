@@ -4,7 +4,6 @@
 #include "test/mocks/server/factory_context.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
-using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 
 namespace Envoy {
@@ -57,7 +56,7 @@ public:
 
     // if async_fetch is enabled, timer is created
     if (config_.has_async_fetch()) {
-      timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+      timer_ = new NiceMock<Event::MockTimer>(&context_.server_factory_context_.dispatcher_);
     }
 
     async_fetcher_ = std::make_unique<JwksAsyncFetcher>(

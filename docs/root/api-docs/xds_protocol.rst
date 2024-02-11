@@ -24,8 +24,8 @@ transports described below.
 The following v3 xDS resource types are supported:
 
 -  :ref:`envoy.config.listener.v3.Listener <envoy_v3_api_msg_config.listener.v3.Listener>`
--  :ref:`envoy.config.route.v3.RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
--  :ref:`envoy.config.route.v3.ScopedRouteConfiguration <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`
+-  :ref:`envoy.config.route.v3.RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`,
+-  :ref:`envoy.config.route.v3.ScopedRouteConfiguration <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`,
 -  :ref:`envoy.config.route.v3.VirtualHost <envoy_v3_api_msg_config.route.v3.VirtualHost>`
 -  :ref:`envoy.config.cluster.v3.Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
 -  :ref:`envoy.config.endpoint.v3.ClusterLoadAssignment <envoy_v3_api_msg_config.endpoint.v3.ClusterLoadAssignment>`
@@ -716,6 +716,9 @@ will not take effect until EDS/RDS responses are supplied.
 
    - Warming of ``Cluster`` is completed only when a new ``ClusterLoadAssignment``
      response is supplied by management server even if there is no change in endpoints.
+     If the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` is set to true,
+     Envoy will use a cached ``ClusterLoadAssignment`` for a cluster, if exists, after
+     the resource warming times out.
    - Warming of ``Listener`` is completed even if management server does not send a
      response for ``RouteConfiguration`` referenced by ``Listener``. Envoy will use the
      previously sent ``RouteConfiguration`` to finish ``Listener`` warming. Management Server

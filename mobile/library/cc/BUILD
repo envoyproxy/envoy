@@ -1,8 +1,12 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_envoy_mobile_request_compression")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_mobile_package",
+)
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "engine_builder_lib",
@@ -22,7 +26,9 @@ envoy_cc_library(
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
         "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/protobuf",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/brotli/decompressor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
@@ -41,15 +47,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
         "@envoy_mobile//library/common/types:matcher_data_lib",
-    ] + envoy_select_envoy_mobile_request_compression(
-        [
-            "@envoy_api//envoy/extensions/compression/brotli/compressor/v3:pkg_cc_proto",
-            "@envoy_api//envoy/extensions/compression/gzip/compressor/v3:pkg_cc_proto",
-            "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
-            "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
-        ],
-        "@envoy",
-    ),
+    ],
 )
 
 envoy_cc_library(
@@ -88,7 +86,6 @@ envoy_cc_library(
         "headers_builder.h",
         "key_value_store.h",
         "log_level.h",
-        "pulse_client.h",
         "request_headers.h",
         "request_headers_builder.h",
         "request_method.h",
@@ -110,7 +107,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        "//library/common:envoy_main_interface_lib_no_stamp",
+        "//library/common:internal_engine_lib_no_stamp",
         "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/key_value/platform:config",

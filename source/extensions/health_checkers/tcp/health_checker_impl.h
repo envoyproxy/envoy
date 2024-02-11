@@ -39,6 +39,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(TcpHealthCheckerFactory);
+
 /**
  * TCP health checker implementation.
  */

@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
 
 #include "source/extensions/load_balancing_policies/ring_hash/config.h"
 
@@ -16,7 +17,7 @@ namespace RingHash {
 namespace {
 
 TEST(RingHashConfigTest, Validate) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Upstream::MockClusterInfo> cluster_info;
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
@@ -31,7 +32,7 @@ TEST(RingHashConfigTest, Validate) {
     EXPECT_EQ("envoy.load_balancing_policies.ring_hash", factory.name());
 
     auto lb_config =
-        factory.loadConfig(factory.createEmptyConfigProto(), context.messageValidationVisitor());
+        factory.loadConfig(*factory.createEmptyConfigProto(), context.messageValidationVisitor());
     auto thread_aware_lb =
         factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
                        context.api_.random_, context.time_system_);
@@ -63,12 +64,26 @@ TEST(RingHashConfigTest, Validate) {
 
     auto message_ptr = factory.createEmptyConfigProto();
     message_ptr->MergeFrom(config_msg);
-    auto lb_config = factory.loadConfig(std::move(message_ptr), context.messageValidationVisitor());
+    auto lb_config = factory.loadConfig(*message_ptr, context.messageValidationVisitor());
 
     EXPECT_THROW_WITH_MESSAGE(
         factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
                        context.api_.random_, context.time_system_),
         EnvoyException, "ring hash: minimum_ring_size (4) > maximum_ring_size (2)");
+  }
+
+  {
+    envoy::config::core::v3::TypedExtensionConfig config;
+    config.set_name("envoy.load_balancing_policies.ring_hash");
+    envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config_msg;
+    config_msg.mutable_minimum_ring_size()->set_value(0);
+
+    config.mutable_typed_config()->PackFrom(config_msg);
+
+    std::string err;
+    EXPECT_EQ(Validate(config_msg, &err), false);
+    EXPECT_EQ(err, "RingHashValidationError.MinimumRingSize: value must be "
+                   "inside range [1, 8388608]");
   }
 }
 

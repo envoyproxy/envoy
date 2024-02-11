@@ -57,13 +57,16 @@ public:
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    cluster_ = std::make_shared<Cluster>(cluster_config, config, factory_context, *this);
+    auto cache = dns_cache_manager_->getCache(config.dns_cache_config()).value();
+    cluster_.reset(
+        new Cluster(cluster_config, std::move(cache), config, factory_context, this->get()));
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
     ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(lb_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
     ON_CALL(lb_context_, downstreamConnection()).WillByDefault(Return(&connection_));
 
     member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
@@ -83,7 +86,7 @@ public:
       }
     }));
     if (!existing_hosts.empty()) {
-      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
+      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0))).Times(existing_hosts.size());
     }
     cluster_->initialize([] {});
   }
@@ -118,8 +121,8 @@ public:
   }
 
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
-    StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
-        lb_context_.downstreamConnection()->streamInfo().filterState());
+    StreamInfo::FilterState& filter_state =
+        const_cast<StreamInfo::FilterState&>(lb_context_.requestStreamInfo()->filterState());
 
     filter_state.setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
@@ -230,22 +233,6 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
 }
 
-TEST_F(ClusterTest, InvalidSubClusterConfig) {
-  const std::string bad_sub_cluster_yaml_config = R"EOF(
-name: name
-connect_timeout: 0.25s
-cluster_type:
-  name: dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-    sub_clusters_config:
-      max_sub_clusters: 1024
-      lb_policy: CLUSTER_PROVIDED
-)EOF";
-
-  EXPECT_THROW(initialize(bad_sub_cluster_yaml_config, false), EnvoyException);
-}
-
 // Basic flow of the cluster including adding hosts and removing them.
 TEST_F(ClusterTest, BasicFlow) {
   initialize(default_yaml_config_, false);
@@ -270,6 +257,7 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // After changing the address, LB will immediately resolve the new address with a refresh.
   updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(1)));
   update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
@@ -720,6 +708,47 @@ upstream_http_protocol_options: {}
 )EOF");
 
   createCluster(yaml_config);
+}
+
+TEST_F(ClusterFactoryTest, InvalidSubprotocolOptions) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+      lb_policy: CLUSTER_PROVIDED
+)EOF";
+
+  EXPECT_THROW(createCluster(yaml_config), EnvoyException);
+}
+
+TEST(ObjectFactory, DynamicHost) {
+  const std::string name = "envoy.upstream.dynamic_host";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string host = "site.com";
+  auto object = factory->createFromBytes(host);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(host, object->serializeAsString());
+}
+
+TEST(ObjectFactory, DynamicPort) {
+  const std::string name = "envoy.upstream.dynamic_port";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string port = "8080";
+  auto object = factory->createFromBytes(port);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(port, object->serializeAsString());
+  ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
 }
 
 } // namespace DynamicForwardProxy

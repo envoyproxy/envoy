@@ -39,7 +39,7 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
       }
       new_format = parsed_params->asObjectArray()[0]->asString();
       for (size_t i = 1; i < parsed_params->asObjectArray().size(); i++) {
-        new_format += ":" + parsed_params->asObjectArray()[i]->asString();
+        absl::StrAppend(&new_format, ":", parsed_params->asObjectArray()[i]->asString());
       }
 
       new_format = absl::StrCat("%", matches[1], "_METADATA(", new_format, ")%");

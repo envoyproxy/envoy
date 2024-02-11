@@ -60,22 +60,11 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& 
           cluster, dns_refresh_rate_ms_.count(),
           context.serverFactoryContext().api().randomGenerator());
 
-  const auto& locality_lb_endpoints = load_assignment_.endpoints();
-  if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
-    if (cluster.has_load_assignment()) {
-      throw EnvoyException(
-          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
-    } else {
-      throw EnvoyException("LOGICAL_DNS clusters must have a single host");
-    }
-  }
-
   const envoy::config::core::v3::SocketAddress& socket_address =
       lbEndpoint().endpoint().address().socket_address();
 
-  if (!socket_address.resolver_name().empty()) {
-    throw EnvoyException("LOGICAL_DNS clusters must NOT have a custom resolver name set");
-  }
+  // Checked by factory;
+  ASSERT(socket_address.resolver_name().empty());
   dns_address_ = socket_address.address();
   dns_port_ = socket_address.port_value();
 
@@ -101,7 +90,7 @@ LogicalDnsCluster::~LogicalDnsCluster() {
 }
 
 void LogicalDnsCluster::startResolve() {
-  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address_);
+  ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   info_->configUpdateStats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_->resolve(
@@ -109,7 +98,7 @@ void LogicalDnsCluster::startResolve() {
       [this](Network::DnsResolver::ResolutionStatus status,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
-        ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
 
         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
 
@@ -132,7 +121,7 @@ void LogicalDnsCluster::startResolve() {
                                                           lbEndpoint(), nullptr, time_source_);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
+            PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
             priority_state_manager.initializePriorityFor(locality_lb_endpoint);
             priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
 
@@ -174,13 +163,32 @@ void LogicalDnsCluster::startResolve() {
       });
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 LogicalDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                             ClusterFactoryContext& context) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
-  return std::make_pair(
-      std::make_shared<LogicalDnsCluster>(cluster, context, selected_dns_resolver), nullptr);
+  const auto& load_assignment = cluster.load_assignment();
+  const auto& locality_lb_endpoints = load_assignment.endpoints();
+  if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
+    if (cluster.has_load_assignment()) {
+      return absl::InvalidArgumentError(
+          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+    } else {
+      return absl::InvalidArgumentError("LOGICAL_DNS clusters must have a single host");
+    }
+  }
+
+  const envoy::config::core::v3::SocketAddress& socket_address =
+      locality_lb_endpoints[0].lb_endpoints()[0].endpoint().address().socket_address();
+  if (!socket_address.resolver_name().empty()) {
+    return absl::InvalidArgumentError(
+        "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+  }
+
+  return std::make_pair(std::shared_ptr<LogicalDnsCluster>(
+                            new LogicalDnsCluster(cluster, context, selected_dns_resolver)),
+                        nullptr);
 }
 
 /**

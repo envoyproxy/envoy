@@ -9,6 +9,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::Return;
 
 namespace Envoy {
 namespace Network {
@@ -19,7 +20,12 @@ MockTransportSocket::MockTransportSocket() {
   ON_CALL(*this, connect(_)).WillByDefault(Invoke([&](Network::ConnectionSocket& socket) {
     return TransportSocket::connect(socket);
   }));
+  ON_CALL(*this, doRead(_))
+      .WillByDefault(Return(IoResult{PostIoAction::KeepOpen, 0, false, absl::nullopt}));
+  ON_CALL(*this, doWrite(_, _))
+      .WillByDefault(Return(IoResult{PostIoAction::KeepOpen, 0, false, absl::nullopt}));
 }
+
 MockTransportSocket::~MockTransportSocket() = default;
 
 MockTransportSocketFactory::MockTransportSocketFactory() = default;

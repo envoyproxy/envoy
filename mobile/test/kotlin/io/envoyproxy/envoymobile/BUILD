@@ -1,6 +1,9 @@
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_jni_kt_test", "envoy_mobile_kt_test")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 envoy_mobile_jni_kt_test(
     name = "engine_builder_test",
@@ -12,9 +15,14 @@ envoy_mobile_jni_kt_test(
         "sandboxAllowed": "False",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-    ],
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -35,8 +43,9 @@ envoy_mobile_kt_test(
     srcs = [
         "GRPCStreamTest.kt",
     ],
+    associates = ["//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib"],
     deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/kotlin/io/envoyproxy/envoymobile/mocks:mocks_lib",
     ],
 )
 

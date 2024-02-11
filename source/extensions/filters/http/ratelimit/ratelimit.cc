@@ -70,7 +70,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
-                   callbacks_->streamInfo());
+                   callbacks_->streamInfo(), 0);
     initiating_call_ = false;
   }
 }
@@ -199,13 +199,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
     callbacks_->sendLocalReply(
         config_->rateLimitedStatus(), response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
           config_->responseHeadersParser().evaluateHeaders(
-              headers, *request_headers_, dynamic_cast<const Http::ResponseHeaderMap&>(headers),
+              headers, {request_headers_, dynamic_cast<const Http::ResponseHeaderMap*>(&headers)},
               callbacks_->streamInfo());
         },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
@@ -218,9 +218,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       }
     } else {
       state_ = State::Responded;
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, response_body, nullptr,
-                                 absl::nullopt, RcDetails::get().RateLimitError);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimitServiceError);
+      callbacks_->sendLocalReply(config_->statusOnError(), response_body, nullptr, absl::nullopt,
+                                 RcDetails::get().RateLimitError);
     }
   } else if (!initiating_call_) {
     appendRequestHeaders(req_headers_to_add);

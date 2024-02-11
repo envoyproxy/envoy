@@ -56,6 +56,7 @@ envoy_cc_test(
     name = "crash_integration_test",
     size = "large",
     srcs = ["crash_integration_test.cc"],
+    coverage = False,
     shard_count = 8,
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
