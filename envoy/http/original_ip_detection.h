@@ -39,6 +39,8 @@ struct OriginalIPDetectionResult {
   // If set, these parameters will be used to signal that detection failed and the request should
   // be rejected.
   absl::optional<OriginalIPRejectRequestOptions> reject_options;
+  // Whether to append the detected remote address to ``x-forwarded-for``.
+  bool append_xff;
 };
 
 /**

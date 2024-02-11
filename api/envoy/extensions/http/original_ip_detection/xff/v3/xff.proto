@@ -52,6 +52,9 @@ message XffConfig {
   // Note: Use of this option is an ``n*m`` operation on every request, where ``n`` is
   // the number of trusted CIDRs and ``m`` is the number of entries in the XFF header.
   XffTrustedCidrs xff_trusted_cidrs = 2;
+
+  // Whether to append the detected trusted client IP address to ``x-forwarded-for``.
+  google.protobuf.BoolValue append_xff = 3;
 }
 
 message XffTrustedCidrs {

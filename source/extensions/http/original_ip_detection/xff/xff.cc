@@ -12,6 +12,7 @@ namespace Xff {
 XffIPDetection::XffIPDetection(
     const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig& config)
     : xff_num_trusted_hops_(config.xff_num_trusted_hops()),
+      append_xff_(config.append_xff().value()),
       recurse_(config.xff_trusted_cidrs().recurse().value()) {
   if (config.has_xff_trusted_cidrs() && config.xff_num_trusted_hops() > 0) {
     throw EnvoyException("Cannot set both xff_num_trusted_hops and xff_trusted_cidrs");
@@ -24,26 +25,26 @@ XffIPDetection::XffIPDetection(
 }
 
 XffIPDetection::XffIPDetection(uint32_t xff_num_trusted_hops)
-    : xff_num_trusted_hops_(xff_num_trusted_hops), recurse_(false) {}
+    : xff_num_trusted_hops_(xff_num_trusted_hops), append_xff_(false), recurse_(false) {}
 
 Envoy::Http::OriginalIPDetectionResult
 XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
   if (!xff_trusted_cidrs_.empty()) {
     if (!Envoy::Http::Utility::remoteAddressIsTrustedProxy(params.downstream_remote_address,
                                                            xff_trusted_cidrs_)) {
-      return {nullptr, false, absl::nullopt};
+      return {nullptr, false, absl::nullopt, false};
     }
     if (recurse_) {
       // Check XFF for last IP that isn't in `xff_trusted_cidrs`
       auto ret = Envoy::Http::Utility::getLastNonTrustedAddressFromXFF(params.request_headers,
                                                                        xff_trusted_cidrs_);
-      return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt};
+      return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, append_xff_};
     }
   }
 
   auto ret =
       Envoy::Http::Utility::getLastAddressFromXFF(params.request_headers, xff_num_trusted_hops_);
-  return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt};
+  return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, append_xff_};
 }
 
 } // namespace Xff

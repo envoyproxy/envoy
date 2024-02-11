@@ -27,6 +27,7 @@ public:
 private:
   const uint32_t xff_num_trusted_hops_;
   std::vector<Network::Address::CidrRange> xff_trusted_cidrs_;
+  const bool append_xff_;
   const bool recurse_;
 };
 
