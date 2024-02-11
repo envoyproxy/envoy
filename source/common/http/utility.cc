@@ -814,15 +814,15 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
     }
     last_valid_addr = addr;
 
-    bool trusted = false;
+    bool remoteAddressIsTrustedProxy = false;
     for (const auto& cidr : trusted_cidrs) {
       if (cidr.isInRange(*addr.get())) {
-        trusted = true;
+        remoteAddressIsTrustedProxy = true;
         break;
       }
     }
 
-    if (trusted) {
+    if (remoteAddressIsTrustedProxy) {
       continue;
     }
 
