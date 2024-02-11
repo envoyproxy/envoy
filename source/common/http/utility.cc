@@ -834,11 +834,11 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
       // or XFF is malformed.
       return {nullptr, false};
     }
-    return {addr, true};
+    return {addr, xff_entries.size() == 1};
   }
   // If we reach this point all addresses in XFF were considered trusted, so return
   // first IP in XFF (the last in the reverse-evaluated chain).
-  return {last_valid_addr, true};
+  return {last_valid_addr, xff_entries.size() == 1};
 }
 
 Utility::GetLastAddressFromXffInfo
