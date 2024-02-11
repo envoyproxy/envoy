@@ -11,5 +11,6 @@ cc_library(
         "include",
     ],
     strip_include_prefix = "include",
+    defines = ["MSGPACK_NO_BOOST"],
     visibility = ["//visibility:public"],
 )
