@@ -776,7 +776,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::config::core::v3::SocketOption* sock_opt =
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
     sock_opt->set_name(SO_RCVBUF);
-    sock_opt->set_level(IPPROTO_UDP);
+    sock_opt->set_level(SOL_SOCKET);
     sock_opt->set_int_value(SocketReceiveBufferSize);
     sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", SocketReceiveBufferSize, " bytes"));
   }

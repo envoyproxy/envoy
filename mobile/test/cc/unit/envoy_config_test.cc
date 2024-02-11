@@ -301,7 +301,7 @@ TEST(TestConfig, DisableHttp3) {
 }
 
 #ifdef ENVOY_ENABLE_QUIC
-TEST(TestConfig, QuicSocketReceiveBufferSize) {
+TEST(TestConfig, SocketReceiveBufferSize) {
   EngineBuilder engine_builder;
   engine_builder.enableHttp3(true);
 
