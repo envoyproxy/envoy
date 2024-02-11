@@ -115,9 +115,9 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
       "info",
-      "Configured tcmalloc with background release rate: 67108864 bytes per 2000 milliseconds",
-      initialiseAllocatorManager(64 * MB /*bytes per second*/, 2));
-  EXPECT_EQ(64 * MB, AllocatorManagerPeer::bytesToRelease(*allocator_manager_));
+      "Configured tcmalloc with background release rate: 16777216 bytes per 2000 milliseconds",
+      initialiseAllocatorManager(16 * MB /*bytes per second*/, 2));
+  EXPECT_EQ(16 * MB, AllocatorManagerPeer::bytesToRelease(*allocator_manager_));
   EXPECT_EQ(std::chrono::milliseconds(2000),
             AllocatorManagerPeer::memoryReleaseInterval(*allocator_manager_));
   a.reset();
