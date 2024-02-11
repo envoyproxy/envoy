@@ -113,7 +113,7 @@ TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfDisconnectedByLocal) {
 }
 
 TEST_F(FluentdAccessLoggerImplTest, LogSingleEntry) {
-  init(); // Default buffer limit is 0 so single entry should be flushed immedietly.
+  init(); // Default buffer limit is 0 so single entry should be flushed immediately.
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
     logger_->onEvent(Network::ConnectionEvent::Connected);
