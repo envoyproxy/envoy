@@ -1,7 +1,5 @@
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 
-#include <elf.h>
-
 #include <fstream>
 
 #include "envoy/common/exception.h"
@@ -626,7 +624,6 @@ absl::Status WebIdentityCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
   const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
-  // THROW_IF_STATUS_NOT_OK(web_token_file_or_error, throw);
   if (!(web_token_file_or_error.ok())) {
     return absl::NotFoundError("Failure reading web identity credentials");
   }
