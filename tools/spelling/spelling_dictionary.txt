@@ -747,6 +747,7 @@ exe
 execlp
 exprfor
 expectable
+extensibility
 extrahelp
 faceplant
 facto
@@ -992,6 +993,7 @@ netblocks
 netfilter
 netlink
 netmask
+NLB
 NLMSG
 nonblocking
 noncopyable

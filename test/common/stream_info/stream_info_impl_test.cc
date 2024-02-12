@@ -27,6 +27,9 @@ namespace Envoy {
 namespace StreamInfo {
 namespace {
 
+REGISTER_CUSTOM_RESPONSE_FLAG(CF, CustomFlag);
+REGISTER_CUSTOM_RESPONSE_FLAG(CF2, CustomFlag2);
+
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
                                        absl::optional<std::chrono::nanoseconds> timing) {
   EXPECT_TRUE(timing);
@@ -121,38 +124,141 @@ TEST_F(StreamInfoImplTest, BytesTest) {
   EXPECT_EQ(bytes_received, stream_info.bytesReceived());
 }
 
-TEST_F(StreamInfoImplTest, ResponseFlagTest) {
-  const std::vector<ResponseFlag> responseFlags = {FailedLocalHealthCheck,
-                                                   NoHealthyUpstream,
-                                                   UpstreamRequestTimeout,
-                                                   LocalReset,
-                                                   UpstreamRemoteReset,
-                                                   UpstreamConnectionFailure,
-                                                   UpstreamConnectionTermination,
-                                                   UpstreamOverflow,
-                                                   NoRouteFound,
-                                                   DelayInjected,
-                                                   FaultInjected,
-                                                   RateLimited};
+// This is used to ensure the new extendable response flags are compatible with the legacy one
+// and the legacyResponseFlags() method works as expected.
+// TODO(wbpcode): remove this class and related test after the legacyResponseFlags() method is
+// removed.
+enum LegacyResponseFlag {
+  // Local server healthcheck failed.
+  FailedLocalHealthCheck = 0x1,
+  // No healthy upstream.
+  NoHealthyUpstream = 0x2,
+  // Request timeout on upstream.
+  UpstreamRequestTimeout = 0x4,
+  // Local codec level reset was sent on the stream.
+  LocalReset = 0x8,
+  // Remote codec level reset was received on the stream.
+  UpstreamRemoteReset = 0x10,
+  // Local reset by a connection pool due to an initial connection failure.
+  UpstreamConnectionFailure = 0x20,
+  // If the stream was locally reset due to connection termination.
+  UpstreamConnectionTermination = 0x40,
+  // The stream was reset because of a resource overflow.
+  UpstreamOverflow = 0x80,
+  // No route found for a given request.
+  NoRouteFound = 0x100,
+  // Request was delayed before proxying.
+  DelayInjected = 0x200,
+  // Abort with error code was injected.
+  FaultInjected = 0x400,
+  // Request was ratelimited locally by rate limit filter.
+  RateLimited = 0x800,
+  // Request was unauthorized by external authorization service.
+  UnauthorizedExternalService = 0x1000,
+  // Unable to call Ratelimit service.
+  RateLimitServiceError = 0x2000,
+  // If the stream was reset due to a downstream connection termination.
+  DownstreamConnectionTermination = 0x4000,
+  // Exceeded upstream retry limit.
+  UpstreamRetryLimitExceeded = 0x8000,
+  // Request hit the stream idle timeout, triggering a 408.
+  StreamIdleTimeout = 0x10000,
+  // Request specified x-envoy-* header values that failed strict header checks.
+  InvalidEnvoyRequestHeaders = 0x20000,
+  // Downstream request had an HTTP protocol error
+  DownstreamProtocolError = 0x40000,
+  // Upstream request reached to user defined max stream duration.
+  UpstreamMaxStreamDurationReached = 0x80000,
+  // True if the response was served from an Envoy cache filter.
+  ResponseFromCacheFilter = 0x100000,
+  // Filter config was not received within the permitted warming deadline.
+  NoFilterConfigFound = 0x200000,
+  // Request or connection exceeded the downstream connection duration.
+  DurationTimeout = 0x400000,
+  // Upstream response had an HTTP protocol error
+  UpstreamProtocolError = 0x800000,
+  // No cluster found for a given request.
+  NoClusterFound = 0x1000000,
+  // Overload Manager terminated the stream.
+  OverloadManager = 0x2000000,
+  // DNS resolution failed.
+  DnsResolutionFailed = 0x4000000,
+  // Drop certain percentage of overloaded traffic.
+  DropOverLoad = 0x8000000,
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
+  LastFlag = DropOverLoad,
+};
 
+TEST_F(StreamInfoImplTest, LegacyResponseFlagTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+
+  absl::flat_hash_map<LegacyResponseFlag, CoreResponseFlag> flags = {
+      {LegacyResponseFlag::FailedLocalHealthCheck, CoreResponseFlag::FailedLocalHealthCheck},
+      {LegacyResponseFlag::NoHealthyUpstream, CoreResponseFlag::NoHealthyUpstream},
+      {LegacyResponseFlag::UpstreamRequestTimeout, CoreResponseFlag::UpstreamRequestTimeout},
+      {LegacyResponseFlag::LocalReset, CoreResponseFlag::LocalReset},
+      {LegacyResponseFlag::UpstreamRemoteReset, CoreResponseFlag::UpstreamRemoteReset},
+      {LegacyResponseFlag::UpstreamConnectionFailure, CoreResponseFlag::UpstreamConnectionFailure},
+      {LegacyResponseFlag::UpstreamConnectionTermination,
+       CoreResponseFlag::UpstreamConnectionTermination},
+      {LegacyResponseFlag::UpstreamOverflow, CoreResponseFlag::UpstreamOverflow},
+      {LegacyResponseFlag::NoRouteFound, CoreResponseFlag::NoRouteFound},
+      {LegacyResponseFlag::DelayInjected, CoreResponseFlag::DelayInjected},
+      {LegacyResponseFlag::FaultInjected, CoreResponseFlag::FaultInjected},
+      {LegacyResponseFlag::RateLimited, CoreResponseFlag::RateLimited},
+      {LegacyResponseFlag::UnauthorizedExternalService,
+       CoreResponseFlag::UnauthorizedExternalService},
+      {LegacyResponseFlag::RateLimitServiceError, CoreResponseFlag::RateLimitServiceError},
+      {LegacyResponseFlag::DownstreamConnectionTermination,
+       CoreResponseFlag::DownstreamConnectionTermination},
+      {LegacyResponseFlag::UpstreamRetryLimitExceeded,
+       CoreResponseFlag::UpstreamRetryLimitExceeded},
+      {LegacyResponseFlag::StreamIdleTimeout, CoreResponseFlag::StreamIdleTimeout},
+      {LegacyResponseFlag::InvalidEnvoyRequestHeaders,
+       CoreResponseFlag::InvalidEnvoyRequestHeaders},
+      {LegacyResponseFlag::DownstreamProtocolError, CoreResponseFlag::DownstreamProtocolError},
+      {LegacyResponseFlag::UpstreamMaxStreamDurationReached,
+       CoreResponseFlag::UpstreamMaxStreamDurationReached},
+      {LegacyResponseFlag::ResponseFromCacheFilter, CoreResponseFlag::ResponseFromCacheFilter},
+      {LegacyResponseFlag::NoFilterConfigFound, CoreResponseFlag::NoFilterConfigFound},
+      {LegacyResponseFlag::DurationTimeout, CoreResponseFlag::DurationTimeout},
+      {LegacyResponseFlag::UpstreamProtocolError, CoreResponseFlag::UpstreamProtocolError},
+      {LegacyResponseFlag::NoClusterFound, CoreResponseFlag::NoClusterFound},
+      {LegacyResponseFlag::OverloadManager, CoreResponseFlag::OverloadManager},
+      {LegacyResponseFlag::DnsResolutionFailed, CoreResponseFlag::DnsResolutionFailed},
+      {LegacyResponseFlag::DropOverLoad, CoreResponseFlag::DropOverLoad},
+  };
+
+  for (auto& flag : flags) {
+    stream_info.setResponseFlag(flag.second);
+    EXPECT_TRUE(stream_info.hasResponseFlag(flag.second));
+
+    EXPECT_EQ(static_cast<uint64_t>(flag.first), stream_info.legacyResponseFlags());
+
+    stream_info.response_flags_.clear();
+  }
+}
+
+TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
   EXPECT_FALSE(stream_info.hasAnyResponseFlag());
-  for (ResponseFlag flag : responseFlags) {
+  for (auto& flag : ResponseFlagUtils::responseFlagsVec()) {
     // Test cumulative setting of response flags.
-    EXPECT_FALSE(stream_info.hasResponseFlag(flag))
-        << fmt::format("Flag: {} was already set", flag);
-    stream_info.setResponseFlag(flag);
-    EXPECT_TRUE(stream_info.hasResponseFlag(flag))
-        << fmt::format("Flag: {} was expected to be set", flag);
+    EXPECT_FALSE(stream_info.hasResponseFlag(flag.flag_))
+        << fmt::format("Flag: {} was already set", flag.short_string_);
+    stream_info.setResponseFlag(flag.flag_);
+    EXPECT_TRUE(stream_info.hasResponseFlag(flag.flag_))
+        << fmt::format("Flag: {} was expected to be set", flag.short_string_);
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
 
-  for (size_t i = 0; i < responseFlags.size(); i++) {
-    EXPECT_EQ(static_cast<uint16_t>(responseFlags[i]), stream_info.responseFlags()[i].value());
+  for (size_t i = 0; i < ResponseFlagUtils::responseFlagsVec().size(); i++) {
+    EXPECT_EQ(ResponseFlagUtils::responseFlagsVec()[i].flag_.value(),
+              stream_info.responseFlags()[i].value());
   }
 
-  EXPECT_EQ(0xFFF, stream_info.legacyResponseFlags());
+  EXPECT_EQ(0xFFFFFFF, stream_info.legacyResponseFlags());
 }
 
 TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
@@ -289,7 +395,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
   s1.upstreamInfo()->upstreamTiming().onLastUpstreamTxByteSent(test_time_.timeSystem());
   s1.onRequestComplete();
-  s1.setResponseFlag(FailedLocalHealthCheck);
+  s1.setResponseFlag(CoreResponseFlag::FailedLocalHealthCheck);
   s1.healthCheck(true);
   s1.route_ = std::make_shared<NiceMock<Router::MockRoute>>();
   s1.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));

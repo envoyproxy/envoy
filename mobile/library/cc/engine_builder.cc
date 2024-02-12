@@ -1,5 +1,9 @@
 #include "engine_builder.h"
 
+#include <stdint.h>
+#include <sys/socket.h>
+
+#include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
@@ -24,7 +28,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
@@ -33,6 +37,14 @@
 
 namespace Envoy {
 namespace Platform {
+
+namespace {
+
+// This is the same value Cronet uses for QUIC:
+// https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
+constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
+
+} // namespace
 
 #ifdef ENVOY_MOBILE_XDS
 XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
@@ -266,6 +278,11 @@ EngineBuilder& EngineBuilder::addQuicHint(std::string host, int port) {
 
 EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
   quic_suffixes_.emplace_back(std::move(suffix));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enablePortMigration(bool enable_port_migration) {
+  enable_port_migration_ = enable_port_migration;
   return *this;
 }
 
@@ -737,10 +754,32 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           ->add_canonical_suffixes(suffix);
     }
 
+    if (enable_port_migration_) {
+      alpn_options.mutable_auto_config()
+          ->mutable_http3_protocol_options()
+          ->mutable_quic_protocol_options()
+          ->mutable_num_timeouts_to_trigger_port_migration()
+          ->set_value(4);
+    }
+
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
             .PackFrom(alpn_options);
+
+    // Set the upstream connections socket receive buffer size. The operating system defaults are
+    // usually too small for QUIC.
+    // TODO(32304): We can remove this once core Envoy has better receive buffer defaults.
+    // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
+    // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
+    // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
+    // we've tested, IPPROTO_UDP cannot be used as a level for the SO_RCVBUF option.
+    envoy::config::core::v3::SocketOption* sock_opt =
+        base_cluster->mutable_upstream_bind_config()->add_socket_options();
+    sock_opt->set_name(SO_RCVBUF);
+    sock_opt->set_level(SOL_SOCKET);
+    sock_opt->set_int_value(SocketReceiveBufferSize);
+    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", SocketReceiveBufferSize, " bytes"));
   }
 
   // Set up stats.
@@ -829,8 +868,8 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  Envoy::Engine* envoy_engine =
-      new Envoy::Engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+  Envoy::InternalEngine* envoy_engine =
+      new Envoy::InternalEngine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

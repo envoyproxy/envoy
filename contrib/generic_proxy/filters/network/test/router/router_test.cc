@@ -251,6 +251,7 @@ public:
     if (with_tracing_) {
       EXPECT_CALL(mock_filter_callback_, tracingConfig())
           .WillOnce(Return(OptRef<const Tracing::Config>{tracing_config_}));
+      EXPECT_CALL(tracing_config_, spawnUpstreamSpan()).WillOnce(Return(true));
       EXPECT_CALL(active_span_, spawnChild_(_, "router observability_name egress", _))
           .WillOnce(Invoke([this](const Tracing::Config&, const std::string&, SystemTime) {
             child_span_ = new NiceMock<Tracing::MockSpan>();
