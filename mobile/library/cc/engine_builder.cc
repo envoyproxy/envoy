@@ -769,6 +769,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
     // Set the upstream connections socket receive buffer size. The operating system defaults are
     // usually too small for QUIC.
+    // TODO(32304): We can remove this once core Envoy has better receive buffer defaults.
     // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
     // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
     // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
