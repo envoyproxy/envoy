@@ -149,6 +149,14 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
   MOCK_METHOD(bool, fullScanCertsOnSNIMismatch, (), (const));
+
+  Ssl::HandshakerCapabilities capabilities_;
+  std::string ciphers_{"RSA"};
+  std::string alpn_{""};
+  std::string sigalgs_{""};
+  Network::Address::IpList iplist_;
+  std::string path_;
+  std::vector<SessionTicketKey> ticket_keys_;
 };
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {
