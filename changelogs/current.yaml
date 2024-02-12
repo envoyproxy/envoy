@@ -48,6 +48,9 @@ bug_fixes:
 - area: tracing
   change: |
     Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
+- area: aws
+  change: |
+    Removed exceptions from the data plane.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
