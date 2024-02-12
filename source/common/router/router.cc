@@ -906,9 +906,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       cleanup();
       callbacks_->sendLocalReply(
           Http::Code::ServiceUnavailable,
-          "upstream is closed prematurely during decoding data from downstream",
-          modify_headers_, absl::nullopt,
-          StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset);
+          "upstream is closed prematurely during decoding data from downstream", modify_headers_,
+          absl::nullopt, StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
