@@ -213,7 +213,8 @@ TEST_P(HttpUpstreamTest, UpstreamTrailersPropagateFinDownstream) {
 TEST_P(HttpUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatureDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers", "false"}});
+      {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
+        "false"}});
   setupUpstream();
   EXPECT_CALL(encoder_.stream_, resetStream(_)).Times(0);
   upstream_->doneWriting();
