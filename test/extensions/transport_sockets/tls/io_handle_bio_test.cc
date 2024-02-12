@@ -38,10 +38,10 @@ TEST_F(IoHandleBioTest, WriteError) {
 TEST_F(IoHandleBioTest, TestMiscApis) {
   EXPECT_EQ(BIO_read(bio_, nullptr, 0), 0);
 
-  int ret = BIO_ctrl(bio_, BIO_CTRL_RESET, 0, nullptr);
+  int ret = BIO_reset(bio_);
   EXPECT_EQ(ret, 0);
 
-  ret = BIO_ctrl(bio_, BIO_CTRL_FLUSH, 0, nullptr);
+  ret = BIO_flush(bio_);
   EXPECT_EQ(ret, 1);
 }
 
