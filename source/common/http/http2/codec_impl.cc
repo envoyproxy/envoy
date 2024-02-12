@@ -30,6 +30,7 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/container/fixed_array.h"
+#include "quiche/common/quiche_endian.h"
 #include "quiche/http2/adapter/callback_visitor.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 #include "quiche/http2/adapter/oghttp2_adapter.h"
@@ -1768,12 +1769,16 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
 }
 
+ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connection_(connection) {
+}
+
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
   return connection_->onSend(reinterpret_cast<const uint8_t*>(serialized.data()), serialized.size());
 }
 
 bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
                      uint8_t flags) {
+  current_frame_ = {stream_id, length, type, flags};
   auto status = connection_->onBeforeFrameReceived(stream_id, length, type, flags);
   return 0 == connection_->setAndCheckCodecCallbackStatus(
       std::move(status));
@@ -1807,6 +1812,35 @@ http2::adapter::Http2VisitorInterface::OnHeaderResult ConnectionImpl::Http2Visit
   }
 }
 
+bool ConnectionImpl::Http2Visitor::OnEndHeadersForStream(Http2StreamId stream_id) {
+  auto status = connection_->onHeaders(stream_id, current_frame_.size, current_frame_.flags);
+  return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
+}
+
+bool ConnectionImpl::Http2Visitor::OnBeginDataForStream(Http2StreamId stream_id,
+                                                        size_t payload_length) {
+  remaining_data_payload_ = payload_length;
+  padding_length_ = 0;
+  if (remaining_data_payload_ == 0 &&
+      (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
+    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags, padding_length_);
+    return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
+  }
+  return true;
+}
+
+bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
+                                                       size_t padding_length) {
+  padding_length_ = padding_length;
+  remaining_data_payload_ -= padding_length;
+  if (remaining_data_payload_ == 0 &&
+      (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
+    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags, padding_length_);
+    return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
+  }
+  return true;
+}
+
 bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id, absl::string_view data) {
   return 0 == connection_->onData(stream_id, reinterpret_cast<const uint8_t*>(data.data()), data.size());
 }
@@ -1824,6 +1858,20 @@ bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id, Http2E
   auto status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
   return 0 == connection_->setAndCheckCodecCallbackStatus(
       std::move(status));
+}
+
+void ConnectionImpl::Http2Visitor::OnPing(Http2PingId ping_id, bool is_ack) {
+  const uint64_t network_order_opaque_data =
+      quiche::QuicheEndian::HostToNet64(ping_id);
+  auto status = connection_->onPing(network_order_opaque_data, is_ack);
+  connection_->setAndCheckCodecCallbackStatus(std::move(status));
+}
+
+bool ConnectionImpl::Http2Visitor::OnGoAway(Http2StreamId /*last_accepted_stream_id*/,
+                                            Http2ErrorCode error_code,
+                                            absl::string_view /*opaque_data*/) {
+  auto status = connection_->onGoAway(static_cast<uint32_t>(error_code));
+  return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
 void ConnectionImpl::Http2Visitor::OnWindowUpdate(Http2StreamId stream_id, int window_increment) {
@@ -2124,12 +2172,13 @@ ServerConnectionImpl::ServerConnectionImpl(
                     "found. Is it configured?");
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
-  auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
-      http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
   if (use_oghttp2_library_) {
+    auto visitor = std::make_unique<Http2Visitor>(this);
     visitor_ = std::move(visitor);
     adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
   } else {
+    auto visitor = std::make_unique<http2::adapter::CallbackVisitor>(
+        http2::adapter::Perspective::kServer, *http2_callbacks_.callbacks(), base());
     auto adapter =
         http2::adapter::NgHttp2Adapter::CreateServerAdapter(*visitor, h2_options.options());
     auto stream_close_listener = [p = adapter.get()](http2::adapter::Http2StreamId stream_id) {

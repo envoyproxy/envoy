@@ -236,6 +236,15 @@ protected:
    private:
     ConnectionImpl* connection_;
     std::vector<http2::adapter::Http2Setting> settings_;
+    struct FrameInfo {
+      Http2StreamId stream_id;
+      size_t size;
+      uint8_t type;
+      uint8_t flags;
+    };
+    FrameInfo current_frame_;
+    size_t padding_length_;
+    size_t remaining_data_payload_;
   };
 
   /**
