@@ -128,10 +128,10 @@ public:
     useRefreshToken->set_value(use_refresh_token);
 
     if (default_refresh_token_expires_in != 0) {
-        auto* refresh_token_expires_in = p.mutable_default_refresh_token_expires_in();
-        refresh_token_expires_in->set_seconds(default_refresh_token_expires_in);
+      auto* refresh_token_expires_in = p.mutable_default_refresh_token_expires_in();
+      refresh_token_expires_in->set_seconds(default_refresh_token_expires_in);
     }
-    
+
     p.set_auth_type(auth_type);
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
