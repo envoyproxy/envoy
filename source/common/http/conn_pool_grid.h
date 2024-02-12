@@ -96,6 +96,8 @@ public:
                                   StreamInfo::StreamInfo& info,
                                   absl::optional<Http::Protocol> protocol);
 
+    ConnectionPool::Callbacks* getInnerCallbacks() { return inner_callbacks_; }
+
   private:
     // Removes this from the owning list, deleting it.
     void deleteThis();

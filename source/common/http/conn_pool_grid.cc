@@ -238,6 +238,11 @@ ConnectivityGrid::~ConnectivityGrid() {
   destroying_ = true;
   // Callbacks might have pending streams registered with the pools, so cancel and delete
   // the callback before deleting the pools.
+  for (const auto& callback : wrapped_callbacks_) {
+    callback->getInnerCallbacks()->onPoolFailure(
+        ConnectionPool::PoolFailureReason::LocalConnectionFailure, "ConnectivityGrid destruction",
+        host_);
+  }
   wrapped_callbacks_.clear();
   pools_.clear();
 }
