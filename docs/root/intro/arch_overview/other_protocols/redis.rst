@@ -302,3 +302,9 @@ response for each in place of the value.
   3) (error) upstream failure
   4) (error) upstream failure
   5) "echo"
+
+Protocol
+--------
+
+Although `RESP <https://redis.io/docs/reference/protocol-spec/>`_ is recommended for production use,
+`inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_ are also supported.

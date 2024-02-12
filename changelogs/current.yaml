@@ -178,5 +178,8 @@ new_features:
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
+- area: redis
+  change: |
+    Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
 
 deprecated:
