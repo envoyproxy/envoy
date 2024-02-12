@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 
+#include <elf.h>
+
 #include <fstream>
 
 #include "envoy/common/exception.h"
@@ -416,22 +418,22 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     return;
   }
 
-  ENVOY_LOG(debug,
-            "Obtained following AWS credentials from the EC2MetadataService: {}={}, {}={}, {}={}",
-            AWS_ACCESS_KEY_ID, std::get<std::string>(access_key_id.value()), AWS_SECRET_ACCESS_KEY,
-            std::get<std::string>(secret_access_key.value()).empty() ? "" : "*****",
-            AWS_SESSION_TOKEN, std::get<std::string>(session_token.value()).empty() ? "" : "*****");
+  ENVOY_LOG(
+      debug, "Obtained following AWS credentials from the EC2MetadataService: {}={}, {}={}, {}={}",
+      AWS_ACCESS_KEY_ID, absl::get<std::string>(access_key_id.value()), AWS_SECRET_ACCESS_KEY,
+      absl::get<std::string>(secret_access_key.value()).empty() ? "" : "*****", AWS_SESSION_TOKEN,
+      absl::get<std::string>(session_token.value()).empty() ? "" : "*****");
 
   last_updated_ = api_.timeSource().systemTime();
   if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
-        std::make_unique<Credentials>(std::get<std::string>(access_key_id.value()),
-                                      std::get<std::string>(secret_access_key.value()),
-                                      std::get<std::string>(session_token.value())));
+        std::make_unique<Credentials>(absl::get<std::string>(access_key_id.value()),
+                                      absl::get<std::string>(secret_access_key.value()),
+                                      absl::get<std::string>(session_token.value())));
   } else {
-    cached_credentials_ = Credentials(std::get<std::string>(access_key_id.value()),
-                                      std::get<std::string>(secret_access_key.value()),
-                                      std::get<std::string>(session_token.value()));
+    cached_credentials_ = Credentials(absl::get<std::string>(access_key_id.value()),
+                                      absl::get<std::string>(secret_access_key.value()),
+                                      absl::get<std::string>(session_token.value()));
   }
   handleFetchDone();
 }
@@ -547,7 +549,7 @@ void TaskRoleCredentialsProvider::extractCredentials(
     return;
   }
 
-  const auto session_token = document_json.value()->getValue(SESSION_TOKEN);
+  const auto session_token = document_json.value()->getValue(TOKEN);
   if (!session_token.ok() || (!absl::holds_alternative<std::string>(session_token.value()))) {
     ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from task role - "
                      "session_token could not be read");
@@ -556,9 +558,10 @@ void TaskRoleCredentialsProvider::extractCredentials(
   }
 
   ENVOY_LOG(debug, "Found following AWS credentials in the task role: {}={}, {}={}, {}={}",
-            AWS_ACCESS_KEY_ID, std::get<std::string>(access_key_id.value()), AWS_SECRET_ACCESS_KEY,
-            std::get<std::string>(secret_access_key.value()).empty() ? "" : "*****",
-            AWS_SESSION_TOKEN, std::get<std::string>(session_token.value()).empty() ? "" : "*****");
+            AWS_ACCESS_KEY_ID, absl::get<std::string>(access_key_id.value()), AWS_SECRET_ACCESS_KEY,
+            absl::get<std::string>(secret_access_key.value()).empty() ? "" : "*****",
+            AWS_SESSION_TOKEN,
+            absl::get<std::string>(session_token.value()).empty() ? "" : "*****");
 
   const auto expiration_str = document_json.value()->getString(EXPIRATION, "");
   if (!expiration_str.empty()) {
@@ -572,13 +575,13 @@ void TaskRoleCredentialsProvider::extractCredentials(
   last_updated_ = api_.timeSource().systemTime();
   if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
-        std::make_unique<Credentials>(std::get<std::string>(access_key_id.value()),
-                                      std::get<std::string>(secret_access_key.value()),
-                                      std::get<std::string>(session_token.value())));
+        std::make_unique<Credentials>(absl::get<std::string>(access_key_id.value()),
+                                      absl::get<std::string>(secret_access_key.value()),
+                                      absl::get<std::string>(session_token.value())));
   } else {
-    cached_credentials_ = Credentials(std::get<std::string>(access_key_id.value()),
-                                      std::get<std::string>(secret_access_key.value()),
-                                      std::get<std::string>(session_token.value()));
+    cached_credentials_ = Credentials(absl::get<std::string>(access_key_id.value()),
+                                      absl::get<std::string>(secret_access_key.value()),
+                                      absl::get<std::string>(session_token.value()));
   }
   handleFetchDone();
 }
@@ -727,19 +730,18 @@ void WebIdentityCredentialsProvider::extractCredentials(
   }
 
   setCredentialsToAllThreads(
-      std::make_unique<Credentials>(std::get<std::string>(access_key_id.value()),
-                                    std::get<std::string>(secret_access_key.value()),
-                                    std::get<std::string>(session_token.value())));
+      std::make_unique<Credentials>(absl::get<std::string>(access_key_id.value()),
+                                    absl::get<std::string>(secret_access_key.value()),
+                                    absl::get<std::string>(session_token.value())));
 
-  const auto expiration = credentials.value()->getInteger(EXPIRATION, 0);
-  if (expiration != 0) {
-    expiration_time_ =
-        std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
-    ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
-  } else {
+  const auto expiration = credentials.value()->getValue(EXPIRATION);
+  if (!expiration.ok() || (!absl::holds_alternative<int64_t>(expiration.value()))) {
     expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
     ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
                     "setting expiration to 1 hour in future");
+  } else {
+    expiration_time_ = std::chrono::time_point<std::chrono::system_clock>(
+        std::chrono::seconds(absl::get<int64_t>(expiration.value())));
   }
 
   last_updated_ = api_.timeSource().systemTime();

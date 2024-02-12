@@ -2648,6 +2648,7 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, TimestampCredentialExpiration) {
+
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   // Time 2018-01-02T03:04:05Z in unix_timestamp is 1514862245
