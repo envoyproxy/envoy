@@ -152,17 +152,28 @@ TEST_F(FluentdAccessLoggerImplTest, LogTwoEntries) {
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
 
+TEST_F(FluentdAccessLoggerImplTest, CallbacksTest) {
+  init();
+  EXPECT_CALL(*async_client_, connect()).WillOnce(Return(true));
+  EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
+  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+  EXPECT_NO_THROW(logger_->onAboveWriteBufferHighWatermark());
+  EXPECT_NO_THROW(logger_->onBelowWriteBufferLowWatermark());
+  Buffer::OwnedImpl buffer;
+  EXPECT_NO_THROW(logger_->onData(buffer, false));
+}
+
 class FluentdAccessLoggerCacheImplTest : public testing::Test {
 public:
-  FluentdAccessLoggerCacheImplTest()
-      : async_client1_(new Tcp::AsyncClient::MockAsyncTcpClient()),
-        async_client2_(new Tcp::AsyncClient::MockAsyncTcpClient()),
-        logger_cache_(cluster_manager_, scope_, tls_) {}
+  FluentdAccessLoggerCacheImplTest() : logger_cache_(cluster_manager_, scope_, tls_) {}
 
   void init(bool second_logger = false) {
+    async_client1_ = new Tcp::AsyncClient::MockAsyncTcpClient();
     EXPECT_CALL(*async_client1_, setAsyncTcpClientCallbacks(_));
 
     if (second_logger) {
+      async_client2_ = new Tcp::AsyncClient::MockAsyncTcpClient();
       EXPECT_CALL(*async_client2_, setAsyncTcpClientCallbacks(_));
     }
   }

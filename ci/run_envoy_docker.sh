@@ -113,7 +113,7 @@ if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
 fi
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
-docker run --rm \
+docker run \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
        -e BUILD_DIR \

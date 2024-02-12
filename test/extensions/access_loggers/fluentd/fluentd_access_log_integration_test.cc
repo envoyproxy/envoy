@@ -51,7 +51,8 @@ public:
               MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
                   *config_blob);
 
-          tcp_proxy_config.set_flush_access_log_on_connected(flush_access_log_on_connected);
+          tcp_proxy_config.mutable_access_log_options()->set_flush_access_log_on_connected(
+              flush_access_log_on_connected);
           auto* access_log = tcp_proxy_config.add_access_log();
           access_log->set_name("access_log.fluentd");
           envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig access_log_config;
@@ -85,7 +86,7 @@ public:
 
     size_t entry_index = 0;
     msgpack::object_handle handle;
-    while (bool ret = unpacker.next(handle)) {
+    while (unpacker.next(handle)) {
       auto& expected_records_as_json = expected_entries[entry_index++];
 
       msgpack::object message = handle.get();

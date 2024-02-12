@@ -37,7 +37,7 @@ The file access log has statistics rooted at the *filesystem.* namespace.
 Fluentd access log statistics
 -----------------------------
 
-The file access log has statistics rooted at the *access_logs.fluentd.<stat_prefix>.* namespace.
+The Fluentd access log has statistics rooted at the *access_logs.fluentd.<stat_prefix>.* namespace.
 
 .. csv-table::
   :header: Name, Type, Description
