@@ -283,7 +283,7 @@ class RepoNotifier(runner.Runner):
         response = await self.session.get(
             "https://api.github.com/repos/envoyproxy/envoy/issues?labels=triage")
         content = str(await response.read(), 'UTF-8')
-        parsed = json.loads(content)
+        parsed = await response.json()
         return len(parsed)
 
     async def run(self):
