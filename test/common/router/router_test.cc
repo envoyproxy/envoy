@@ -2737,6 +2737,32 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Test when the upstream request gets reset while the client is sending the body
+// with more data arriving but not buffering any data.
+TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) {
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}, {"myheader", "present"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  const std::string body1("body1");
+  Buffer::OwnedImpl buf1(body1);
+
+  // Send data while the upstream request is reset, should not have any failure.
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+  router_->decodeData(buf1, false);
+
+  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started");
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
 // Test retrying a request, when the first attempt fails while the client
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts.
