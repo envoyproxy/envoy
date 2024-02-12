@@ -147,7 +147,7 @@ public:
       return *this;
     }
 
-    // Move contructor and assignment operator
+    // Move constructor and assignment operator
     Entry(Entry&& other) = default;
     Entry& operator=(Entry&& other) = default;
 

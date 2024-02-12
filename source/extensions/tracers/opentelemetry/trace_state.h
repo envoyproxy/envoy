@@ -110,8 +110,8 @@ public:
    * instance: Update Key value: The updated value must be moved to beginning of List Add : The new
    * key-value pair SHOULD be added to beginning of List
    *
-   * If the provided key-value pair is invalid, or results in transtate that violates the
-   * tracecontext specification, empty TraceState instance will be returned.
+   * If the provided key-value pair is invalid, or results in trace state that violates the
+   * trace context specification, empty TraceState instance will be returned.
    *
    * If the existing object has maximum list members, it's copy is returned.
    */
@@ -168,7 +168,7 @@ public:
   // Returns true if there are no keys, false otherwise.
   bool empty() const noexcept { return kv_properties_->size() == 0; }
 
-  // @return all key-values entris by repeatedly invoking the function reference passed as argument
+  // @return all key-values entries by repeatedly invoking the function reference passed as argument
   // for each entry
   bool
   getAllEntries(std::function<bool(absl::string_view, absl::string_view)> callback) const noexcept {
