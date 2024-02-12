@@ -89,19 +89,18 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     ENVOY_LOG(debug, "signing failed: empty request headers");
     config.stats().signing_failed_.inc();
     config.stats().payload_signing_failed_.inc();
-  }
-
-  result = config.signer().sign(*request_headers_, hash);
-
-  if (result.ok()) {
-    config.stats().signing_added_.inc();
-    config.stats().payload_signing_added_.inc();
   } else {
-    ENVOY_LOG(debug, "signing failed: {}", result.message());
-    config.stats().signing_failed_.inc();
-    config.stats().payload_signing_failed_.inc();
-  }
+    result = config.signer().sign(*request_headers_, hash);
 
+    if (result.ok()) {
+      config.stats().signing_added_.inc();
+      config.stats().payload_signing_added_.inc();
+    } else {
+      ENVOY_LOG(debug, "signing failed: {}", result.message());
+      config.stats().signing_failed_.inc();
+      config.stats().payload_signing_failed_.inc();
+    }
+  }
   return Http::FilterDataStatus::Continue;
 }
 
