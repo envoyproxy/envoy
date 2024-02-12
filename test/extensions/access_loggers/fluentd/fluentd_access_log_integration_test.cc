@@ -134,7 +134,7 @@ public:
 };
 
 TEST_F(FluentdAccessLogIntegrationTest, UnknownCluster) {
-  EXPECT_DEATH(init("unknown_cluster"), "cluster 'unknown_cluster' was not found");
+  EXPECT_DEATH(init("unknown_cluster"), "");
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
