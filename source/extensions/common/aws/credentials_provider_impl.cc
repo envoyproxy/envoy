@@ -83,7 +83,10 @@ Credentials EnvironmentCredentialsProvider::getCredentials() {
 void CachedCredentialsProviderBase::refreshIfNeeded() {
   const Thread::LockGuard lock(lock_);
   if (needsRefresh()) {
-    refresh();
+    auto result = refresh();
+    if (!result.ok()) {
+      ENVOY_LOG(debug, "Credential refresh unsuccessful: {}", result.message());
+    }
   }
 }
 
@@ -121,14 +124,14 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
       if (useHttpAsyncClient()) {
         const Thread::LockGuard lock(lock_);
-        refresh();
+        auto result = refresh();
       }
     });
 
     if (useHttpAsyncClient()) {
       // Register with init_manager, force the listener to wait for fetching (refresh).
-      init_target_ =
-          std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { refresh(); });
+      init_target_ = std::make_unique<Init::TargetImpl>(
+          debug_name_, [this]() -> void { auto result = refresh(); });
       context_->initManager().add(*init_target_);
     }
   }
@@ -181,7 +184,7 @@ bool CredentialsFileCredentialsProvider::needsRefresh() {
   return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
-void CredentialsFileCredentialsProvider::refresh() {
+absl::Status CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
   auto credentials_file = Utility::getCredentialFilePath();
@@ -190,6 +193,7 @@ void CredentialsFileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credentials_file, profile);
 
   extractCredentials(credentials_file, profile);
+  return absl::OkStatus();
 }
 
 void CredentialsFileCredentialsProvider::extractCredentials(const std::string& credentials_file,
@@ -234,7 +238,7 @@ bool InstanceProfileCredentialsProvider::needsRefresh() {
   return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
-void InstanceProfileCredentialsProvider::refresh() {
+absl::Status InstanceProfileCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the EC2MetadataService");
 
   // First request for a session TOKEN so that we can call EC2MetadataService securely.
@@ -276,6 +280,7 @@ void InstanceProfileCredentialsProvider::refresh() {
     continue_on_async_fetch_failure_reason_ = "Token fetch failed so fall back to less secure way";
     metadata_fetcher_->fetch(token_req_message, Tracing::NullSpan::instance(), *this);
   }
+  return absl::OkStatus();
 }
 
 void InstanceProfileCredentialsProvider::fetchInstanceRole(const std::string&& token_string,
@@ -374,32 +379,59 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     }
     return;
   }
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document: {}", e.what());
+
+  absl::StatusOr<Json::ObjectSharedPtr> document_json =
+      Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials from instance profile: {}",
+              document_json.status().message());
     if (async) {
       handleFetchDone();
     }
     return;
   }
 
-  const auto access_key_id = document_json->getString(ACCESS_KEY_ID, "");
-  const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
-  const auto session_token = document_json->getString(TOKEN, "");
+  const auto access_key_id = document_json.value()->getValue(ACCESS_KEY_ID);
+  if (!access_key_id.ok() || (!absl::holds_alternative<std::string>(access_key_id.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials from instance profile - "
+                     "access_key_id could not be read");
+    handleFetchDone();
+    return;
+  }
+
+  const auto secret_access_key = document_json.value()->getValue(SECRET_ACCESS_KEY);
+  if (!secret_access_key.ok() ||
+      (!absl::holds_alternative<std::string>(secret_access_key.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from instance profile - "
+                     "secret_access_key could not be read");
+    handleFetchDone();
+    return;
+  }
+
+  const auto session_token = document_json.value()->getValue(TOKEN);
+  if (!session_token.ok() || (!absl::holds_alternative<std::string>(session_token.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from instance profile - "
+                     "session token could not be read");
+    handleFetchDone();
+    return;
+  }
 
   ENVOY_LOG(debug,
             "Obtained following AWS credentials from the EC2MetadataService: {}={}, {}={}, {}={}",
-            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
-            session_token.empty() ? "" : "*****");
+            AWS_ACCESS_KEY_ID, std::get<std::string>(access_key_id.value()), AWS_SECRET_ACCESS_KEY,
+            std::get<std::string>(secret_access_key.value()).empty() ? "" : "*****",
+            AWS_SESSION_TOKEN, std::get<std::string>(session_token.value()).empty() ? "" : "*****");
 
   last_updated_ = api_.timeSource().systemTime();
   if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
-        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+        std::make_unique<Credentials>(std::get<std::string>(access_key_id.value()),
+                                      std::get<std::string>(secret_access_key.value()),
+                                      std::get<std::string>(session_token.value())));
   } else {
-    cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
+    cached_credentials_ = Credentials(std::get<std::string>(access_key_id.value()),
+                                      std::get<std::string>(secret_access_key.value()),
+                                      std::get<std::string>(session_token.value()));
   }
   handleFetchDone();
 }
@@ -441,7 +473,7 @@ bool TaskRoleCredentialsProvider::needsRefresh() {
          (expiration_time_ - now < REFRESH_GRACE_PERIOD);
 }
 
-void TaskRoleCredentialsProvider::refresh() {
+absl::Status TaskRoleCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the task role at URI: {}", credential_uri_);
 
   absl::string_view host;
@@ -459,7 +491,7 @@ void TaskRoleCredentialsProvider::refresh() {
     const auto credential_document = fetch_metadata_using_curl_(message);
     if (!credential_document) {
       ENVOY_LOG(error, "Could not load AWS credentials document from the task role");
-      return;
+      return absl::NotFoundError("Could not load AWS credentials document from the task role");
     }
     extractCredentials(std::move(credential_document.value()));
   } else {
@@ -474,10 +506,12 @@ void TaskRoleCredentialsProvider::refresh() {
       metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
     }
     on_async_fetch_cb_ = [this](const std::string&& arg) {
-      return this->extractCredentials(std::move(arg));
+      this->extractCredentials(std::move(arg));
+      return absl::OkStatus();
     };
     metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
   }
+  return absl::OkStatus();
 }
 
 void TaskRoleCredentialsProvider::extractCredentials(
@@ -486,24 +520,47 @@ void TaskRoleCredentialsProvider::extractCredentials(
     handleFetchDone();
     return;
   }
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document from the task role: {}", e.what());
+
+  absl::StatusOr<Json::ObjectSharedPtr> document_json =
+      Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document from the task rolet: {}",
+              document_json.status().message());
     handleFetchDone();
     return;
   }
 
-  const auto access_key_id = document_json->getString(ACCESS_KEY_ID, "");
-  const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
-  const auto session_token = document_json->getString(TOKEN, "");
+  const auto access_key_id = document_json.value()->getValue(ACCESS_KEY_ID);
+  if (!access_key_id.ok() || (!absl::holds_alternative<std::string>(access_key_id.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from task role - "
+                     "access_key_id could not be read");
+    handleFetchDone();
+    return;
+  }
+
+  const auto secret_access_key = document_json.value()->getValue(SECRET_ACCESS_KEY);
+  if (!secret_access_key.ok() ||
+      (!absl::holds_alternative<std::string>(secret_access_key.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from task role - "
+                     "secret_access_key could not be read");
+    handleFetchDone();
+    return;
+  }
+
+  const auto session_token = document_json.value()->getValue(SESSION_TOKEN);
+  if (!session_token.ok() || (!absl::holds_alternative<std::string>(session_token.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from task role - "
+                     "session_token could not be read");
+    handleFetchDone();
+    return;
+  }
 
   ENVOY_LOG(debug, "Found following AWS credentials in the task role: {}={}, {}={}, {}={}",
-            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
-            session_token.empty() ? "" : "*****");
+            AWS_ACCESS_KEY_ID, std::get<std::string>(access_key_id.value()), AWS_SECRET_ACCESS_KEY,
+            std::get<std::string>(secret_access_key.value()).empty() ? "" : "*****",
+            AWS_SESSION_TOKEN, std::get<std::string>(session_token.value()).empty() ? "" : "*****");
 
-  const auto expiration_str = document_json->getString(EXPIRATION, "");
+  const auto expiration_str = document_json.value()->getString(EXPIRATION, "");
   if (!expiration_str.empty()) {
     absl::Time expiration_time;
     if (absl::ParseTime(EXPIRATION_FORMAT, expiration_str, &expiration_time, nullptr)) {
@@ -515,9 +572,13 @@ void TaskRoleCredentialsProvider::extractCredentials(
   last_updated_ = api_.timeSource().systemTime();
   if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
-        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+        std::make_unique<Credentials>(std::get<std::string>(access_key_id.value()),
+                                      std::get<std::string>(secret_access_key.value()),
+                                      std::get<std::string>(session_token.value())));
   } else {
-    cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
+    cached_credentials_ = Credentials(std::get<std::string>(access_key_id.value()),
+                                      std::get<std::string>(secret_access_key.value()),
+                                      std::get<std::string>(session_token.value()));
   }
   handleFetchDone();
 }
@@ -552,17 +613,21 @@ bool WebIdentityCredentialsProvider::needsRefresh() {
          (expiration_time_ - now < REFRESH_GRACE_PERIOD);
 }
 
-void WebIdentityCredentialsProvider::refresh() {
+absl::Status WebIdentityCredentialsProvider::refresh() {
   // If http async client is not enabled then just set empty credentials and return.
   if (!useHttpAsyncClient()) {
     cached_credentials_ = Credentials();
-    return;
+    return absl::OkStatus();
   }
 
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
   const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
-  THROW_IF_STATUS_NOT_OK(web_token_file_or_error, throw);
+  // THROW_IF_STATUS_NOT_OK(web_token_file_or_error, throw);
+  if (!(web_token_file_or_error.ok())) {
+    return absl::NotFoundError("Failure reading web identity credentials");
+  }
+
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
@@ -593,6 +658,8 @@ void WebIdentityCredentialsProvider::refresh() {
     return this->extractCredentials(std::move(arg));
   };
   metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
+
+  return absl::OkStatus();
 }
 
 void WebIdentityCredentialsProvider::extractCredentials(
@@ -603,16 +670,17 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  Json::ObjectSharedPtr document_json;
-  TRY_NEEDS_AUDIT { document_json = Json::Factory::loadFromString(credential_document_value); }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not parse AWS credentials document from STS: {}", e.what());
+  absl::StatusOr<Json::ObjectSharedPtr> document_json =
+      Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json.ok()) {
+    ENVOY_LOG(error, "CCould not parse AWS credentials document from STS: {}",
+              document_json.status().message());
     handleFetchDone();
     return;
   }
 
   absl::StatusOr<Json::ObjectSharedPtr> root_node =
-      document_json->getObjectNoThrow(WEB_IDENTITY_RESPONSE_ELEMENT);
+      document_json.value()->getObjectNoThrow(WEB_IDENTITY_RESPONSE_ELEMENT);
   if (!root_node.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document is empty");
     handleFetchDone();
@@ -633,42 +701,45 @@ void WebIdentityCredentialsProvider::extractCredentials(
     return;
   }
 
-  TRY_NEEDS_AUDIT {
-    const auto access_key_id = credentials.value()->getString(ACCESS_KEY_ID, "");
-    const auto secret_access_key = credentials.value()->getString(SECRET_ACCESS_KEY, "");
-    const auto session_token = credentials.value()->getString(SESSION_TOKEN, "");
-
-    ENVOY_LOG(debug, "Received the following AWS credentials from STS: {}={}, {}={}, {}={}",
-              AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-              secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
-              session_token.empty() ? "" : "*****");
-    setCredentialsToAllThreads(
-        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-  }
-  END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS: {}", e.what());
+  const auto access_key_id = credentials.value()->getValue(ACCESS_KEY_ID);
+  if (!access_key_id.ok() || (!absl::holds_alternative<std::string>(access_key_id.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS - "
+                     "access_key_id could not be read");
     handleFetchDone();
     return;
   }
 
-  TRY_NEEDS_AUDIT {
-    const auto expiration = credentials.value()->getInteger(EXPIRATION, 0);
-    if (expiration != 0) {
-      expiration_time_ =
-          std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
-      ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
-    } else {
-      expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
-      ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
-                      "setting expiration to 1 hour in future");
-    }
+  const auto secret_access_key = credentials.value()->getValue(SECRET_ACCESS_KEY);
+  if (!secret_access_key.ok() ||
+      (!absl::holds_alternative<std::string>(secret_access_key.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS - "
+                     "secret_access_key could not be read");
+    handleFetchDone();
+    return;
   }
-  END_TRY catch (EnvoyException& e) {
+
+  const auto session_token = credentials.value()->getValue(SESSION_TOKEN);
+  if (!session_token.ok() || (!absl::holds_alternative<std::string>(session_token.value()))) {
+    ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS - "
+                     "session_token could not be read");
+    handleFetchDone();
+    return;
+  }
+
+  setCredentialsToAllThreads(
+      std::make_unique<Credentials>(std::get<std::string>(access_key_id.value()),
+                                    std::get<std::string>(secret_access_key.value()),
+                                    std::get<std::string>(session_token.value())));
+
+  const auto expiration = credentials.value()->getInteger(EXPIRATION, 0);
+  if (expiration != 0) {
+    expiration_time_ =
+        std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(expiration));
+    ENVOY_LOG(debug, "AWS STS credentials expiration time (unix timestamp): {}", expiration);
+  } else {
     expiration_time_ = api_.timeSource().systemTime() + REFRESH_INTERVAL;
-    ENVOY_LOG(warn,
-              "Could not parse Expiration value of AWS credentials document from STS: {}, so "
-              "setting expiration to 1 hour in future",
-              e.what());
+    ENVOY_LOG(warn, "Could not get Expiration value of AWS credentials document from STS, so "
+                    "setting expiration to 1 hour in future");
   }
 
   last_updated_ = api_.timeSource().systemTime();

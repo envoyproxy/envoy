@@ -61,7 +61,7 @@ protected:
   void refreshIfNeeded();
 
   virtual bool needsRefresh() PURE;
-  virtual void refresh() PURE;
+  virtual absl::Status refresh() PURE;
 };
 
 /**
@@ -78,7 +78,7 @@ private:
   Api::Api& api_;
 
   bool needsRefresh() override;
-  void refresh() override;
+  absl::Status refresh() override;
   void extractCredentials(const std::string& credentials_file, const std::string& profile);
 };
 
@@ -177,7 +177,7 @@ public:
 
 private:
   bool needsRefresh() override;
-  void refresh() override;
+  absl::Status refresh() override;
   void fetchInstanceRole(const std::string&& token, bool async = false);
   void fetchInstanceRoleAsync(const std::string&& token) {
     fetchInstanceRole(std::move(token), true);
@@ -219,7 +219,7 @@ private:
   const std::string authorization_token_;
 
   bool needsRefresh() override;
-  void refresh() override;
+  absl::Status refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
 };
 
@@ -249,7 +249,7 @@ private:
   const std::string role_session_name_;
 
   bool needsRefresh() override;
-  void refresh() override;
+  absl::Status refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
 };
 

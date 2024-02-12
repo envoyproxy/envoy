@@ -104,9 +104,10 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
   auto message = buildMessageToSign(absl::string_view(service_url.data(), service_url.length()),
                                     absl::string_view(method_name.data(), method_name.length()));
 
-  TRY_NEEDS_AUDIT { signer_->sign(message, false); }
-  END_TRY catch (const EnvoyException& e) {
-    return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
+  auto result = signer_->sign(message, false);
+
+  if (!result.ok()) {
+    return grpc::Status{grpc::StatusCode::INTERNAL, std::string(result.message())};
   }
 
   signedHeadersToMetadata(message.headers(), *metadata);

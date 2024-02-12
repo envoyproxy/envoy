@@ -52,15 +52,15 @@ public:
 // No authorization header should be present when the credentials are empty
 TEST_F(SigV4ASignerImplTest, AnonymousCredentials) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
-  signer_.sign(*message_);
+  auto result = signer_.sign(*message_);
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
 
 // HTTP :method header is required
 TEST_F(SigV4ASignerImplTest, MissingMethodException) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
-  EXPECT_THROW_WITH_MESSAGE(signer_.sign(*message_), EnvoyException,
-                            "Message is missing :method header");
+  auto result = signer_.sign(*message_);
+  EXPECT_EQ(result.code(), absl::StatusCode::kNotFound);
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
 
@@ -68,8 +68,8 @@ TEST_F(SigV4ASignerImplTest, MissingMethodException) {
 TEST_F(SigV4ASignerImplTest, MissingPathException) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
-  EXPECT_THROW_WITH_MESSAGE(signer_.sign(*message_), EnvoyException,
-                            "Message is missing :path header");
+  auto result = signer_.sign(*message_);
+  EXPECT_EQ(result.code(), absl::StatusCode::kNotFound);
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
 
@@ -78,7 +78,7 @@ TEST_F(SigV4ASignerImplTest, SignDateHeader) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
-  signer_.sign(*message_);
+  auto result = signer_.sign(*message_);
   EXPECT_FALSE(message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256).empty());
   EXPECT_EQ(
       "20180102T030400Z",
@@ -95,7 +95,7 @@ TEST_F(SigV4ASignerImplTest, SignSecurityTokenHeader) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(token_credentials_));
   addMethod("GET");
   addPath("/");
-  signer_.sign(*message_);
+  auto result = signer_.sign(*message_);
   EXPECT_EQ("token", message_->headers()
                          .get(SigV4ASignatureHeaders::get().SecurityToken)[0]
                          ->value()
@@ -113,7 +113,7 @@ TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
-  signer_.sign(*message_, true);
+  auto result = signer_.sign(*message_, true);
   EXPECT_EQ(SigV4ASignatureConstants::get().HashedEmptyString,
             message_->headers()
                 .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
@@ -132,7 +132,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeader) {
   addMethod("POST");
   addPath("/");
   setBody("test1234");
-  signer_.sign(*message_, true);
+  auto result = signer_.sign(*message_, true);
   EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
             message_->headers()
                 .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
@@ -151,7 +151,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeaderOverrideRegion) {
   addMethod("POST");
   addPath("/");
   setBody("test1234");
-  signer_.sign(*message_, true, "region1");
+  auto result = signer_.sign(*message_, true, "region1");
   EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
             message_->headers()
                 .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
@@ -172,7 +172,7 @@ TEST_F(SigV4ASignerImplTest, SignExtraHeaders) {
   addHeader("a", "a_value");
   addHeader("b", "b_value");
   addHeader("c", "c_value");
-  signer_.sign(*message_);
+  auto result = signer_.sign(*message_);
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
@@ -186,7 +186,7 @@ TEST_F(SigV4ASignerImplTest, SignHostHeader) {
   addMethod("GET");
   addPath("/");
   addHeader("host", "www.example.com");
-  signer_.sign(*message_);
+  auto result = signer_.sign(*message_);
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
@@ -209,7 +209,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerify) {
   addHeader("host", "www.example.com");
 
   // Sign the message using our signing algorithm
-  signer_.sign(*message_, false, "ap-southeast-2");
+  auto result = signer_.sign(*message_, false, "ap-southeast-2");
 
   // Now manually sign the same string_to_sign
   std::string canonical_request = R"EOF(GET
@@ -264,7 +264,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyMultiRegion) {
   addHeader("host", "www.example.com");
 
   // Sign the message using our signing algorithm
-  signer_.sign(*message_, false, "ap-southeast-2,us-east-1");
+  auto result = signer_.sign(*message_, false, "ap-southeast-2,us-east-1");
 
   // Now manually sign the same string_to_sign
   std::string canonical_request = R"EOF(GET
@@ -318,7 +318,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyUnsignedPayload) {
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
   // Sign the message using our signing algorithm
-  signer_.signUnsignedPayload(headers, "ap-southeast-2");
+  auto result = signer_.signUnsignedPayload(headers, "ap-southeast-2");
 
   // Now manually sign the same string_to_sign
   std::string canonical_request = R"EOF(GET
@@ -373,7 +373,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyUnsignedPayloadMultiRegion) {
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
   // Sign the message using our signing algorithm
-  signer_.signUnsignedPayload(headers, "ap-southeast-2,us-east-*");
+  auto result = signer_.signUnsignedPayload(headers, "ap-southeast-2,us-east-*");
 
   // Now manually sign the same string_to_sign
   std::string canonical_request = R"EOF(GET
@@ -427,7 +427,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyEmptyPayload) {
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
   // Sign the message using our signing algorithm
-  signer_.signEmptyPayload(headers, "ap-southeast-2");
+  auto result = signer_.signEmptyPayload(headers, "ap-southeast-2");
 
   // Now manually sign the same string_to_sign
   std::string canonical_request = R"EOF(GET
@@ -482,7 +482,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyEmptyPayloadMultiRegion) {
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
   // Sign the message using our signing algorithm
-  signer_.signEmptyPayload(headers, "ap-southeast-2,us-east-*");
+  auto result = signer_.signEmptyPayload(headers, "ap-southeast-2,us-east-*");
 
   // Now manually sign the same string_to_sign
   std::string canonical_request = R"EOF(GET

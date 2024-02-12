@@ -801,7 +801,7 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentSecure) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentUnsecure) {
+TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentInsecure) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectSessionToken(200, std::move(std::string()));

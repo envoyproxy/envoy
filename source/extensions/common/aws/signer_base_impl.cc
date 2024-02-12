@@ -21,7 +21,7 @@ namespace Common {
 namespace Aws {
 
 absl::Status SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
-                          const absl::string_view override_region) {
+                                  const absl::string_view override_region) {
 
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
@@ -29,14 +29,14 @@ absl::Status SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
 }
 
 absl::Status SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
-                                      const absl::string_view override_region) {
+                                              const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().HashedEmptyString);
   return sign(headers, SignatureConstants::get().HashedEmptyString, override_region);
 }
 
 absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                         const absl::string_view override_region) {
+                                                 const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().UnsignedPayload);
   return sign(headers, SignatureConstants::get().UnsignedPayload, override_region);
@@ -50,7 +50,7 @@ void SignerBaseImpl::addRegionHeader(
 std::string SignerBaseImpl::getRegion() const { return region_; }
 
 absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                          const absl::string_view override_region) {
+                                  const absl::string_view override_region) {
 
   headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   const auto& credentials = credentials_provider_->getCredentials();
@@ -100,7 +100,6 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 
   return absl::OkStatus();
-
 }
 
 std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {
