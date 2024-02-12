@@ -706,12 +706,8 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_aws_credentials_file")) {
-    ENVOY_LOG(debug, "Using credentials file credentials provider");
-    add(factories.createCredentialsFileCredentialsProvider(api));
-  } else {
-    ENVOY_LOG(debug, "Not using credential file credentials provider because it is not enabled");
-  }
+  ENVOY_LOG(debug, "Using credentials file credentials provider");
+  add(factories.createCredentialsFileCredentialsProvider(api));
 
   // WebIdentityCredentialsProvider can be used only if `context` is supplied which is required to
   // use http async http client to make http calls to fetch the credentials.

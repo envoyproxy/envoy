@@ -1,7 +1,8 @@
 package org.chromium.net.impl;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.google.common.truth.Truth.assertThat;
+
+import static org.junit.Assert.assertThrows;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
@@ -69,7 +70,7 @@ public class CancelProofEnvoyStreamTest {
   public void setStream() {
     cancelProofEnvoyStream.setStream(mMockedStream);
 
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
   }
 
   @Test
@@ -78,15 +79,14 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.setStream(mMockedStream);
 
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
   public void setStream_twice() {
     cancelProofEnvoyStream.setStream(mMockedStream);
 
-    assertThatThrownBy(() -> cancelProofEnvoyStream.setStream(mMockedStream))
-        .isInstanceOf(AssertionError.class);
+    assertThrows(AssertionError.class, () -> cancelProofEnvoyStream.setStream(mMockedStream));
   }
 
   @Test
@@ -95,14 +95,14 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.sendHeaders(HEADERS, false);
 
-    assertThat(mSendHeadersInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mSendHeadersInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
   }
 
   @Test
   public void sendHeaders_withoutStreamSet() {
-    assertThatThrownBy(() -> cancelProofEnvoyStream.sendHeaders(HEADERS, false))
-        .isInstanceOf(NullPointerException.class);
+    assertThrows(NullPointerException.class,
+                 () -> cancelProofEnvoyStream.sendHeaders(HEADERS, false));
   }
 
   @Test
@@ -112,8 +112,8 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.sendHeaders(HEADERS, false);
 
-    assertThat(mSendHeadersInvocationCount.get()).isZero();
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mSendHeadersInvocationCount.get()).isEqualTo(0);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -128,8 +128,8 @@ public class CancelProofEnvoyStreamTest {
     mSendHeadersBlock.open();
     thread.join(); // Wait for the Thread to die.
 
-    assertThat(mSendHeadersInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mSendHeadersInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -138,14 +138,14 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.sendData(BYTE_BUFFER, false);
 
-    assertThat(mSendDataInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mSendDataInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
   }
 
   @Test
   public void sendData_withoutStreamSet() {
-    assertThatThrownBy(() -> cancelProofEnvoyStream.sendData(BYTE_BUFFER, false))
-        .isInstanceOf(NullPointerException.class);
+    assertThrows(NullPointerException.class,
+                 () -> cancelProofEnvoyStream.sendData(BYTE_BUFFER, false));
   }
 
   @Test
@@ -155,8 +155,8 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.sendData(BYTE_BUFFER, false);
 
-    assertThat(mSendDataInvocationCount.get()).isZero();
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mSendDataInvocationCount.get()).isEqualTo(0);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -171,8 +171,8 @@ public class CancelProofEnvoyStreamTest {
     mSendDataBlock.open();
     thread.join(); // Wait for the Thread to die.
 
-    assertThat(mSendDataInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mSendDataInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -181,14 +181,13 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.readData(1);
 
-    assertThat(mReadDataInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mReadDataInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
   }
 
   @Test
   public void readData_withoutStreamSet() {
-    assertThatThrownBy(() -> cancelProofEnvoyStream.readData(1))
-        .isInstanceOf(NullPointerException.class);
+    assertThrows(NullPointerException.class, () -> cancelProofEnvoyStream.readData(1));
   }
 
   @Test
@@ -198,8 +197,8 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.readData(1);
 
-    assertThat(mReadDataInvocationCount.get()).isZero();
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mReadDataInvocationCount.get()).isEqualTo(0);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -214,8 +213,8 @@ public class CancelProofEnvoyStreamTest {
     mReadDataBlock.open();
     thread.join(); // Wait for the Thread to die.
 
-    assertThat(mReadDataInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mReadDataInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -224,7 +223,7 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.cancel();
 
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -234,7 +233,7 @@ public class CancelProofEnvoyStreamTest {
     cancelProofEnvoyStream.cancel();
     cancelProofEnvoyStream.cancel();
 
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -252,7 +251,7 @@ public class CancelProofEnvoyStreamTest {
       thread.join();
     }
 
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   @Test
@@ -275,8 +274,8 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.cancel();
 
-    assertThat(mSendHeadersInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mSendHeadersInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
   }
 
   @Test
@@ -289,8 +288,8 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.cancel();
 
-    assertThat(mSendDataInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mSendDataInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
   }
 
   @Test
@@ -303,8 +302,8 @@ public class CancelProofEnvoyStreamTest {
 
     cancelProofEnvoyStream.cancel();
 
-    assertThat(mReadDataInvocationCount.get()).isOne();
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mReadDataInvocationCount.get()).isEqualTo(1);
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
   }
 
   @Test
@@ -342,7 +341,7 @@ public class CancelProofEnvoyStreamTest {
     assertThat(mReadDataInvocationCount.get()).isEqualTo(threads.length / 3);
 
     cancelProofEnvoyStream.cancel();
-    assertThat(mCancelInvocationCount.get()).isZero();
+    assertThat(mCancelInvocationCount.get()).isEqualTo(0);
 
     // Let all the Threads to finish executing the cancelProofEnvoyStream's methods.
     mSendHeadersBlock.open();
@@ -352,7 +351,7 @@ public class CancelProofEnvoyStreamTest {
     for (Thread thread : threads) {
       thread.join();
     }
-    assertThat(mCancelInvocationCount.get()).isOne();
+    assertThat(mCancelInvocationCount.get()).isEqualTo(1);
   }
 
   private class MockedStream extends EnvoyHTTPStream {

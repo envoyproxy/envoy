@@ -50,7 +50,7 @@ jobs:
           rbe: false
           steps-pre: |
             - id: url
-              uses: envoyproxy/toolshed/gh-actions/jq@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+              uses: envoyproxy/toolshed/gh-actions/jq@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
               with:
                 options: -Rr
                 input: >-
@@ -66,15 +66,15 @@ jobs:
                     end
                   | . as $bucket
                   | "https://storage.googleapis.com/\($bucket)/\($sha)"
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
               with:
                 url: %{{ steps.url.outputs.value }}/docker/envoy.tar
                 variant: dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
               with:
                 url: %{{ steps.url.outputs.value }}/docker/envoy-contrib.tar
                 variant: contrib-dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@2b4b266dbf6e410f2e8a05abf0dcd8ad13e6ecac  # actions-v0.2.23
+            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
               with:
                 url: %{{ steps.url.outputs.value }}/docker/envoy-google-vrp.tar
                 variant: google-vrp-dev
