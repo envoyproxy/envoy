@@ -1,7 +1,7 @@
 package io.envoyproxy.envoymobile.jni;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -143,9 +143,9 @@ public class JniHelperTest {
 
   @Test
   public void testThrowNew() {
-    assertThatThrownBy(() -> throwNew("java/lang/RuntimeException", "Test"))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessageContaining("Test");
+    RuntimeException exception =
+        assertThrows(RuntimeException.class, () -> throwNew("java/lang/RuntimeException", "Test"));
+    assertThat(exception).hasMessageThat().contains("Test");
   }
 
   @Test

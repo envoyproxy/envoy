@@ -48,6 +48,29 @@ bug_fixes:
 - area: tracing
   change: |
     Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
+- area: proxy protocol
+  change: |
+    Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
+- area: url matching
+  change: |
+    Fixed excessive CPU utilization when using regex URL template matcher.
+- area: http
+  change: |
+    Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: proxy_protocol
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in a proxy protocol header. Connections will instead be dropped/reset.
+- area: proxy_protocol
+  change: |
+    Fixed a bug where TLVs with non utf8 characters were inserted as protobuf values into filter metadata circumventing
+    ext_authz checks when ``failure_mode_allow`` is set to ``true``.
+- area: tls
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
+    ``%DOWNSTREAM_PEER_IP_SAN%``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -69,6 +92,9 @@ removed_config_or_runtime:
 - area: resource_monitors
   change: |
     removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` runtime flag  and legacy code paths.
+- area: aws
+  change: |
+    Removed ``envoy.reloadable_features.enable_aws_credentials_file`` runtime flag and legacy code paths.
 
 new_features:
 - area: aws_request_signing
@@ -112,6 +138,9 @@ new_features:
     metadata may be sent to the server. If
     :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
     is defined, returned metadata may be written to the specified allowed namespaces.
+- area: wasm
+  change: |
+    added ``verify_signature`` foreign function to verify cryptographic signatures.
 - area: monitoring
   change: |
     Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is

@@ -51,6 +51,7 @@ envoy_mobile_android_test(
     srcs = [
         "AndroidNetworkMonitorTest.java",
     ],
+    associates = ["//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib"],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
@@ -63,6 +64,6 @@ envoy_mobile_android_test(
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/kotlin/io/envoyproxy/envoymobile/mocks:mocks_lib",
     ],
 )
