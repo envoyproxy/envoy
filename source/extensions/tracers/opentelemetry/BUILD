@@ -73,3 +73,13 @@ envoy_cc_library(
         "@opentelemetry_proto//:trace_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "trace_state_lib",
+    hdrs = [
+        "kv_properties.h",
+        "trace_state.h",
+    ],
+    deps = [
+    ],
+)

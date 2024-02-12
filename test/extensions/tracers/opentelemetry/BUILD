@@ -93,3 +93,16 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "tracestate_test",
+    srcs = [
+        "kv_properties_test.cc",
+        "trace_state_test.cc",
+    ],
+    extension_names = ["envoy.tracers.opentelemetry"],
+    deps = [
+        "//source/extensions/tracers/opentelemetry:trace_state_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
