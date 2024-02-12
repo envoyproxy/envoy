@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.source.extensions.common.wasm;
+
+message VerifySignatureArguments {
+  string hash_function = 1;
+  bytes public_key = 2;
+  bytes signature = 3;
+  bytes text = 4;
+};
+
+message VerifySignatureResult {
+  bool result = 1;
+  string error = 2;
+};

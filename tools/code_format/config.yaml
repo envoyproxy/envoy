@@ -128,7 +128,6 @@ paths:
     - source/common/protobuf/utility.cc
     - source/common/protobuf/message_validator_impl.cc
     - source/common/quic/quic_server_transport_socket_factory.cc
-    - source/common/access_log/access_log_manager_impl.cc
     - source/common/secret/secret_manager_impl.cc
     - source/common/grpc/async_client_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc
@@ -167,6 +166,9 @@ paths:
     - source/common/secret/sds_api.cc
     - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
+    - source/common/common/logger_delegates.cc
+    - source/common/upstream/health_checker_event_logger.h
+    - source/common/upstream/outlier_detection_impl.h
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:

@@ -1,5 +1,7 @@
-package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile.mocks
 
+import io.envoyproxy.envoymobile.Stream
+import io.envoyproxy.envoymobile.StreamPrototype
 import java.util.concurrent.Executor
 
 /**
@@ -7,8 +9,7 @@ import java.util.concurrent.Executor
  *
  * @param onStart Closure that will be called each time a new stream is started from the prototype.
  */
-class MockStreamPrototype
-internal constructor(private val onStart: ((stream: MockStream) -> Unit)?) :
+class MockStreamPrototype(private val onStart: ((stream: MockStream) -> Unit)?) :
   StreamPrototype(MockEnvoyEngine()) {
   override fun start(executor: Executor): Stream {
     val callbacks = createCallbacks(executor)

@@ -90,6 +90,14 @@ TEST(OptRefTest, Conversion) {
   // Assignment conversion.
   foo_ref = bar;
   foo_ref = bar_ref;
+
+  // Ref conversion on construction from derived class.
+  OptRef<Foo> foo_ref_to_bar = bar_ref;
+  EXPECT_EQ(&(*foo_ref_to_bar), &bar);
+
+  // Ref conversion on construction from non-const to const.
+  OptRef<const Bar> const_ref_to_bar = bar_ref;
+  EXPECT_EQ(&(*const_ref_to_bar), &bar);
 }
 
 TEST(OptRefTest, Size) {

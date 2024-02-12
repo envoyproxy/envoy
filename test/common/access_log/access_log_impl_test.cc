@@ -1131,13 +1131,13 @@ typed_config:
   ON_CALL(context_.server_factory_context_, accessLogManager())
       .WillByDefault(ReturnRef(log_manager_));
   EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info.path_, "");
-            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info)
+                           -> absl::StatusOr<AccessLogFileSharedPtr> {
+        EXPECT_EQ(file_info.path_, "");
+        EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
 
-            return file_;
-          }));
+        return file_;
+      }));
   EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
 }
 
@@ -1152,12 +1152,12 @@ typed_config:
   ON_CALL(context_.server_factory_context_, accessLogManager())
       .WillByDefault(ReturnRef(log_manager_));
   EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info.path_, "");
-            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
-            return file_;
-          }));
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info)
+                           -> absl::StatusOr<AccessLogFileSharedPtr> {
+        EXPECT_EQ(file_info.path_, "");
+        EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
+        return file_;
+      }));
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 

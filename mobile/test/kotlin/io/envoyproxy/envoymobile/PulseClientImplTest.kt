@@ -1,13 +1,12 @@
 package io.envoyproxy.envoymobile
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
