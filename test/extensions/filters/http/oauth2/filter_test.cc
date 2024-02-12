@@ -126,9 +126,12 @@ public:
 
     auto* useRefreshToken = p.mutable_use_refresh_token();
     useRefreshToken->set_value(use_refresh_token);
-    auto* refresh_token_expires_in = p.mutable_default_refresh_token_expires_in();
-    refresh_token_expires_in->set_seconds(default_refresh_token_expires_in);
 
+    if (default_refresh_token_expires_in != 0) {
+        auto* refresh_token_expires_in = p.mutable_default_refresh_token_expires_in();
+        refresh_token_expires_in->set_seconds(default_refresh_token_expires_in);
+    }
+    
     p.set_auth_type(auth_type);
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
@@ -1785,7 +1788,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token) {
       {Http::Headers::get().SetCookie.get(),
        "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=0;secure;HttpOnly"},
+       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=604800;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
   };
 
@@ -1801,7 +1804,7 @@ TEST_P(OAuth2Test,
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
-                 1200 /* default_refresh_token_type */));
+                 1200 /* default_refresh_token_expires_in */));
   TestScopedRuntime scoped_runtime;
   if (GetParam() == 1) {
     scoped_runtime.mergeValues({
@@ -1861,7 +1864,7 @@ TEST_P(OAuth2Test,
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
-                 1200 /* default_refresh_token_type */));
+                 1200 /* default_refresh_token_expires_in */));
   TestScopedRuntime scoped_runtime;
   if (GetParam() == 1) {
     scoped_runtime.mergeValues({

@@ -77,7 +77,7 @@ bug_fixes:
     by the refresh token. The expiration time of the refresh token is taken from the exp claim of jwt by default.
     If the claim is ommited in the jwt then :ref:`default_refresh_token_expires_in
     <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_refresh_token_expires_in>`
-    specifies the lifetime of the refresh token.
+    specifies the lifetime of the refresh token. Default value is 604800 seconds (a week)
 
 
 removed_config_or_runtime:
