@@ -75,6 +75,9 @@ bug_fixes:
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
     received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
     ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: jwt_authn
+  change: |
+    Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
