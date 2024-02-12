@@ -52,6 +52,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
       if (use_proto) {
         envoy::Cookie cookie;
         cookie.set_address("1.2.3.4:80");
+        // The expiration field is not set in the cookie because TTL is 0 in the config.
         cookie.SerializeToString(&cookie_content);
       } else {
         cookie_content = "1.2.3.4:80";
