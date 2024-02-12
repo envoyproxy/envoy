@@ -92,6 +92,9 @@ removed_config_or_runtime:
 - area: resource_monitors
   change: |
     removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` runtime flag  and legacy code paths.
+- area: aws
+  change: |
+    Removed ``envoy.reloadable_features.enable_aws_credentials_file`` runtime flag and legacy code paths.
 
 new_features:
 - area: aws_request_signing
