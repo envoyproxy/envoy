@@ -1760,6 +1760,47 @@ void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);
 
+nghttp2_session_callbacks_set_send_callback(
+      callbacks_,
+      [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+        return static_cast<ConnectionImpl*>(user_data)->onSend(data, length);
+      });
+
+  nghttp2_session_callbacks_set_on_begin_headers_callback(
+      callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
+        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame->hd.stream_id);
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
+            std::move(status));
+      });
+
+  nghttp2_session_callbacks_set_on_header_callback(
+      callbacks_,
+      [](nghttp2_session*, const nghttp2_frame* frame, const uint8_t* raw_name, size_t name_length,
+         const uint8_t* raw_value, size_t value_length, uint8_t, void* user_data) -> int {
+        // TODO PERF: Can reference count here to avoid copies.
+        HeaderString name;
+        name.setCopy(reinterpret_cast<const char*>(raw_name), name_length);
+        HeaderString value;
+        value.setCopy(reinterpret_cast<const char*>(raw_value), value_length);
+        return static_cast<ConnectionImpl*>(user_data)->onHeader(frame->hd.stream_id,
+                                                                 std::move(name), std::move(value));
+      });
+
+  nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
+      callbacks_,
+      [](nghttp2_session*, uint8_t, int32_t stream_id, const uint8_t* data, size_t len,
+         void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onData(stream_id, data, len);
+      });
+
+  nghttp2_session_callbacks_set_on_begin_frame_callback(
+      callbacks_, [](nghttp2_session*, const nghttp2_frame_hd* hd, void* user_data) -> int {
+        auto status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(
+            hd->stream_id, hd->length, hd->type, hd->flags);
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
+            std::move(status));
+      });
+
   nghttp2_session_callbacks_set_on_frame_recv_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
         auto status = static_cast<ConnectionImpl*>(user_data)->onFrameReceived(frame);
@@ -1767,6 +1808,68 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
             std::move(status));
       });
 
+  nghttp2_session_callbacks_set_on_stream_close_callback(
+      callbacks_,
+      [](nghttp2_session*, int32_t stream_id, uint32_t error_code, void* user_data) -> int {
+        auto status = static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
+            std::move(status));
+      });
+
+  nghttp2_session_callbacks_set_on_frame_send_callback(
+      callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
+        uint32_t error_code = 0;
+        switch (frame->hd.type) {
+        case NGHTTP2_GOAWAY:
+          error_code = frame->goaway.error_code;
+          break;
+        case NGHTTP2_RST_STREAM:
+          error_code = frame->rst_stream.error_code;
+          break;
+        }
+        return static_cast<ConnectionImpl*>(user_data)->onFrameSend(
+            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags, error_code);
+      });
+
+  nghttp2_session_callbacks_set_before_frame_send_callback(
+      callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onBeforeFrameSend(
+            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags);
+      });
+
+  nghttp2_session_callbacks_set_on_frame_not_send_callback(
+      callbacks_, [](nghttp2_session*, const nghttp2_frame*, int, void*) -> int {
+        // We used to always return failure here but it looks now this can get called if the other
+        // side sends GOAWAY and we are trying to send a SETTINGS ACK. Just ignore this for now.
+        return 0;
+      });
+
+  nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(
+      callbacks_,
+      [](nghttp2_session*, const nghttp2_frame* frame, int error_code, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onInvalidFrame(frame->hd.stream_id,
+                                                                       error_code);
+      });
+
+  nghttp2_session_callbacks_set_on_extension_chunk_recv_callback(
+      callbacks_,
+      [](nghttp2_session*, const nghttp2_frame_hd* hd, const uint8_t* data, size_t len,
+         void* user_data) -> int {
+        ASSERT(hd->length >= len);
+        return static_cast<ConnectionImpl*>(user_data)->onMetadataReceived(hd->stream_id, data,
+                                                                           len);
+      });
+
+  nghttp2_session_callbacks_set_unpack_extension_callback(
+      callbacks_, [](nghttp2_session*, void**, const nghttp2_frame_hd* hd, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onMetadataFrameComplete(
+            hd->stream_id, hd->flags == END_METADATA_FLAG);
+      });
+
+  nghttp2_session_callbacks_set_error_callback2(
+      callbacks_, [](nghttp2_session*, int, const char* msg, size_t len, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onError(absl::string_view(msg, len));
+      });
 }
 
 ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connection_(connection) {
@@ -1779,6 +1882,8 @@ int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized
 bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
                      uint8_t flags) {
   current_frame_ = {stream_id, length, type, flags};
+  padding_length_ = 0;
+  remaining_data_payload_ = 0;
   auto status = connection_->onBeforeFrameReceived(stream_id, length, type, flags);
   return 0 == connection_->setAndCheckCodecCallbackStatus(
       std::move(status));
@@ -1842,10 +1947,25 @@ bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
 }
 
 bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id, absl::string_view data) {
-  return 0 == connection_->onData(stream_id, reinterpret_cast<const uint8_t*>(data.data()), data.size());
+  const int result = connection_->onData(stream_id, reinterpret_cast<const uint8_t*>(data.data()), data.size());
+  remaining_data_payload_ -= data.size();
+  if (result == 0 && remaining_data_payload_ == 0 &&
+      (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
+    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags, padding_length_);
+    return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
+  }
+  return result == 0;
 }
 
 bool ConnectionImpl::Http2Visitor::OnEndStream(Http2StreamId stream_id) {
+  if (current_frame_.type == NGHTTP2_DATA &&
+      (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) != 0) {
+    // `onBeginData` is invoked here to ensure that the connection
+    // has successfully validated and processed the entire DATA
+    // frame.
+    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags, padding_length_);
+    return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
+  }
   connection_->onEndStream(stream_id);
   return true;
 }
