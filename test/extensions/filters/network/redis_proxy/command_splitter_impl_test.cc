@@ -413,7 +413,7 @@ TEST_F(RedisSingleServerRequestTest, EchoSuccess) {
   makeBulkStringArray(*request, {"echo", "foobar"});
 
   Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::SimpleString);
+  response.type(Common::Redis::RespType::BulkString);
   response.asString() = "foobar";
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));

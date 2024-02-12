@@ -636,7 +636,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
       return nullptr;
     }
     Common::Redis::RespValuePtr echo_resp(new Common::Redis::RespValue());
-    echo_resp->type(Common::Redis::RespType::SimpleString);
+    echo_resp->type(Common::Redis::RespType::BulkString);
     echo_resp->asString() = request->asArray()[1].asString();
     callbacks.onResponse(std::move(echo_resp));
     return nullptr;
