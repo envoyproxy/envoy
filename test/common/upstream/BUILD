@@ -268,6 +268,7 @@ envoy_cc_test(
     srcs = ["load_balancer_impl_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_includes",

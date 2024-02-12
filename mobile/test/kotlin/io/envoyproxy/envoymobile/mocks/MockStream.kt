@@ -1,5 +1,11 @@
-package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile.mocks
 
+import io.envoyproxy.envoymobile.EnvoyError
+import io.envoyproxy.envoymobile.RequestHeaders
+import io.envoyproxy.envoymobile.RequestTrailers
+import io.envoyproxy.envoymobile.ResponseHeaders
+import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.Stream
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import java.nio.ByteBuffer
@@ -8,7 +14,7 @@ import java.nio.ByteBuffer
  * Mock implementation of `Stream` that also provides an interface for sending mocked responses
  * through to the stream's callbacks. Created via `MockStreamPrototype`.
  */
-class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) :
+class MockStream(underlyingStream: MockEnvoyHTTPStream) :
   Stream(underlyingStream, useByteBufferPosition = false) {
   private val mockStream: MockEnvoyHTTPStream = underlyingStream
 
