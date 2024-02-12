@@ -46,6 +46,7 @@ bool ExternalProcessorStreamImpl::startStream(
   Http::AsyncClient::StreamOptions options;
   options.setParentContext(grpc_context_);
   if (retry_policy.has_value()) {
+    options.setBufferBodyForRetry(true); // Need to buffer message in body.
     options.setRetryPolicy(*retry_policy);
   }
   stream_ = client_.start(*descriptor, *this, options);
