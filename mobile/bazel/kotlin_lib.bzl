@@ -20,7 +20,7 @@ def native_lib_name(native_dep):
         lib_name = native_dep.split(".so")[0]
     return lib_name
 
-def envoy_mobile_kt_library(name, visibility = None, srcs = [], deps = [], exports = []):
+def envoy_mobile_kt_library(name, visibility = None, srcs = [], deps = [], exports = [], associates = []):
     # These source files must be re-exported to the kotlin custom library rule to ensure their
     # inclusion. This is used to work around testing visibility.
     native.filegroup(
@@ -34,6 +34,7 @@ def envoy_mobile_kt_library(name, visibility = None, srcs = [], deps = [], expor
         srcs = srcs,
         deps = deps,
         exports = exports,
+        associates = associates,
         visibility = visibility,
     )
 

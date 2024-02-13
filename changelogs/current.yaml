@@ -2,12 +2,21 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: http
+  change: |
+    Remove the hop by hop TE header from downstream request headers if it's not set to ``trailers``, else keep it. This change can be
+    temporarily reverted by setting ``envoy.reloadable_features.sanitize_te`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+- area: quic
+  change: |
+    :ref:`Server preferred address <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.server_preferred_address_config>` is
+    now sent to non-quiche quic clients when configured. This behavior can be disabled with runtime flag
+    ``envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients``.
 - area: dns
   change: |
     Allowing <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>` to go as low as 1s.
@@ -24,6 +33,11 @@ minor_behavior_changes:
     Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
     is degrading. Can be manually turned on via
     :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: aws
+  change: |
+    AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
+    grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
+    xDS region will take preference. aws_request_signer documentation now reflects the region chain.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -43,6 +57,32 @@ bug_fixes:
 - area: tracing
   change: |
     Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
+- area: proxy protocol
+  change: |
+    Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
+- area: url matching
+  change: |
+    Fixed excessive CPU utilization when using regex URL template matcher.
+- area: http
+  change: |
+    Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: proxy_protocol
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in a proxy protocol header. Connections will instead be dropped/reset.
+- area: proxy_protocol
+  change: |
+    Fixed a bug where TLVs with non utf8 characters were inserted as protobuf values into filter metadata circumventing
+    ext_authz checks when ``failure_mode_allow`` is set to ``true``.
+- area: tls
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
+    ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: jwt_authn
+  change: |
+    Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -64,6 +104,9 @@ removed_config_or_runtime:
 - area: resource_monitors
   change: |
     removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` runtime flag  and legacy code paths.
+- area: aws
+  change: |
+    Removed ``envoy.reloadable_features.enable_aws_credentials_file`` runtime flag and legacy code paths.
 
 new_features:
 - area: aws_request_signing
@@ -107,6 +150,9 @@ new_features:
     metadata may be sent to the server. If
     :ref:`receiving_namespaces <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.receiving_namespaces>`
     is defined, returned metadata may be written to the specified allowed namespaces.
+- area: wasm
+  change: |
+    added ``verify_signature`` foreign function to verify cryptographic signatures.
 - area: monitoring
   change: |
     Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is
@@ -117,6 +163,13 @@ new_features:
     Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
     :ref:`UriTemplateMatchConfig<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>`
     to allow use of glob patterns for URI path matching in RBAC.
+- area: upstream
+  change: |
+    Added :ref:`selection_method <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    option to the least request load balancer. If set to ``FULL_SCAN``,
+    Envoy will select the host with the fewest active requests from the entire host set rather than
+    :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    random choices.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
