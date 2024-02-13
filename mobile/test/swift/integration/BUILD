@@ -5,8 +5,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
-# TODO(jpsim): Fix remote execution for all the tests in this file.
-
 envoy_mobile_swift_test(
     name = "end_to_end_networking_test",
     srcs = [
