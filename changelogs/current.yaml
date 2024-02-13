@@ -12,6 +12,11 @@ minor_behavior_changes:
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+- area: quic
+  change: |
+    :ref:`Server preferred address <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.server_preferred_address_config>` is
+    now sent to non-quiche quic clients when configured. This behavior can be disabled with runtime flag
+    ``envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients``.
 - area: dns
   change: |
     Allowing <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>` to go as low as 1s.
