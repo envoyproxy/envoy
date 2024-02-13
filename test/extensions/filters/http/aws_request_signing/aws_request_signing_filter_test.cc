@@ -150,18 +150,26 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
 }
 
+absl::Status fakeSignEmpty(Http::HeaderMap&, const absl::string_view) {
+  return absl::NotFoundError("error");
+};
+
 // Verify filter functionality when signing fails in decodeHeaders.
 TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
+
   EXPECT_CALL(*(filter_config_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
-      .WillOnce(Invoke(
-          [](Http::HeaderMap&, const absl::string_view) { return absl::NotFoundError("error"); }));
+      .WillOnce(Invoke(&fakeSignEmpty));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
 }
+
+absl::Status fakeSign(Http::RequestHeaderMap&, const std::string&, absl::string_view) {
+  return absl::NotFoundError("error");
+};
 
 // Verify filter functionality when signing fails in decodeData.
 TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
@@ -175,9 +183,8 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view) {
-        return absl::NotFoundError("failed");
-      }));
+      .WillOnce(Invoke(&fakeSign));
+
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
   EXPECT_EQ(1UL, filter_config_->stats_.payload_signing_failed_.value());
