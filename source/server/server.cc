@@ -825,12 +825,12 @@ void InstanceBase::onRuntimeReady() {
   }
 
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
-  if (runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
+  if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
               "Usage of the deprecated runtime key {}, consider switching to "
               "`envoy.resource_monitors.downstream_connections` instead."
               "This runtime key will be removed in future.",
-              Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
+              Runtime::Keys::GlobalMaxCxRuntimeKey);
   }
 }
 
