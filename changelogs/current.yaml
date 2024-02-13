@@ -198,3 +198,7 @@ new_features:
     the downstream info filter state.
 
 deprecated:
+- area: listener
+  change: |
+    deprecated runtime key ``overload.global_downstream_max_connections`` in favor of :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.
