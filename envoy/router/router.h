@@ -441,7 +441,10 @@ public:
    */
   virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
                                        DoRetryResetCallback callback) PURE;
-
+  /**
+   * Determine whether a failed request on connection failure would be retried
+   */
+  virtual bool retryOnConnectionFailure() PURE;
   /**
    * Determine whether a "hedged" retry should be sent after the per try
    * timeout expires. This means the original request is not canceled, but a

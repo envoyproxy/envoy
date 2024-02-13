@@ -45,6 +45,7 @@ public:
   MOCK_METHOD(Envoy::Http::RequestTrailerMap*, downstreamTrailers, ());
   MOCK_METHOD(bool, downstreamResponseStarted, (), (const));
   MOCK_METHOD(bool, downstreamEndStream, (), (const));
+  MOCK_METHOD(void, onUpstreamConnectionEstablished, ());
   MOCK_METHOD(uint32_t, attemptCount, (), (const));
 
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;

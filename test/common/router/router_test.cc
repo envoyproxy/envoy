@@ -2877,6 +2877,45 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+// Test retrying a request on connect failure, when the first attempt fails while the client
+// is sending the body, with the rest of the request arriving in between upstream
+// request attempts, and wait to get a new connection.
+TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+  EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(10));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "connect-failure,5xx"},
+                                         {"x-envoy-internal", "true"},
+                                         {"myheader", "present"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  const std::string body1("body1");
+  Buffer::OwnedImpl buf1(body1);
+  EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
+  router_->decodeData(buf1, false);
+
+  router_->retry_state_->expectResetRetry();
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+
+  // Complete request while there is no upstream request.
+  const std::string body2(50, 'a');
+  Buffer::OwnedImpl buf2(body2);
+  router_->decodeData(buf2, false);
+
+  EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
 // Two requests are sent (slow request + hedged retry) and then global timeout
 // is hit. Verify everything gets cleaned up.
 TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {

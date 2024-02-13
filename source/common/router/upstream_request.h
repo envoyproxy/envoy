@@ -166,6 +166,10 @@ public:
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }
 
+  void addUpstreamCallbacks(Http::UpstreamCallbacks& callbacks) {
+    upstream_callbacks_.push_back(&callbacks);
+  }
+
 private:
   friend class UpstreamFilterManager;
   friend class UpstreamCodecFilter;
@@ -363,7 +367,7 @@ public:
     return upstream_request_.upstreamStreamOptions();
   }
   void addUpstreamCallbacks(Http::UpstreamCallbacks& callbacks) override {
-    upstream_request_.upstream_callbacks_.push_back(&callbacks);
+    upstream_request_.addUpstreamCallbacks(callbacks);
   }
   void setUpstreamToDownstream(UpstreamToDownstream& upstream_to_downstream_interface) override {
     upstream_request_.upstream_interface_ = upstream_to_downstream_interface;

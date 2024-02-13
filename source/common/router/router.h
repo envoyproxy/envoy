@@ -294,14 +294,16 @@ using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
+               public Http::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")) {}
+        wait_for_connect_(false), high_watermark_enable_(false), request_buffer_overflowed_(false),
+        streaming_shadows_(
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -471,6 +473,7 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const { return upstream_requests_; }
+  void onUpstreamConnectionEstablished() override;
 
   TimeSource& timeSource() { return config_.timeSource(); }
   const Route* route() const { return route_.get(); }
@@ -598,6 +601,8 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
+  bool wait_for_connect_ : 1;
+  bool high_watermark_enable_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;

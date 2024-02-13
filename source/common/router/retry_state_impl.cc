@@ -478,7 +478,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
              "0-RTT was attempted on non-Quic connection and failed.");
       return RetryDecision::RetryImmediately;
     }
-    if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE)) {
+    if (retryOnConnectionFailure()) {
       // This is a pool failure.
       return RetryDecision::RetryWithBackoff;
     }
