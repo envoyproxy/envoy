@@ -159,12 +159,16 @@ public:
   ExecutionContext* executionContext() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  bool skipCallbackVisitor() const { return skip_callback_visitor_; }
+  std::unique_ptr<http2::adapter::Http2VisitorInterface> newVisitor();
+
 protected:
   friend class ProdNghttp2SessionFactory;
 
   /**
    * Wrapper for static nghttp2 callback dispatchers.
    */
+  // TODO: remove when removing `envoy.reloadable_features.http2_skip_callback_visitor`.
   class Http2Callbacks {
   public:
     Http2Callbacks();
@@ -177,7 +181,7 @@ protected:
   };
 
   class Http2Visitor : public http2::adapter::Http2VisitorInterface {
-   public:
+  public:
     using Http2ErrorCode = http2::adapter::Http2ErrorCode;
     using Http2PingId = http2::adapter::Http2PingId;
     using Http2Setting = http2::adapter::Http2Setting;
@@ -185,56 +189,50 @@ protected:
 
     explicit Http2Visitor(ConnectionImpl* connection);
 
+    void setStreamCloseListener(std::function<void(Http2StreamId)> f) {
+      stream_close_listener_ = std::move(f);
+    }
     int64_t OnReadyToSend(absl::string_view serialized) override;
-    void OnConnectionError(ConnectionError /*error*/) override { /* not implemented */ }
+    void OnConnectionError(ConnectionError /*error*/) override { /* not implemented */
+    }
     bool OnFrameHeader(Http2StreamId stream_id, size_t length, uint8_t type,
                        uint8_t flags) override;
     void OnSettingsStart() override { settings_.clear(); }
-    void OnSetting(Http2Setting setting) override {
-      settings_.push_back(setting);
-    }
+    void OnSetting(Http2Setting setting) override { settings_.push_back(setting); }
     void OnSettingsEnd() override;
     void OnSettingsAck() override {}
     bool OnBeginHeadersForStream(Http2StreamId stream_id) override;
-    OnHeaderResult OnHeaderForStream(Http2StreamId stream_id,
-                                     absl::string_view name_view,
+    OnHeaderResult OnHeaderForStream(Http2StreamId stream_id, absl::string_view name_view,
                                      absl::string_view value_view) override;
     bool OnEndHeadersForStream(Http2StreamId stream_id) override;
-    bool OnDataPaddingLength(Http2StreamId stream_id,
-                             size_t padding_length) override;
-    bool OnBeginDataForStream(Http2StreamId stream_id,
-                              size_t payload_length) override;
-    bool OnDataForStream(Http2StreamId stream_id,
-                         absl::string_view data) override;
+    bool OnDataPaddingLength(Http2StreamId stream_id, size_t padding_length) override;
+    bool OnBeginDataForStream(Http2StreamId stream_id, size_t payload_length) override;
+    bool OnDataForStream(Http2StreamId stream_id, absl::string_view data) override;
     bool OnEndStream(Http2StreamId stream_id) override;
     void OnRstStream(Http2StreamId stream_id, Http2ErrorCode error_code) override;
-    bool OnCloseStream(Http2StreamId stream_id,
-                       Http2ErrorCode error_code) override;
-    void OnPriorityForStream(Http2StreamId /*stream_id*/,
-                             Http2StreamId /*parent_stream_id*/, int /*weight*/,
-                             bool /*exclusive*/) override {}
+    bool OnCloseStream(Http2StreamId stream_id, Http2ErrorCode error_code) override;
+    void OnPriorityForStream(Http2StreamId /*stream_id*/, Http2StreamId /*parent_stream_id*/,
+                             int /*weight*/, bool /*exclusive*/) override {}
     void OnPing(Http2PingId ping_id, bool is_ack) override;
     void OnPushPromiseForStream(Http2StreamId /*stream_id*/,
                                 Http2StreamId /*promised_stream_id*/) override {}
-    bool OnGoAway(Http2StreamId last_accepted_stream_id,
-                  Http2ErrorCode error_code,
+    bool OnGoAway(Http2StreamId last_accepted_stream_id, Http2ErrorCode error_code,
                   absl::string_view opaque_data) override;
     void OnWindowUpdate(Http2StreamId stream_id, int window_increment) override;
-    int OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
-                          size_t length, uint8_t flags) override;
-    int OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
-                    uint8_t flags, uint32_t error_code) override;
-    bool OnInvalidFrame(Http2StreamId stream_id,
-                        InvalidFrameError error) override;
-    void OnBeginMetadataForStream(Http2StreamId /*stream_id*/,
-                                  size_t /*payload_length*/) override {}
-    bool OnMetadataForStream(Http2StreamId stream_id,
-                             absl::string_view metadata) override;
+    int OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
+                          uint8_t flags) override;
+    int OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length, uint8_t flags,
+                    uint32_t error_code) override;
+    bool OnInvalidFrame(Http2StreamId stream_id, InvalidFrameError error) override;
+    void OnBeginMetadataForStream(Http2StreamId /*stream_id*/, size_t /*payload_length*/) override {
+    }
+    bool OnMetadataForStream(Http2StreamId stream_id, absl::string_view metadata) override;
     bool OnMetadataEndForStream(Http2StreamId stream_id) override;
     void OnErrorDebug(absl::string_view message) override;
 
-   private:
+  private:
     ConnectionImpl* const connection_;
+    std::function<void(Http2StreamId)> stream_close_listener_;
     std::vector<http2::adapter::Http2Setting> settings_;
     struct FrameInfo {
       Http2StreamId stream_id;
@@ -715,6 +713,8 @@ protected:
 
   // Whether to use the new HTTP/2 library.
   bool use_oghttp2_library_;
+
+  // TODO: remove when removing `envoy.reloadable_features.http2_skip_callback_visitor`.
   static Http2Callbacks http2_callbacks_;
 
   // If deferred processing, the streams will be in LRU order based on when the
@@ -783,7 +783,6 @@ private:
   Status onGoAway(uint32_t error_code);
   void onWindowUpdate(int32_t /*stream_id*/, int /*window_increment*/) {}
   Status onHeaders(int32_t stream_id, size_t length, uint8_t flags);
-  void onEndStream(int32_t stream_id);
   Status onRstStream(int32_t stream_id, uint32_t error_code);
   Status onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
@@ -826,6 +825,9 @@ private:
   std::chrono::milliseconds keepalive_interval_;
   std::chrono::milliseconds keepalive_timeout_;
   uint32_t keepalive_interval_jitter_percent_;
+
+  const bool skip_callback_visitor_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_skip_callback_visitor");
 };
 
 /**
