@@ -1384,7 +1384,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
 }
 
 ValidationResults ContextImpl::customVerifyCertChainForQuic(
-    STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
+    STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     const CertValidator::ExtraValidationContext& validation_context, const std::string& host_name) {
   ASSERT(!tls_contexts_.empty());
