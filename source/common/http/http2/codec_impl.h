@@ -201,7 +201,7 @@ protected:
                        uint8_t flags) override;
     void OnSettingsStart() override { settings_.clear(); }
     void OnSetting(Http2Setting setting) override { settings_.push_back(setting); }
-    void OnSettingsEnd() override;
+    void OnSettingsEnd() override { connection_->onSettings(settings_); }
     void OnSettingsAck() override {}
     bool OnBeginHeadersForStream(Http2StreamId stream_id) override;
     OnHeaderResult OnHeaderForStream(Http2StreamId stream_id, absl::string_view name_view,

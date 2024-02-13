@@ -1911,8 +1911,6 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
-void ConnectionImpl::Http2Visitor::OnSettingsEnd() { connection_->onSettings(settings_); }
-
 bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
   auto status = connection_->onBeginHeaders(stream_id);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
