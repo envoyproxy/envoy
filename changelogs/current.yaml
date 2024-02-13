@@ -75,6 +75,10 @@ bug_fixes:
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
     received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
     ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: router |
+  change: |
+    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
+    controlled by ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
