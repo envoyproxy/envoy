@@ -140,8 +140,8 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
       sni, true /* TODO: ecdsa_capable */, false /* TODO: ocsp_capable */, cert_matched_sni);
 
   // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
-  // Both of these members are themselves refcounted, so it is safe to use them after ``ssl_ctx``
-  // goes out of scope after the function returns.
+  // Both of these members are themselves reference counted, so it is safe to use them after
+  // ``ssl_ctx`` goes out of scope after the function returns.
   return {tls_context.quic_cert_, tls_context.quic_private_key_};
 }
 
