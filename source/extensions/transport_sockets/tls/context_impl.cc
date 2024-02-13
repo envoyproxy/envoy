@@ -327,7 +327,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   // Use the SSL library to iterate over the configured ciphers.
   //
   // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
-  for (TlsContext& tls_context : tls_contexts_) {
+  for (Ssl::TlsContext& tls_context : tls_contexts_) {
     for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
       stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
     }
