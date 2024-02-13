@@ -35,7 +35,7 @@ enum class LogResult { Yes, No, Undecided };
 
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
-  void setupPolicy(envoy::config::rbac::v3::RBAC::Action action) {
+  void setupPolicy(envoy::config::rbac::v3::RBAC::Action action, string rules_stat_prefix = "") {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
     envoy::config::rbac::v3::Policy policy;
@@ -47,6 +47,7 @@ public:
     policy.add_principals()->set_any(true);
     config.mutable_rules()->set_action(action);
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
+    config.set_rules_stat_prefix(rules_stat_prefix);
 
     envoy::config::rbac::v3::Policy shadow_policy;
     auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
@@ -707,11 +708,10 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherShouldNotLog) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RulesStatPrefix) {
-  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
-  config_.set_rules_stat_prefix("rules_prefix_");
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "rules_prefix_");
 
-  EXPECT_EQ("test.rbac.rules_prefix.allowed", config_->stats().allowed_.name());
-  EXPECT_EQ("test.rbac.rules_prefix.denied", config_->stats().denied_.name());
+  EXPECT_EQ("test.rbac.rules_prefix_.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("test.rbac.rules_prefix_.denied", config_->stats().denied_.name());
 }
 
 // Upstream Ip and Port matcher tests.
