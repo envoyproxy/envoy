@@ -2043,10 +2043,6 @@ bool ConnectionImpl::Http2Visitor::OnGoAway(Http2StreamId /*last_accepted_stream
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
-void ConnectionImpl::Http2Visitor::OnWindowUpdate(Http2StreamId stream_id, int window_increment) {
-  connection_->onWindowUpdate(stream_id, window_increment);
-}
-
 int ConnectionImpl::Http2Visitor::OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id,
                                                     size_t length, uint8_t flags) {
   return connection_->onBeforeFrameSend(stream_id, length, frame_type, flags);
