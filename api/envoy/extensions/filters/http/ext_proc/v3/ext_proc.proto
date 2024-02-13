@@ -207,7 +207,7 @@ message ExternalProcessor {
   // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 16;
 
-  // Optional retry policy for the extenal grpc stream.
+  // Optional retry policy for the external grpc stream.
   config.route.v3.RetryPolicy retry_policy = 17;
 }
 
