@@ -13,7 +13,8 @@ public:
    * Resets the proxy settings monitor to the supplied monitor instance.
    * For tests only.
    */
-  void setSettingsMonitorForTest(std::unique_ptr<Network::AppleSystemProxySettingsMonitor>&& monitor);
+  void
+  setSettingsMonitorForTest(std::unique_ptr<Network::AppleSystemProxySettingsMonitor>&& monitor);
 
   /**
    * Resets the PAC URL resolver to the supplied instance.

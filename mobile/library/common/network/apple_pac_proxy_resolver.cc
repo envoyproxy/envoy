@@ -4,8 +4,9 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <dispatch/dispatch.h>
 
-#include "library/common/apple/utility.h"
 #include "source/common/common/assert.h"
+
+#include "library/common/apple/utility.h"
 
 namespace Envoy {
 namespace Network {

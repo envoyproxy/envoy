@@ -3,11 +3,13 @@
 namespace Envoy {
 namespace Network {
 
-void TestAppleProxyResolver::setSettingsMonitorForTest(std::unique_ptr<Network::AppleSystemProxySettingsMonitor>&& monitor) {
+void TestAppleProxyResolver::setSettingsMonitorForTest(
+    std::unique_ptr<Network::AppleSystemProxySettingsMonitor>&& monitor) {
   proxy_settings_monitor_ = std::move(monitor);
 }
 
-void TestAppleProxyResolver::setPacResolverForTest(std::unique_ptr<Network::ApplePacProxyResolver>&& resolver) {
+void TestAppleProxyResolver::setPacResolverForTest(
+    std::unique_ptr<Network::ApplePacProxyResolver>&& resolver) {
   pac_proxy_resolver_ = std::move(resolver);
 }
 
