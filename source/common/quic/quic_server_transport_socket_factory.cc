@@ -60,15 +60,10 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
 
   std::istringstream pem_stream(certs_str);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
-
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
       new quic::ProofSource::Chain(chain));
-  std::string error_details;
-  bssl::UniquePtr<X509> cert = parseDERCertificate(cert_chain->certs[0], &error_details);
-  if (cert == nullptr) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid leaf cert: ", error_details));
-  }
 
+  std::string error_details;
   bssl::UniquePtr<EVP_PKEY> pub_key(X509_get_pubkey(context.cert_chain_.get()));
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(pub_key.get(), &error_details);
   if (sign_alg == 0) {
