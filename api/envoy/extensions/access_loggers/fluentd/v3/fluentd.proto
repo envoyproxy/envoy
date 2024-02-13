@@ -47,7 +47,7 @@ message FluentdAccessLogConfig {
   // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#entry
   // Values are rendered as strings, numbers, or boolean values as appropriate.
   // Nested JSON objects may be produced by some command operators (e.g. FILTER_STATE or DYNAMIC_METADATA).
-  // See the documentation for a specific command operator for details.
+  // See :ref:`format string<config_access_log_format_strings>` documentation for a specific command operator details.
   //
   // .. validated-code-block:: yaml
   //   :type-name: envoy.extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig
