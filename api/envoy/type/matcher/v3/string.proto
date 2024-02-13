@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: String matcher]
 
 // Specifies the way to match a string.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message StringMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.StringMatcher";
 
@@ -61,6 +61,10 @@ message StringMatcher {
     //
     // * ``abc`` matches the value ``xyz.abc.def``
     string contains = 7 [(validate.rules).string = {min_len: 1}];
+
+    // Use an extension as the matcher type.
+    // [#extension-category: envoy.matching.string]
+    config.core.v3.TypedExtensionConfig extension = 8;
   }
 
   // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This
