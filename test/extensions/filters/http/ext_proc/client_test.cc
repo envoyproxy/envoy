@@ -5,9 +5,9 @@
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
-#include "test/test_common/utility.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

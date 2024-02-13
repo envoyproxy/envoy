@@ -3,16 +3,16 @@ syntax = "proto3";
 package envoy.extensions.filters.http.ext_proc.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
-import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/matcher/v3/string.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
-import "envoy/config/route/v3/route_components.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3";
 option java_outer_classname = "ExtProcProto";
@@ -208,7 +208,7 @@ message ExternalProcessor {
   MetadataOptions metadata_options = 16;
 
   // Optional retry policy for the extenal grpc stream.
-  envoy.config.route.v3.RetryPolicy retry_policy = 17;
+  config.route.v3.RetryPolicy retry_policy = 17;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of
