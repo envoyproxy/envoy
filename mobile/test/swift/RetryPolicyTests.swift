@@ -1,7 +1,7 @@
 import Envoy
 import XCTest
 
-final class RetryPolicyTests: XCTestCase {
+finl class RetryPolicyTests: XCTestCase {
   func testRetryPoliciesAreEqualWhenPropertiesAreEqual() {
     let policy1 = RetryPolicy(maxRetryCount: 123,
                               retryOn: [.connectFailure],
