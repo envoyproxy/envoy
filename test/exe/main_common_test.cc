@@ -45,6 +45,23 @@ const std::string& outOfMemoryPattern() {
 }
 #endif
 
+class StreamingAdminRequest : public Envoy::Server::Admin::Request {
+public:
+  static constexpr uint64_t NumChunks = 10;
+  static constexpr uint64_t BytesPerChunk = 10000;
+
+  StreamingAdminRequest() : chunk_(BytesPerChunk, 'a') {}
+  Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
+  bool nextChunk(Buffer::Instance& response) override {
+    response.add(chunk_);
+    return --chunks_remaining_ > 0;
+  }
+
+private:
+  const std::string chunk_;
+  uint64_t chunks_remaining_{NumChunks};
+};
+
 } // namespace
 
 /**
@@ -287,6 +304,44 @@ protected:
     return out;
   }
 
+  void setupStreamingRequest(absl::string_view prefix) {
+    Server::Admin& admin = *main_common_->server()->admin();
+    admin.addStreamingHandler(
+        std::string(prefix), "streaming api",
+        [](Server::AdminStream&) -> Server::Admin::RequestPtr {
+          return std::make_unique<StreamingAdminRequest>();
+        },
+        true, false);
+  }
+
+  using ChunksBytes = std::pair<uint64_t, uint64_t>;
+  ChunksBytes adminStreamingRequest(absl::string_view path, absl::string_view method) {
+    absl::Notification done;
+    std::vector<std::string> out;
+    MainCommonBase::AdminResponsePtr response = main_common_->adminRequest(path, method);
+    absl::Notification headers_notify;
+    response->getHeaders(
+        [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
+    headers_notify.WaitForNotification();
+    bool cont = true;
+    uint64_t num_chunks = 0;
+    uint64_t num_bytes = 0;
+    while (cont) {
+      absl::Notification chunk_notify;
+      response->nextChunk(
+          [&chunk_notify, &num_chunks, &num_bytes, &cont](Buffer::Instance& chunk, bool more) {
+            cont = more;
+            num_bytes += chunk.length();
+            chunk.drain(chunk.length());
+            ++num_chunks;
+            chunk_notify.Notify();
+          });
+      chunk_notify.WaitForNotification();
+    }
+
+    return ChunksBytes(num_chunks, num_bytes);
+  }
+
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
     envoy_thread_ = Thread::threadFactoryForTest().createThread([this]() {
@@ -367,6 +422,20 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminStreamingRequestGetStatsAndQuit) {
+  startEnvoy();
+  started_.WaitForNotification();
+
+  setupStreamingRequest("/stream");
+  ChunksBytes chunks_bytes = adminStreamingRequest("/stream", "GET");
+  EXPECT_EQ(StreamingAdminRequest::NumChunks, chunks_bytes.first);
+  EXPECT_EQ(StreamingAdminRequest::NumChunks * StreamingAdminRequest::BytesPerChunk,
+            chunks_bytes.second);
+
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
 }
