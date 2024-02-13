@@ -107,7 +107,7 @@ class SocketImpl : public virtual Socket {
 public:
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
              const Address::InstanceConstSharedPtr& remote_address,
-             const SocketCreationOptions& options, absl::Status& creation_status);
+             const SocketCreationOptions& options);
 
   // Network::Socket
   ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
@@ -126,7 +126,7 @@ public:
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
-    if (io_handle_->isOpen()) {
+    if (io_handle_ && io_handle_->isOpen()) {
       io_handle_->close();
     }
   }

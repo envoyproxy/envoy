@@ -26,7 +26,7 @@ IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
   return makePlatformSpecificSocket(socket_fd, socket_v6only, domain);
 }
 
-absl::StatusOr<IoHandlePtr> SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
+IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
                                         Address::IpVersion version, bool socket_v6only,
                                         const SocketCreationOptions& options) const {
   int protocol = 0;
@@ -69,22 +69,36 @@ absl::StatusOr<IoHandlePtr> SocketInterfaceImpl::socket(Socket::Type socket_type
   const Api::SysCallSocketResult result =
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
   if (!SOCKET_VALID(result.return_value_)) {
-// FIXME envoy bug                fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-    return absl::InvalidArgumentError("failed");
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_client_socket_creation_failure")) {
+      IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+      return nullptr;
+    } else {
+      RELEASE_ASSERT(!SOCKET_VALID(result.return_value_),
+                     fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+    }
   }
   IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
   const int rc = io_handle->setBlocking(false).return_value_;
-  RELEASE_ASSERT(!SOCKET_FAILURE(rc),
-                 fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+  if (SOCKET_FAILURE(result.return_value_)) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_client_socket_creation_failure")) {
+      IS_ENVOY_BUG(fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+      return nullptr;
+    } else {
+      RELEASE_ASSERT(SOCKET_FAILURE(rc),
+                     fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+    }
+  }
 #endif
 
   return io_handle;
 }
 
-absl::StatusOr<IoHandlePtr> SocketInterfaceImpl::socket(Socket::Type socket_type,
+IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
                                         const Address::InstanceConstSharedPtr addr,
                                         const SocketCreationOptions& options) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
@@ -93,11 +107,9 @@ absl::StatusOr<IoHandlePtr> SocketInterfaceImpl::socket(Socket::Type socket_type
     v6only = addr->ip()->ipv6()->v6only();
   }
 
-  auto io_handle_or_error =
+  IoHandlePtr io_handle =
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, options);
-  RETURN_IF_STATUS_NOT_OK(io_handle_or_error);
-  IoHandlePtr io_handle = std::move(io_handle_or_error.value());
-  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
+  if (io_handle && addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
       !Address::forceV6()) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(

@@ -140,12 +140,10 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
-  absl::Status creation_status;
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{}, creation_status);
-  if (!creation_status.ok()) { // FIXME test
-    connection_socket->close();
-    ENVOY_LOG_MISC(error, creation_status.message());
+      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
+  if (!connection_socket->isOpen()) {
+    ENVOY_LOG_MISC(error, "Failed to create socket");
     return connection_socket;
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());

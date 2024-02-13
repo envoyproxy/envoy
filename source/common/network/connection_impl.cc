@@ -113,7 +113,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(!ioHandle().isOpen() && delayed_close_timer_ == nullptr,
+  ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -140,7 +140,7 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -233,7 +233,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return State::Closed;
   } else if (inDelayedClose()) {
     return State::Closing;
@@ -268,7 +268,7 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (!ConnectionImpl::ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -325,7 +325,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -363,7 +363,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (inDelayedClose() || !filterChainWantsData()) {
     return;
   }
-  ASSERT(ioHandle().isOpen());
+  ASSERT(socket_->isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -649,7 +649,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore read event processing.
-  if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
+  if (socket_->isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
 }
@@ -818,7 +818,7 @@ void ConnectionImpl::onWriteReady() {
         }
 
         // If a callback closes the socket, stop iterating.
-        if (!ioHandle().isOpen()) {
+        if (!socket_->isOpen()) {
           return;
         }
       }
@@ -940,21 +940,13 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   setFailureReason("connect timeout");
 }
 
-std::unique_ptr<ClientSocketImpl> socketOrNullptr(const Address::InstanceConstSharedPtr& remote_address,
-                                                  const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  // We ignore the creation status as it will have ENVOY_BUGged on failure.
-  // Failure will be detected via the socket_->isOpen check below.
-  absl::Status creation_status;
-  return std::make_unique<ClientSocketImpl>(remote_address, options, creation_status);
-}
-
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_options)
-    : ClientConnectionImpl(dispatcher, socketOrNullptr(remote_address, options),
+    : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
                            source_address, std::move(transport_socket), options,
                            transport_options) {}
 
@@ -967,15 +959,12 @@ ClientConnectionImpl::ClientConnectionImpl(
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
-  if (!socket_->isOpen()) {  // FIXME
-      setFailureReason("early fail\n");
-      // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-      immediate_error_event_ = ConnectionEvent::LocalClose;
-
-      // Trigger a write event to close this connection out-of-band.
-      ioHandle().activateFileEvents(Event::FileReadyType::Write);
-      return;
+  if (!socket_->isOpen()) {
+    setFailureReason("socket creation failure");
+    // Set up the dispatcher to "close" the connection on the next loop after
+    // the owner has a chance to add callbacks.
+    dispatcher_.post([this]() { raiseEvent(ConnectionEvent::LocalClose); });
+    return;
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
