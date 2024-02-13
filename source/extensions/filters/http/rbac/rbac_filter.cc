@@ -64,6 +64,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, proto_config.rules_stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
+      per_rule_stats_(proto_config.track_per_rule_stats()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
                                                   action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
@@ -128,14 +129,14 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       ENVOY_LOG(debug, "shadow allowed, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_allowed_.inc();
-      if (!effective_policy_id.empty()) {
+      if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
         config_->stats().inc_policy_shadow_allowed(effective_policy_id);
       }
     } else {
       ENVOY_LOG(debug, "shadow denied, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_denied_.inc();
-      if (!effective_policy_id.empty()) {
+      if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
         config_->stats().inc_policy_shadow_denied(effective_policy_id);
       }
       shadow_resp_code =
@@ -162,7 +163,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     if (allowed) {
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();
-      if (!effective_policy_id.empty()) {
+      if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
         config_->stats().inc_policy_allowed(effective_policy_id);
       }
       return Http::FilterHeadersStatus::Continue;
@@ -172,7 +173,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
                                  absl::nullopt,
                                  Filters::Common::RBAC::responseDetail(log_policy_id));
       config_->stats().denied_.inc();
-      if (!effective_policy_id.empty()) {
+      if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
         config_->stats().inc_policy_denied(effective_policy_id);
       }
       return Http::FilterHeadersStatus::StopIteration;

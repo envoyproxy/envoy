@@ -67,6 +67,9 @@ message RBAC {
   // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with
   // shadow rules.
   string shadow_rules_stat_prefix = 3;
+
+  // If track_per_rulestats is true, counters will be published for each rule and shadow rule.
+  bool track_per_rule_stats = 6;
 }
 
 message RBACPerRoute {
