@@ -97,8 +97,6 @@ See the reference for :ref:`UpstreamTlsContexts <envoy_v3_api_msg_extensions.tra
   subject name, hash, etc. Other validation context configuration is typically required depending
   on the deployment.
 
-.. _arch_overview_ssl_cert_select:
-
 Custom Certificate Validator
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -109,6 +107,8 @@ configured on :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.tr
 For example, Envoy can be configured to verify peer certificates following the `SPIFFE <https://github.com/spiffe/spiffe>`_ specification
 with multiple trust bundles in a single listener or cluster.
 For more detail, please refer to :ref:`the documentation of custom_validator_config field<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.custom_validator_config>`.
+
+.. _arch_overview_ssl_cert_select:
 
 Certificate selection
 ---------------------
