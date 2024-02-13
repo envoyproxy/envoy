@@ -30,6 +30,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche_platform_impl/quiche_flags_impl.h"
+#include "quiche/common/platform/api/quiche_flags.h"
 #endif
 
 namespace Envoy {
@@ -60,10 +61,9 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
 #ifdef ENVOY_ENABLE_QUIC
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 
-  SetQuicheFlagImpl(
-      quic_always_support_server_preferred_address,
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients"));
+  SetQuicheFlag(quic_always_support_server_preferred_address,
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients"));
 
 #endif
   // Make sure ints are parsed after the flag allowing deprecated ints is parsed.
