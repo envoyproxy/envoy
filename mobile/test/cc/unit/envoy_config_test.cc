@@ -1,6 +1,10 @@
+#include <sys/socket.h>
+
 #include <string>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 
 #include "test/test_common/utility.h"
@@ -24,10 +28,13 @@ namespace {
 using namespace Platform;
 
 using envoy::config::bootstrap::v3::Bootstrap;
+using envoy::config::cluster::v3::Cluster;
+using envoy::config::core::v3::SocketOption;
 using DfpClusterConfig = ::envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig;
 using testing::HasSubstr;
 using testing::IsEmpty;
 using testing::Not;
+using testing::NotNull;
 using testing::SizeIs;
 
 DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
@@ -292,6 +299,38 @@ TEST(TestConfig, DisableHttp3) {
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
 #endif
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+TEST(TestConfig, SocketReceiveBufferSize) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* rcv_buf_option = nullptr;
+  for (const SocketOption& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == SO_RCVBUF) {
+      rcv_buf_option = &sock_opt;
+      break;
+    }
+  }
+
+  // When using an H3 cluster, the UDP receive buffer size option should always be set.
+  ASSERT_THAT(rcv_buf_option, NotNull());
+  EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
+  EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
+}
+#endif
 
 #ifdef ENVOY_MOBILE_XDS
 TEST(TestConfig, XdsConfig) {
