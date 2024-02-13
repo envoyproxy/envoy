@@ -5,10 +5,15 @@ licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
+# TODO(abeyad): Fix remote execution for all the tests in this file.
+
 envoy_mobile_swift_test(
     name = "http_request_using_proxy_test",
     srcs = [
         "HTTPRequestUsingProxyTest.swift",
+    ],
+    tags = [
+        "no-remote-exec",
     ],
     visibility = ["//visibility:public"],
     deps = [
