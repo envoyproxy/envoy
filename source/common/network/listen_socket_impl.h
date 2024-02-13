@@ -43,19 +43,12 @@ protected:
   bool isOpen() const override { return io_handle_ != nullptr && io_handle_->isOpen(); }
 };
 
-static IoHandlePtr createOrReleaseAssert(absl::StatusOr<IoHandlePtr>&& status_or_error) {
-  // Ideally this and the release assert below would be graceful failures but
-  // Envoy has hard-failed on socket creation since its inception.
-  RELEASE_ASSERT(status_or_error.ok(), std::string(status_or_error.status().message()));
-  return std::move(status_or_error.value());
-}
-
 template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
                       const SocketCreationOptions& creation_options = {})
-      : ListenSocketImpl(bind_to_port ? createOrReleaseAssert(Network::ioHandleForAddr(T::type, address, creation_options))
+      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address, creation_options)
                                       : nullptr,
                          address) {
     // Prebind is applied if the socket is bind to port.

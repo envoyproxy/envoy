@@ -44,14 +44,9 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
   Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
-    absl::Status creation_status;
-    auto ret = std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
+    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
                                                  /*remote_address=*/nullptr,
-                                                 Network::SocketCreationOptions{}, creation_status);
-    // Traditionally Envoy hard fails on socket creation failure.  It'd be good
-    // to handle this gracefully.
-    RELEASE_ASSERT(creation_status.ok(), std::string(creation_status.message()));
-    return ret;
+                                                 Network::SocketCreationOptions{});
   }
 
   bool valid() const override { return host_ != nullptr; }
