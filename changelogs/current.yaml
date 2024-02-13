@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: http
+  change: |
+    Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
+    previously used HTTP/1 parser).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
