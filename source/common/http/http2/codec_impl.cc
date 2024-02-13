@@ -1766,7 +1766,6 @@ void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);
-
   nghttp2_session_callbacks_set_send_callback(
       callbacks_,
       [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
@@ -1882,9 +1881,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       });
 }
 
-std::unique_ptr<http2::adapter::Http2VisitorInterface> ConnectionImpl::newVisitor() {
-  return std::make_unique<Http2Visitor>(this);
-}
+ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
 ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connection_(connection) {}
 
@@ -2078,8 +2075,6 @@ bool ConnectionImpl::Http2Visitor::OnMetadataEndForStream(Http2StreamId stream_i
 void ConnectionImpl::Http2Visitor::OnErrorDebug(absl::string_view message) {
   connection_->onError(message);
 }
-
-ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
 ConnectionImpl::Http2Options::Http2Options(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, uint32_t max_headers_kb) {
@@ -2379,7 +2374,6 @@ ServerConnectionImpl::ServerConnectionImpl(
       adapter_ = std::move(adapter);
     }
   }
-
   sendSettings(http2_options, false);
   allow_metadata_ = http2_options.allow_metadata();
 }

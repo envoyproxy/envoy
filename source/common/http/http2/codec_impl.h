@@ -160,7 +160,6 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override;
 
   bool skipCallbackVisitor() const { return skip_callback_visitor_; }
-  std::unique_ptr<http2::adapter::Http2VisitorInterface> newVisitor();
 
 protected:
   friend class ProdNghttp2SessionFactory;
@@ -180,6 +179,9 @@ protected:
     nghttp2_session_callbacks* callbacks_;
   };
 
+  /**
+   * This class handles protocol events from the codec layer.
+   */
   class Http2Visitor : public http2::adapter::Http2VisitorInterface {
   public:
     using Http2ErrorCode = http2::adapter::Http2ErrorCode;
@@ -218,7 +220,7 @@ protected:
                                 Http2StreamId /*promised_stream_id*/) override {}
     bool OnGoAway(Http2StreamId last_accepted_stream_id, Http2ErrorCode error_code,
                   absl::string_view opaque_data) override;
-    void OnWindowUpdate(Http2StreamId stream_id, int window_increment) override;
+    void OnWindowUpdate(Http2StreamId /*stream_id*/, int /*window_increment*/) override {}
     int OnBeforeFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length,
                           uint8_t flags) override;
     int OnFrameSent(uint8_t frame_type, Http2StreamId stream_id, size_t length, uint8_t flags,
@@ -232,7 +234,6 @@ protected:
 
   private:
     ConnectionImpl* const connection_;
-    std::function<void(Http2StreamId)> stream_close_listener_;
     std::vector<http2::adapter::Http2Setting> settings_;
     struct FrameInfo {
       Http2StreamId stream_id;
@@ -243,6 +244,8 @@ protected:
     FrameInfo current_frame_ = {};
     size_t padding_length_ = 0;
     size_t remaining_data_payload_ = 0;
+    // TODO: remove when removing `envoy.reloadable_features.http2_use_oghttp2`.
+    std::function<void(Http2StreamId)> stream_close_listener_;
   };
 
   /**
@@ -781,7 +784,6 @@ private:
   Status onPing(uint64_t opaque_data, bool is_ack);
   Status onBeginData(int32_t stream_id, size_t length, uint8_t flags, size_t padding);
   Status onGoAway(uint32_t error_code);
-  void onWindowUpdate(int32_t /*stream_id*/, int /*window_increment*/) {}
   Status onHeaders(int32_t stream_id, size_t length, uint8_t flags);
   Status onRstStream(int32_t stream_id, uint32_t error_code);
   Status onFrameReceived(const nghttp2_frame* frame);
