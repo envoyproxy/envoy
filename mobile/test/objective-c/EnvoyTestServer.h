@@ -3,6 +3,10 @@
 #import <Foundation/Foundation.h>
 
 // Interface for starting and managing a test server. Calls into to test_server.cc
+//
+// NB: Any test that utilizes this class must have a `no-remote-exec` tag in its BUILD target.
+// EnvoyTestServer binds to a listening socket on the machine it runs on, and on CI, this
+// operation is not permitted in remote execution environments.
 @interface EnvoyTestServer : NSObject
 
 // Get the port of the upstream server.
