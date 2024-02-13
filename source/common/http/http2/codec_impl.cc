@@ -1107,6 +1107,9 @@ enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
 }
 
 Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
+  ENVOY_CONN_LOG(trace, "recv frame type=PING", connection_);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
+
   if (is_ack) {
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, opaque_data);
 
@@ -1115,9 +1118,10 @@ Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
   return okStatus();
 }
 
-Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t flags,
                                    size_t padding) {
-  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, type, flags, padding));
+  ENVOY_CONN_LOG(trace, "recv frame type=DATA stream_id={}", connection_, stream_id);
+  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, NGHTTP2_DATA, flags, padding));
 
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
@@ -1133,6 +1137,7 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t typ
 }
 
 Status ConnectionImpl::onGoAway(uint32_t error_code) {
+  ENVOY_CONN_LOG(trace, "recv frame type=GOAWAY", connection_);
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
   // notifications are the same as a normal GOAWAY.
   // TODO: handle multiple GOAWAY frames.
@@ -1191,11 +1196,12 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
 }
 
 Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
-  ENVOY_CONN_LOG(trace, "remote reset: {} {}", connection_, stream_id, error_code);
+  ENVOY_CONN_LOG(trace, "recv frame type=RST_STREAM stream_id={}", connection_, stream_id);
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
     return okStatus();
   }
+  ENVOY_CONN_LOG(trace, "remote reset: {} {}", connection_, stream_id, error_code);
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(/*frame_length=*/4 + H2_FRAME_HEADER_SIZE);
   stream->remote_rst_ = true;
@@ -1221,8 +1227,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return onPing(data, frame->ping.hd.flags & NGHTTP2_FLAG_ACK);
   }
   if (frame->hd.type == NGHTTP2_DATA) {
-    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags,
-                       frame->data.padlen);
+    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.flags, frame->data.padlen);
   }
   if (frame->hd.type == NGHTTP2_GOAWAY) {
     ASSERT(frame->hd.stream_id == 0);
