@@ -42,9 +42,7 @@ struct RoleBasedAccessControlFilterStats {
     incCounter(per_policy_stat_, name, ".allowed");
   }
 
-  void inc_policy_denied(absl::string_view name) {
-    incCounter(per_policy_stat_, name, ".denied");
-  }
+  void inc_policy_denied(absl::string_view name) { incCounter(per_policy_stat_, name, ".denied"); }
 
   void inc_policy_shadow_allowed(absl::string_view name) {
     incCounter(per_policy_shadow_stat_, name, ".shadow_allowed");
