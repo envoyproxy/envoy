@@ -1,0 +1,35 @@
+config {
+  providers {
+    key: "H"
+    value {
+      remote_jwks {
+        http_uri {
+          uri: "https://exampl\037.com"
+          cluster: "provider1"
+          timeout {
+            seconds: 1
+            nanos: -687866108
+          }
+        }
+      }
+    }
+  }
+  rules {
+    match {
+      prefix: ""
+    }
+    requires {
+      allow_missing_or_failed {
+      }
+    }
+  }
+}
+request_data {
+  headers {
+    headers {
+      key: "authorization"
+      value: "Bearer eyJhbGciOiJSUzI1NiIsInR3cCI6IkpXVCJ9.eyJpc3MiOiJoZSIsImV4cCI6MjAwMTAwMTAwMX0.nexfP590ACPyXrivtsxg"
+    }
+  }
+}
+num_calls: 4

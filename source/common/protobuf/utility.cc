@@ -27,6 +27,48 @@ using namespace std::chrono_literals;
 namespace Envoy {
 namespace {
 
+absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
+                                     int64_t max_seconds_value) {
+  if (duration.seconds() < 0 || duration.nanos() < 0) {
+    return absl::OutOfRangeError(
+        fmt::format("Expected positive duration: {}", duration.DebugString()));
+  }
+  if (duration.nanos() > 999999999 || duration.seconds() > max_seconds_value) {
+    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
+  }
+  return absl::OkStatus();
+}
+
+void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
+  const auto result = validateDurationNoThrow(duration, max_seconds_value);
+  if (!result.ok()) {
+    throwEnvoyExceptionOrPanic(std::string(result.message()));
+  }
+}
+
+void validateDuration(const ProtobufWkt::Duration& duration) {
+  validateDuration(duration, Protobuf::util::TimeUtil::kDurationMaxSeconds);
+}
+
+void validateDurationAsMilliseconds(const ProtobufWkt::Duration& duration) {
+  // Apply stricter max boundary to the `seconds` value to avoid overflow.
+  // Note that protobuf internally converts to nanoseconds.
+  // The kMaxInt64Nanoseconds = 9223372036, which is about 300 years.
+  constexpr int64_t kMaxInt64Nanoseconds =
+      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+  validateDuration(duration, kMaxInt64Nanoseconds);
+}
+
+absl::Status validateDurationAsMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
+  constexpr int64_t kMaxInt64Nanoseconds =
+      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+  return validateDurationNoThrow(duration, kMaxInt64Nanoseconds);
+}
+
+} // namespace
+
+namespace {
+
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind('/');
   if (index == std::string::npos || index == full_path.size()) {
@@ -302,6 +344,58 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                  : nullptr;
   UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
   ProtobufMessage::traverseMessage(unexpected_field_visitor, message, recurse_into_any);
+}
+
+namespace {
+
+// A proto visitor that validates the correctness of google.protobuf.Duration messages
+// as defined by Envoy's duration constraints.
+class DurationFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
+public:
+  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
+    const Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
+    const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
+
+    // If this field is not in use, continue.
+    if ((field.is_repeated() && reflection->FieldSize(*reflectable_message, &field) == 0) ||
+        (!field.is_repeated() && !reflection->HasField(*reflectable_message, &field))) {
+      return;
+    }
+
+    // If this field is a repeated field or not of a duration type, continue.
+    if (field.is_repeated() || field.type() != google::protobuf::FieldDescriptor::TYPE_MESSAGE ||
+        field.message_type()->full_name() != "google.protobuf.Duration") {
+      return;
+    }
+
+    // If the field is populated in the message, validate its correctness.
+    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+    const Protobuf::FieldDescriptor* duration_field = descriptor->FindFieldByName(field.name());
+    if (duration_field != nullptr && reflection->HasField(message, duration_field)) {
+      ASSERT(duration_field != nullptr);
+      ProtobufWkt::Duration duration_message;
+      duration_message.MergeFrom(reflection->GetMessage(message, duration_field));
+      // Validate the value of the duration.
+      absl::Status status =
+          validateDurationNoThrow(duration_message, Protobuf::util::TimeUtil::kDurationMaxSeconds);
+      if (!status.ok()) {
+        throwEnvoyExceptionOrPanic(
+            fmt::format("Invalid duration in field '{}': {}", field.name(), status.message()));
+      }
+    }
+  }
+
+  void onMessage(const Protobuf::Message&, absl::Span<const Protobuf::Message* const>,
+                 bool) override {}
+};
+
+} // namespace
+
+void MessageUtil::validateDurationFields(const Protobuf::Message& message, bool recurse_into_any) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_duration_in_configs")) {
+    DurationFieldProtoVisitor duration_field_visitor;
+    ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any);
+  }
 }
 
 namespace {
@@ -714,48 +808,6 @@ ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& v
   val.set_allocated_list_value(list.release());
   return val;
 }
-
-namespace {
-
-absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
-                                     int64_t max_seconds_value) {
-  if (duration.seconds() < 0 || duration.nanos() < 0) {
-    return absl::OutOfRangeError(
-        fmt::format("Expected positive duration: {}", duration.DebugString()));
-  }
-  if (duration.nanos() > 999999999 || duration.seconds() > max_seconds_value) {
-    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
-  }
-  return absl::OkStatus();
-}
-
-void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
-  const auto result = validateDurationNoThrow(duration, max_seconds_value);
-  if (!result.ok()) {
-    throwEnvoyExceptionOrPanic(std::string(result.message()));
-  }
-}
-
-void validateDuration(const ProtobufWkt::Duration& duration) {
-  validateDuration(duration, Protobuf::util::TimeUtil::kDurationMaxSeconds);
-}
-
-void validateDurationAsMilliseconds(const ProtobufWkt::Duration& duration) {
-  // Apply stricter max boundary to the `seconds` value to avoid overflow.
-  // Note that protobuf internally converts to nanoseconds.
-  // The kMaxInt64Nanoseconds = 9223372036, which is about 300 years.
-  constexpr int64_t kMaxInt64Nanoseconds =
-      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-  validateDuration(duration, kMaxInt64Nanoseconds);
-}
-
-absl::Status validateDurationAsMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
-  constexpr int64_t kMaxInt64Nanoseconds =
-      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-  return validateDurationNoThrow(duration, kMaxInt64Nanoseconds);
-}
-
-} // namespace
 
 uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
   validateDurationAsMilliseconds(duration);

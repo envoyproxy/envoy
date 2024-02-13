@@ -1775,6 +1775,35 @@ TEST(DurationUtilTest, NoThrow) {
   }
 }
 
+// Validate that the duration in a message is validated correctly.
+TEST_F(ProtobufUtilityTest, MessageDurationValidation) {
+  // Once the runtime key is deprecated, the scoped_runtime should be removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.validate_duration_in_configs", "true"}});
+
+  {
+    envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    bootstrap.mutable_stats_flush_interval()->set_seconds(1);
+    EXPECT_NO_THROW(MessageUtil::validateDurationFields(bootstrap));
+  }
+  // Invalid durations.
+  {
+    envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    bootstrap.mutable_stats_flush_interval()->set_seconds(-1);
+    EXPECT_THROW_WITH_REGEX(
+        MessageUtil::validateDurationFields(bootstrap), EnvoyException,
+        "Invalid duration in field 'stats_flush_interval': Expected positive duration");
+  }
+  {
+    envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    bootstrap.mutable_stats_flush_interval()->set_seconds(1);
+    bootstrap.mutable_stats_flush_interval()->set_nanos(-100);
+    EXPECT_THROW_WITH_REGEX(
+        MessageUtil::validateDurationFields(bootstrap), EnvoyException,
+        "Invalid duration in field 'stats_flush_interval': Expected positive duration");
+  }
+}
+
 // Verify WIP accounting of the file based annotations. This test uses the strict validator to test
 // that code path.
 TEST_F(ProtobufUtilityTest, MessageInWipFile) {
