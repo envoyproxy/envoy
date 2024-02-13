@@ -33,8 +33,8 @@ The RBAC filter outputs statistics in the ``http.<stat_prefix>.rbac.`` namespace
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 
-For rules-based RBAC filters configured using :ref:`rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules`, the filter outputs additional statistics for per-rule
-granularity in the ``http.<stat_prefix>.rbac.policy`` namespace. Similarly, :ref:`shadow_rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules` are
+For rules-based RBAC filters configured using :ref:`rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules>`, the filter outputs additional statistics for per-rule
+granularity in the ``http.<stat_prefix>.rbac.policy`` namespace. Similarly, :ref:`shadow_rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules>` are
 in the ``http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.policy`` namespace.
 
 For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>`
