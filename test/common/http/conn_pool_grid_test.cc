@@ -599,20 +599,18 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
   // The first time a drain is started, both pools should start draining.
   {
     EXPECT_CALL(*grid_->first(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     EXPECT_CALL(*grid_->second(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
-    grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 
-  // The second time, the pools will not see any change.
+  // The second time a drain is started, both pools should still be notified.
   {
     EXPECT_CALL(*grid_->first(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-        .Times(0);
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
     EXPECT_CALL(*grid_->second(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-        .Times(0);
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
     grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
   {
