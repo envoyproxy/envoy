@@ -1951,9 +1951,8 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRemoteEndstreamWith1xxHeader) {
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
 
-  const uint32_t client_stream_idx = 1;
   // Start a request and wait for it to reach the upstream.
-  sendFrame(Http2Frame::makeRequest(client_stream_idx, "host", "/path/to/long/url"));
+  sendFrame(Http2Frame::makeRequest(1, "host", "/path/to/long/url"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
   ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
