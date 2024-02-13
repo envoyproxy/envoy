@@ -61,6 +61,8 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
 #ifdef ENVOY_ENABLE_QUIC
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
 
+  // Because this is a QUICHE protocol flag, this behavior can't be flipped with the above
+  // code, so it needs its own runtime flag and code to set it.
   SetQuicheFlag(quic_always_support_server_preferred_address,
                 Runtime::runtimeFeatureEnabled(
                     "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients"));
