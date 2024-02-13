@@ -1774,15 +1774,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   // member update callback registered with the local cluster.
   ENVOY_LOG(debug, "shutting down thread local cluster manager");
   destroying_ = true;
-  host_http_conn_pool_map_.clear();
-  host_tcp_conn_pool_map_.clear();
-  ASSERT(host_tcp_conn_map_.empty());
   for (auto& cluster : thread_local_clusters_) {
     if (&cluster.second->prioritySet() != local_priority_set_) {
       cluster.second.reset();
     }
   }
   thread_local_clusters_.clear();
+  host_http_conn_pool_map_.clear();
+  host_tcp_conn_pool_map_.clear();
+  ASSERT(host_tcp_conn_map_.empty());
 
   // Ensure that all pools are completely destructed.
   thread_local_dispatcher_.clearDeferredDeleteList();
