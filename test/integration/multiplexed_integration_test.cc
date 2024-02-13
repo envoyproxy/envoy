@@ -1959,7 +1959,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRemoteEndstreamWith1xxHeader) {
 
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
 
-  // A malformed frame with 103 header and END_STREAM is send, and should not crash Envoy.
+  // A malformed frame with 103 header and END_STREAM is sent, and should not crash Envoy.
   std::vector<uint8_t> header_frame =
       Hex::decode("0000050132000000012dfeff0110000005090d000000010903313033");
   std::string header_frame_str(reinterpret_cast<const char*>(header_frame.data()),
