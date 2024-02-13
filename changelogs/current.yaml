@@ -6,6 +6,11 @@ behavior_changes:
   change: |
     Remove the hop by hop TE header from downstream request headers if it's not set to ``trailers``, else keep it. This change can be
     temporarily reverted by setting ``envoy.reloadable_features.sanitize_te`` to false.
+- area: stats
+  change: |
+    The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
+    This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
+    be flushed to stat sinks.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
