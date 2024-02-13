@@ -40,6 +40,9 @@ public:
   uint32_t concurrency() const override { return 1; }
   void closeSocket() override {}
 
+  GenRequestFn createRequestFunction() const override { return nullptr; }
+  RequestPtr makeRequest(AdminStream&) const override { return nullptr; }
+
 private:
   ConfigTrackerImpl config_tracker_;
   Network::SocketSharedPtr socket_;

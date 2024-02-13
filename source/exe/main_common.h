@@ -34,6 +34,18 @@ public:
   bool run();
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
+  class AdminResponse {
+  public:
+    virtual ~AdminResponse() = default;
+
+    using HeadersFn = std::function<void(Http::Code, Http::ResponseHeaderMap& map)>;
+    virtual void getHeaders(HeadersFn fn) PURE;
+
+    using BodyFn = std::function<void(Buffer::Instance&, bool)>;
+    virtual void nextChunk(BodyFn fn) PURE;
+  };
+  using AdminResponsePtr = std::unique_ptr<AdminResponse>;
+
   using AdminRequestFn =
       std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
 
@@ -51,6 +63,7 @@ public:
   // semantics, rather than a handler callback.
   void adminRequest(absl::string_view path_and_query, absl::string_view method,
                     const AdminRequestFn& handler);
+  AdminResponsePtr adminRequest(absl::string_view path_and_query, absl::string_view method);
 #endif
 };
 
@@ -81,6 +94,10 @@ public:
   void adminRequest(absl::string_view path_and_query, absl::string_view method,
                     const MainCommonBase::AdminRequestFn& handler) {
     base_.adminRequest(path_and_query, method, handler);
+  }
+  MainCommonBase::AdminResponsePtr adminRequest(absl::string_view path_and_query,
+                                                absl::string_view method) {
+    return base_.adminRequest(path_and_query, method);
   }
 #endif
 

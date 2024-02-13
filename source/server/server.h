@@ -332,8 +332,7 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(
-      Stage stage, std::function<void()> completion_cb = [] {});
+  void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
 
@@ -352,7 +351,7 @@ private:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   bool workers_started_{false};
   std::atomic<bool> live_;
-  bool shutdown_{false};
+  std::atomic<bool> shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;

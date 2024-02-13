@@ -216,7 +216,7 @@ public:
   void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  GenRequestFn createRequestFunction() const {
+  GenRequestFn createRequestFunction() const override {
     return [this](AdminStream& admin_stream) -> RequestPtr { return makeRequest(admin_stream); };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
@@ -245,10 +245,7 @@ private:
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 #endif
 
-  /**
-   * Creates a Request from the request in the admin stream.
-   */
-  RequestPtr makeRequest(AdminStream& admin_stream) const;
+  RequestPtr makeRequest(AdminStream& admin_stream) const override;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.

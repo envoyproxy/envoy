@@ -89,6 +89,98 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
     handler(*response_headers, body);
   });
 }
+
+namespace {
+class AdminResponseImpl : public MainCommonBase::AdminResponse {
+public:
+  AdminResponseImpl(Server::Instance& server, absl::string_view path, absl::string_view method)
+      : server_(server), opt_admin_(server.admin()) {
+    request_headers_->setMethod(method);
+    request_headers_->setPath(path);
+  }
+
+  void getHeaders(HeadersFn fn) override {
+    if (!opt_admin_) {
+      fn(Http::Code::InternalServerError, *response_headers_);
+      return;
+    }
+
+    server_.dispatcher().post([this, fn]() {
+      if (!sent_headers_.exchange(true)) {
+        Server::AdminFilter filter(opt_admin_->createRequestFunction());
+        filter.decodeHeaders(*request_headers_, false);
+        request_ = opt_admin_->makeRequest(filter);
+        code_ = request_->start(*response_headers_);
+        Server::Utility::populateFallbackResponseHeaders(code_, *response_headers_);
+        fn(code_, *response_headers_);
+      }
+    });
+    if (server_.isShutdown()) {
+      if (!sent_headers_.exchange(true)) {
+        fn(Http::Code::InternalServerError, *response_headers_);
+      }
+    }
+  }
+
+  void nextChunk(BodyFn fn) override {
+    server_.dispatcher().post([this, fn]() {
+      while (response_.length() == 0 && more_data_) {
+        more_data_ = request_->nextChunk(response_);
+      }
+      /*      Buffer::SliceDataPtr slice;
+      absl::string_view chunk;
+      if (response_.length() != 0) {
+        slice = response_.extractMutableFrontSlice();
+        absl::Span<uint8_t> data = slice->getMutableData();
+        more_data_ |= response_.length() != 0;
+        chunk = absl::string_view(
+            reinterpret_cast<char*>(data.data()), data.size());
+      } else {
+        more_data_ = false;
+      }
+      sendChunk(fn, chunk, more_data_);
+      */
+      sendChunk(fn, response_, more_data_);
+    });
+
+    // We do not know if the post () worked.
+    if (server_.isShutdown()) {
+      Buffer::OwnedImpl error;
+      error.add("server was shut down");
+      sendChunk(fn, error, false);
+    }
+  }
+
+  void sendChunk(BodyFn fn, Buffer::Instance& chunk, bool more_data) {
+    {
+      absl::MutexLock lock(&mutex_);
+      if (sent_end_stream_) {
+        return;
+      }
+      sent_end_stream_ = !more_data;
+    }
+    fn(chunk, more_data);
+  }
+
+private:
+  Server::Instance& server_;
+  OptRef<Server::Admin> opt_admin_;
+  Buffer::OwnedImpl response_;
+  Http::Code code_;
+  Server::Admin::RequestPtr request_;
+  Http::RequestHeaderMapPtr request_headers_{Http::RequestHeaderMapImpl::create()};
+  Http::ResponseHeaderMapPtr response_headers_{Http::ResponseHeaderMapImpl::create()};
+  bool more_data_{true};
+  std::atomic<bool> sent_headers_{false};
+  bool sent_end_stream_{false};
+  absl::Mutex mutex_;
+};
+} // namespace
+
+MainCommonBase::AdminResponsePtr MainCommonBase::adminRequest(absl::string_view path_and_query,
+                                                              absl::string_view method) {
+  return std::make_unique<AdminResponseImpl>(*server(), path_and_query, method);
+}
 #endif
 
 MainCommon::MainCommon(const std::vector<std::string>& args)

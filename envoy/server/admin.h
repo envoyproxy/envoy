@@ -281,6 +281,13 @@ public:
    * Closes the listening socket for the admin.
    */
   virtual void closeSocket() PURE;
+
+  virtual GenRequestFn createRequestFunction() const PURE;
+
+  /**
+   * Creates a Request from the request in the admin stream.
+   */
+  virtual RequestPtr makeRequest(AdminStream& admin_stream) const PURE;
 };
 
 } // namespace Server
