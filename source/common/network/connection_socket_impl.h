@@ -40,8 +40,8 @@ public:
 
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address,
-                       const SocketCreationOptions& options)
-      : SocketImpl(type, local_address, remote_address, options) {
+                       const SocketCreationOptions& options, absl::Status& creation_status)
+      : SocketImpl(type, local_address, remote_address, options, creation_status) {
     connection_info_provider_->setLocalAddress(local_address);
   }
 
@@ -93,12 +93,14 @@ protected:
   std::vector<std::string> application_protocols_;
 };
 
+// FIXME(alyssar) test e2e with failure.
 // ConnectionSocket used with client connections.
 class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
-                   const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}),
+                   const OptionsSharedPtr& options,
+                   absl::Status& creation_status)
+      : ConnectionSocketImpl(getHandleAndSetStatus(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}), creation_status),
                              nullptr, remote_address) {
     if (options) {
       addOptions(options);

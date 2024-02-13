@@ -88,7 +88,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // Keep it as a bool flag to reduce the times calling runtime method..
   enable_rst_detect_send_ = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.detect_and_raise_rst_tcp_connection");
-
+  if (!socket_->isOpen()) {
+    IS_ENVOY_BUG("Client socket failure");
+    return;
+  }
   if (!connected) {
     connecting_ = true;
   }
@@ -937,13 +940,21 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   setFailureReason("connect timeout");
 }
 
+std::unique_ptr<ClientSocketImpl> socketOrNullptr(const Address::InstanceConstSharedPtr& remote_address,
+                                                  const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  // We ignore the creation status as it will have ENVOY_BUGged on failure.
+  // Failure will be detected via the socket_->isOpen check below.
+  absl::Status creation_status;
+  return std::make_unique<ClientSocketImpl>(remote_address, options, creation_status);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_options)
-    : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
+    : ClientConnectionImpl(dispatcher, socketOrNullptr(remote_address, options),
                            source_address, std::move(transport_socket), options,
                            transport_options) {}
 
@@ -956,6 +967,16 @@ ClientConnectionImpl::ClientConnectionImpl(
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
+  if (!socket_->isOpen()) {  // FIXME
+      setFailureReason("early fail\n");
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+      immediate_error_event_ = ConnectionEvent::LocalClose;
+
+      // Trigger a write event to close this connection out-of-band.
+      ioHandle().activateFileEvents(Event::FileReadyType::Write);
+      return;
+  }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 

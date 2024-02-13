@@ -4405,6 +4405,51 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   cleanupUpstreamAndDownstream();
 }
 
+// A singleton which will fail creation of the Nth socket
+class AllowForceFail : public Api::OsSysCallsImpl {
+public:
+ void startFailing() {
+   absl::MutexLock m(&mutex_);
+   fail_ = true;
+ }
+ Api::SysCallSocketResult socket(int domain, int type, int protocol) override {
+   absl::MutexLock m(&mutex_);
+   if (fail_) {
+     return {-1, 1};
+   }
+   return Api::OsSysCallsImpl::socket(domain, type, protocol);
+ }
+private:
+ absl::Mutex mutex_;
+ bool fail_ = false;
+};
+
+TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
+  AllowForceFail fail_socket_n_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  fail_socket_n_.startFailing();
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  //waitForNextUpstreamRequest();
+  ASSERT_TRUE(response->waitForReset());
+  /*
+
+  // Makes us have Envoy's writes to downstream return EBADF
+  Api::IoErrorPtr ebadf = Network::IoSocketError::getIoSocketEbadfError();
+  socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
+  socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  */
+  // Shut down the server and upstreams before os_calls goes out of scope to avoid syscalls
+  // during its removal.
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
+  fake_upstreams_.clear();
+}
+
+
 TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter

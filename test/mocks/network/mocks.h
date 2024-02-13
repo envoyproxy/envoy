@@ -330,8 +330,8 @@ public:
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr& options));
   MOCK_METHOD(const OptionsSharedPtr&, options, (), (const));
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
-  MOCK_METHOD(IoHandlePtr, socketForAddrPtr, (Socket::Type, const Address::InstanceConstSharedPtr),
+  MOCK_METHOD(absl::StatusOr<IoHandlePtr>, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
+  MOCK_METHOD(absl::StatusOr<IoHandlePtr>, socketForAddrPtr, (Socket::Type, const Address::InstanceConstSharedPtr),
               (const));
   MOCK_METHOD(Api::SysCallIntResult, bind, (const Address::InstanceConstSharedPtr));
   MOCK_METHOD(Api::SysCallIntResult, connect, (const Address::InstanceConstSharedPtr));
@@ -722,10 +722,10 @@ class MockSocketInterface : public SocketInterfaceImpl {
 public:
   explicit MockSocketInterface(const std::vector<Address::IpVersion>& versions)
       : versions_(versions.begin(), versions.end()) {}
-  MOCK_METHOD(IoHandlePtr, socket,
+  MOCK_METHOD(absl::StatusOr<IoHandlePtr>, socket,
               (Socket::Type, Address::Type, Address::IpVersion, bool, const SocketCreationOptions&),
               (const));
-  MOCK_METHOD(IoHandlePtr, socket,
+  MOCK_METHOD(absl::StatusOr<IoHandlePtr>, socket,
               (Socket::Type, const Address::InstanceConstSharedPtr, const SocketCreationOptions&),
               (const));
   bool ipFamilySupported(int domain) override {

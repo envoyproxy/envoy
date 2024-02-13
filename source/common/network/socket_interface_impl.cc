@@ -26,7 +26,7 @@ IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
   return makePlatformSpecificSocket(socket_fd, socket_v6only, domain);
 }
 
-IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
+absl::StatusOr<IoHandlePtr> SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
                                         Address::IpVersion version, bool socket_v6only,
                                         const SocketCreationOptions& options) const {
   int protocol = 0;
@@ -68,8 +68,10 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
   const Api::SysCallSocketResult result =
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
-  RELEASE_ASSERT(SOCKET_VALID(result.return_value_),
-                 fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+  if (!SOCKET_VALID(result.return_value_)) {
+// FIXME envoy bug                fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+    return absl::InvalidArgumentError("failed");
+  }
   IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
 
 #if defined(__APPLE__) || defined(WIN32)
@@ -82,7 +84,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   return io_handle;
 }
 
-IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
+absl::StatusOr<IoHandlePtr> SocketInterfaceImpl::socket(Socket::Type socket_type,
                                         const Address::InstanceConstSharedPtr addr,
                                         const SocketCreationOptions& options) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
@@ -91,8 +93,10 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
     v6only = addr->ip()->ipv6()->v6only();
   }
 
-  IoHandlePtr io_handle =
+  auto io_handle_or_error =
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, options);
+  RETURN_IF_STATUS_NOT_OK(io_handle_or_error);
+  IoHandlePtr io_handle = std::move(io_handle_or_error.value());
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
       !Address::forceV6()) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.

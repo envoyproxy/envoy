@@ -107,7 +107,7 @@ class SocketImpl : public virtual Socket {
 public:
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
              const Address::InstanceConstSharedPtr& remote_address,
-             const SocketCreationOptions& options);
+             const SocketCreationOptions& options, absl::Status& creation_status);
 
   // Network::Socket
   ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
@@ -130,7 +130,7 @@ public:
       io_handle_->close();
     }
   }
-  bool isOpen() const override { return io_handle_->isOpen(); }
+  bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();
