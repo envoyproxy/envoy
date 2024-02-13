@@ -38,6 +38,10 @@ template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val)
     // Do not include 32-byte per-entry overhead while counting header size.
     return false;
   }
+  if (name == "quic_always_support_server_preferred_address") {
+    // Envoy should send server preferred address without a client option by default.
+    return true;
+  }
 
   return val;
 }

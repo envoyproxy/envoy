@@ -170,6 +170,7 @@ run:
     - envoy/**/*
     - source/**/*
     - test/**/*
+    - VERSION.txt
   build-macos:
     paths:
     - .bazelrc

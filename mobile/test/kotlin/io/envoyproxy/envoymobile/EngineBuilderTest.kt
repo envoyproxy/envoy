@@ -1,8 +1,8 @@
 package io.envoyproxy.envoymobile
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.mockito.Mockito.mock
 
