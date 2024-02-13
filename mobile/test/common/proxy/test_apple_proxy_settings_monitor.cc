@@ -4,7 +4,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 
 namespace Envoy {
-namespace test {
+namespace Network {
 
 TestAppleSystemProxySettingsMonitor::TestAppleSystemProxySettingsMonitor(
     const std::string& host, const int port, const bool use_pac_resolver,
@@ -64,5 +64,5 @@ CFDictionaryRef TestAppleSystemProxySettingsMonitor::getSystemProxySettingsWithP
   return settings_dict;
 }
 
-} // namespace test
+} // namespace Network
 } // namespace Envoy

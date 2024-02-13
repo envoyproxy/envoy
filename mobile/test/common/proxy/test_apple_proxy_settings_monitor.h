@@ -6,7 +6,7 @@
 #include "library/common/network/proxy_settings.h"
 
 namespace Envoy {
-namespace test {
+namespace Network {
 
 class TestAppleSystemProxySettingsMonitor : public Network::AppleSystemProxySettingsMonitor {
 public:
@@ -30,5 +30,5 @@ protected:
   const int one_{1};
 };
 
-} // namespace test
+} // namespace Network
 } // namespace Envoy

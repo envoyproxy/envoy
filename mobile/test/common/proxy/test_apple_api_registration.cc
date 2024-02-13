@@ -1,6 +1,7 @@
 #include "test/common/proxy/test_apple_api_registration.h"
 
 #include "test/common/proxy/test_apple_pac_proxy_resolver.h"
+#include "test/common/proxy/test_apple_proxy_resolver.h"
 #include "test/common/proxy/test_apple_proxy_settings_monitor.h"
 
 #include "library/common/api/external.h"
@@ -23,16 +24,16 @@ void registerTestAppleProxyResolver(absl::string_view host, int port, const bool
     wrapped.reset();
   }
 
-  // Create a new test AppleProxyResolver.
-  auto test_resolver = std::make_unique<Envoy::Network::AppleProxyResolver>();
+  // Create a new test proxy resolver.
+  auto test_resolver = std::make_unique<Envoy::Network::TestAppleProxyResolver>();
   // Create a TestAppleSystemProxySettingsMonitor and set the test resolver to use it.
   test_resolver->setSettingsMonitorForTest(
-      std::make_unique<Envoy::test::TestAppleSystemProxySettingsMonitor>(
+      std::make_unique<Envoy::Network::TestAppleSystemProxySettingsMonitor>(
           std::string(host), port, use_pac_resolver, test_resolver->proxySettingsUpdater()));
   if (use_pac_resolver) {
     // Create a TestApplePacProxyResolver and set the test resolver to use it.
     test_resolver->setPacResolverForTest(
-        std::make_unique<Envoy::test::TestApplePacProxyResolver>(std::string(host), port));
+        std::make_unique<Envoy::Network::TestApplePacProxyResolver>(std::string(host), port));
   }
   // Start the resolver, as we do when registering the envoy_proxy_resolver API.
   test_resolver->start();

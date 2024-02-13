@@ -154,7 +154,7 @@ open class EngineBuilder: NSObject {
   private var quicHints: [String: Int] = [:]
   private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
-  private var enableProxying: Bool = false
+  private var respectSystemProxySettings: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
@@ -376,12 +376,13 @@ open class EngineBuilder: NSObject {
   /// critical issues in the implementation of the proxying feature. It's intended to be removed
   /// after it's confirmed that proxies on iOS work as expected.
   ///
-  /// - parameter enableProxying: whether to enable Envoy's support for proxies.
+  /// - parameter respectSystemProxySettings: whether to use the system's proxy settings for
+  ///                                         outbound connections.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableProxying(_ enableProxying: Bool) -> Self {
-    self.enableProxying = enableProxying
+  public func respectSystemProxySettings(_ respectSystemProxySettings: Bool) -> Self {
+    self.respectSystemProxySettings = respectSystemProxySettings
     return self
   }
 
@@ -717,7 +718,7 @@ open class EngineBuilder: NSObject {
                                       },
                                       eventTracker: self.eventTracker,
                                       networkMonitoringMode: Int32(self.monitoringMode.rawValue),
-                                      enableProxying: self.enableProxying)
+                                      respectSystemProxySettings: self.respectSystemProxySettings)
     let config = self.makeConfig()
 #if canImport(EnvoyCxxSwiftInterop)
     if self.enableSwiftBootstrap {

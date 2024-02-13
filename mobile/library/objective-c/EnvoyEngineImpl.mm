@@ -408,7 +408,7 @@ static void ios_track_event(envoy_map map, const void *context) {
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode
-                         enableProxying:(BOOL)enableProxying {
+             respectSystemProxySettings:(BOOL)respectSystemProxySettings {
   self = [super init];
   if (!self) {
     return nil;
@@ -439,7 +439,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   _engine = new Envoy::InternalEngine(native_callbacks, native_logger, native_event_tracker);
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
-  if (enableProxying) {
+  if (respectSystemProxySettings) {
     registerAppleProxyResolver();
   }
 

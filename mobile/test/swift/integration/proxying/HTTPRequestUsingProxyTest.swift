@@ -27,7 +27,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
-      .enableProxying(true)
+      .respectSystemProxySettings(true)
       .build()
 
     EnvoyTestApi.registerTestProxyResolver("127.0.0.1", port: port, usePacResolver: false)
@@ -81,7 +81,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
-      .enableProxying(true)
+      .respectSystemProxySettings(true)
       .build()
 
     EnvoyTestApi.registerTestProxyResolver("127.0.0.1", port: port, usePacResolver: false)
@@ -137,7 +137,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }
-      .enableProxying(true)
+      .respectSystemProxySettings(true)
       .build()
 
     EnvoyTestApi.registerTestProxyResolver("127.0.0.1", port: port, usePacResolver: true)

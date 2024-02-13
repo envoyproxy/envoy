@@ -8,7 +8,7 @@
 #include "library/common/network/proxy_settings.h"
 
 namespace Envoy {
-namespace test {
+namespace Network {
 
 namespace {
 
@@ -88,5 +88,5 @@ CFRunLoopSourceRef TestApplePacProxyResolver::createPacUrlResolverSource(
   return run_loop_source;
 }
 
-} // namespace test
+} // namespace Network
 } // namespace Envoy

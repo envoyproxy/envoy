@@ -1,9 +1,11 @@
 #include "library/common/network/apple_pac_proxy_resolver.h"
 
 #include <CFNetwork/CFNetwork.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <dispatch/dispatch.h>
 
 #include "library/common/apple/utility.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Network {
@@ -11,9 +13,9 @@ namespace Network {
 namespace {
 
 // Creates a CFURLRef from a C++ string URL.
-CFURLRef createCFURL(absl::string_view url_string) {
+CFURLRef createCFURL(const std::string& url_string) {
   auto cf_url_string =
-      CFStringCreateWithCString(kCFAllocatorDefault, url_string.begin(), kCFStringEncodingUTF8);
+      CFStringCreateWithCString(kCFAllocatorDefault, url_string.c_str(), kCFStringEncodingUTF8);
   auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, /*baseURL=*/nullptr);
   CFRelease(cf_url_string);
   return cf_url;
@@ -30,6 +32,7 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
 
   std::vector<ProxySettings> proxies;
   if (cf_error != nullptr || cf_proxies == nullptr) {
+    ENVOY_BUG(cf_error != nullptr, Apple::toString(CFErrorCopyDescription(cf_error)));
     // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
     // system (URLSession) is doing.
     (*completion_callback)(proxies);
@@ -72,11 +75,10 @@ ApplePacProxyResolver::createPacUrlResolverSource(CFURLRef cf_proxy_autoconfigur
 }
 
 void ApplePacProxyResolver::resolveProxies(
-    absl::string_view target_url_string, absl::string_view proxy_autoconfiguration_file_url_string,
+    const std::string& target_url, const std::string& proxy_autoconfiguration_file_url,
     ProxySettingsResolvedCallback proxy_resolution_completed) {
-  CFURLRef cf_target_url = createCFURL(target_url_string);
-  CFURLRef cf_proxy_autoconfiguration_file_url =
-      createCFURL(proxy_autoconfiguration_file_url_string);
+  CFURLRef cf_target_url = createCFURL(target_url);
+  CFURLRef cf_proxy_autoconfiguration_file_url = createCFURL(proxy_autoconfiguration_file_url);
 
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback =
       std::make_unique<ProxySettingsResolvedCallback>(std::move(proxy_resolution_completed));

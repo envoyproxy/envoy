@@ -6,7 +6,7 @@
 #include "library/common/network/apple_pac_proxy_resolver.h"
 
 namespace Envoy {
-namespace test {
+namespace Network {
 
 class TestApplePacProxyResolver : public Network::ApplePacProxyResolver {
 public:
@@ -23,5 +23,5 @@ protected:
   std::unique_ptr<CFRunLoopSourceContext> run_loop_context_;
 };
 
-} // namespace test
+} // namespace Network
 } // namespace Envoy

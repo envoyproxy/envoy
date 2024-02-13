@@ -63,6 +63,8 @@ bool NetworkConfigurationFilter::onAddressResolved(
 void NetworkConfigurationFilter::onProxyResolutionComplete(
     Network::ProxySettingsConstSharedPtr proxy_settings) {
   if (continueWithProxySettings(proxy_settings) == Http::FilterHeadersStatus::Continue) {
+    // PAC URL resolution happens via Apple APIs on a separate thread (Apple's run loop thread), so
+    // we schedule the continuation callback on the engine's dispatcher.
     continue_decoding_callback_ = decoder_callbacks_->dispatcher().createSchedulableCallback(
         [this]() { decoder_callbacks_->continueDecoding(); });
     continue_decoding_callback_->scheduleCallbackNextIteration();
@@ -78,14 +80,16 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
     return Http::FilterHeadersStatus::Continue;
   }
 
+  // For iOS, we use the `envoy_proxy_resolver` API, which reads proxy settings asynchronously,
+  // and callbacks are invoked in the filter when proxy settings are updated.
   auto* proxy_resolver = static_cast<Network::ProxyResolverApi*>(
       Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
   if (proxy_resolver != nullptr) {
     return resolveProxy(request_headers, proxy_resolver);
   }
 
-  // TODO(abeyad): Migrate Android so that it uses API registry instead of calling
-  // getProxySettings().
+  // For Android, proxy settings are pushed to the ConnectivityManager and synchronously handled
+  // here.
   const auto proxy_settings = connectivity_manager_->getProxySettings();
   return continueWithProxySettings(proxy_settings);
 }

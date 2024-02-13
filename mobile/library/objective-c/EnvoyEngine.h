@@ -33,13 +33,14 @@ NS_ASSUME_NONNULL_BEGIN
  @param logger Logging interface.
  @param eventTracker Event tracking interface.
  @param networkMonitoringMode Configure how the engines observe network reachability.
- @param enableProxying Whether to respect system proxy settings when performing network requests.
+ @param respectSystemProxySettings Whether to respect system proxy settings when performing
+ network requests.
  */
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode
-                         enableProxying:(BOOL)enableProxying;
+             respectSystemProxySettings:(BOOL)respectSystemProxySettings;
 /**
  Run the Envoy engine with the provided configuration and log level.
 

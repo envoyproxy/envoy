@@ -43,23 +43,14 @@ public:
    */
   SystemProxySettingsReadCallback proxySettingsUpdater();
 
-  /**
-   * Resets the proxy settings monitor to the supplied monitor instance.
-   * For tests only.
-   */
-  void setSettingsMonitorForTest(std::unique_ptr<AppleSystemProxySettingsMonitor>&& monitor);
-
-  /**
-   * Resets the PAC URL resolver to the supplied instance.
-   * For tests only.
-   */
-  void setPacResolverForTest(std::unique_ptr<ApplePacProxyResolver>&& resolver);
-
 private:
+  friend class TestAppleProxyResolver;
+
   std::unique_ptr<AppleSystemProxySettingsMonitor> proxy_settings_monitor_;
   std::unique_ptr<ApplePacProxyResolver> pac_proxy_resolver_;
   absl::optional<SystemProxySettings> proxy_settings_;
   absl::Mutex mutex_;
+  bool started_;
 };
 
 } // namespace Network

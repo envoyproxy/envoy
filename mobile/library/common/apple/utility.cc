@@ -10,7 +10,7 @@ std::string toString(CFStringRef cf_string) {
   // does not allow this to be returned efficiently.
   // CFStringGetCStringPtr will return a pointer to the string with no memory allocation and in
   // constant time, if it can; otherwise, it will return null.
-  auto efficient_c_str = CFStringGetCStringPtr(cf_string, kCFStringEncodingUTF8);
+  const char* efficient_c_str = CFStringGetCStringPtr(cf_string, kCFStringEncodingUTF8);
   if (efficient_c_str) {
     return std::string(efficient_c_str);
   }
@@ -35,7 +35,7 @@ int toInt(CFNumberRef number) {
     return 0;
   }
 
-  int value;
+  int value = 0;
   const bool ret = CFNumberGetValue(number, kCFNumberSInt32Type, &value);
   ENVOY_BUG(ret, "CFNumberGetValue failed to convert CFNumberRef to int.");
 
