@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.jwt_authn.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
@@ -53,7 +54,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -103,6 +104,20 @@ message JwtProvider {
   //     - bookstore_web.apps.googleusercontent.com
   //
   repeated string audiences = 2;
+
+  // Restrict the `subjects <https://tools.ietf.org/html/rfc7519#section-4.1.2>`_
+  // that the JwtProvider can assert. For instance, this could implement JWT-SVID
+  // `subject restrictions <https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md#31-subject>`_.
+  // If not specified, will not check subjects in the token.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     subjects:
+  //       prefix: spiffe://spiffe.example.com/
+  //
+  type.matcher.v3.StringMatcher subjects = 19;
 
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.

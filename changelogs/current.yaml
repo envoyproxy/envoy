@@ -173,5 +173,10 @@ new_features:
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
+- area: jwt_authn
+  change: |
+    Added
+    :ref:`subjects <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.subjects>` to allow restrictions
+    of subjects a ``JwtProvider`` can assert.
 
 deprecated:

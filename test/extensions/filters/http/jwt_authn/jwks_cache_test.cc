@@ -181,6 +181,46 @@ TEST_F(JwksCacheTest, TestAudiences) {
   EXPECT_FALSE(jwks->areAudiencesAllowed({"wrong-audience1", "wrong-audience2"}));
 }
 
+// Test subject constraints for JwtProvider
+TEST_F(JwksCacheTest, TestSubjects) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+  setupCache(SubjectConfig);
+
+  {
+    auto jwks = cache_->findByIssuer("https://example.com");
+
+    // example.com has a suffix constraint of "@example.com"
+    EXPECT_TRUE(jwks->isSubjectAllowed("test@example.com"));
+    // Negative test for other subjects
+    EXPECT_FALSE(jwks->isSubjectAllowed("othersubject"));
+  }
+
+  {
+    auto jwks = cache_->findByIssuer("https://spiffe.example.com");
+
+    // Provider has a prefix constraint of spiffe://spiffe.example.com
+    EXPECT_TRUE(jwks->isSubjectAllowed("spiffe://spiffe.example.com/service"));
+    // Negative test for other subjects
+    EXPECT_FALSE(jwks->isSubjectAllowed("spiffe://spiffe.baz.com/service"));
+  }
+
+  {
+    auto jwks = cache_->findByIssuer("https://nosub.com");
+
+    // Provider no constraints, so test any subject should be allowed
+    EXPECT_TRUE(jwks->isSubjectAllowed("any_subject"));
+  }
+
+  {
+    auto jwks = cache_->findByIssuer("https://regexsub.com");
+
+    // Provider allows spiffe://*.example.com/
+    EXPECT_TRUE(jwks->isSubjectAllowed("spiffe://test1.example.com/service"));
+    EXPECT_TRUE(jwks->isSubjectAllowed("spiffe://test2.example.com/service"));
+    EXPECT_FALSE(jwks->isSubjectAllowed("spiffe://test1.baz.com/service"));
+  }
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

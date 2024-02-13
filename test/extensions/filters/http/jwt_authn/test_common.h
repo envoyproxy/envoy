@@ -66,6 +66,52 @@ const char PublicKey[] = R"(
 }
 )";
 
+// Provider config with various subject constraints
+const char SubjectConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    subjects:
+      suffix: "@example.com"
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  spiffe_provider:
+    issuer: https://spiffe.example.com
+    subjects:
+      prefix: spiffe://spiffe.example.com/
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  no_subj_provider:
+    issuer: https://nosub.com
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  regex_provider:
+    issuer: https://regexsub.com
+    subjects:
+      safe_regex:
+      safe_regex:
+        regex: "spiffe://.*\\.example\\.com/.*"
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+
+)";
+
 // A good config.
 const char ExampleConfig[] = R"(
 providers:

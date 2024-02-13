@@ -241,6 +241,13 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
+  const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);
+
+  if (!sub_allowed) {
+    doneWithStatus(Status::JwtVerificationFail);
+    return;
+  }
+
   if (use_jwt_cache) {
     handleGoodJwt(/*cache_hit=*/true);
     return;
