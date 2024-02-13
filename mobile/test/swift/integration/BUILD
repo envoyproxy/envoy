@@ -10,6 +10,11 @@ envoy_mobile_swift_test(
     srcs = [
         "EndToEndNetworkingTest.swift",
     ],
+    # The test starts an Envoy server, which binds to a local socket. Binding to a local socket is
+    # not permitted on remote execution hosts, so we have to add the `no-remote-exec` tag.
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -70,6 +75,11 @@ envoy_mobile_swift_test(
     name = "idle_timeout_test",
     srcs = [
         "IdleTimeoutTest.swift",
+    ],
+    # The test starts an Envoy server, which binds to a local socket. Binding to a local socket is
+    # not permitted on remote execution hosts, so we have to add the `no-remote-exec` tag.
+    tags = [
+        "no-remote-exec",
     ],
     visibility = ["//visibility:public"],
     deps = [
