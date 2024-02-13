@@ -128,7 +128,7 @@ FlagRegistry& FlagRegistry::getInstance() {
          2);
   ASSERT(sizeof(quiche_protocol_flag_overrides) /
              sizeof(std::pair<absl::string_view, absl::variant<bool, uint32_t>>) ==
-         2);
+         3);
   return *instance;
 }
 

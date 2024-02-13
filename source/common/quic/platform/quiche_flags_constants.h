@@ -32,7 +32,9 @@
    * for now. 512MB is way too large, but the actual bytes buffered should be bound by the         \
    * negotiated upstream flow control window. */                                                   \
   KEY_VALUE_PAIR(quic_buffered_data_threshold,                                                     \
-                 2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE)
+                 2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE)   \
+  /* Envoy should send server preferred address without a client option by default. */             \
+  KEY_VALUE_PAIR(quic_always_support_server_preferred_address, true)
 
 namespace quiche {
 
