@@ -248,8 +248,11 @@ private:
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
-  void setUpstreamOverrideHost(absl::string_view) override {}
-  absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+  upstreamOverrideHost() const override {
+    return absl::nullopt;
+  }
   absl::string_view filterConfigName() const override { return ""; }
   RequestHeaderMapOptRef requestHeaders() override { return makeOptRefFromPtr(request_headers_); }
   RequestTrailerMapOptRef requestTrailers() override {
@@ -272,6 +275,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
+  const std::unique_ptr<const Router::RetryPolicy> retry_policy_;
   std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};

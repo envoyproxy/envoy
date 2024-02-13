@@ -11,6 +11,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -728,7 +729,7 @@ public:
         0,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
+        {}, empty_host_vector_, empty_host_vector_, random_.random(), absl::nullopt);
   }
 
   void peekThenPick(std::vector<int> picks) {
@@ -2880,7 +2881,13 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 }
 
-TEST_P(LeastRequestLoadBalancerTest, FullScan) {
+TEST_P(LeastRequestLoadBalancerTest, DefaultSelectionMethod) {
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  EXPECT_EQ(lr_lb_config.selection_method(),
+            envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::N_CHOICES);
+}
+
+TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
@@ -2895,38 +2902,73 @@ TEST_P(LeastRequestLoadBalancerTest, FullScan) {
   hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[4]->stats().rq_active_.set(5);
 
-  // Creating various load balancer objects with different choice configs.
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
-  lr_lb_config.mutable_choice_count()->set_value(2);
-  // Enable full table scan on hosts
-  lr_lb_config.mutable_enable_full_scan()->set_value(true);
-  common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(3);
-  LeastRequestLoadBalancer lb_3{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(4);
-  LeastRequestLoadBalancer lb_4{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
-  lr_lb_config.mutable_choice_count()->set_value(6);
-  LeastRequestLoadBalancer lb_6{priority_set_, nullptr, stats_,       runtime_,
-                                random_,       1,       lr_lb_config, simTime()};
+  // Enable FULL_SCAN on hosts.
+  lr_lb_config.set_selection_method(
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
 
-  // random is called only once every time and is not to select the host.
+  LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
+                              random_,       1,       lr_lb_config, simTime()};
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_2.chooseHost(nullptr));
+  // With FULL_SCAN we will always choose the host with least number of active requests.
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
+}
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_3.chooseHost(nullptr));
+TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_4.chooseHost(nullptr));
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[4]->stats().rq_active_.set(1);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(9999));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_6.chooseHost(nullptr));
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+
+  // Enable FULL_SCAN on hosts.
+  lr_lb_config.set_selection_method(
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
+
+  auto random = Random::RandomGeneratorImpl();
+
+  LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
+                              random,        1,       lr_lb_config, simTime()};
+
+  // Make 1 million selections. Then, check that the selection probability is
+  // approximately equal among the 3 hosts tied for least requests.
+  // Accept a +/-0.5% deviation from the expected selection probability (33.3..%).
+  size_t num_selections = 1000000;
+  size_t expected_approx_selections_per_tied_host = num_selections / 3;
+  size_t abs_error = 5000;
+
+  size_t host_2_counts = 0;
+  size_t host_3_counts = 0;
+  size_t host_4_counts = 0;
+
+  for (size_t i = 0; i < num_selections; ++i) {
+    auto selected_host = lb.chooseHost(nullptr);
+
+    if (selected_host == hostSet().healthy_hosts_[2]) {
+      ++host_2_counts;
+    } else if (selected_host == hostSet().healthy_hosts_[3]) {
+      ++host_3_counts;
+    } else if (selected_host == hostSet().healthy_hosts_[4]) {
+      ++host_4_counts;
+    } else {
+      FAIL() << "Must only select hosts with least requests";
+    }
+  }
+
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_2_counts, abs_error);
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_3_counts, abs_error);
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_4_counts, abs_error);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {

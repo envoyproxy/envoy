@@ -5,12 +5,12 @@
 #include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/extensions/bootstrap/internal_listener/active_internal_listener.h"
 #include "source/extensions/bootstrap/internal_listener/thread_local_registry.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
@@ -271,7 +271,8 @@ public:
                                    ? std::make_shared<Network::NopConnectionBalancerImpl>()
                                    : connection_balancer),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
-          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit) {
+          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit),
+          listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
       socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
@@ -323,9 +324,8 @@ public:
         return *internal_listener_config_;
       }
     }
-    envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
-    void setDirection(envoy::config::core::v3::TrafficDirection direction) {
-      direction_ = direction;
+    const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+      return listener_info_;
     }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return *connection_balancer_;
@@ -362,7 +362,7 @@ public:
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
-    envoy::config::core::v3::TrafficDirection direction_;
+    const Network::ListenerInfoConstSharedPtr listener_info_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;
@@ -397,6 +397,7 @@ public:
   std::shared_ptr<AccessLog::MockInstance> access_log_;
   TestScopedRuntime scoped_runtime_;
   Runtime::Loader& runtime_{scoped_runtime_.loader()};
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 TEST_F(ConnectionHandlerTest, DisableInternalListener) {
@@ -410,7 +411,7 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_);
+  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
   auto internal_listener_cb = handler_->findByAddress(local_address);
   ASSERT_TRUE(internal_listener_cb.has_value());
 
@@ -438,7 +439,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
                   internal_listener->socket_factories_[0].get()),
               localAddress())
       .WillRepeatedly(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener, runtime_);
+  handler_->addListener(absl::nullopt, *internal_listener, runtime_, random_);
 
   ASSERT_NE(internal_listener, nullptr);
 
@@ -448,7 +449,7 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
       addInternalListener(new_listener_tag, "test_internal_listener", std::chrono::milliseconds(),
                           false, overridden_filter_chain_manager);
 
-  handler_->addListener(old_listener_tag, *new_test_listener, runtime_);
+  handler_->addListener(old_listener_tag, *new_test_listener, runtime_, random_);
 
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
 

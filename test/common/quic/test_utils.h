@@ -162,6 +162,7 @@ public:
                                      proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
+  quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
 };
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
@@ -201,7 +202,7 @@ public:
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr) {}
+                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr, {}) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();
@@ -269,7 +270,8 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
 std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
-  auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate);
+  auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
+                                                            quic::HuffmanEncoding::kEnabled);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
   // therefore the value of |stream_id| does not matter.

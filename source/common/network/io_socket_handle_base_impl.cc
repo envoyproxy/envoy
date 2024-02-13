@@ -1,4 +1,4 @@
-#include "io_socket_handle_base_impl.h"
+#include "source/common/network/io_socket_handle_base_impl.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
@@ -134,7 +134,10 @@ absl::optional<std::string> IoSocketHandleBaseImpl::interfaceName() {
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
+  if (rc.return_value_ != 0) {
+    ENVOY_LOG_EVERY_POW_2(warn, "getifaddrs error: {}", rc.errno_);
+    return absl::nullopt;
+  }
 
   absl::optional<std::string> selected_interface_name{};
   for (const auto& interface_address : interface_addresses) {

@@ -35,6 +35,7 @@
 #include "source/common/router/scoped_config_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/server/admin/admin_factory_context.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/admin/clusters_handler.h"
 #include "source/server/admin/config_dump_handler.h"
@@ -76,6 +77,8 @@ public:
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutableSocket() { return *socket_; }
 
+  Configuration::FactoryContext& factoryContext() { return factory_context_; }
+
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
   // Wins would be no manual removeHandler() and code reuse.
@@ -90,11 +93,9 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-                         const std::string& address_out_path,
+  void startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
                          Network::Address::InstanceConstSharedPtr address,
-                         const Network::Socket::OptionsSharedPtr& socket_options,
-                         Stats::ScopeSharedPtr&& listener_scope) override;
+                         Network::Socket::OptionsSharedPtr socket_options) override;
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
@@ -369,9 +370,9 @@ private:
 
   class AdminListener : public Network::ListenerConfig {
   public:
-    AdminListener(AdminImpl& parent, Stats::ScopeSharedPtr&& listener_scope)
-        : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
-          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
+    AdminListener(AdminImpl& parent, Stats::Scope& listener_scope)
+        : parent_(parent), name_("admin"), scope_(listener_scope),
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", scope_)),
           init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
@@ -385,14 +386,14 @@ private:
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
-    Stats::Scope& listenerScope() override { return *scope_; }
+    Stats::Scope& listenerScope() override { return scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+      return parent_.listener_info_;
+    }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
-    envoy::config::core::v3::TrafficDirection direction() const override {
-      return envoy::config::core::v3::UNSPECIFIED;
-    }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return connection_balancer_;
     }
@@ -409,7 +410,7 @@ private:
 
     AdminImpl& parent_;
     const std::string name_;
-    Stats::ScopeSharedPtr scope_;
+    Stats::Scope& scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl open_connections_;
@@ -448,6 +449,8 @@ private:
   };
 
   Server::Instance& server_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
+  AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const bool flush_access_log_on_new_request_ = false;

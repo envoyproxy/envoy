@@ -17,22 +17,6 @@ bool isIoUringSupported() {
   return is_supported;
 }
 
-IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                                       ThreadLocal::SlotAllocator& tls)
-    : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
-      tls_(tls) {}
-
-IoUring& IoUringFactoryImpl::getOrCreate() const {
-  return const_cast<IoUringImpl&>(tls_.get().ref());
-}
-
-void IoUringFactoryImpl::onServerInitialized() {
-  tls_.set([io_uring_size = io_uring_size_,
-            use_submission_queue_polling = use_submission_queue_polling_](Event::Dispatcher&) {
-    return std::make_shared<IoUringImpl>(io_uring_size, use_submission_queue_polling);
-  });
-}
-
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : cqes_(io_uring_size, nullptr) {
   struct io_uring_params p {};
@@ -177,6 +161,36 @@ IoUringResult IoUringImpl::prepareClose(os_fd_t fd, Request* user_data) {
   }
 
   io_uring_prep_close(sqe, fd);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareCancel(Request* cancelling_user_data, Request* user_data) {
+  ENVOY_LOG(trace, "prepare cancels for user data = {}", fmt::ptr(cancelling_user_data));
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare cancel for user data = {}", fmt::ptr(cancelling_user_data));
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_cancel(sqe, cancelling_user_data, 0);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, Request* user_data) {
+  ENVOY_LOG(trace, "prepare shutdown for fd = {}, how = {}", fd, how);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare shutdown for fd = {}", fd);
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_shutdown(sqe, fd, how);
   io_uring_sqe_set_data(sqe, user_data);
   return IoUringResult::Ok;
 }

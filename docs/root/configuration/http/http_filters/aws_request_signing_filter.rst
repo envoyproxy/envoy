@@ -15,6 +15,8 @@ The HTTP AWS request signing filter is used to access authenticated AWS services
 existing AWS Credential Provider to get the secrets used for generating the required
 headers.
 
+This filter can be used to communicate with both AWS API endpoints and customer API endpoints, such as AWS API Gateway
+hosted APIs or Amazon VPC Lattice services.
 
 The :ref:`use_unsigned_payload <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.use_unsigned_payload>`
 option determines whether or not requests are buffered so the request body can be used to compute the payload hash. Some
@@ -29,6 +31,15 @@ The :ref:`match_excluded_headers <envoy_v3_api_field_extensions.filters.http.aws
 option allows excluding certain request headers from being signed. This usually applies to headers that are likely to mutate or
 are added later such as in retries. By default, the headers ``x-forwarded-for``, ``x-forwarded-proto``, and ``x-amzn-trace-id`` are always excluded.
 
+The :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.signing_algorithm>`
+can be specified as ``AWS_SIGV4`` or ``AWS_SIGV4A``. If the signing algorithm is unspecified, this filter will default to ``AWS_SIGV4``.
+If ``AWS_SIGV4`` is unspecified, or explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
+is used to define the region to which the sigv4 calculation is addressed to.
+If ``AWS_SIGV4A`` is explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
+is used as a region set. A region set is a single region, or comma seperated list of regions. Regions in a region set can also include wildcards,
+such as ``us-east-*`` or even ``*``. By using ``AWS_SIGV4A`` and wildcarded regions it is possible to simplify the overall envoy configuration for
+multi-region implementations.
+
 Example configuration
 ---------------------
 
@@ -41,7 +52,7 @@ Example filter configuration:
     :linenos:
     :caption: :download:`aws-request-signing-filter.yaml <_include/aws-request-signing-filter.yaml>`
 
-Note that this filter also supports per route configuration:
+This filter also supports per route configuration. Below is an example of route-level config overriding the config at the virtual-host level.
 
 .. literalinclude:: _include/aws-request-signing-filter-route-level-override.yaml
     :language: yaml
@@ -50,9 +61,41 @@ Note that this filter also supports per route configuration:
     :linenos:
     :caption: :download:`aws-request-signing-filter-route-level-override.yaml <_include/aws-request-signing-filter-route-level-override.yaml>`
 
-Above shows an example of route-level config overriding the config on the virtual-host level.
+An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to an Amazon VPC Lattice service:
+
+.. literalinclude:: _include/aws-request-signing-filter-sigv4a.yaml
+    :language: yaml
+    :lines: 26-36
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-sigv4a.yaml <_include/aws-request-signing-filter-sigv4a.yaml>`
+
+
+Configuration as an upstream HTTP filter
+----------------------------------------
+SigV4 or SigV4A request signatures are calculated using the HTTP host, URL and payload as input. Depending on the configuration, Envoy may modify one or more of
+these prior to forwarding to the Cluster subsystem, but after the signature has been calculated and inserted into the HTTP headers. Modifying fields in a SigV4 or SigV4A
+signed request will result in an invalid signature.
+
+To avoid invalid signatures, the AWS Request Signing Filter can be configured as an upstream HTTP filter. This allows signatures to be
+calculated as a final step before the HTTP request is forwarded upstream, ensuring signatures are correctly calculated over the updated
+HTTP fields.
+
+Configuring this filter as an upstream HTTP filter is done in a similar way to the downstream case, but using the :ref:`http_filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`
+filter chain within the cluster configuration.
+
+.. literalinclude:: _include/aws-request-signing-filter-upstream.yaml
+    :language: yaml
+    :lines: 47-57
+    :lineno-start: 47
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-upstream.yaml <_include/aws-request-signing-filter-upstream.yaml>`
 
 .. include:: _include/aws_credentials.rst
+
+.. _config_http_filters_aws_request_signing_region:
+
+.. include:: _include/aws_regions.rst
 
 Statistics
 ----------

@@ -12,7 +12,8 @@ Envoy::Http::EarlyHeaderMutationPtr
 Factory::createExtension(const Protobuf::Message& message,
                          Server::Configuration::FactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+      *Envoy::Protobuf::DynamicCastToGenerated<const ProtobufWkt::Any>(&message),
+      context.messageValidationVisitor(), *this);
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation&>(
       *mptr, context.messageValidationVisitor());

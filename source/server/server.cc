@@ -40,18 +40,18 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
-#include "source/common/network/tcp_listener_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
@@ -501,9 +501,10 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
-  stats_store_.setStatsMatcher(
-      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
-  stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
+  stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
+      bootstrap_.stats_config(), stats_store_.symbolTable()));
+  stats_store_.setHistogramSettings(
+      std::make_unique<Stats::HistogramSettingsImpl>(bootstrap_.stats_config()));
 
   const std::string server_stats_prefix = "server.";
   const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
@@ -582,7 +583,9 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  absl::Status creation_status;
+  Configuration::InitialImpl initial_config(bootstrap_, creation_status);
+  THROW_IF_NOT_OK(creation_status);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -693,8 +696,6 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_ = component_factory.createRuntime(*this, initial_config);
-
-  initial_config.initAdminAccessLog(bootstrap_, *this);
   validation_context_.setRuntime(runtime());
 
   if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
@@ -705,15 +706,19 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   if (initial_config.admin().address()) {
-    if (!admin_) {
-      throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
-    }
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+    // Admin instance always be created if admin support is not compiled out.
+    RELEASE_ASSERT(admin_ != nullptr, "Admin instance should be created but actually not.");
+    auto typed_admin = dynamic_cast<AdminImpl*>(admin_.get());
+    RELEASE_ASSERT(typed_admin != nullptr, "Admin implementation is not an AdminImpl.");
+    initial_config.initAdminAccessLog(bootstrap_, typed_admin->factoryContext());
+    admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
+                              initial_config.admin().socketOptions());
+#else
+    throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
+#endif
   } else {
-    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+    ENVOY_LOG(info, "No admin address given, so no admin HTTP server started.");
   }
   if (admin_) {
     config_tracker_entry_ = admin_->getConfigTracker().add(
@@ -735,7 +740,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
-  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -776,10 +781,8 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      *stats_store_.rootScope(), config_.mainThreadWatchdogConfig(), *api_, "main_thread");
-  worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      *stats_store_.rootScope(), config_.workerWatchdogConfig(), *api_, "workers");
+  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
+  worker_guard_dog_ = maybeCreateGuardDog("workers");
 }
 
 void InstanceBase::onClusterManagerPrimaryInitializationComplete() {
@@ -790,7 +793,9 @@ void InstanceBase::onClusterManagerPrimaryInitializationComplete() {
 void InstanceBase::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
   // Initializing can throw exceptions, so catch these.
-  TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
+  TRY_ASSERT_MAIN_THREAD {
+    THROW_IF_NOT_OK(clusterManager().initializeSecondaryClusters(bootstrap_));
+  }
   END_TRY
   CATCH(const EnvoyException& e, {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
@@ -804,12 +809,13 @@ void InstanceBase::onRuntimeReady() {
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                         *stats_store_.rootScope(), false)
-              ->createUncachedRawAsyncClient(),
-          stats_store_, *ssl_context_manager_, info_factory_);
+          factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
+          *ssl_context_manager_, info_factory_);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -830,7 +836,7 @@ void InstanceBase::onRuntimeReady() {
 
 void InstanceBase::startWorkers() {
   // The callback will be called after workers are started.
-  listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
+  listener_manager_->startWorkers(makeOptRefFromPtr(worker_guard_dog_.get()), [this]() {
     if (isShutdown()) {
       return;
     }
@@ -956,12 +962,17 @@ void InstanceBase::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
-                                                         "main_thread", *dispatcher_);
+  WatchDogSharedPtr watchdog;
+  if (main_thread_guard_dog_) {
+    watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                      "main_thread", *dispatcher_);
+  }
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
-  main_thread_guard_dog_->stopWatching(watchdog);
+  if (main_thread_guard_dog_) {
+    main_thread_guard_dog_->stopWatching(watchdog);
+  }
   watchdog.reset();
 
   terminate();

@@ -38,7 +38,6 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
 
   internal var grpcInitialMetadata = mutableMapOf<String, String>()
   internal var sslRootCerts: String? = null
-  internal var sni: String? = null
   internal var rtdsResourceName: String? = null
   internal var rtdsTimeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
   internal var enableCds: Boolean = false
@@ -75,19 +74,6 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
    */
   fun setSslRootCerts(rootCerts: String): XdsBuilder {
     this.sslRootCerts = rootCerts
-    return this
-  }
-
-  /**
-   * Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake and
-   * the authority HTTP header. If not set, the SNI is set by default to the xDS server address and
-   * the authority HTTP header is not set.
-   *
-   * @param sni The SNI value.
-   * @return this builder.
-   */
-  fun setSni(sni: String): XdsBuilder {
-    this.sni = sni
     return this
   }
 
@@ -144,12 +130,16 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
 /** Builder used for creating and running a new `Engine` instance. */
 open class EngineBuilder(private val configuration: BaseConfiguration = Standard()) {
   protected var onEngineRunning: (() -> Unit) = {}
-  protected var logger: ((String) -> Unit)? = null
+  protected var logger: ((LogLevel, String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
   private var runtimeGuards = mutableMapOf<String, Boolean>()
   private var engineType: () -> EnvoyEngine = {
-    EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
+    EnvoyEngineImpl(
+      onEngineRunning,
+      { level, msg -> logger?.let { it(LogLevel.from(level), msg) } },
+      eventTracker
+    )
   }
   private var logLevel = LogLevel.INFO
   private var connectTimeoutSeconds = 30
@@ -488,7 +478,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
    * @param closure: The closure to be called.
    * @return This builder.
    */
-  fun setLogger(closure: (String) -> Unit): EngineBuilder {
+  fun setLogger(closure: (LogLevel, String) -> Unit): EngineBuilder {
     this.logger = closure
     return this
   }
@@ -687,7 +677,6 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         xdsBuilder?.xdsServerPort ?: 0,
         xdsBuilder?.grpcInitialMetadata ?: mapOf<String, String>(),
         xdsBuilder?.sslRootCerts,
-        xdsBuilder?.sni,
         nodeId,
         nodeRegion,
         nodeZone,

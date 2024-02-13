@@ -57,7 +57,9 @@ public:
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    cluster_.reset(new Cluster(cluster_config, config, factory_context, *this));
+    auto cache = dns_cache_manager_->getCache(config.dns_cache_config()).value();
+    cluster_.reset(
+        new Cluster(cluster_config, std::move(cache), config, factory_context, this->get()));
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
@@ -84,7 +86,7 @@ public:
       }
     }));
     if (!existing_hosts.empty()) {
-      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
+      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0))).Times(existing_hosts.size());
     }
     cluster_->initialize([] {});
   }
@@ -255,6 +257,7 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // After changing the address, LB will immediately resolve the new address with a refresh.
   updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(1)));
   update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",

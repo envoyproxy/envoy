@@ -28,7 +28,7 @@
 
 #include "gmock/gmock.h"
 
-#include "quiche/common/platform/api/quiche_logging.h"
+#include "quiche/common/platform/api/quiche_test.h"
 
 using testing::_;
 using testing::Invoke;
@@ -79,7 +79,8 @@ envoy::config::core::v3::Http2ProtocolOptions
 fromHttp2Settings(const test::common::http::Http2Settings& settings) {
   envoy::config::core::v3::Http2ProtocolOptions options(
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions()));
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value());
   // We apply an offset and modulo interpretation to settings to ensure that
   // they are valid. Rejecting invalid settings is orthogonal to the fuzzed
   // code.
@@ -832,7 +833,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll
     // need to further evaluate. However, in fuzzing we allow oghttp2 reaching FATAL states that may
     // happen in production environments.
-    quiche::setDFatalExitDisabled(true);
+    quiche::test::QuicheScopedDisableExitOnDFatal scoped_object;
     codecFuzzHttp2Oghttp2(input);
 #endif
   } catch (const EnvoyException& e) {

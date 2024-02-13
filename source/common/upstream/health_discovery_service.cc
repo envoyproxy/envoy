@@ -371,10 +371,11 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
     for (const auto& host : locality_endpoints.lb_endpoints()) {
       const LocalityEndpointTuple endpoint_key = {locality_endpoints.locality(), host};
       // Initialize an endpoint host object.
+      auto address_or_error = Network::Address::resolveProtoAddress(host.endpoint().address());
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
       HostSharedPtr endpoint = std::make_shared<HostImpl>(
-          info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
-          locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
-          envoy::config::core::v3::UNKNOWN, time_source_);
+          info_, "", std::move(address_or_error.value()), nullptr, 1, locality_endpoints.locality(),
+          host.endpoint().health_check_config(), 0, envoy::config::core::v3::UNKNOWN, time_source_);
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be
@@ -483,10 +484,13 @@ void HdsCluster::updateHosts(
         host = host_pair->second;
       } else {
         // We do not have this endpoint saved, so create a new one.
-        host = std::make_shared<HostImpl>(
-            info_, "", Network::Address::resolveProtoAddress(endpoint.endpoint().address()),
-            nullptr, 1, endpoints.locality(), endpoint.endpoint().health_check_config(), 0,
-            envoy::config::core::v3::UNKNOWN, time_source_);
+        auto address_or_error =
+            Network::Address::resolveProtoAddress(endpoint.endpoint().address());
+        THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+        host = std::make_shared<HostImpl>(info_, "", std::move(address_or_error.value()), nullptr,
+                                          1, endpoints.locality(),
+                                          endpoint.endpoint().health_check_config(), 0,
+                                          envoy::config::core::v3::UNKNOWN, time_source_);
 
         // Set the initial health status as in HdsCluster::initialize.
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -520,8 +524,9 @@ void HdsCluster::updateHosts(
   // Update the priority set.
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
-  priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                            hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+  priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {}, hosts_added, hosts_removed,
+      server_context_.api().randomGenerator().random(), absl::nullopt, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
@@ -571,7 +576,8 @@ void HdsCluster::initialize(std::function<void()> callback) {
     }
     // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                              *hosts_, {}, absl::nullopt, absl::nullopt);
+                              *hosts_, {}, server_context_.api().randomGenerator().random(),
+                              absl::nullopt, absl::nullopt);
 
     initialized_ = true;
   }

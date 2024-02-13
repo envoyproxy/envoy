@@ -1,4 +1,3 @@
-#include "config.h"
 #include "source/common/http/match_delegate/config.h"
 
 #include <memory>
@@ -289,11 +288,11 @@ Envoy::Http::FilterFactoryCb MatchDelegateConfig::createFilterFactoryFromProtoTy
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
   Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context,
-                                                                context.getServerFactoryContext()};
+                                                                context.serverFactoryContext()};
 
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
                             Envoy::Http::Matching::HttpFilterActionContext>
-      matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
+      matcher_factory(action_context, context.serverFactoryContext(), validation_visitor);
   absl::optional<Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData>> factory_cb =
       std::nullopt;
   if (proto_config.has_xds_matcher()) {

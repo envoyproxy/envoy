@@ -56,8 +56,11 @@ public:
 
   const Mutations& mutations() const { return mutations_; }
 
+  bool mostSpecificHeaderMutationsWins() const { return most_specific_header_mutations_wins_; }
+
 private:
   Mutations mutations_;
+  const bool most_specific_header_mutations_wins_;
 };
 using HeaderMutationConfigSharedPtr = std::shared_ptr<HeaderMutationConfig>;
 
@@ -73,7 +76,8 @@ public:
 
 private:
   HeaderMutationConfigSharedPtr config_{};
-  const PerRouteHeaderMutation* route_config_{};
+  // The lifetime of route config pointers is same as the matched route.
+  absl::InlinedVector<const PerRouteHeaderMutation*, 3> route_configs_{};
 };
 
 } // namespace HeaderMutation

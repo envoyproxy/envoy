@@ -13,12 +13,12 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "direct_response_testing.h"
-#include "engine.h"
-#include "engine_callbacks.h"
-#include "key_value_store.h"
+#include "library/cc/engine.h"
+#include "library/cc/engine_callbacks.h"
+#include "library/cc/key_value_store.h"
+#include "library/cc/log_level.h"
+#include "library/cc/string_accessor.h"
 #include "library/common/types/matcher_data.h"
-#include "log_level.h"
-#include "string_accessor.h"
 
 namespace Envoy {
 namespace Platform {
@@ -36,7 +36,7 @@ struct NodeLocality {
   std::string sub_zone;
 };
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 // A class for building the xDS configuration for the Envoy Mobile engine.
 // xDS is a protocol for dynamic configuration of Envoy instances, more information can be found in:
 // https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol.
@@ -66,11 +66,6 @@ public:
   // Sets the PEM-encoded server root certificates used to negotiate the TLS handshake for the gRPC
   // connection. If no root certs are specified, the operating system defaults are used.
   XdsBuilder& setSslRootCerts(std::string root_certs);
-
-  // Sets the SNI (https://datatracker.ietf.org/doc/html/rfc6066#section-3) on the TLS handshake
-  // and the authority HTTP header. If not set, the SNI is set by default to the xDS server address
-  // and the authority HTTP header is not set.
-  XdsBuilder& setSni(std::string sni);
 
   // Adds Runtime Discovery Service (RTDS) to the Runtime layers of the Bootstrap configuration,
   // to retrieve dynamic runtime configuration via the xDS management server.
@@ -114,7 +109,6 @@ private:
   uint32_t xds_server_port_;
   std::vector<envoy::config::core::v3::HeaderValue> xds_initial_grpc_metadata_;
   std::string ssl_root_certs_;
-  std::string sni_;
   std::string rtds_resource_name_;
   int rtds_timeout_in_seconds_ = DefaultXdsTimeout;
   bool enable_cds_ = false;
@@ -160,6 +154,7 @@ public:
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
   EngineBuilder& addQuicHint(std::string host, int port);
   EngineBuilder& addQuicCanonicalSuffix(std::string suffix);
+  EngineBuilder& enablePortMigration(bool enable_port_migration);
 #endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
@@ -171,7 +166,7 @@ public:
   EngineBuilder& setNodeLocality(std::string region, std::string zone, std::string sub_zone);
   // Sets the node.metadata field in the Bootstrap configuration.
   EngineBuilder& setNodeMetadata(ProtobufWkt::Struct node_metadata);
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.
   //
   // `xds_builder`: the XdsBuilder instance used to specify the xDS configuration options.
@@ -245,6 +240,7 @@ private:
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
+  bool enable_port_migration_ = false;
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
@@ -255,7 +251,7 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif
 };

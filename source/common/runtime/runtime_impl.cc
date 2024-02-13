@@ -30,6 +30,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche_platform_impl/quiche_flags_impl.h"
+#include "quiche/common/platform/api/quiche_flags.h"
 #endif
 
 namespace Envoy {
@@ -59,6 +60,13 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
   }
 #ifdef ENVOY_ENABLE_QUIC
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
+
+  // Because this is a QUICHE protocol flag, this behavior can't be flipped with the above
+  // code, so it needs its own runtime flag and code to set it.
+  SetQuicheFlag(quic_always_support_server_preferred_address,
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients"));
+
 #endif
   // Make sure ints are parsed after the flag allowing deprecated ints is parsed.
   for (const auto& it : flag_map) {
@@ -425,7 +433,11 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   }
 
   Filesystem::Directory directory(path);
-  for (const Filesystem::DirectoryEntry& entry : directory) {
+  Filesystem::DirectoryIteratorImpl it = directory.begin();
+  THROW_IF_NOT_OK_REF(it.status());
+  for (; it != directory.end(); ++it) {
+    THROW_IF_NOT_OK_REF(it.status());
+    Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
     if (prefix.empty()) {
@@ -474,6 +486,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 #endif
     }
   }
+  THROW_IF_NOT_OK_REF(it.status());
 }
 
 ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)

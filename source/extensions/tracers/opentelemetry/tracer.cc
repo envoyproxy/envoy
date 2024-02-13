@@ -7,6 +7,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
+#include "source/common/tracing/trace_context_impl.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -16,21 +17,29 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-constexpr absl::string_view kTraceParent = "traceparent";
-constexpr absl::string_view kTraceState = "tracestate";
 constexpr absl::string_view kDefaultVersion = "00";
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
 namespace {
 
+const Tracing::TraceContextHandler& traceParentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "traceparent");
+}
+
+const Tracing::TraceContextHandler& traceStateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "tracestate");
+}
+
 void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> span_context,
-                 Span& new_span, const std::string& operation_name) {
+                 Span& new_span, const std::string& operation_name,
+                 OptRef<const Tracing::TraceContext> trace_context) {
   if (!sampler) {
     return;
   }
-  const auto sampling_result = sampler->shouldSample(
-      span_context, operation_name, new_span.getTraceIdAsHex(), new_span.spankind(), {}, {});
+  const auto sampling_result =
+      sampler->shouldSample(span_context, operation_name, new_span.getTraceIdAsHex(),
+                            new_span.spankind(), trace_context, {});
   new_span.setSampled(sampling_result.isSampled());
 
   if (sampling_result.attributes) {
@@ -45,40 +54,23 @@ void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> spa
 
 } // namespace
 
-Span::Span(const Tracing::Config& config, const std::string& name, SystemTime start_time,
-           Envoy::TimeSource& time_source, Tracer& parent_tracer, bool downstream_span)
+Span::Span(const std::string& name, SystemTime start_time, Envoy::TimeSource& time_source,
+           Tracer& parent_tracer, OTelSpanKind span_kind)
     : parent_tracer_(parent_tracer), time_source_(time_source) {
   span_ = ::opentelemetry::proto::trace::v1::Span();
 
-  if (downstream_span) {
-    // If this is downstream span that be created by 'startSpan' for downstream request, then
-    // set the span type based on the spawnUpstreamSpan flag and traffic direction:
-    // * If separate tracing span will be created for upstream request, then set span type to
-    //   SERVER because the downstream span should be server span in trace chain.
-    // * If separate tracing span will not be created for upstream request, that means the
-    //   Envoy will not be treated as independent hop in trace chain and then set span type
-    //   based on the traffic direction.
-    span_.set_kind(config.spawnUpstreamSpan()
-                       ? ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER
-                   : config.operationName() == Tracing::OperationName::Egress
-                       ? ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT
-                       : ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
-  } else {
-    // If this is an non-downstream span that be created for upstream request or async HTTP/gRPC
-    // request, then set the span type to client always.
-    span_.set_kind(::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
-  }
+  span_.set_kind(span_kind);
 
   span_.set_name(name);
   span_.set_start_time_unix_nano(std::chrono::nanoseconds(start_time.time_since_epoch()).count());
 }
 
-Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
+Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name,
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
   SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled(), tracestate());
-  return parent_tracer_.startSpan(config, name, start_time, span_context,
-                                  /*downstream_span*/ false);
+  return parent_tracer_.startSpan(name, start_time, span_context, {},
+                                  ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
 
 void Span::finishSpan() {
@@ -99,9 +91,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   std::string traceparent_header_value =
       absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
   // Set the traceparent in the trace_context.
-  trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
+  traceParentHeader().setRefKey(trace_context, traceparent_header_value);
   // Also set the tracestate.
-  trace_context.setByReferenceKey(kTraceState, span_.trace_state());
+  traceStateHeader().setRefKey(trace_context, span_.trace_state());
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
@@ -152,7 +144,7 @@ void Tracer::flushSpans() {
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
-  resource_span->set_schema_url(resource_->schemaUrl_);
+  resource_span->set_schema_url(resource_->schema_url_);
 
   // add resource attributes
   for (auto const& att : resource_->attributes_) {
@@ -191,29 +183,31 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   }
 }
 
-Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
-                                   SystemTime start_time, Tracing::Decision tracing_decision,
-                                   bool downstream_span) {
+Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime start_time,
+                                   Tracing::Decision tracing_decision,
+                                   OptRef<const Tracing::TraceContext> trace_context,
+                                   OTelSpanKind span_kind) {
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
-  Span new_span(config, operation_name, start_time, time_source_, *this, downstream_span);
+  Span new_span(operation_name, start_time, time_source_, *this, span_kind);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
   new_span.setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
   uint64_t span_id = random_.random();
   new_span.setId(Hex::uint64ToHex(span_id));
   if (sampler_) {
-    callSampler(sampler_, absl::nullopt, new_span, operation_name);
+    callSampler(sampler_, absl::nullopt, new_span, operation_name, trace_context);
   } else {
     new_span.setSampled(tracing_decision.traced);
   }
   return std::make_unique<Span>(new_span);
 }
 
-Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
-                                   SystemTime start_time, const SpanContext& previous_span_context,
-                                   bool downstream_span) {
+Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, SystemTime start_time,
+                                   const SpanContext& previous_span_context,
+                                   OptRef<const Tracing::TraceContext> trace_context,
+                                   OTelSpanKind span_kind) {
   // Create a new span and populate details from the span context.
-  Span new_span(config, operation_name, start_time, time_source_, *this, downstream_span);
+  Span new_span(operation_name, start_time, time_source_, *this, span_kind);
   new_span.setTraceId(previous_span_context.traceId());
   if (!previous_span_context.parentId().empty()) {
     new_span.setParentId(previous_span_context.parentId());
@@ -223,7 +217,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   new_span.setId(Hex::uint64ToHex(span_id));
   if (sampler_) {
     // Sampler should make a sampling decision and set tracestate
-    callSampler(sampler_, previous_span_context, new_span, operation_name);
+    callSampler(sampler_, previous_span_context, new_span, operation_name, trace_context);
   } else {
     // Respect the previous span's sampled flag.
     new_span.setSampled(previous_span_context.sampled());

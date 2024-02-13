@@ -2237,5 +2237,42 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHo
   EXPECT_EQ("80", headers.getForwardedPortValue());
 }
 
+// Verify when TE header is present, the value should be preserved only if it's equal to "trailers".
+TEST_F(ConnectionManagerUtilityTest, KeepTrailersTEHeaderSimple) {
+  TestRequestHeaderMapImpl headers{{"te", "trailers"}};
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  EXPECT_EQ("trailers", headers.getTEValue());
+}
+
+// Verify when TE header is present, the value should be preserved only if it contains "trailers".
+TEST_F(ConnectionManagerUtilityTest, KeepTrailersTEHeaderMultipleValuesAndWeigthted) {
+  TestRequestHeaderMapImpl headers{{"te", "chunked;q=0.8  ,  trailers  ,deflate  "}};
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  EXPECT_EQ("trailers", headers.getTEValue());
+}
+
+// Verify when TE header is present, the value should be discarded if it doesn't contains
+// "trailers".
+TEST_F(ConnectionManagerUtilityTest, DiscardTEHeaderWithoutTrailers) {
+  TestRequestHeaderMapImpl headers{{"te", "gzip"}};
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  EXPECT_EQ("", headers.getTEValue());
+}
+
+// Verify when TE header is present, the value should be kept if the reloadable feature
+// "sanitize_te" is enabled.
+TEST_F(ConnectionManagerUtilityTest, KeepTrailersTEHeaderReloadableFeatureDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_te", "false"}});
+
+  TestRequestHeaderMapImpl headers{{"te", "gzip"}};
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  EXPECT_EQ("gzip", headers.getTEValue());
+}
+
 } // namespace Http
 } // namespace Envoy

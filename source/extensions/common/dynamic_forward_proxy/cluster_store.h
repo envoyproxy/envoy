@@ -3,8 +3,6 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/server/factory_context_base_impl.h"
-
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
@@ -66,11 +64,12 @@ using DFPClusterStoreSharedPtr = std::shared_ptr<DFPClusterStore>;
 
 class DFPClusterStoreFactory {
 public:
-  DFPClusterStoreFactory(Server::Configuration::FactoryContextBase& context) : context_(context) {}
+  DFPClusterStoreFactory(Singleton::Manager& singleton_manager)
+      : singleton_manager_(singleton_manager) {}
   DFPClusterStoreSharedPtr get();
 
 private:
-  Server::FactoryContextBaseImpl context_;
+  Singleton::Manager& singleton_manager_;
 };
 
 } // namespace DynamicForwardProxy

@@ -321,7 +321,7 @@ response: {}
     const std::string route_name("route-name-test");
     ON_CALL(stream_info, getRouteName()).WillByDefault(ReturnRef(route_name));
 
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+    ON_CALL(stream_info, hasResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
     stream_info.onRequestComplete();
 
@@ -461,6 +461,8 @@ response: {}
     ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
     const std::string peerSubject = "peerSubject";
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(peerSubject));
+    const std::string peerIssuer = "peerIssuer";
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(peerIssuer));
     const std::string localSubject = "localSubject";
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(localSubject));
     const std::string sessionId =
@@ -512,6 +514,7 @@ common_properties:
       - uri: peerSan1
       - uri: peerSan2
       subject: peerSubject
+      issuer: peerIssuer
     tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
 request:
   request_method: "METHOD_UNSPECIFIED"
@@ -530,6 +533,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.2";
@@ -586,6 +590,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.1";
@@ -642,6 +647,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1";
@@ -698,6 +704,7 @@ response: {}
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::string empty;
     ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
     ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
     const std::string tlsVersion = "TLSv1.4";

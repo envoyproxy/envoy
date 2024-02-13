@@ -236,9 +236,10 @@ Specify a closure to be called when Envoy's engine emits a log message.
 
   // Kotlin
   // This interface is pending for Kotlin
+  builder.setLogger { level, message -> /* log it */ }
 
   // Swift
-  builder.setLogger { msg in
+  builder.setLogger { level, msg in
     NSLog("Envoy log: \(msg)")
   }
 

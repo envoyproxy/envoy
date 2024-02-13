@@ -103,12 +103,17 @@ func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 }
 
 type StreamFilterConfigParser interface {
+	// Parse the proto message to any Go value, and return error to reject the config.
+	// This is called when Envoy receives the config from the control plane.
+	// Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
 	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
+	// Merge the two configs(filter level config or route level config) into one.
+	// May merge multi-level configurations, i.e. filter level, virtualhost level, router level and weighted cluster level,
+	// into a single one recursively, by invoking this method multiple times.
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
-type StreamFilterConfigFactory func(config interface{}) StreamFilterFactory
-type StreamFilterFactory func(callbacks FilterCallbackHandler) StreamFilter
+type StreamFilterFactory func(config interface{}, callbacks FilterCallbackHandler) StreamFilter
 
 // stream info
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
@@ -139,7 +144,8 @@ type StreamInfo interface {
 	FilterState() FilterState
 	// VirtualClusterName returns the name of the virtual cluster which got matched
 	VirtualClusterName() (string, bool)
-
+	// WorkerID returns the ID of the Envoy worker thread
+	WorkerID() uint32
 	// Some fields in stream info can be fetched via GetProperty
 	// For example, startTime() is equal to GetProperty("request.time")
 }
@@ -152,7 +158,7 @@ type FilterCallbacks interface {
 	StreamFilterCallbacks
 	// Continue or SendLocalReply should be last API invoked, no more code after them.
 	Continue(StatusType)
-	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
+	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
 	Log(level LogType, msg string)

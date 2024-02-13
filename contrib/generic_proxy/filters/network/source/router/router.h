@@ -172,13 +172,15 @@ public:
   uint64_t stream_id_{};
 
   GenericUpstreamSharedPtr generic_upstream_;
-  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
   Buffer::OwnedImpl upstream_request_buffer_;
 
   StreamInfo::StreamInfoImpl stream_info_;
+  std::shared_ptr<StreamInfo::UpstreamInfoImpl> upstream_info_;
   OptRef<const Tracing::Config> tracing_config_;
   Tracing::SpanPtr span_;
+
+  absl::optional<MonotonicTime> connecting_start_time_;
 
   // One of these flags should be set to true when the request is complete.
   bool stream_reset_{};
@@ -209,7 +211,9 @@ class RouterFilter : public DecoderFilter,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouterFilter(RouterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
-      : config_(std::move(config)), context_(context) {}
+      : config_(std::move(config)),
+        cluster_manager_(context.serverFactoryContext().clusterManager()),
+        time_source_(context.serverFactoryContext().timeSource()) {}
 
   // DecoderFilter
   void onDestroy() override;
@@ -265,7 +269,8 @@ private:
   DecoderFilterCallback* callbacks_{};
 
   RouterConfigSharedPtr config_;
-  Server::Configuration::FactoryContext& context_;
+  Upstream::ClusterManager& cluster_manager_;
+  TimeSource& time_source_;
 };
 
 } // namespace Router

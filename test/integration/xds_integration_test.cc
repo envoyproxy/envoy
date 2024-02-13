@@ -28,6 +28,7 @@ class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVer
                            public HttpIntegrationTest {
 public:
   XdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    skip_tag_extraction_rule_check_ = false;
     setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 

@@ -540,8 +540,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
     EXPECT_EQ("LR", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LR")));
@@ -549,8 +548,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS_LONG");
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
-        .WillByDefault(Return(true));
+    stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
     EXPECT_EQ("LocalReset", response_flags_format.formatWithContext({}, stream_info));
     EXPECT_THAT(response_flags_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("LocalReset")));
@@ -796,7 +794,14 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(id)));
   }
-
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CONNECTION_ID");
+    uint64_t id = 1234;
+    stream_info.upstreamInfo()->setUpstreamConnectionId(id);
+    EXPECT_EQ("1234", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::numberValue(id)));
+  }
   {
     StreamInfoFormatter upstream_format("STREAM_ID");
 
@@ -862,6 +867,30 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    StreamInfoFormatter upstream_connection_pool_callback_duration_format(
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
+    EXPECT_EQ(absl::nullopt,
+              upstream_connection_pool_callback_duration_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter upstream_connection_pool_callback_duration_format(
+        "UPSTREAM_CONNECTION_POOL_READY_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
+    upstream_timing.recordConnectionPoolCallbackLatency(
+        MonotonicTime(std::chrono::nanoseconds(10000000)), time_system);
+
+    EXPECT_EQ("15",
+              upstream_connection_pool_callback_duration_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        upstream_connection_pool_callback_duration_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::numberValue(15.0)));
   }
 }
 

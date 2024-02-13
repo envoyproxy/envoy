@@ -27,107 +27,106 @@ std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) 
                      error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
 }
 
-Upstream::ClusterConstOptRef Utility::checkCluster(absl::string_view error_prefix,
-                                                   absl::string_view cluster_name,
-                                                   Upstream::ClusterManager& cm,
-                                                   bool allow_added_via_api) {
+absl::StatusOr<Upstream::ClusterConstOptRef> Utility::checkCluster(absl::string_view error_prefix,
+                                                                   absl::string_view cluster_name,
+                                                                   Upstream::ClusterManager& cm,
+                                                                   bool allow_added_via_api) {
   const auto cluster = cm.clusters().getCluster(cluster_name);
   if (!cluster.has_value()) {
-    throwEnvoyExceptionOrPanic(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
+    return absl::InvalidArgumentError(
+        fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
 
   if (!allow_added_via_api && cluster->get().info()->addedViaApi()) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "{}: invalid cluster '{}': currently only static (non-CDS) clusters are supported",
         error_prefix, cluster_name));
   }
   return cluster;
 }
 
-Upstream::ClusterConstOptRef
-Utility::checkClusterAndLocalInfo(absl::string_view error_prefix, absl::string_view cluster_name,
-                                  Upstream::ClusterManager& cm,
-                                  const LocalInfo::LocalInfo& local_info) {
-  checkLocalInfo(error_prefix, local_info);
-  return checkCluster(error_prefix, cluster_name, cm);
-}
-
-void Utility::checkLocalInfo(absl::string_view error_prefix,
-                             const LocalInfo::LocalInfo& local_info) {
+absl::Status Utility::checkLocalInfo(absl::string_view error_prefix,
+                                     const LocalInfo::LocalInfo& local_info) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("{}: node 'id' and 'cluster' are required. Set it either in 'node' config or "
                     "via --service-node and --service-cluster options.",
                     error_prefix, local_info.node().DebugString()));
   }
+  return absl::OkStatus();
 }
 
-void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api) {
+absl::Status Utility::checkFilesystemSubscriptionBackingPath(const std::string& path,
+                                                             Api::Api& api) {
   // TODO(junr03): the file might be deleted between this check and the
   // watch addition.
   if (!api.fileSystem().fileExists(path)) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "paths must refer to an existing path in the system: '{}' does not exist", path));
   }
+  return absl::OkStatus();
 }
 
 namespace {
 /**
  * Check the grpc_services and cluster_names for API config sanity. Throws on error.
  * @param api_config_source the config source to validate.
- * @throws EnvoyException when an API config has the wrong number of gRPC
+ * @return an invalid status when an API config has the wrong number of gRPC
  * services or cluster names, depending on expectations set by its API type.
  */
-void checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+absl::Status
+checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
        api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("API configs must have either a gRPC service or a cluster name defined: {}",
                     api_config_source.DebugString()));
   }
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("{}::(DELTA_)GRPC must not have a cluster name specified: {}",
                       api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services().size() > 1) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("{}::(DELTA_)GRPC must have a single gRPC service specified: {}",
                       api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
   } else {
     if (!api_config_source.grpc_services().empty()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("{}, if not a gRPC type, must not have a gRPC service specified: {}",
                       api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
     if (api_config_source.cluster_names().size() != 1) {
-      throwEnvoyExceptionOrPanic(fmt::format("{} must have a singleton cluster name specified: {}",
-                                             api_config_source.GetTypeName(),
-                                             api_config_source.DebugString()));
+      return absl::InvalidArgumentError(
+          fmt::format("{} must have a singleton cluster name specified: {}",
+                      api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
   }
+  return absl::OkStatus();
 }
 } // namespace
 
-void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
-                                  const std::string& cluster_name,
-                                  const std::string& config_source) {
+absl::Status
+Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
+                             const std::string& cluster_name, const std::string& config_source) {
   const auto& it = primary_clusters.find(cluster_name);
   if (it == primary_clusters.end()) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("{} must have a statically defined non-EDS cluster: '{}' does "
                     "not exist, was added via api, or is an EDS cluster",
                     config_source, cluster_name));
   }
+  return absl::OkStatus();
 }
 
-void Utility::checkApiConfigSourceSubscriptionBackingCluster(
+absl::Status Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterSet& primary_clusters,
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   // We don't need to check backing sources for ADS sources, the backing cluster must be verified in
@@ -135,9 +134,9 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
   if (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC ||
       api_config_source.api_type() ==
           envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
-    return;
+    return absl::OkStatus();
   }
-  checkApiConfigSourceNames(api_config_source);
+  RETURN_IF_NOT_OK(checkApiConfigSourceNames(api_config_source));
 
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -146,19 +145,20 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     // All API configs of type REST and UNSUPPORTED_REST_LEGACY should have cluster names.
     // Additionally, some gRPC API configs might have a cluster name set instead
     // of an envoy gRPC.
-    Utility::validateClusterName(primary_clusters, api_config_source.cluster_names()[0],
-                                 api_config_source.GetTypeName());
+    RETURN_IF_NOT_OK(Utility::validateClusterName(
+        primary_clusters, api_config_source.cluster_names()[0], api_config_source.GetTypeName()));
   } else if (is_grpc) {
     // Some ApiConfigSources of type GRPC won't have a cluster name, such as if
     // they've been configured with google_grpc.
     if (api_config_source.grpc_services()[0].has_envoy_grpc()) {
       // If an Envoy gRPC exists, we take its cluster name.
-      Utility::validateClusterName(primary_clusters,
-                                   api_config_source.grpc_services()[0].envoy_grpc().cluster_name(),
-                                   api_config_source.GetTypeName());
+      RETURN_IF_NOT_OK(Utility::validateClusterName(
+          primary_clusters, api_config_source.grpc_services()[0].envoy_grpc().cluster_name(),
+          api_config_source.GetTypeName()));
     }
   }
   // Otherwise, there is no cluster name to validate.
+  return absl::OkStatus();
 }
 
 absl::optional<std::string>
@@ -175,22 +175,6 @@ Utility::getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api
     }
   }
   return absl::nullopt;
-}
-
-std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
-    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
-  if (!api_config_source.has_refresh_delay()) {
-    throwEnvoyExceptionOrPanic("refresh_delay is required for REST API configuration sources");
-  }
-
-  return std::chrono::milliseconds(
-      DurationUtil::durationToMilliseconds(api_config_source.refresh_delay()));
-}
-
-std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
-    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
-  return std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
 std::chrono::milliseconds Utility::configSourceInitialFetchTimeout(
@@ -220,28 +204,17 @@ Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootst
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
 }
 
-Stats::StatsMatcherPtr
-Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                            Stats::SymbolTable& symbol_table) {
-  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config(), symbol_table);
-}
-
-Stats::HistogramSettingsConstPtr
-Utility::createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::HistogramSettingsImpl>(bootstrap.stats_config());
-}
-
-Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
+absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
     bool skip_cluster_check) {
-  checkApiConfigSourceNames(api_config_source);
+  RETURN_IF_NOT_OK(checkApiConfigSourceNames(api_config_source));
 
   if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
       api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    throwEnvoyExceptionOrPanic(fmt::format("{} type must be gRPC: {}",
-                                           api_config_source.GetTypeName(),
-                                           api_config_source.DebugString()));
+    return absl::InvalidArgumentError(fmt::format("{} type must be gRPC: {}",
+                                                  api_config_source.GetTypeName(),
+                                                  api_config_source.DebugString()));
   }
 
   envoy::config::core::v3::GrpcService grpc_service;
@@ -309,7 +282,8 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   }
 }
 
-JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffStrategy(
+absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
+Utility::buildJitteredExponentialBackOffStrategy(
     absl::optional<const envoy::config::core::v3::BackoffStrategy> backoff,
     Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
     absl::optional<const uint32_t> default_max_interval_ms) {
@@ -320,7 +294,8 @@ JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffSt
         PROTOBUF_GET_MS_OR_DEFAULT(backoff.value(), max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throwEnvoyExceptionOrPanic("max_interval must be greater than or equal to the base_interval");
+      return absl::InvalidArgumentError(
+          "max_interval must be greater than or equal to the base_interval");
     }
     return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
                                                                 random);
@@ -328,13 +303,13 @@ JitteredExponentialBackOffStrategyPtr Utility::buildJitteredExponentialBackOffSt
 
   // default_base_interval_ms must be greater than zero
   if (default_base_interval_ms == 0) {
-    throwEnvoyExceptionOrPanic("default_base_interval_ms must be greater than zero");
+    return absl::InvalidArgumentError("default_base_interval_ms must be greater than zero");
   }
 
   // default maximum interval is specified
   if (default_max_interval_ms != absl::nullopt) {
     if (default_max_interval_ms.value() < default_base_interval_ms) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
     }
     return std::make_unique<JitteredExponentialBackOffStrategy>(

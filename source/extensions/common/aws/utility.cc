@@ -28,6 +28,13 @@ constexpr absl::string_view S3_SERVICE_NAME = "s3";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
 constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
+constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
+constexpr char AWS_PROFILE[] = "AWS_PROFILE";
+constexpr char DEFAULT_AWS_SHARED_CREDENTIALS_FILE[] = "/.aws/credentials";
+constexpr char DEFAULT_AWS_PROFILE[] = "default";
+constexpr char AWS_CONFIG_FILE[] = "AWS_CONFIG_FILE";
+constexpr char DEFAULT_AWS_CONFIG_FILE[] = "/.aws/config";
+
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
                              const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
@@ -222,6 +229,22 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
   });
 }
 
+std::string Utility::getSTSEndpoint(absl::string_view region) {
+  if (region == "cn-northwest-1" || region == "cn-north-1") {
+    return fmt::format("sts.{}.amazonaws.com.cn", region);
+  }
+#ifdef ENVOY_SSL_FIPS
+  // Use AWS STS FIPS endpoints in FIPS mode https://docs.aws.amazon.com/general/latest/gr/sts.html.
+  // Note: AWS GovCloud doesn't have separate fips endpoints.
+  // TODO(suniltheta): Include `ca-central-1` when sts supports a dedicated FIPS endpoint.
+  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
+      region == "us-west-2") {
+    return fmt::format("sts-fips.{}.amazonaws.com", region);
+  }
+#endif
+  return fmt::format("sts.{}.amazonaws.com", region);
+}
+
 static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
   auto buf = static_cast<std::string*>(data);
   buf->append(ptr, nmemb);
@@ -241,8 +264,9 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
   const auto host = message.headers().getHostValue();
   const auto path = message.headers().getPathValue();
   const auto method = message.headers().getMethodValue();
+  const auto scheme = message.headers().getSchemeValue();
 
-  const std::string url = fmt::format("http://{}{}", host, path);
+  const std::string url = fmt::format("{}://{}{}", scheme, host, path);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, TIMEOUT.count());
   curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
@@ -334,12 +358,26 @@ bool Utility::addInternalClusterStatic(
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
               .PackFrom(protocol_options);
 
+      // Add tls transport socket if cluster supports https over port 443.
+      if (port == 443) {
+        auto* socket = cluster.mutable_transport_socket();
+        envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
+        socket->set_name("envoy.transport_sockets.tls");
+        socket->mutable_typed_config()->PackFrom(tls_socket);
+      }
+
       // TODO(suniltheta): use random number generator here for cluster version.
+      // While adding multiple clusters make sure that change in random version number across
+      // multiple clusters won't make Envoy delete/replace previously registered internal cluster.
       cm.addOrUpdateCluster(cluster, "12345");
+
+      const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
+                                        ->FindValueByNumber(cluster_type)
+                                        ->name();
       ENVOY_LOG_MISC(info,
-                     "Added a {} internal cluster [name: {}, address:{}:{}] to fetch aws "
+                     "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
                      "credentials",
-                     cluster_type, cluster_name, host, port);
+                     cluster_type_str, cluster_name, host_port);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -348,6 +386,95 @@ bool Utility::addInternalClusterStatic(
     });
   }
   return true;
+}
+
+std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                                     const std::string& default_value) {
+  const char* value = getenv(variable_name.c_str());
+  return (value != nullptr) && (value[0] != '\0') ? value : default_value;
+}
+
+bool Utility::resolveProfileElements(const std::string& profile_file,
+                                     const std::string& profile_name,
+                                     absl::flat_hash_map<std::string, std::string>& elements) {
+  std::ifstream file(profile_file);
+  if (!file.is_open()) {
+    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", profile_file);
+    return false;
+  }
+  const auto profile_start = absl::StrFormat("[%s]", profile_name);
+
+  bool found_profile = false;
+  std::string line;
+  while (std::getline(file, line)) {
+    line = std::string(StringUtil::trim(line));
+    if (line.empty()) {
+      continue;
+    }
+
+    if (line == profile_start) {
+      found_profile = true;
+      continue;
+    }
+
+    if (found_profile) {
+      // Stop reading once we find the start of the next profile.
+      if (absl::StartsWith(line, "[")) {
+        break;
+      }
+
+      std::vector<std::string> parts = absl::StrSplit(line, absl::MaxSplits('=', 1));
+      if (parts.size() == 2) {
+
+        const auto key = StringUtil::toUpper(StringUtil::trim(parts[0]));
+        const auto val = StringUtil::trim(parts[1]);
+        auto found = elements.find(key);
+        if (found != elements.end()) {
+          found->second = val;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+std::string Utility::getCredentialFilePath() {
+
+  // Default credential file path plus current home directory. Will fall back to / if HOME
+  // environment variable does
+  // not exist
+
+  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto default_credentials_file_path =
+      absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
+
+  return Utility::getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE,
+                                                  default_credentials_file_path);
+}
+
+std::string Utility::getConfigFilePath() {
+
+  // Default config file path plus current home directory. Will fall back to / if HOME environment
+  // variable does
+  // not exist
+
+  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto default_credentials_file_path = absl::StrCat(home, DEFAULT_AWS_CONFIG_FILE);
+
+  return Utility::getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
+}
+
+std::string Utility::getCredentialProfileName() {
+  return Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+}
+
+std::string Utility::getConfigProfileName() {
+  auto profile_name = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  if (profile_name == DEFAULT_AWS_PROFILE) {
+    return profile_name;
+  } else {
+    return "profile " + profile_name;
+  }
 }
 
 } // namespace Aws

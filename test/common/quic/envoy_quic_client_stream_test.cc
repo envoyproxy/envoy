@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -247,6 +248,37 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   quic_stream_->OnStreamFrame(frame);
 }
 
+TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithMemSliceReleasor) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quiche_use_mem_slice_releasor_api", "true"}});
+
+  EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_TRUE(result.ok());
+  quic_stream_->encodeData(request_body_, false);
+  quic_stream_->encodeTrailers(request_trailers_);
+
+  size_t offset = receiveResponse(response_body_, false);
+  EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
+      .WillOnce(Invoke([](const Http::ResponseTrailerMapPtr& headers) {
+        Http::LowerCaseString key1("key1");
+        Http::LowerCaseString key2(":final-offset");
+        EXPECT_EQ("value1", headers->get(key1)[0]->value().getStringView());
+        EXPECT_TRUE(headers->get(key2).empty());
+      }));
+  std::string more_response_body{"bbb"};
+  EXPECT_CALL(stream_decoder_, decodeData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool finished_reading) {
+        EXPECT_EQ(more_response_body, buffer.toString());
+        EXPECT_EQ(false, finished_reading);
+      }));
+  std::string payload = absl::StrCat(bodyToHttp3StreamPayload(more_response_body),
+                                     spdyHeaderToHttp3StreamPayload(spdy_trailers_));
+  quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
+  quic_stream_->OnStreamFrame(frame);
+}
+
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
@@ -317,7 +349,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   size_t i = 0;
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  for (const std::string& status : {"100", "199", "100"}) {
+  for (const std::string status : {"100", "199", "100"}) {
     spdy::Http2HeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);
@@ -723,6 +755,14 @@ TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
   quic_session_.OnMessageReceived(datagram_fragment_);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
+
+TEST_F(EnvoyQuicClientStreamTest, ResetStreamWithHttpDatagramHandler) {
+  setUpCapsuleProtocol(true, false);
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(quic_stream_->rst_sent());
+}
+
 #endif
 
 } // namespace Quic

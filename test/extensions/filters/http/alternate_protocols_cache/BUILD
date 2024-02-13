@@ -33,6 +33,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],

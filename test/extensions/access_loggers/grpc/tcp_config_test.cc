@@ -41,7 +41,8 @@ public:
     TestUtility::jsonConvert(tcp_grpc_access_log_, *message_);
 
     if (cluster_name == good_cluster) {
-      EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
+                  factoryForGrpcService(_, _, _))
           .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
           }));
@@ -57,7 +58,7 @@ public:
   }
 
   AccessLog::FilterPtr filter_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig tcp_grpc_access_log_;
   ProtobufTypes::MessagePtr message_;
   AccessLog::AccessLogInstanceFactory* factory_{};

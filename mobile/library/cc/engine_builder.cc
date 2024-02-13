@@ -1,5 +1,9 @@
 #include "engine_builder.h"
 
+#include <stdint.h>
+#include <sys/socket.h>
+
+#include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
@@ -17,14 +21,6 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
-#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
-#include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
-#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
-#include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
-#endif
-
 #include "source/common/http/matching/inputs.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -32,18 +28,25 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
-#include "library/common/engine.h"
+#include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
-#include "library/common/main_interface.h"
 
 namespace Envoy {
 namespace Platform {
 
-#ifdef ENVOY_GOOGLE_GRPC
+namespace {
+
+// This is the same value Cronet uses for QUIC:
+// https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
+constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
+
+} // namespace
+
+#ifdef ENVOY_MOBILE_XDS
 XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
@@ -57,11 +60,6 @@ XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string v
 
 XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
   ssl_root_certs_ = std::move(root_certs);
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::setSni(std::string sni) {
-  sni_ = std::move(sni);
   return *this;
 }
 
@@ -283,6 +281,11 @@ EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enablePortMigration(bool enable_port_migration) {
+  enable_port_migration_ = enable_port_migration;
+  return *this;
+}
+
 #endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
@@ -321,7 +324,7 @@ EngineBuilder& EngineBuilder::setNodeMetadata(ProtobufWkt::Struct node_metadata)
   return *this;
 }
 
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
 EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
   // Add the XdsBuilder's xDS server hostname and port to the list of DNS addresses to preresolve in
@@ -487,63 +490,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     brotli_filter->set_name("envoy.filters.http.decompressor");
     brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  auto* compressor_filter = hcm->add_http_filters();
-  compressor_filter->set_name("envoy.filters.http.compressor");
-  envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_config;
-  extension_config.mutable_extension_config()->set_name("composite");
-  envoy::extensions::filters::http::composite::v3::Composite composite_config;
-  extension_config.mutable_extension_config()->mutable_typed_config()->PackFrom(composite_config);
-  auto* matcher_tree = extension_config.mutable_xds_matcher()->mutable_matcher_tree();
-  auto* matcher_input = matcher_tree->mutable_input();
-  matcher_input->set_name("request-headers");
-  envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_header_match_input;
-  request_header_match_input.set_header_name("x-envoy-mobile-compression");
-  matcher_input->mutable_typed_config()->PackFrom(request_header_match_input);
-  auto* exact_match_map = matcher_tree->mutable_exact_match_map()->mutable_map();
-  ::xds::type::matcher::v3::Matcher_OnMatch on_gzip_match;
-  auto* on_gzip_match_action = on_gzip_match.mutable_action();
-  on_gzip_match_action->set_name("composite-action");
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction execute_gzip_filter_action;
-  envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
-  gzip_config.mutable_window_bits()->set_value(15);
-  envoy::extensions::filters::http::compressor::v3::Compressor gzip_compressor_config;
-  gzip_compressor_config.mutable_compressor_library()->set_name("gzip");
-  gzip_compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(
-      gzip_config);
-  auto* gzip_common_request =
-      gzip_compressor_config.mutable_request_direction_config()->mutable_common_config();
-  gzip_common_request->mutable_enabled()->mutable_default_value()->set_value(true);
-  auto* gzip_common_response =
-      gzip_compressor_config.mutable_response_direction_config()->mutable_common_config();
-  gzip_common_response->mutable_enabled()->mutable_default_value()->set_value(false);
-  execute_gzip_filter_action.mutable_typed_config()->set_name("envoy.filters.http.compressor");
-  execute_gzip_filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(
-      gzip_compressor_config);
-  on_gzip_match_action->mutable_typed_config()->PackFrom(execute_gzip_filter_action);
-  (*exact_match_map)["gzip"] = on_gzip_match;
-  ::xds::type::matcher::v3::Matcher_OnMatch on_brotli_match;
-  auto* on_brotli_match_action = on_brotli_match.mutable_action();
-  on_brotli_match_action->set_name("composite-action");
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction execute_brotli_filter_action;
-  envoy::extensions::compression::brotli::compressor::v3::Brotli brotli_config;
-  envoy::extensions::filters::http::compressor::v3::Compressor brotli_compressor_config;
-  brotli_compressor_config.mutable_compressor_library()->set_name("text_optimized");
-  brotli_compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(
-      brotli_config);
-  auto* brotli_common_request =
-      brotli_compressor_config.mutable_request_direction_config()->mutable_common_config();
-  brotli_common_request->mutable_enabled()->mutable_default_value()->set_value(true);
-  auto* brotli_common_response =
-      brotli_compressor_config.mutable_response_direction_config()->mutable_common_config();
-  brotli_common_response->mutable_enabled()->mutable_default_value()->set_value(false);
-  execute_brotli_filter_action.mutable_typed_config()->set_name("envoy.filters.http.compressor");
-  execute_brotli_filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(
-      brotli_compressor_config);
-  on_brotli_match_action->mutable_typed_config()->PackFrom(execute_brotli_filter_action);
-  (*exact_match_map)["brotli"] = on_brotli_match;
-  compressor_filter->mutable_typed_config()->PackFrom(extension_config);
-#endif
   if (socket_tagging_filter_) {
     envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
     auto* tag_filter = hcm->add_http_filters();
@@ -651,7 +597,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
   } else {
     std::string certs;
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
     if (xds_builder_ && !xds_builder_->ssl_root_certs_.empty()) {
       certs = xds_builder_->ssl_root_certs_;
     }
@@ -808,10 +754,37 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           ->add_canonical_suffixes(suffix);
     }
 
+    if (enable_port_migration_) {
+      alpn_options.mutable_auto_config()
+          ->mutable_http3_protocol_options()
+          ->mutable_quic_protocol_options()
+          ->mutable_num_timeouts_to_trigger_port_migration()
+          ->set_value(4);
+    }
+
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_idle_network_timeout()
+        ->set_seconds(30);
+
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
             .PackFrom(alpn_options);
+
+    // Set the upstream connections socket receive buffer size. The operating system defaults are
+    // usually too small for QUIC.
+    // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
+    // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
+    // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
+    // we've tested, IPPROTO_UDP cannot be used as a level for the SO_RCVBUF option.
+    envoy::config::core::v3::SocketOption* sock_opt =
+        base_cluster->mutable_upstream_bind_config()->add_socket_options();
+    sock_opt->set_name(SO_RCVBUF);
+    sock_opt->set_level(SOL_SOCKET);
+    sock_opt->set_int_value(SocketReceiveBufferSize);
+    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", SocketReceiveBufferSize, " bytes"));
   }
 
   // Set up stats.
@@ -878,7 +851,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
   bootstrap->mutable_dynamic_resources();
-#ifdef ENVOY_GOOGLE_GRPC
+#ifdef ENVOY_MOBILE_XDS
   if (xds_builder_) {
     xds_builder_->build(*bootstrap);
   }
@@ -900,35 +873,37 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  envoy_engine_t envoy_engine =
-      init_engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+  Envoy::InternalEngine* envoy_engine =
+      new Envoy::InternalEngine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
-    auto* api = new envoy_kv_store();
-    *api = store->asEnvoyKeyValueStore();
-    register_platform_api(name.c_str(), api);
+    if (!Api::External::retrieveApi(name, true)) {
+      auto* api = new envoy_kv_store();
+      *api = store->asEnvoyKeyValueStore();
+      Envoy::Api::External::registerApi(name.c_str(), api);
+    }
   }
 
   for (const auto& [name, accessor] : string_accessors_) {
     // TODO(RyanTheOptimist): This leaks, but it's tied to the life of the engine.
-    auto* api = new envoy_string_accessor();
-    *api = StringAccessor::asEnvoyStringAccessor(accessor);
-    register_platform_api(name.c_str(), api);
+    if (!Api::External::retrieveApi(name, true)) {
+      auto* api = new envoy_string_accessor();
+      *api = StringAccessor::asEnvoyStringAccessor(accessor);
+      Envoy::Api::External::registerApi(name.c_str(), api);
+    }
   }
 
   Engine* engine = new Engine(envoy_engine);
 
-  if (auto cast_engine = reinterpret_cast<Envoy::Engine*>(envoy_engine)) {
-    auto options = std::make_unique<Envoy::OptionsImpl>();
-    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
-    if (bootstrap) {
-      options->setConfigProto(std::move(bootstrap));
-    }
-    options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_)));
-    options->setConcurrency(1);
-    cast_engine->run(std::move(options));
+  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
+  if (bootstrap) {
+    options->setConfigProto(std::move(bootstrap));
   }
+  ENVOY_BUG(options->setLogLevel(logLevelToString(log_level_)).ok(), "invalid log level");
+  options->setConcurrency(1);
+  envoy_engine->run(std::move(options));
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

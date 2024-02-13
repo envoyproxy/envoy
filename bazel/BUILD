@@ -362,8 +362,8 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_envoy_mobile_request_compression",
-    values = {"define": "envoy_mobile_request_compression=disabled"},
+    name = "disable_envoy_mobile_xds",
+    values = {"define": "envoy_mobile_xds=disabled"},
 )
 
 config_setting(
@@ -700,6 +700,15 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "darwin_any",
+    match_any = [
+        ":darwin",
+        ":darwin_arm64",
+        ":darwin_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "apple_dbg",
     match_all = [
         ":apple",
@@ -891,7 +900,7 @@ cc_library(
 updater(
     name = "update",
     data = ["//tools/dependency:check"],
-    dependencies = ":repository_locations",
+    dependencies = "//tools/dependency:filtered-dependencies",
     post_script = ":version_update_post.sh",
     pydict = True,
     tags = ["skip_on_windows"],

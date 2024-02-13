@@ -305,7 +305,7 @@ public:
 
   ~Filter() override;
 
-  static StreamInfo::ResponseFlag
+  static StreamInfo::CoreResponseFlag
   streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   // Http::StreamFilterBase
@@ -520,11 +520,12 @@ private:
   // Handle an upstream request aborted due to a local timeout.
   void onSoftPerTryTimeout();
   void onSoftPerTryTimeout(UpstreamRequest& upstream_request);
-  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag, absl::string_view details);
+  void onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag response_flag,
+                              absl::string_view details);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
-  void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
+  void onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag response_flag,
                        absl::string_view body, bool dropped, absl::string_view details);
   void onUpstreamComplete(UpstreamRequest& upstream_request);
   // Reset all in-flight upstream requests.
@@ -536,6 +537,7 @@ private:
   void sendNoHealthyUpstreamResponse();
   bool setupRedirect(const Http::ResponseHeaderMap& headers);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
+                                                const Http::ResponseHeaderMap& upstream_headers,
                                                 const Http::HeaderEntry& internal_redirect,
                                                 uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
@@ -548,6 +550,8 @@ private:
                                    UpstreamRequest& upstream_request, bool end_stream,
                                    uint64_t grpc_to_http_status);
   Http::Context& httpContext() { return config_.http_context_; }
+  bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
+                         std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
 
   RetryStatePtr retry_state_;
   FilterConfig& config_;

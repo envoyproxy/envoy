@@ -13,10 +13,11 @@ namespace Envoy {
 namespace Http {
 
 struct AlternateProtocolsData {
-  AlternateProtocolsData(Server::Configuration::FactoryContextBase& context)
-      : dispatcher_(context.mainThreadDispatcher()),
-        validation_visitor_(context.messageValidationVisitor()),
+  AlternateProtocolsData(Server::Configuration::ServerFactoryContext& context,
+                         ProtobufMessage::ValidationVisitor& validation_visitor)
+      : dispatcher_(context.mainThreadDispatcher()), validation_visitor_(validation_visitor),
         file_system_(context.api().fileSystem()), concurrency_(context.options().concurrency()) {}
+
   Event::Dispatcher& dispatcher_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Filesystem::Instance& file_system_;

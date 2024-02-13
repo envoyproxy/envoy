@@ -2,20 +2,18 @@
 
 #include <vector>
 
+#include "library/cc/request_headers.h"
+#include "library/cc/request_trailers.h"
+#include "library/cc/stream_callbacks.h"
 #include "library/common/types/c_types.h"
-#include "request_headers.h"
-#include "request_trailers.h"
-#include "stream_callbacks.h"
 
 namespace Envoy {
+class InternalEngine;
 namespace Platform {
-
-class Engine;
-using EngineSharedPtr = std::shared_ptr<Engine>;
 
 class Stream {
 public:
-  Stream(envoy_engine_t engine_handle, envoy_stream_t handle);
+  Stream(Envoy::InternalEngine* engine, envoy_stream_t handle);
 
   Stream& sendHeaders(RequestHeadersSharedPtr headers, bool end_stream);
   Stream& sendData(envoy_data data);
@@ -25,7 +23,7 @@ public:
   void cancel();
 
 private:
-  envoy_engine_t engine_handle_;
+  Envoy::InternalEngine* engine_;
   envoy_stream_t handle_;
 };
 

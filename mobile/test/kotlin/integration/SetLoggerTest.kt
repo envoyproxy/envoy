@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
@@ -9,11 +10,9 @@ import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 class SetLoggerTest {
-
   init {
     JniLibrary.loadTestLibrary()
   }
@@ -29,7 +28,7 @@ class SetLoggerTest {
           "test_logger",
           "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger\"}"
         )
-        .setLogger { msg ->
+        .setLogger { _, msg ->
           if (msg.contains("starting main dispatch loop")) {
             countDownLatch.countDown()
           }

@@ -139,9 +139,9 @@ Config::SharedConfig::SharedConfig(
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
-      upstream_drain_manager_slot_(context.getServerFactoryContext().threadLocal().allocateSlot()),
+      upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
-      random_generator_(context.getServerFactoryContext().api().randomGenerator()) {
+      random_generator_(context.serverFactoryContext().api().randomGenerator()) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -223,13 +223,8 @@ Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
 
-  const Formatter::HttpFormatterContext log_context{
-      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpConnectionEnd};
-
   // Flush the final end stream access log entry.
-  for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(log_context, getStreamInfo());
-  }
+  flushAccessLog(AccessLog::AccessLogType::TcpConnectionEnd);
 
   ASSERT(generic_conn_pool_ == nullptr);
   ASSERT(upstream_ == nullptr);
@@ -422,7 +417,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
       ENVOY_CONN_LOG(debug, "Cluster not found {} and no on demand cluster set.",
                      read_callbacks_->connection(), cluster_name);
       config_->stats().downstream_cx_no_route_.inc();
-      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+      getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
       onInitFailure(UpstreamFailureReason::NoRoute);
     } else {
       ASSERT(!cluster_discovery_handle_);
@@ -450,7 +445,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
   // will never be released.
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
     cluster->trafficStats()->upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
     return Network::FilterStatus::StopIteration;
@@ -458,7 +453,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   const uint32_t max_connect_attempts = config_->maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
     cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::ConnectFailed);
     return Network::FilterStatus::StopIteration;
@@ -492,7 +487,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   if (!maybeTunnel(*thread_local_cluster)) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
     // cluster->trafficStats()->upstream_cx_none_healthy in the latter case.
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
   }
   return Network::FilterStatus::StopIteration;
@@ -525,7 +520,7 @@ void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus clust
   }
   // Failure path.
   config_->stats().downstream_cx_no_route_.inc();
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
   onInitFailure(UpstreamFailureReason::NoRoute);
 }
 
@@ -672,7 +667,7 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
   }
   filter_state->setData(
       TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void TunnelingConfigHelperImpl::propagateResponseTrailers(
@@ -690,7 +685,7 @@ void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginTimeout);
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
 
   // Raise LocalClose, which will trigger a reconnect if needed/configured.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
@@ -799,12 +794,12 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
+    upstream_.reset();
     disableIdleTimer();
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
-        getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+        getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
@@ -854,12 +849,7 @@ void Filter::onUpstreamConnection() {
   }
 
   if (config_->flushAccessLogOnConnected()) {
-    const Formatter::HttpFormatterContext log_context{
-        nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpUpstreamConnected};
-
-    for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(log_context, getStreamInfo());
-    }
+    flushAccessLog(AccessLog::AccessLogType::TcpUpstreamConnected);
   }
 }
 
@@ -874,7 +864,7 @@ void Filter::onIdleTimeout() {
 
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(
       Network::ConnectionCloseType::NoFlush,
@@ -882,18 +872,21 @@ void Filter::onMaxDownstreamConnectionDuration() {
 }
 
 void Filter::onAccessLogFlushInterval() {
-  const Formatter::HttpFormatterContext log_context{
-      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpPeriodic};
-
-  for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(log_context, getStreamInfo());
-  }
+  flushAccessLog(AccessLog::AccessLogType::TcpPeriodic);
   const SystemTime now = read_callbacks_->connection().dispatcher().timeSource().systemTime();
   getStreamInfo().getDownstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
   if (getStreamInfo().getUpstreamBytesMeter()) {
     getStreamInfo().getUpstreamBytesMeter()->takeDownstreamPeriodicLoggingSnapshot(now);
   }
   resetAccessLogFlushTimer();
+}
+
+void Filter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
+  const Formatter::HttpFormatterContext log_context{nullptr, nullptr, nullptr, {}, access_log_type};
+
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(log_context, getStreamInfo());
+  }
 }
 
 void Filter::resetAccessLogFlushTimer() {

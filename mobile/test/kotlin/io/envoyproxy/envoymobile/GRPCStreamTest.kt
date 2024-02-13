@@ -1,12 +1,14 @@
 package io.envoyproxy.envoymobile
 
+import com.google.common.truth.Truth.assertThat
+import io.envoyproxy.envoymobile.mocks.MockStream
+import io.envoyproxy.envoymobile.mocks.MockStreamClient
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 class GRPCStreamTest {
@@ -204,7 +206,7 @@ class GRPCStreamTest {
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
       .setOnResponseMessage { message, _ ->
-        assertThat(message.array()).hasSize(0)
+        assertThat(message.array()).hasLength(0)
         countDownLatch.countDown()
       }
       .start(Executor {})
@@ -257,7 +259,7 @@ class GRPCStreamTest {
       .newGRPCStreamPrototype()
       .setOnResponseMessage { message, _ ->
         if (countDownLatch.count == 2L) {
-          assertThat(message.array()).hasSize(0)
+          assertThat(message.array()).hasLength(0)
         } else {
           assertThat(message.array()).isEqualTo(secondMessage)
         }

@@ -109,13 +109,14 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
+  Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders(), upstream_host);
+    span_->injectContext(trace_context, upstream_host);
   } else {
     // No independent child span for current upstream request then inject the parent span's tracing
     // context into the request headers.
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), upstream_host);
+    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_host);
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -509,17 +510,26 @@ void UpstreamRequest::setupPerTryTimeout() {
 
 void UpstreamRequest::onPerTryIdleTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream per try idle timeout", *parent_.callbacks());
-  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  if (per_try_timeout_) {
+    // Disable the per try idle timer, so it does not trigger further retries
+    per_try_timeout_->disableTimer();
+  }
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   parent_.onPerTryIdleTimeout(*this);
 }
 
 void UpstreamRequest::onPerTryTimeout() {
+  if (per_try_idle_timeout_) {
+    // Delete the per try idle timer, so it does not trigger further retries.
+    // The timer has to be deleted to prevent data flow from re-arming it.
+    per_try_idle_timeout_.reset();
+  }
   // If we've sent anything downstream, ignore the per try timeout and let the response continue
   // up to the global timeout
   if (!parent_.downstreamResponseStarted()) {
     ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks());
 
-    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
+    stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout);
     parent_.onPerTryTimeout(*this);
   } else {
     ENVOY_STREAM_LOG(debug,

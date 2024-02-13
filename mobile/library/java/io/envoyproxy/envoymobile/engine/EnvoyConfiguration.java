@@ -64,7 +64,6 @@ public class EnvoyConfiguration {
   public final Integer xdsPort;
   public final Map<String, String> xdsGrpcInitialMetadata;
   public final String xdsRootCerts;
-  public final String xdsSni;
   public final String nodeId;
   public final String nodeRegion;
   public final String nodeZone;
@@ -109,10 +108,8 @@ public class EnvoyConfiguration {
    *     known to speak QUIC.
    * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
-   *     compression.
    * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
-   *     compression.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
@@ -143,8 +140,6 @@ public class EnvoyConfiguration {
    * @param xdsRootCerts                                  the root certificates to use for the TLS
    *                                                      handshake during connection establishment
    *                                                      with the xDS management server.
-   * @param xdsSni                                        the SNI (server name identification) to
-   *                                                      use for the TLS handshake.
    * @param nodeId                                        the node ID in the Node metadata.
    * @param nodeRegion                                    the node region in the Node metadata.
    * @param nodeZone                                      the node zone in the Node metadata.
@@ -173,7 +168,7 @@ public class EnvoyConfiguration {
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
       boolean enablePlatformCertificatesValidation, String rtdsResourceName,
       Integer rtdsTimeoutSeconds, String xdsAddress, Integer xdsPort,
-      Map<String, String> xdsGrpcInitialMetadata, String xdsRootCerts, String xdsSni, String nodeId,
+      Map<String, String> xdsGrpcInitialMetadata, String xdsRootCerts, String nodeId,
       String nodeRegion, String nodeZone, String nodeSubZone, Struct nodeMetadata,
       String cdsResourcesLocator, Integer cdsTimeoutSeconds, boolean enableCds) {
     JniLibrary.load();
@@ -235,7 +230,6 @@ public class EnvoyConfiguration {
     this.xdsPort = xdsPort;
     this.xdsGrpcInitialMetadata = new HashMap<>(xdsGrpcInitialMetadata);
     this.xdsRootCerts = xdsRootCerts;
-    this.xdsSni = xdsSni;
     this.nodeId = nodeId;
     this.nodeRegion = nodeRegion;
     this.nodeZone = nodeZone;
@@ -269,9 +263,8 @@ public class EnvoyConfiguration {
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
         enablePlatformCertificatesValidation, runtimeGuards, rtdsResourceName, rtdsTimeoutSeconds,
-        xdsAddress, xdsPort, xdsGrpcInitialMetadata, xdsRootCerts, xdsSni, nodeId, nodeRegion,
-        nodeZone, nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds,
-        enableCds);
+        xdsAddress, xdsPort, xdsGrpcInitialMetadata, xdsRootCerts, nodeId, nodeRegion, nodeZone,
+        nodeSubZone, nodeMetadata.toByteArray(), cdsResourcesLocator, cdsTimeoutSeconds, enableCds);
   }
 
   static class ConfigurationException extends RuntimeException {

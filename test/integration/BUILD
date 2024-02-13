@@ -1,4 +1,3 @@
-load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -8,11 +7,11 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
-    "envoy_py_test",
     "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
     "envoy_select_enable_yaml",
     "envoy_select_envoy_mobile_listener",
+    "envoy_select_linkstatic",
     "envoy_sh_test",
 )
 
@@ -84,6 +83,7 @@ envoy_cc_test(
     name = "alpn_integration_test",
     size = "large",
     srcs = ["alpn_integration_test.cc"],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -353,34 +353,25 @@ envoy_cc_test_binary(
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
-        "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
-        "//source/extensions/load_balancing_policies/subset:config",
     ],
 )
 
-envoy_py_test(
-    name = "hotrestart_handoff_test",
-    size = "medium",
-    srcs = select({
-        "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
-        "//conditions:default": ["hotrestart_handoff_test.py"],
-    }),
-    data = [":hotrestart_main"],
-    main = select({
-        "//bazel:disable_hot_restart_or_admin": "null_test.py",
-        "//conditions:default": "hotrestart_handoff_test.py",
-    }),
-    # Hot restart does not apply on Windows.
-    # py_test doesn't do coverage.
-    tags = [
-        "nocoverage",
-        "skip_on_windows",
+envoy_cc_test_binary(
+    name = "hotrestart_small_main",
+    srcs = ["hotrestart_main.cc"],
+    external_deps = [
+        "abseil_symbolize",
     ],
+    linkstatic = envoy_select_linkstatic(),
     deps = [
-        requirement("aiohttp"),
+        "//source/exe:main_common_lib",
+        "//source/exe:platform_impl_lib",
+        "//source/exe:process_wide_lib",
+        "//source/exe:stripped_main_base_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
     ],
 )
 
@@ -403,14 +394,15 @@ envoy_sh_test(
 )
 
 envoy_sh_test(
-    name = "run_envoy_test",
+    name = "run_envoy_small_test",
     size = "large",
     srcs = ["run_envoy_test.sh"],
-    cc_binary = [":hotrestart_main"],
+    cc_binary = [":hotrestart_small_main"],
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cc_test(
@@ -1076,6 +1068,8 @@ envoy_cc_test_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:codec_stats_lib",
+        "//source/common/listener_manager:active_raw_udp_listener_config",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1084,8 +1078,6 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
-        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -1101,7 +1093,7 @@ envoy_cc_test_library(
         "//source/common/quic:quic_server_factory_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]) + envoy_select_envoy_mobile_listener([
-        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "//source/common/listener_manager:listener_manager_lib",
     ]),
 )
 
@@ -1279,6 +1271,7 @@ envoy_cc_test_library(
         "//source/common/http:headers_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/listener_manager:connection_handler_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -1294,7 +1287,6 @@ envoy_cc_test_library(
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
-        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -1846,6 +1838,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        "//source/common/stream_info:utility_lib",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//source/extensions/upstreams/http/udp:config",

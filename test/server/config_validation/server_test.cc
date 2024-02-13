@@ -206,13 +206,11 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   server.admin()->addStreamingHandler("", "", nullptr, false, false);
   server.admin()->addListenerToHandler(nullptr);
   server.admin()->closeSocket();
-  server.admin()->startHttpListener({}, "", nullptr, nullptr, nullptr);
+  server.admin()->startHttpListener({}, nullptr, nullptr);
 
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockListenerConfig listener_config;
   Server::ThreadLocalOverloadStateOptRef overload_state;
-  server.dispatcher().createListener(nullptr, listener_callbacks, server.runtime(), listener_config,
-                                     overload_state);
 
   server.dnsResolver()->resolve("", Network::DnsLookupFamily::All, nullptr);
 

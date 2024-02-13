@@ -53,9 +53,9 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                                   Server::Configuration::CommonFactoryContext& context) {
-  Runtime::Loader& runtime = context.runtime();
-  Random::RandomGenerator& random = context.api().randomGenerator();
+                                   Server::Configuration::FactoryContext& context) {
+  Runtime::Loader& runtime = context.serverFactoryContext().runtime();
+  Random::RandomGenerator& random = context.serverFactoryContext().api().randomGenerator();
   ProtobufMessage::ValidationVisitor& validation_visitor = context.messageValidationVisitor();
   switch (config.filter_specifier_case()) {
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kStatusCodeFilter:
@@ -156,7 +156,7 @@ bool RuntimeFilter::evaluate(const Formatter::HttpFormatterContext&,
 
 OperatorFilter::OperatorFilter(
     const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-    Server::Configuration::CommonFactoryContext& context) {
+    Server::Configuration::FactoryContext& context) {
   for (const auto& config : configs) {
     auto filter = FilterFactory::fromProto(config, context);
     if (filter != nullptr) {
@@ -166,11 +166,11 @@ OperatorFilter::OperatorFilter(
 }
 
 OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
-                   Server::Configuration::CommonFactoryContext& context)
+                   Server::Configuration::FactoryContext& context)
     : OperatorFilter(config.filters(), context) {}
 
 AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-                     Server::Configuration::CommonFactoryContext& context)
+                     Server::Configuration::FactoryContext& context)
     : OperatorFilter(config.filters(), context) {}
 
 bool OrFilter::evaluate(const Formatter::HttpFormatterContext& context,
@@ -215,20 +215,34 @@ bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
-    const envoy::config::accesslog::v3::ResponseFlagFilter& config) {
+    const envoy::config::accesslog::v3::ResponseFlagFilter& config)
+    : has_configured_flags_(!config.flags().empty()) {
+
+  // Preallocate the vector to avoid frequent heap allocations.
+  configured_flags_.resize(StreamInfo::ResponseFlagUtils::responseFlagsVec().size(), false);
   for (int i = 0; i < config.flags_size(); i++) {
-    absl::optional<StreamInfo::ResponseFlag> response_flag =
-        StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
+    auto response_flag = StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
     // The config has been validated. Therefore, every flag in the config will have a mapping.
     ASSERT(response_flag.has_value());
-    configured_flags_ |= response_flag.value();
+
+    // The vector is allocated with the size of the response flags vec. Therefore, the index
+    // should always be valid.
+    ASSERT(response_flag.value().value() < configured_flags_.size());
+
+    configured_flags_[response_flag.value().value()] = true;
   }
 }
 
 bool ResponseFlagFilter::evaluate(const Formatter::HttpFormatterContext&,
                                   const StreamInfo::StreamInfo& info) const {
-  if (configured_flags_ != 0) {
-    return info.intersectResponseFlags(configured_flags_);
+  if (has_configured_flags_) {
+    for (const auto flag : info.responseFlags()) {
+      ASSERT(flag.value() < configured_flags_.size());
+      if (configured_flags_[flag.value()]) {
+        return true;
+      }
+    }
+    return false;
   }
   return info.hasAnyResponseFlag();
 }
@@ -311,11 +325,8 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
   return default_match_;
 }
 
-namespace {
-
-template <typename FactoryContext>
-InstanceSharedPtr makeAccessLogInstance(const envoy::config::accesslog::v3::AccessLog& config,
-                                        FactoryContext& context) {
+InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                                              Server::Configuration::FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context);
@@ -326,20 +337,6 @@ InstanceSharedPtr makeAccessLogInstance(const envoy::config::accesslog::v3::Acce
       config, context.messageValidationVisitor(), factory);
 
   return factory.createAccessLogInstance(*message, std::move(filter), context);
-}
-
-} // namespace
-
-InstanceSharedPtr
-AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                            Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return makeAccessLogInstance(config, context);
-}
-
-InstanceSharedPtr
-AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                            Server::Configuration::CommonFactoryContext& context) {
-  return makeAccessLogInstance(config, context);
 }
 
 } // namespace AccessLog
