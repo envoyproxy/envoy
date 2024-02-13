@@ -23,6 +23,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>` must be configured.
 // [#extension: envoy.geoip_providers.maxmind]
 
+// [#next-free-field: 6]
 message MaxMindConfig {
   // Full file path to the Maxmind city database, e.g. /etc/GeoLite2-City.mmdb.
   // Database file is expected to have .mmdb extension.
@@ -39,4 +40,11 @@ message MaxMindConfig {
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
   common.v3.CommonGeoipProviderConfig common_provider_config = 4
       [(validate.rules).message = {required: true}];
+
+  // Optional full file path to the config country mappings overrides, e.g. /etc/country-mapping.conf.
+  // File expected to have .conf extension. File should be a json with the following format:
+  // {
+  //   "country_code": "country_code" # comment
+  // }
+  optional string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
 }

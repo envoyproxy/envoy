@@ -1,6 +1,16 @@
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <regex>
+
+#include "envoy/type/matcher/v3/regex.pb.h"
+
 #include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -27,6 +37,10 @@ GeoipProviderConfig::GeoipProviderConfig(
                                                  : absl::nullopt),
       anon_db_path_(!config.anon_db_path().empty() ? absl::make_optional(config.anon_db_path())
                                                    : absl::nullopt),
+      // Path is hardcoded since we don't have the field on the OSS version of the proto.
+      country_mapping_path_(!config.country_mapping_path().empty()
+                                ? absl::make_optional(config.country_mapping_path())
+                                : absl::nullopt),
       stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
       stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
   auto geo_headers_to_add = config.common_provider_config().geo_headers_to_add();
@@ -68,6 +82,7 @@ GeoipProviderConfig::GeoipProviderConfig(
   if (anon_db_path_) {
     registerGeoDbStats("anon_db");
   }
+  stat_name_set_->rememberBuiltin(absl::StrCat("country_mapping", ".parse_error"));
 };
 
 void GeoipProviderConfig::registerGeoDbStats(const std::string& db_type) {
@@ -111,6 +126,61 @@ MaxmindDbPtr GeoipProvider::initMaxMindDb(const absl::optional<std::string>& db_
   }
 }
 
+CountryMappingPtr
+GeoipProvider::initCountryMapping(const absl::optional<std::string>& country_mapping_path) {
+  auto country_mapping = std::make_unique<absl::flat_hash_map<std::string, std::string>>();
+  if (country_mapping_path) {
+    if (file_system_.fileExists(country_mapping_path.value())) {
+      auto file_or_error = file_system_.fileReadToEnd(country_mapping_path.value());
+      RELEASE_ASSERT(absl::OkStatus() == file_or_error.status(),
+                     fmt::format("Unable to open country mapping file {}. Error {}",
+                                 country_mapping_path.value(),
+                                 std::string(file_or_error.status().message())));
+      parseCountryMapping(file_or_error.value(), country_mapping);
+    } else {
+      config_->incCountryMappingFileParseError();
+      ENVOY_LOG(warn,
+                fmt::format("Country Mapping configuration file {} does not exist, skipping map",
+                            country_mapping_path.value()));
+    }
+  }
+  return country_mapping;
+}
+
+void GeoipProvider::parseCountryMapping(const std::string& file,
+                                        const CountryMappingPtr& country_mapping) {
+  TRY_NEEDS_AUDIT {
+    // Remove lines with comments.
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
+    matcher.set_regex("#.*");
+    auto compiled_regex = Regex::Utility::parseRegex(matcher);
+    std::string content_without_comments = compiled_regex->replaceAll(file, "");
+    // Load as json and fill country_mapping_.
+    Json::ObjectSharedPtr json = Json::Factory::loadFromString(content_without_comments);
+    json->iterate([&](const std::string& key, const Json::Object& value) {
+      country_mapping->insert(std::make_pair(key, value.asString()));
+      return true;
+    });
+  }
+  END_TRY
+  catch (Json::Exception&) {
+    config_->incCountryMappingFileParseError();
+    ENVOY_LOG(warn, fmt::format("Cannot parse Country Mapping configuration file {}, skipping map",
+                                file));
+  }
+}
+
+const std::string& GeoipProvider::getCountryMapping(const std::string& country) const {
+  if (!country.empty() && country_mapping_ && !country_mapping_->empty()) {
+    auto it = country_mapping_->find(country);
+    if (it != country_mapping_->end()) {
+      return it->second;
+    }
+  }
+  return country;
+}
+
 void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
                            Geolocation::LookupGeoHeadersCallback&& cb) const {
   auto& remote_address = request.remoteAddress();
@@ -150,6 +220,12 @@ void GeoipProvider::lookupInCityDb(
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
                                   MMDB_COUNTRY_LOOKUP_ARGS[1]);
+          auto it = lookup_result.find(config_->countryHeader().value());
+          std::string country;
+          if (it != lookup_result.end()) {
+            country = it->second;
+          }
+          lookup_result[config_->countryHeader().value()] = getCountryMapping(country);
         }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit("city_db");

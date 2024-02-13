@@ -13,3 +13,11 @@ filegroup(
     name = "geolocation_databases",
     srcs = glob(["*.mmdb"]),
 )
+
+filegroup(
+    name = "country_mapping",
+    srcs = glob([
+        "country_mapping.conf",
+        "country_mapping_invalid_json.conf",
+    ]),
+)

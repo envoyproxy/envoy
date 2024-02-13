@@ -24,7 +24,9 @@ envoy_cc_extension(
     deps = [
         ":provider_impl",
         "//envoy/geoip:geoip_provider_driver_interface",
+        "//source/common/common:regex_lib",
         "//source/common/config:utility_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/geoip_providers/common:factory_base_lib",
         "@envoy_api//envoy/extensions/geoip_providers/maxmind/v3:pkg_cc_proto",
@@ -43,6 +45,9 @@ envoy_cc_library(
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/geoip:geoip_provider_driver_interface",
+        "//source/common/common:regex_lib",
+        "//source/common/filesystem:filesystem_lib",
+        "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/geoip_providers/maxmind/v3:pkg_cc_proto",
     ],
 )

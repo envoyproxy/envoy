@@ -6,12 +6,15 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using ::testing::AllOf;
+
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -30,6 +33,9 @@ public:
   }
   static const absl::optional<std::string>& anonDbPath(const GeoipProvider& provider) {
     return provider.config_->anonDbPath();
+  }
+  static const absl::optional<std::string>& countryMappingPath(const GeoipProvider& provider) {
+    return provider.config_->countryMappingPath();
   }
   static const absl::optional<std::string>& countryHeader(const GeoipProvider& provider) {
     return provider.config_->countryHeader();
@@ -87,6 +93,18 @@ MATCHER_P(HasAnonDbPath, expected_db_path, "") {
   }
   *result_listener << "expected anon_db_path=" << expected_db_path
                    << " but anon_db_path was not found in provider config";
+  return false;
+}
+
+MATCHER_P(HasCountryMappingPath, expected_country_mapping_path, "") {
+  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
+  auto country_mapping_path = GeoipProviderPeer::countryMappingPath(*provider);
+  if (!country_mapping_path.value().empty() &&
+      testing::Matches(expected_country_mapping_path)(country_mapping_path)) {
+    return true;
+  }
+  *result_listener << "expected country_mapping_path=" << expected_country_mapping_path
+                   << " but country_mapping_path was not found in provider config";
   return false;
 }
 
@@ -183,6 +201,8 @@ std::string genGeoDbFilePath(std::string db_name) {
       "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/" + db_name);
 }
 
+class MaxmindProviderConfigTest : public testing::Test {};
+
 TEST(MaxmindProviderConfigTest, EmptyProto) {
   MaxmindProviderFactory factory;
   EXPECT_TRUE(factory.createEmptyConfigProto() != nullptr);
@@ -205,25 +225,34 @@ TEST(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
     city_db_path: %s
     isp_db_path: %s
     anon_db_path: %s
+    country_mapping_path: %s
   )EOF";
   MaxmindProviderConfig provider_config;
   auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
   auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
   auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
-  auto processed_provider_config_yaml =
-      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+  auto country_mapping_path = genGeoDbFilePath("country_mapping.conf");
+  auto processed_provider_config_yaml = absl::StrFormat(
+      provider_config_yaml, city_db_path, asn_db_path, anon_db_path, country_mapping_path);
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto api = Api::createApiForTest();
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
   EXPECT_CALL(context, messageValidationVisitor());
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
       factory.createGeoipProviderDriver(provider_config, "maxmind", context);
-  EXPECT_THAT(driver, AllOf(HasCityDbPath(city_db_path), HasIspDbPath(asn_db_path),
-                            HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
-                            HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
-                            HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
-                            HasAnonTorHeader("x-anon-tor"), HasAnonProxyHeader("x-anon-proxy"),
-                            HasAnonHostingHeader("x-anon-hosting")));
+  EXPECT_THAT(driver,
+              AllOf(HasCityDbPath(city_db_path), HasIspDbPath(asn_db_path),
+                    HasAnonDbPath(anon_db_path), HasCountryMappingPath(country_mapping_path),
+                    HasCountryHeader("x-geo-country"), HasCityHeader("x-geo-city"),
+                    HasRegionHeader("x-geo-region"), HasAsnHeader("x-geo-asn"),
+                    HasAnonVpnHeader("x-anon-vpn"), HasAnonTorHeader("x-anon-tor"),
+                    HasAnonProxyHeader("x-anon-proxy"), HasAnonHostingHeader("x-anon-hosting")));
 }
 
 TEST(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
@@ -287,15 +316,24 @@ TEST(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
     city_db_path: %s
     isp_db_path: %s
     anon_db_path: %s
+    country_mapping_path: %s
   )EOF";
   MaxmindProviderConfig provider_config;
   auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
   auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
   auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
-  auto processed_provider_config_yaml =
-      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+  auto country_mapping_path = genGeoDbFilePath("country_mapping.conf");
+  auto processed_provider_config_yaml = absl::StrFormat(
+      provider_config_yaml, city_db_path, asn_db_path, anon_db_path, country_mapping_path);
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto api = Api::createApiForTest();
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
   EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
@@ -319,6 +357,7 @@ TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfi
     city_db_path: %s
     isp_db_path: %s
     anon_db_path: %s
+    country_mapping_path: %s
   )EOF";
   const auto provider_config_yaml2 = R"EOF(
     common_provider_config:
@@ -331,19 +370,29 @@ TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfi
         anon_hosting: "x-anon-hosting"
     city_db_path: %s
     anon_db_path: %s
+    country_mapping_path: %s
   )EOF";
   MaxmindProviderConfig provider_config1;
   MaxmindProviderConfig provider_config2;
   auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
   auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
   auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
-  auto processed_provider_config_yaml1 =
-      absl::StrFormat(provider_config_yaml1, city_db_path, asn_db_path, anon_db_path);
+  auto country_mapping_path = genGeoDbFilePath("country_mapping.conf");
+
+  auto processed_provider_config_yaml1 = absl::StrFormat(
+      provider_config_yaml1, city_db_path, asn_db_path, anon_db_path, country_mapping_path);
   auto processed_provider_config_yaml2 =
-      absl::StrFormat(provider_config_yaml2, city_db_path, anon_db_path);
+      absl::StrFormat(provider_config_yaml2, city_db_path, anon_db_path, country_mapping_path);
   TestUtility::loadFromYaml(processed_provider_config_yaml1, provider_config1);
   TestUtility::loadFromYaml(processed_provider_config_yaml2, provider_config2);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto api = Api::createApiForTest();
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
   EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
@@ -351,6 +400,33 @@ TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfi
   Geolocation::DriverSharedPtr driver2 =
       factory.createGeoipProviderDriver(provider_config2, "maxmind", context);
   EXPECT_NE(driver1.get(), driver2.get());
+}
+
+TEST(MaxmindProviderConfigTest, CountryMappingPathDoesNotExist) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        city: "x-geo-city"
+    city_db_path: %s
+    country_mapping_path: "/usr/share/geoip2Gcs/wrong_path.conf"
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto processed_provider_config_yaml = absl::StrFormat(provider_config_yaml, city_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto api = Api::createApiForTest();
+
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
+  MaxmindProviderFactory factory;
+
+  EXPECT_LOG_CONTAINS("warn",
+                      "Country Mapping configuration file /usr/share/geoip2Gcs/wrong_path.conf "
+                      "does not exist, skipping map",
+                      factory.createGeoipProviderDriver(provider_config, "maxmind", context));
 }
 
 } // namespace Maxmind

@@ -1,4 +1,6 @@
+#include "envoy/api/api.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/network/address_impl.h"
@@ -42,7 +44,10 @@ public:
   }
 
   void initializeProvider(const std::string& yaml) {
-    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
+    api_ = Api::createApiForTest();
+    ON_CALL(context_, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_, scope()).WillByDefault(ReturnRef(*scope_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
@@ -61,9 +66,12 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   DriverSharedPtr provider_;
   MaxmindProviderFactory* provider_factory_;
   absl::flat_hash_map<std::string, std::string> captured_lookup_response_;
+  Filesystem::MockInstance filesystem_;
+  Api::ApiPtr api_;
 };
 
 TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
@@ -76,6 +84,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
         asn: "x-geo-asn"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -98,6 +107,35 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   expectStats("isp_db");
 }
 
+TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookupWithoutResultDontCauseCrash) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
+  )EOF";
+  initializeProvider(config_yaml);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("67.43.156.1");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(2, captured_lookup_response_.size());
+  const auto& country_it = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ("BT", country_it->second);
+  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("35908", asn_it->second);
+  expectStats("city_db");
+  expectStats("isp_db");
+}
+
 TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -105,6 +143,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
         country: "x-geo-country"
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/MaxMind-DB-test-ipv4-24.mmdb"
+    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -254,6 +293,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   provider_->lookup(std::move(lookup_rq1), std::move(lookup_cb_std));
   EXPECT_EQ(3, captured_lookup_response_.size());
   // Another lookup request.
+  captured_lookup_response_.clear();
   Network::Address::InstanceConstSharedPtr remote_address2 =
       Network::Utility::parseInternetAddress("63.25.243.11");
   Geolocation::LookupRequest lookup_rq2{std::move(remote_address2)};
@@ -263,6 +303,84 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
   EXPECT_EQ(3, captured_lookup_response_.size());
   expectStats("city_db", 2, 2);
+}
+
+TEST_F(GeoipProviderTest, ValidCountryMapping) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        region: "x-geo-region"
+        asn: "x-geo-asn"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+  )EOF";
+
+  initializeProvider(config_yaml);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(4, captured_lookup_response_.size());
+  const auto& city_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Boxford", city_it->second);
+  const auto& region_it = captured_lookup_response_.find("x-geo-region");
+  EXPECT_EQ("ENG", region_it->second);
+  const auto& country_it = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ("GB", country_it->second);
+  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("15169", asn_it->second);
+  captured_lookup_response_.clear();
+  Network::Address::InstanceConstSharedPtr remote_address2 =
+      Network::Utility::parseInternetAddress("89.160.20.113");
+  Geolocation::LookupRequest lookup_rq2{std::move(remote_address2)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
+  auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
+  EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
+  EXPECT_EQ(4, captured_lookup_response_.size());
+  const auto& city_it_rq2 = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Linköping", city_it_rq2->second);
+  const auto& region_it_rq2 = captured_lookup_response_.find("x-geo-region");
+  EXPECT_EQ("E", region_it_rq2->second);
+  const auto& country_it_rq2 = captured_lookup_response_.find("x-geo-country");
+  EXPECT_EQ("XX", country_it_rq2->second);
+  const auto& asn_it_rq2 = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("29518", asn_it_rq2->second);
+  expectStats("city_db", 2, 2, 0);
+  expectStats("isp_db", 2, 2, 0);
+}
+
+TEST_F(GeoipProviderTest, InvalidJsonInCountryMapping) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        region: "x-geo-region"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping_invalid_json.conf"
+  )EOF";
+  EXPECT_LOG_CONTAINS("warn", "Cannot parse Country Mapping configuration file ",
+                      initializeProvider(config_yaml));
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(3, captured_lookup_response_.size());
+  const auto& city_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Boxford", city_it->second);
+  auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
+  EXPECT_EQ(provider_scope.counterFromString("country_mapping.parse_error").value(), 1);
+  expectStats("city_db", 1, 1, 0);
 }
 
 using GeoipProviderDeathTest = GeoipProviderTest;
@@ -293,6 +411,7 @@ TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
       geo_headers_to_add:
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data_atc/GeoLite2-City-Test.mmdb"
+    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
   )EOF";
   EXPECT_DEATH(initializeProvider(config_yaml), ".*Unable to open Maxmind database file.*");
 }
