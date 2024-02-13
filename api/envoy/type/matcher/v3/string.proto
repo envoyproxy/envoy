@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.type.matcher.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/matcher/v3/regex.proto";
 
 import "udpa/annotations/status.proto";
