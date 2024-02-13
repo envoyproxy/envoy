@@ -34,7 +34,6 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
-    // Send a request to trigger the test filter which should log an event.
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
                                                authority: "neverssl.com", path: "/")
       .build()
@@ -55,8 +54,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [responseHeadersExpectation], timeout: 10), .completed)
-    XCTAssertEqual(XCTWaiter.wait(for: [responseTrailersExpectation], timeout: 10), .completed)
+    let expectations = [responseHeadersExpectation, responseTrailersExpectation]
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
       XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
@@ -88,7 +87,6 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
-    // Send a request to trigger the test filter which should log an event.
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "cloud.google.com", path: "/")
       .build()
@@ -111,8 +109,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [responseHeadersExpectation], timeout: 10), .completed)
-    XCTAssertEqual(XCTWaiter.wait(for: [responseBodyExpectation], timeout: 10), .completed)
+    let expectations = [responseHeadersExpectation, responseBodyExpectation]
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
       XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
@@ -144,7 +142,6 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
-    // Send a request to trigger the test filter which should log an event.
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "cloud.google.com", path: "/")
       .build()
@@ -167,12 +164,53 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [responseHeadersExpectation], timeout: 10), .completed)
-    XCTAssertEqual(XCTWaiter.wait(for: [responseBodyExpectation], timeout: 10), .completed)
+    let expectations = [responseHeadersExpectation, responseBodyExpectation]
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
       XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
     }
+
+    engine.terminate()
+    EnvoyTestServer.shutdownTestServer()
+  }
+
+  func testHTTPRequestUsingProxyCancelStream() throws {
+    EnvoyTestServer.startHttpProxyServer()
+    let port = EnvoyTestServer.getEnvoyPort()
+
+    let engineExpectation = self.expectation(description: "Run started engine")
+
+    let engine = EngineBuilder()
+      .addLogLevel(.trace)
+      .setOnEngineRunning {
+        engineExpectation.fulfill()
+      }
+      .respectSystemProxySettings(true)
+      .build()
+
+    EnvoyTestApi.registerTestProxyResolver("127.0.0.1", port: port, usePacResolver: false)
+
+    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
+
+    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
+                                               authority: "neverssl.com", path: "/")
+      .build()
+
+    let cancelExpectation = self.expectation(description: "Stream run with expected cancellation")
+
+    engine.streamClient()
+      .newStreamPrototype()
+      .setOnCancel { _ in
+         // Handle stream cancellation, which is expected since we immediately
+         // cancel the stream after sending headers on it.
+         cancelExpectation.fulfill()
+      }
+      .start()
+      .sendHeaders(requestHeaders, endStream: true)
+      .cancel()
+
+    XCTAssertEqual(XCTWaiter.wait(for: [cancelExpectation], timeout: 10), .completed)
 
     engine.terminate()
     EnvoyTestServer.shutdownTestServer()
