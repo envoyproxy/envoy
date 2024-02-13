@@ -39,6 +39,8 @@ MockAsyncClientFactory::MockAsyncClientFactory() {
 MockAsyncClientFactory::~MockAsyncClientFactory() = default;
 
 MockAsyncClientManager::MockAsyncClientManager() {
+  // Preferve behavior prior to statusor refactor.
+  ON_CALL(*this, getOrCreateRawAsyncClient(_, _, _)).WillByDefault(Return(nullptr));
   ON_CALL(*this, factoryForGrpcService(_, _, _))
       .WillByDefault(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<testing::NiceMock<Grpc::MockAsyncClientFactory>>();
