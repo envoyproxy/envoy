@@ -39,14 +39,19 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
   // API expects. By using the version already loaded, instead of loading it from the source,
   // we can reuse all the code that loads from different formats, allows using passwords on the key,
   // etc.
-  std::string certs_str;
+  std::vector<std::string> chain;
   auto process_one_cert = [&](X509* cert) {
     bssl::UniquePtr<BIO> bio(BIO_new(BIO_s_mem()));
     int result = PEM_write_bio_X509(bio.get(), cert);
     ASSERT(result == 1);
     BUF_MEM* buf_mem = nullptr;
     result = BIO_get_mem_ptr(bio.get(), &buf_mem);
-    certs_str.append(buf_mem->data, buf_mem->length);
+    std::string cert_str(buf_mem->data, buf_mem->length);
+    std::istringstream pem_stream(cert_str);
+    auto pem_result = quic::ReadNextPemMessage(&pem_stream);
+    RELEASE_ASSERT(pem_result.status == quic::PemReadResult::Status::kOk,
+                   "Failed to read already loaded cert");
+    chain.push_back(std::move(pem_result.contents));
   };
 
   process_one_cert(SSL_CTX_get0_certificate(context.ssl_ctx_.get()));
@@ -58,8 +63,6 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
     process_one_cert(sk_X509_value(chain_stack, i));
   }
 
-  std::istringstream pem_stream(certs_str);
-  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
       new quic::ProofSource::Chain(chain));
 
