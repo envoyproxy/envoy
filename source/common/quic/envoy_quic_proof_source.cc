@@ -18,6 +18,9 @@ quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
                                    const quic::QuicSocketAddress& client_address,
                                    const std::string& hostname, bool* cert_matched_sni) {
+  // Ensure this is set even in error paths.
+  *cert_matched_sni = false;
+
   CertWithFilterChain res =
       getTlsCertConfigAndFilterChain(server_address, client_address, hostname, cert_matched_sni);
   return res.cert_;
