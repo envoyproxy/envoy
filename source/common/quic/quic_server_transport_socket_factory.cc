@@ -127,6 +127,7 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   if (!ssl_ctx) {
     ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
     stats_.downstream_context_secrets_not_ready_.inc();
+    *cert_matched_sni = false;
     return {};
   }
   auto ctx =
