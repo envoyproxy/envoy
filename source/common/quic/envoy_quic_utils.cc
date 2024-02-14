@@ -148,12 +148,15 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   if (options != nullptr) {
     connection_socket->addOptions(options);
   }
+  std::cerr << "==> AAB QuicUtils::createConnectionSocket, applying options\n";
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+    std::cerr << "==> AAB QuicUtils::createConnectionSocket, FAILED TO APPLY OPTIONS\n";
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
     return connection_socket;
   }
+  std::cerr << "==> AAB QuicUtils::createConnectionSocket, SUCCESS IN APPLY OPTIONS\n";
   connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
   local_addr = connection_socket->connectionInfoProvider().localAddress();

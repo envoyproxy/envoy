@@ -240,6 +240,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
                                             base_socket_options);
+    std::cerr << "==> AAB calling appendOptions on cluster_socket_options\n";
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
                                             cluster_socket_options);
 
@@ -317,6 +318,8 @@ Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr createUpstreamLocalA
   OptRef<const envoy::config::core::v3::BindConfig> bind_config;
   absl::optional<std::string> cluster_name;
   if (cluster_config.has_upstream_bind_config()) {
+    std::cerr << "==> AAB BIND_CONFIG=" << cluster_config.upstream_bind_config().DebugString()
+              << std::endl;
     bind_config.emplace(cluster_config.upstream_bind_config());
     cluster_name.emplace(cluster_config.name());
   } else if (bootstrap_bind_config.has_value()) {

@@ -33,6 +33,8 @@ bool SocketOptionImpl::setOption(Socket& socket,
                 errorDetails(result.errno_));
       return false;
     }
+    std::cerr << "==> AAB SocketOptionImpl::setOption, optname=" << optname_.name()
+              << ", option=" << optname_.option() << std::endl;
   }
 
   return true;
