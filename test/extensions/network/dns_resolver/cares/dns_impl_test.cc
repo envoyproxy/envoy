@@ -1012,7 +1012,7 @@ TEST_P(DnsImplTest, DestructCallback) {
 // asynchronous behavior or network events.
 TEST_P(DnsImplTest, LocalLookup) {
   std::list<Address::InstanceConstSharedPtr> address_list;
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("", DnsLookupFamily::V4Only));
+  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("no.records", DnsLookupFamily::V4Only));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   if (GetParam() == Address::IpVersion::v4) {
