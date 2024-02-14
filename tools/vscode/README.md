@@ -24,6 +24,7 @@ If you see the following error message:
 ```
 ERROR: vscode@docker-desktop:/workspaces/<your-username>$ tools/vscode/refresh_compdb.sh
 /usr/bin/env: ‘bash\r’: No such file or directory
+```
 
 It would be happening due to the following reason:
 
@@ -32,6 +33,7 @@ Every time you press "return" on your keyboard you insert an invisible character
 When you're collaborating on projects with Git and GitHub, Git might produce unexpected results if, for example, you're working on a Windows machine, and your collaborator has made a change in macOS.
 
 Please follow the [Git Documentation](https://docs.github.com/en/get-started/getting-started-with-git/configuring-git-to-handle-line-endings) to configure Git to handle line endings automatically for effective cross-operating systems collaboration.
+
 
 ### Tips for proxmox users
 
