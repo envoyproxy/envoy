@@ -1963,7 +1963,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRemoteEndstreamWith1xxHeader) {
   const std::vector<uint8_t> header_frame =
       Hex::decode("0000050132000000012dfeff0110000005090d000000010903313033");
   const std::string header_frame_str(reinterpret_cast<const char*>(header_frame.data()),
-                               header_frame.size());
+                                     header_frame.size());
   ASSERT_TRUE(fake_upstream_connection->write(header_frame_str));
 
   const Http2Frame response = readFrame();
