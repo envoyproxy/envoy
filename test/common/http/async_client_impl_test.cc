@@ -369,7 +369,6 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
 
-
 TEST_F(AsyncClientImplTest, OngoingRequestWithResetAfterCompletion) {
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
