@@ -20,6 +20,7 @@ envoy_cc_library(
         ":socket_interface_lib",
         "//envoy/network:address_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",

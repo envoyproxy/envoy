@@ -1,4 +1,4 @@
-package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile.mocks
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
@@ -11,7 +11,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 /**
  * Mock implementation of `EnvoyEngine`. Used internally for testing the bridging layer & mocking.
  */
-internal class MockEnvoyEngine : EnvoyEngine {
+class MockEnvoyEngine : EnvoyEngine {
   override fun runWithConfig(
     envoyConfiguration: EnvoyConfiguration?,
     logLevel: String?

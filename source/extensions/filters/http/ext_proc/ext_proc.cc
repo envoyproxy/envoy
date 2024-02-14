@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <memory>
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
@@ -276,8 +278,7 @@ void Filter::onDestroy() {
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      ProtobufWkt::Struct* proto) {
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -291,14 +292,12 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
+  addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
-  if (proto != nullptr) {
-    (*headers_req->mutable_attributes())[FilterName] = *proto;
-  }
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -315,19 +314,14 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
+  // Set the request headers on decoding and encoding state in case they are
+  // needed later.
+  decoding_state_.setRequestHeaders(&headers);
+  encoding_state_.setRequestHeaders(&headers);
+
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
-    ProtobufWkt::Struct proto;
-
-    if (config_->expressionManager().hasRequestExpr()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(
-          &config_->expressionManager().localInfo(), decoding_state_.callbacks()->streamInfo(),
-          &headers, nullptr, nullptr);
-      proto = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
-    }
-
-    status = onHeaders(decoding_state_, headers, end_stream,
-                       config_->expressionManager().hasRequestExpr() ? &proto : nullptr);
+    status = onHeaders(decoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
@@ -590,7 +584,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
   ENVOY_LOG(trace, "decodeTrailers");
   const auto status = onTrailers(decoding_state_, trailers);
-  ENVOY_LOG(trace, "encodeTrailers returning {}", static_cast<int>(status));
+  ENVOY_LOG(trace, "decodeTrailers returning {}", static_cast<int>(status));
   return status;
 }
 
@@ -605,17 +599,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
-    ProtobufWkt::Struct proto;
-
-    if (config_->expressionManager().hasResponseExpr()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(
-          &config_->expressionManager().localInfo(), encoding_state_.callbacks()->streamInfo(),
-          nullptr, &headers, nullptr);
-      proto = config_->expressionManager().evaluateResponseAttributes(*activation_ptr);
-    }
-
-    status = onHeaders(encoding_state_, headers, end_stream,
-                       config_->expressionManager().hasResponseExpr() ? &proto : nullptr);
+    status = onHeaders(encoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
@@ -650,6 +634,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
                                          bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stream {}", data.length(), end_stream);
   ProcessingRequest req;
+  addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
@@ -667,6 +652,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
+  addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
@@ -769,6 +755,21 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   }
 
   *req.mutable_metadata_context() = forwarding_metadata;
+}
+
+void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
+  if (!state.sendAttributes(config_->expressionManager())) {
+    return;
+  }
+
+  auto activation_ptr = Filters::Common::Expr::createActivation(
+      &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
+      state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
+      dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
+  auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
+
+  state.setSentAttributes(true);
+  (*req.mutable_attributes())[FilterName] = attributes;
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
