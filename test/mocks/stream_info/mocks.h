@@ -20,6 +20,11 @@ class Matcher<Envoy::StreamInfo::ResponseFlag>
     : public internal::MatcherBase<Envoy::StreamInfo::ResponseFlag> {
 public:
   explicit Matcher() = default;
+
+  template <typename M, typename = typename std::remove_reference<M>::type::is_gtest_matcher>
+  Matcher(M&& m)
+      : internal::MatcherBase<Envoy::StreamInfo::ExtendedResponseFlag>(std::forward<M>(m)) {}
+
   Matcher(Envoy::StreamInfo::ResponseFlag value) { *this = Eq(value); }
   Matcher(Envoy::StreamInfo::CoreResponseFlag value) {
     *this = Eq(Envoy::StreamInfo::ResponseFlag(value));
