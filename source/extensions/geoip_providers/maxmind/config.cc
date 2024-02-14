@@ -35,7 +35,9 @@ public:
     } else {
       const auto& provider_config =
           std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
-      driver = std::make_shared<GeoipProvider>(singleton, provider_config);
+      driver = std::make_shared<GeoipProvider>(
+          context.serverFactoryContext().mainThreadDispatcher(),
+          context.serverFactoryContext().api(), singleton, provider_config);
       drivers_[key] = driver;
     }
     return driver;

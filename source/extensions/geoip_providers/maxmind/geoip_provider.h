@@ -48,7 +48,17 @@ public:
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".hit"), unknown_hit_));
   }
 
-  void registerGeoDbStats(const std::string& db_type);
+  void incDbReloadSuccess(absl::string_view maxmind_db_type) {
+    incCounter(stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".db_reload_success"),
+                                          unknown_hit_));
+  }
+
+  void incDbReloadError(absl::string_view maxmind_db_type) {
+    incCounter(stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".db_reload_error"),
+                                          unknown_hit_));
+  }
+
+  void registerGeoDbStats(const absl::string_view& db_type);
 
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
 
@@ -76,17 +86,13 @@ private:
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 
-using MaxmindDbPtr = std::unique_ptr<MMDB_s>;
+using MaxmindDbSharedPtr = std::shared_ptr<MMDB_s>;
 class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
 public:
-  GeoipProvider(Singleton::InstanceSharedPtr owner, GeoipProviderConfigSharedPtr config)
-      : config_(config), owner_(owner) {
-    city_db_ = initMaxMindDb(config_->cityDbPath());
-    isp_db_ = initMaxMindDb(config_->ispDbPath());
-    anon_db_ = initMaxMindDb(config_->anonDbPath());
-  };
+  GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner,
+                GeoipProviderConfigSharedPtr config);
 
   ~GeoipProvider();
 
@@ -97,16 +103,29 @@ private:
   // Allow the unit test to have access to private members.
   friend class GeoipProviderPeer;
   GeoipProviderConfigSharedPtr config_;
-  MaxmindDbPtr city_db_;
-  MaxmindDbPtr isp_db_;
-  MaxmindDbPtr anon_db_;
-  MaxmindDbPtr initMaxMindDb(const absl::optional<std::string>& db_path);
+  // These three mutexes are never held at the same time. We signify this by requiring
+  // that all three are 'acquired before' the others, since there is no exclusion annotation.
+  mutable absl::Mutex city_db_mutex_ ABSL_ACQUIRED_BEFORE(isp_db_mutex_, anon_db_mutex_){};
+  MaxmindDbSharedPtr city_db_;
+  mutable absl::Mutex isp_db_mutex_ ABSL_ACQUIRED_BEFORE(city_db_mutex_, anon_db_mutex_){};
+  MaxmindDbSharedPtr isp_db_;
+  mutable absl::Mutex anon_db_mutex_ ABSL_ACQUIRED_BEFORE(city_db_mutex_, isp_db_mutex_){};
+  MaxmindDbSharedPtr anon_db_;
+  Thread::ThreadPtr mmdb_reload_thread_;
+  Event::DispatcherPtr mmdb_reload_dispatcher_;
+  Filesystem::WatcherPtr mmdb_watcher_;
+  MaxmindDbSharedPtr initMaxmindDb(const std::string& db_path, const absl::string_view& db_type,
+                                   bool reload = false);
   void lookupInCityDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAsnDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAnonDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+  void onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
+  void mmdbReload(MaxmindDbSharedPtr& old_db, const MaxmindDbSharedPtr reloaded_db, absl::Mutex& mu,
+                  const absl::string_view& db_type)
+      ABSL_LOCKS_EXCLUDED(city_db_mutex_, isp_db_mutex_, anon_db_mutex_);
   template <typename... Params>
   void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
                                absl::flat_hash_map<std::string, std::string>& lookup_result,

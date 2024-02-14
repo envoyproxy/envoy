@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -34,7 +35,7 @@ public:
 
 class GeoipProviderTest : public testing::Test {
 public:
-  GeoipProviderTest() {
+  GeoipProviderTest() : api_(Api::createApiForTest(stats_store_)) {
     provider_factory_ = dynamic_cast<MaxmindProviderFactory*>(
         Registry::FactoryRegistry<Geolocation::GeoipProviderFactory>::getFactory(
             "envoy.geoip_providers.maxmind"));
@@ -43,6 +44,20 @@ public:
 
   void initializeProvider(const std::string& yaml) {
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
+    EXPECT_CALL(context_, serverFactoryContext())
+        .WillRepeatedly(ReturnRef(server_factory_context_));
+    EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
+      Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::Modified, _))
+          .WillRepeatedly(
+              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+                on_changed_cbs_.emplace_back(cb);
+              }));
+      return mock_watcher;
+    }));
+    EXPECT_CALL(server_factory_context_, mainThreadDispatcher())
+        .WillRepeatedly(ReturnRef(dispatcher_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
@@ -58,12 +73,28 @@ public:
               error_count);
   }
 
+  void expectReloadStats(const std::string& db_type, const uint32_t reload_success_count = 0,
+                         const uint32_t /*reload_error_count*/ = 0) {
+    auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
+    // TestUtility::waitForCounterEq(provider_scope.store(), "prefix.city_db.db_reload_success",
+    // reload_success_count, time_system_);
+    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_success")).value(),
+              reload_success_count);
+    // EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type,
+    // ".db_reload_error")).value(), reload_error_count);
+  }
+
+  Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  Api::ApiPtr api_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   DriverSharedPtr provider_;
   MaxmindProviderFactory* provider_factory_;
+  Event::SimulatedTimeSystem time_system_;
   absl::flat_hash_map<std::string, std::string> captured_lookup_response_;
+  std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_;
 };
 
 TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
@@ -263,6 +294,53 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
   EXPECT_EQ(3, captured_lookup_response_.size());
   expectStats("city_db", 2, 2);
+}
+
+TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+    city_db_path: {}
+  )EOF";
+  std::string city_db_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb");
+  std::string reloaded_city_db_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Reloaded.mmdb");
+  const std::string formatted_config =
+      fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
+  initializeProvider(formatted_config);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(3, captured_lookup_response_.size());
+  const auto& city_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Boxford", city_it->second);
+  TestEnvironment::renameFile(city_db_path, city_db_path + "1");
+  TestEnvironment::renameFile(reloaded_city_db_path, city_db_path);
+  on_changed_cbs_[0](Filesystem::Watcher::Events::Modified);
+  expectReloadStats("city_db", 1, 0);
+  captured_lookup_response_.clear();
+  EXPECT_EQ(0, captured_lookup_response_.size());
+  remote_address = Network::Utility::parseInternetAddress("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
+  auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
+  EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
+  const auto& city1_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("BoxfordImaginary", city1_it->second);
+  // Clean up modificationds to mmdb file names.
+  TestEnvironment::renameFile(city_db_path, reloaded_city_db_path);
+  TestEnvironment::renameFile(city_db_path + "1", city_db_path);
 }
 
 using GeoipProviderDeathTest = GeoipProviderTest;
