@@ -86,7 +86,6 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
         asn: "x-geo-asn"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -119,7 +118,6 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookupWithoutResultD
         asn: "x-geo-asn"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -145,7 +143,6 @@ TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
         country: "x-geo-country"
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/MaxMind-DB-test-ipv4-24.mmdb"
-    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -437,7 +434,6 @@ TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
       geo_headers_to_add:
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data_atc/GeoLite2-City-Test.mmdb"
-    country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping.conf"
   )EOF";
   EXPECT_DEATH(initializeProvider(config_yaml), ".*Unable to open Maxmind database file.*");
 }

@@ -46,5 +46,5 @@ message MaxMindConfig {
   // {
   //   "country_code": "country_code" # comment
   // }
-  optional string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
+  string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
 }
