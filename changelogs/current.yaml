@@ -2,12 +2,26 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: http
+  change: |
+    Remove the hop by hop TE header from downstream request headers if it's not set to ``trailers``, else keep it. This change can be
+    temporarily reverted by setting ``envoy.reloadable_features.sanitize_te`` to false.
+- area: stats
+  change: |
+    The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
+    This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
+    be flushed to stat sinks.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
+- area: quic
+  change: |
+    :ref:`Server preferred address <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.server_preferred_address_config>` is
+    now sent to non-quiche quic clients when configured. This behavior can be disabled with runtime flag
+    ``envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients``.
 - area: dns
   change: |
     Allowing <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_min_refresh_rate>` to go as low as 1s.
@@ -71,6 +85,9 @@ bug_fixes:
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
     received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
     ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: jwt_authn
+  change: |
+    Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
 - area: oauth
   change: |
     The refresh token and the access token are not expired simultaneously so the access token can be updated using
@@ -100,6 +117,9 @@ removed_config_or_runtime:
 - area: resource_monitors
   change: |
     removed ``envoy.reloadable_features.count_unused_mapped_pages_as_free`` runtime flag  and legacy code paths.
+- area: aws
+  change: |
+    Removed ``envoy.reloadable_features.enable_aws_credentials_file`` runtime flag and legacy code paths.
 
 new_features:
 - area: aws_request_signing
@@ -163,5 +183,8 @@ new_features:
     Envoy will select the host with the fewest active requests from the entire host set rather than
     :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     random choices.
+- area: redis
+  change: |
+    Added support for the ``ECHO`` command.
 
 deprecated:
