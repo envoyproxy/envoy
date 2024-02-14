@@ -789,7 +789,7 @@ std::string Factory::serialize(absl::string_view str) {
 }
 
 std::vector<uint8_t> Factory::jsonToMsgpack(const std::string& json_string) {
-  return nlohmann::json::to_msgpack(nlohmann::json::parse(json_string));
+  return nlohmann::json::to_msgpack(nlohmann::json::parse(json_string, nullptr, false));
 }
 
 } // namespace Nlohmann

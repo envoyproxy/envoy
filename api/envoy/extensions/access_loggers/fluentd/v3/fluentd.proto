@@ -38,9 +38,10 @@ message FluentdAccessLogConfig {
   // 1 second.
   google.protobuf.Duration buffer_flush_interval = 4 [(validate.rules).duration = {gt {}}];
 
-  // Soft size limit in bytes for access log entries buffer. Logger will buffer requests until
-  // this limit it hit, or every time flush interval is elapsed, whichever comes first. Setting it
-  // to zero effectively disables the batching. Defaults to 16384.
+  // Soft size limit in bytes for access log entries buffer. The logger will buffer requests until
+  // this limit it hit, or every time flush interval is elapsed, whichever comes first. When the buffer
+  // limit is hit, the logger will immediately flush the buffer contents. Setting it to zero effectively
+  // disables the batching. Defaults to 16384.
   google.protobuf.UInt32Value buffer_size_bytes = 5;
 
   // A struct that represents the record that is sent for each log entry.

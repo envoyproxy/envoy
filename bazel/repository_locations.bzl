@@ -789,7 +789,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["observability_ext"],
         extensions = ["envoy.access_loggers.fluentd"],
         release_date = "2023-07-08",
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:messagepack:messagepack:*",
         license = "Boost",
         license_url = "https://github.com/msgpack/msgpack-c/blob/cpp-{version}/LICENSE_1_0.txt",
     ),
