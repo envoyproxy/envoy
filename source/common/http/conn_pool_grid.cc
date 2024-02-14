@@ -191,6 +191,9 @@ void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(
 
 absl::optional<ConnectivityGrid::StreamCreationResult>
 ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+  if (grid_.destroying_) {
+    return {};
+  }
   absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
   if (!next_pool.has_value()) {
     // If there are no other pools to try, return an empty optional.
@@ -236,10 +239,10 @@ ConnectivityGrid::ConnectivityGrid(
 ConnectivityGrid::~ConnectivityGrid() {
   // Ignore idle callbacks while the pools are destroyed below.
   destroying_ = true;
-  // Callbacks might have pending streams registered with the pools, so cancel and delete
-  // the callback before deleting the pools.
-  wrapped_callbacks_.clear();
+  // Make sure to clear the pools (which deletes all active connections, and
+  // signals callers) before deleting callbacks.
   pools_.clear();
+  wrapped_callbacks_.clear();
 }
 
 void ConnectivityGrid::deleteIsPending() {
