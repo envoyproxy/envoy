@@ -141,7 +141,7 @@ message OAuth2Config {
   // The default lifetime in seconds of the refresh token, if the exp claim is omitted in the refresh token or the refresh token is not JWT
   //
   // If this value is not set, it will default to ``604800s``. In this case, the cookie with the refresh token will be expired
-  // in a week. 
+  // in a week.
   google.protobuf.Duration default_refresh_token_expires_in = 14;
 }
 
