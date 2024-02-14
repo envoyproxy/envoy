@@ -96,12 +96,17 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller, if the caller hasn't already been notified.
+  signalFailureAndDeleteSelf(reason, transport_failure_reason, host);
+}
+
+void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
+    ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
+    Upstream::HostDescriptionConstSharedPtr host) {
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
   deleteThis();
   if (callbacks != nullptr) {
-    ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(attempt->pool()),
-              host->hostname());
+    ENVOY_LOG(trace, "Passing pool failure up to caller.");
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
   }
 }
@@ -239,10 +244,14 @@ ConnectivityGrid::ConnectivityGrid(
 ConnectivityGrid::~ConnectivityGrid() {
   // Ignore idle callbacks while the pools are destroyed below.
   destroying_ = true;
-  // Make sure to clear the pools (which deletes all active connections, and
-  // signals callers) before deleting callbacks.
+  while (!wrapped_callbacks_.empty()) {
+    // Before tearing down the callbacks, make sure they pass up pool failure to
+    // the caller. We do not call onPoolFailure because it does up-calls to the
+    // (delete-in-process) grid.
+    wrapped_callbacks_.front()->signalFailureAndDeleteSelf(
+        ConnectionPool::PoolFailureReason::LocalConnectionFailure, "grid teardown", host_);
+  }
   pools_.clear();
-  wrapped_callbacks_.clear();
 }
 
 void ConnectivityGrid::deleteIsPending() {

@@ -560,6 +560,22 @@ TEST_F(ConnectivityGridTest, TestCancel) {
   cancel->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
+// Test tearing down the grid with active connections.
+TEST_F(ConnectivityGridTest, TestTeardown) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->first(), nullptr);
+
+  grid_->newStream(decoder_, callbacks_,
+                   {/*can_send_early_data_=*/false,
+                    /*can_use_http3_=*/true});
+  EXPECT_NE(grid_->first(), nullptr);
+
+  // When the grid is reset, pool failure should be called.
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_.reset();
+}
+
 // Make sure drains get sent to all active pools.
 TEST_F(ConnectivityGridTest, Drain) {
   initialize();
