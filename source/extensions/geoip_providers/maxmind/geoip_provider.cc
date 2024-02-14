@@ -132,22 +132,23 @@ GeoipProvider::initCountryMapping(const absl::optional<std::string>& country_map
   if (country_mapping_path) {
     if (file_system_.fileExists(country_mapping_path.value())) {
       auto file_or_error = file_system_.fileReadToEnd(country_mapping_path.value());
-      RELEASE_ASSERT(absl::OkStatus() == file_or_error.status(),
-                     fmt::format("Unable to open country mapping file {}. Error {}",
-                                 country_mapping_path.value(),
-                                 std::string(file_or_error.status().message())));
-      parseCountryMapping(file_or_error.value(), country_mapping);
+
+      if (!file_or_error.status().ok()) {
+        throwEnvoyExceptionOrPanic(fmt::format(fmt::format(
+            "Unable to open country mapping file {}. Error {}", country_mapping_path.value(),
+            std::string(file_or_error.status().message()))));
+      }
+      parseCountryMapping(file_or_error.value(), country_mapping_path.value(), country_mapping);
     } else {
       config_->incCountryMappingFileParseError();
-      ENVOY_LOG(warn,
-                fmt::format("Country Mapping configuration file {} does not exist, skipping map",
-                            country_mapping_path.value()));
+      throwEnvoyExceptionOrPanic(fmt::format(
+          "Country Mapping configuration file {} does not exist.", country_mapping_path.value()));
     }
   }
   return country_mapping;
 }
 
-void GeoipProvider::parseCountryMapping(const std::string& file,
+void GeoipProvider::parseCountryMapping(const std::string& file_data, const std::string& file_path,
                                         const CountryMappingPtr& country_mapping) {
   TRY_NEEDS_AUDIT {
     // Remove lines with comments.
@@ -155,7 +156,7 @@ void GeoipProvider::parseCountryMapping(const std::string& file,
     *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
     matcher.set_regex("#.*");
     auto compiled_regex = Regex::Utility::parseRegex(matcher);
-    std::string content_without_comments = compiled_regex->replaceAll(file, "");
+    std::string content_without_comments = compiled_regex->replaceAll(file_data, "");
     // Load as json and fill country_mapping_.
     Json::ObjectSharedPtr json = Json::Factory::loadFromString(content_without_comments);
     json->iterate([&](const std::string& key, const Json::Object& value) {
@@ -166,8 +167,8 @@ void GeoipProvider::parseCountryMapping(const std::string& file,
   END_TRY
   catch (Json::Exception&) {
     config_->incCountryMappingFileParseError();
-    ENVOY_LOG(warn, fmt::format("Cannot parse Country Mapping configuration file {}, skipping map",
-                                file));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("Cannot parse Country Mapping configuration file {}.", file_path));
   }
 }
 

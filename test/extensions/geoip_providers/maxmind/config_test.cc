@@ -402,7 +402,9 @@ TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfi
   EXPECT_NE(driver1.get(), driver2.get());
 }
 
-TEST(MaxmindProviderConfigTest, CountryMappingPathDoesNotExist) {
+using MaxmindProviderConfigDeathTest = MaxmindProviderConfigTest;
+
+TEST_F(MaxmindProviderConfigDeathTest, CountryMappingPathDoesNotExist) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
@@ -422,11 +424,10 @@ TEST(MaxmindProviderConfigTest, CountryMappingPathDoesNotExist) {
   ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
   EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
   MaxmindProviderFactory factory;
-
-  EXPECT_LOG_CONTAINS("warn",
-                      "Country Mapping configuration file /usr/share/geoip2Gcs/wrong_path.conf "
-                      "does not exist, skipping map",
-                      factory.createGeoipProviderDriver(provider_config, "maxmind", context));
+  EXPECT_THROW_WITH_REGEX(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
+                          EnvoyException,
+                          ".*Country Mapping configuration file "
+                          "/usr/share/geoip2Gcs/wrong_path.conf does not exist.*");
 }
 
 } // namespace Maxmind

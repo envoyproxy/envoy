@@ -18,8 +18,10 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+using ::testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -366,21 +368,11 @@ TEST_F(GeoipProviderTest, InvalidJsonInCountryMapping) {
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
     country_mapping_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/country_mapping_invalid_json.conf"
   )EOF";
-  EXPECT_LOG_CONTAINS("warn", "Cannot parse Country Mapping configuration file ",
-                      initializeProvider(config_yaml));
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("78.26.243.166");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(3, captured_lookup_response_.size());
-  const auto& city_it = captured_lookup_response_.find("x-geo-city");
-  EXPECT_EQ("Boxford", city_it->second);
-  auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
-  EXPECT_EQ(provider_scope.counterFromString("country_mapping.parse_error").value(), 1);
-  expectStats("city_db", 1, 1, 0);
+
+  EXPECT_THROW_WITH_REGEX(
+      initializeProvider(config_yaml), EnvoyException,
+      ".*Cannot parse Country Mapping configuration file "
+      ".*/test/extensions/geoip_providers/maxmind/test_data/country_mapping_invalid_json.conf.*");
 }
 
 using GeoipProviderDeathTest = GeoipProviderTest;
@@ -403,6 +395,40 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
   EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
                "assert failure: isp_db_. Details: Maxmind asn database is not initialized for "
                "performing lookups");
+}
+
+TEST_F(GeoipProviderDeathTest, CountryMappingFileStatusNotOk) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        region: "x-geo-region"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    country_mapping_path: "/test_data/country_mapping.conf"
+  )EOF";
+  NiceMock<Api::MockApi> api_;
+
+  ON_CALL(context_, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
+  ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(api_));
+
+  NiceMock<Filesystem::MockInstance> file_system;
+  EXPECT_CALL(api_, fileSystem()).WillRepeatedly(ReturnRef(file_system));
+  EXPECT_CALL(file_system, fileExists("/test_data/country_mapping.conf"))
+      .WillRepeatedly(Return(true));
+  // fake invalid file
+  EXPECT_CALL(file_system, fileReadToEnd("/test_data/country_mapping.conf"))
+      .WillRepeatedly(Return(
+          absl::InvalidArgumentError("unable to read file: /test_data/country_mapping.conf")));
+
+  ON_CALL(context_, scope()).WillByDefault(ReturnRef(*scope_));
+  envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(config_yaml), config);
+
+  EXPECT_THROW_WITH_REGEX(provider_factory_->createGeoipProviderDriver(config, "prefix.", context_),
+                          EnvoyException,
+                          ".*Unable to open country mapping file /test_data/country_mapping.conf. "
+                          "Error unable to read file: /test_data/country_mapping.conf.*");
 }
 
 TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
