@@ -2,12 +2,12 @@ syntax = "proto3";
 
 package envoy.type.matcher.v3;
 
-import "envoy/config/core/v3/extension.proto";
 import "envoy/type/matcher/v3/regex.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
+import "xds/core/v3/extension.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "StringProto";
@@ -65,7 +65,8 @@ message StringMatcher {
 
     // Use an extension as the matcher type.
     // [#extension-category: envoy.matching.string]
-    config.core.v3.TypedExtensionConfig extension = 8;
+    // [#comment: This uses the xds type instead of the envoy type to avoid a circular dependency in the build system.]
+    xds.core.v3.TypedExtensionConfig extension = 8;
   }
 
   // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This

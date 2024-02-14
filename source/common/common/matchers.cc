@@ -200,5 +200,16 @@ bool PathMatcher::match(const absl::string_view path) const {
   return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
 }
 
+StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config) {
+  auto factory = Registry::FactoryRegistry<StringMatcherExtensionFactory>::getFactoryByType(
+      config.GetTypeName());
+  if (factory != nullptr) {
+    return factory->createStringMatcher(config);
+  }
+
+  throwEnvoyExceptionOrPanic(
+      absl::StrCat("Could not find extension of type ", config.GetTypeName()));
+}
+
 } // namespace Matchers
 } // namespace Envoy

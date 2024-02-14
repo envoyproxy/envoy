@@ -86,6 +86,8 @@ public:
   bool match(absl::string_view) const override { return true; }
 };
 
+StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config);
+
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
@@ -144,9 +146,8 @@ private:
   void initialize(const xds::type::matcher::v3::StringMatcher&) {}
 
   void initialize(const envoy::type::matcher::v3::StringMatcher& matcher) {
-    if (matcher.match_pattern_case() ==
-        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExtension) {
-      PANIC("TODO don't check in");
+    if (matcher.has_extension()) {
+      extension_ = getExtensionStringMatcher(matcher.extension());
     }
   }
 
@@ -190,6 +191,14 @@ private:
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
   StringMatcherPtr extension_;
+};
+
+class StringMatcherExtensionFactory : public Config::UntypedFactory {
+public:
+  virtual StringMatcherPtr
+  createStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config) PURE;
+
+  std::string category() const override { return "envoy.matching.string"; }
 };
 
 class ListMatcher : public ValueMatcher {
