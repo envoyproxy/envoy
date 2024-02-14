@@ -116,10 +116,11 @@ removed_config_or_runtime:
 new_features:
 - area: geoip
   change: |
-    Added :ref:`Geoip country mapping path option<envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_mapping_path` to allow override of
-    country code when needed. The country mapping file is a json containing the iso code to be mapped from:to so it is possible to override the result read
-    from the Maxmind database. If the path is incorrect or the json is invalid, a warning will be logged, the metric country_mapping.parse_error will be incremented
-    and an empty map will be used.
+    Added :ref:`Geoip country mapping path option
+    <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_mapping_path` to allow override of country code when
+    needed. The country mapping file is a json containing the iso code to be mapped from:to so it is possible to override the result
+    read from the Maxmind database. If the path is incorrect or the json is invalid, a warning will be logged, the metric
+    country_mapping.parse_error will be incremented and an empty map will be used.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
