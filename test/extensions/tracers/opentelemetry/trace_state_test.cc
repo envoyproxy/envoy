@@ -148,7 +148,7 @@ TEST(TraceStateTest, isValidKey) {
 
 TEST(TraceStateTest, isValidValue) {
   EXPECT_TRUE(TraceState::isValidValue("valid-val$%&~"));
-  EXPECT_FALSE(TraceState::isValidValue("\tinvalid"));
+  EXPECT_FALSE(TraceState::isValidValue("\t invalid"));
   EXPECT_FALSE(TraceState::isValidValue("invalid="));
   EXPECT_FALSE(TraceState::isValidValue("invalid,val"));
   EXPECT_FALSE(TraceState::isValidValue(""));
