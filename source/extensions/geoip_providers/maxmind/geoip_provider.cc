@@ -134,9 +134,9 @@ GeoipProvider::initCountryMapping(const absl::optional<std::string>& country_map
       auto file_or_error = file_system_.fileReadToEnd(country_mapping_path.value());
 
       if (!file_or_error.status().ok()) {
-        throwEnvoyExceptionOrPanic(fmt::format(fmt::format(
-            "Unable to open country mapping file {}. Error {}", country_mapping_path.value(),
-            std::string(file_or_error.status().message()))));
+        throwEnvoyExceptionOrPanic(fmt::format("Unable to open country mapping file {}. Error {}",
+                                               country_mapping_path.value(),
+                                               std::string(file_or_error.status().message())));
       }
       parseCountryMapping(file_or_error.value(), country_mapping_path.value(), country_mapping);
     } else {
