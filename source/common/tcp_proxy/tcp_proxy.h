@@ -564,7 +564,7 @@ public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
           Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
-          absl::optional<std::chrono::milliseconds>& idle_timeout,
+          absl::optional<std::chrono::milliseconds> idle_timeout,
           const Upstream::HostDescriptionConstSharedPtr& upstream_host);
 
   void onEvent(Network::ConnectionEvent event);
@@ -579,7 +579,7 @@ private:
   std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   Event::TimerPtr idle_timer_;
-  absl::optional<std::chrono::milliseconds>& idle_timeout_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Config::SharedConfigSharedPtr config_;
 };
@@ -592,7 +592,7 @@ public:
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-           Event::TimerPtr&& idle_timer, absl::optional<std::chrono::milliseconds>& idle_timeout,
+           Event::TimerPtr&& idle_timer, absl::optional<std::chrono::milliseconds> idle_timeout,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host);
   void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 
