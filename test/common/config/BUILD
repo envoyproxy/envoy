@@ -126,6 +126,7 @@ envoy_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/config:api_version_lib",
+        "//source/common/config:stats_utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",

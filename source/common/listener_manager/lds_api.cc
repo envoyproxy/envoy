@@ -12,6 +12,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
