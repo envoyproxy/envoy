@@ -282,9 +282,7 @@ class RepoNotifier(runner.Runner):
     async def track_open_issues(self):
         response = await self.session.get(
             "https://api.github.com/repos/envoyproxy/envoy/issues?labels=triage")
-        content = str(await response.read(), 'UTF-8')
-        parsed = await response.json()
-        return len(parsed)
+        return len(await response.json())
 
     async def run(self):
         if not self.github_token:
