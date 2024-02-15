@@ -1750,7 +1750,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
                                    std::chrono::seconds(600));
 }
 
-TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token) {
+TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshToken) {
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   TestScopedRuntime scoped_runtime;
   if (GetParam() == 1) {
@@ -1799,7 +1799,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token) {
 }
 
 TEST_P(OAuth2Test,
-       OAuthAccessTokenSucessWithTokens_use_refresh_token_and_default_refresh_token_expires_in) {
+       OAuthAccessTokenSucessWithTokensUseRefreshTokenAndDefaultRefreshTokenExpiresIn) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
@@ -1852,14 +1852,14 @@ TEST_P(OAuth2Test,
 }
 
 /**
- * Scenario: The Oauth filter saves cookies with tokens after successful receipt of the tokens
+ * Scenario: The Oauth filter saves cookies with tokens after successful receipt of the tokens.
  *
  * Expected behavior: The lifetime of the refresh token cookie is taken from the exp claim of the
  * refresh token.
  */
 
 TEST_P(OAuth2Test,
-       OAuthAccessTokenSucessWithTokens_use_refresh_token_and_refresh_token_expires_in_from_jwt) {
+       OAuthAccessTokenSucessWithTokensUseRefreshTokenAndRefreshTokenExpiresInFromJwt) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
@@ -1918,12 +1918,12 @@ TEST_P(OAuth2Test,
 }
 
 /**
- * Scenario: The Oauth filter doesn't save cookie with refresh token because the token is expired
+ * Scenario: The Oauth filter doesn't save cookie with refresh token because the token is expired.
  *
- * Expected behavior: the age of the cookie with refresh token is equaled zero.
+ * Expected behavior: the age of the cookie with refresh token is equal to zero.
  */
 
-TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_use_refresh_token_and_expired_refresh_token) {
+TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndExpiredRefreshToken) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
