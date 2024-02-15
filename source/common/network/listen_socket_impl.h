@@ -15,7 +15,6 @@
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -52,14 +51,9 @@ public:
       : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address, creation_options)
                                       : nullptr,
                          address) {
-    // Allow null io handles for unit tests. Disallow closed io handles as they
-    // indicate socket creation failure, which is not yet supported for listeners.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.allow_client_socket_creation_failure")) {
-      RELEASE_ASSERT(!io_handle_ || io_handle_->isOpen(), "");
-    }
     // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
+      RELEASE_ASSERT(io_handle_->isOpen(), "");
       setPrebindSocketOptions();
       setupSocket(options);
     } else {

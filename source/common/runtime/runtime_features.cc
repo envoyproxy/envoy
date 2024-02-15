@@ -95,12 +95,13 @@ RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
-RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
+// TODO(alyssawilk) flip true after server side is handled.
+FALSE_RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 // Execution context is optional and must be enabled explicitly.
 // See https://github.com/envoyproxy/envoy/issues/32012.
 FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
