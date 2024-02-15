@@ -3,6 +3,8 @@
 
 #include "source/common/grpc/google_async_client_impl.h"
 
+#include "test/test_common/test_runtime.h"
+
 #endif
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
@@ -484,6 +486,8 @@ INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
 
 // Validate that a simple request-reply unary RPC works with SSL.
 TEST_P(GrpcSslClientIntegrationTest, BasicSslRequest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.google_grpc_disable_tls_13", "true"}});
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -497,6 +501,26 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
+}
+
+// Validate TLS version mismatch between the client and the server.
+TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestHandshakeFailure) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.google_grpc_disable_tls_13", "true"}});
+  use_client_tls_12_ = true;
+  use_server_tls_13_ = true;
+  initialize();
+  auto request = createRequest(empty_metadata_, false);
+  FakeRawConnectionPtr fake_connection;
+  ASSERT_TRUE(fake_upstream_->waitForRawConnection(fake_connection));
+  dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  if (fake_connection->connected()) {
+    ASSERT_TRUE(fake_connection->waitForDisconnect());
+  }
+  EXPECT_CALL(*request->child_span_,
+              setTag(Eq(Tracing::Tags::get().Status), Eq(Tracing::Tags::get().Canceled)));
+  EXPECT_CALL(*request->child_span_, finishSpan());
+  request->grpc_request_->cancel();
 }
 
 #ifdef ENVOY_GOOGLE_GRPC

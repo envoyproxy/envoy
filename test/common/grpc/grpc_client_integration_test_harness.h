@@ -394,7 +394,8 @@ public:
 
   virtual void expectExtraHeaders(FakeStream&) {}
 
-  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata) {
+  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata,
+                                     bool expect_upstream_request = true) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -417,15 +418,22 @@ public:
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_, _));
 
+    Http::AsyncClient::RequestOptions options;
+    options.setTimeout(std::chrono::milliseconds(1000));
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
                                                 active_span, Http::AsyncClient::RequestOptions());
     EXPECT_NE(request->grpc_request_, nullptr);
+
+    if (!expect_upstream_request) {
+      return request;
+    }
 
     if (!fake_connection_) {
       AssertionResult result =
           fake_upstream_->waitForHttpConnection(*dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
+
     fake_streams_.emplace_back();
     AssertionResult result = fake_connection_->waitForNewStream(*dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
@@ -556,6 +564,14 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
+    if (use_client_tls_12_) {
+      auto* tls_params = common_tls_context->mutable_tls_params();
+      tls_params->set_tls_minimum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+      tls_params->set_tls_maximum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+    }
+
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
         tls_context, factory_context_);
 
@@ -587,6 +603,13 @@ public:
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
+    if (use_server_tls_13_) {
+      auto* tls_params = common_tls_context->mutable_tls_params();
+      tls_params->set_tls_minimum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+      tls_params->set_tls_maximum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+    }
 
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
@@ -598,6 +621,8 @@ public:
   }
 
   bool use_client_cert_{};
+  bool use_client_tls_12_{false};
+  bool use_server_tls_13_{false};
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
