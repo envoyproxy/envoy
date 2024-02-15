@@ -193,7 +193,7 @@ private:
   StringMatcherPtr extension_;
 };
 
-class StringMatcherExtensionFactory : public Config::UntypedFactory {
+class StringMatcherExtensionFactory : public Config::TypedFactory {
 public:
   virtual StringMatcherPtr
   createStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config) PURE;

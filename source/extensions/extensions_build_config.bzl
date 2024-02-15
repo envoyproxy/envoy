@@ -115,6 +115,11 @@ EXTENSIONS = {
     "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
 
     #
+    # StringMatchers
+    #
+    "envoy.matching.string.lua":                        "//source/extensions/matching/string/lua:config",
+
+    #
     # HTTP filters
     #
 

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.string.lua.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.string.lua.v3";
+option java_outer_classname = "LuaProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/string/lua/v3;luav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Lua]
+// Lua StringMatcher
+// [#extension: envoy.matching.string.lua]
+
+message Lua {
+  // The Lua code that Envoy will execute
+  string inline_code = 1;
+}
