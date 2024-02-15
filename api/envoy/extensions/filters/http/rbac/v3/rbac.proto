@@ -68,7 +68,7 @@ message RBAC {
   // shadow rules.
   string shadow_rules_stat_prefix = 3;
 
-  // If track_per_rulestats is true, counters will be published for each rule and shadow rule.
+  // If track_per_rule_stats is true, counters will be published for each rule and shadow rule.
   bool track_per_rule_stats = 6;
 }
 
