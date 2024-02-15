@@ -23,7 +23,7 @@ public:
 
   template <typename M, typename = typename std::remove_reference<M>::type::is_gtest_matcher>
   Matcher(M&& m)
-      : internal::MatcherBase<Envoy::StreamInfo::ExtendedResponseFlag>(std::forward<M>(m)) {}
+      : internal::MatcherBase<Envoy::StreamInfo::ResponseFlag>(std::forward<M>(m)) {}
 
   Matcher(Envoy::StreamInfo::ResponseFlag value) { *this = Eq(value); }
   Matcher(Envoy::StreamInfo::CoreResponseFlag value) {
