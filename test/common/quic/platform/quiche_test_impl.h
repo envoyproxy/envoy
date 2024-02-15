@@ -40,5 +40,7 @@ inline std::string QuicheGetCommonSourcePathImpl() {
   return absl::StrCat(test_srcdir, "/external/com_github_google_quiche/quiche/common");
 }
 
+class QuicheScopedDisableExitOnDFatalImpl {};
+
 } // namespace test
 } // namespace quiche
