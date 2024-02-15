@@ -307,6 +307,10 @@ public:
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        bool recurse_into_any = false) {
+    // TODO(adisuissa): There are multiple recursive traversals done by the
+    // calls in this function. This can be refactored into a single recursive
+    // traversal that invokes the various validators.
+
     // Log warnings or throw errors if deprecated fields or unknown fields are in use.
     if (!validation_visitor.skipValidation()) {
       checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
