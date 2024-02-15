@@ -8,6 +8,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -253,6 +254,10 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
   quic_config.SetConnectionOptionsToSend(quic::ParseQuicTagVector(config.connection_options()));
   quic_config.SetClientConnectionOptions(
       quic::ParseQuicTagVector(config.client_connection_options()));
+  if (config.has_idle_network_timeout()) {
+    quic_config.SetIdleNetworkTimeout(quic::QuicTimeDelta::FromSeconds(
+        DurationUtil::durationToSeconds(config.idle_network_timeout())));
+  }
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

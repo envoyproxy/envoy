@@ -6,6 +6,11 @@ behavior_changes:
   change: |
     Remove the hop by hop TE header from downstream request headers if it's not set to ``trailers``, else keep it. This change can be
     temporarily reverted by setting ``envoy.reloadable_features.sanitize_te`` to false.
+- area: stats
+  change: |
+    The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
+    This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
+    be flushed to stat sinks.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -170,6 +175,9 @@ new_features:
     Envoy will select the host with the fewest active requests from the entire host set rather than
     :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     random choices.
+- area: redis
+  change: |
+    Added support for the ``ECHO`` command.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
