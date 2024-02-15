@@ -41,13 +41,14 @@ message MaxMindConfig {
   common.v3.CommonGeoipProviderConfig common_provider_config = 4
       [(validate.rules).message = {required: true}];
 
-  // Optional full file path to the config country mappings overrides, e.g. ``/etc/country-mapping.conf``.
+  // Optional full file path to the config for country mapping overrides, e.g. ``/etc/country-mapping.conf``.
   // The file is expected to have a ``.conf`` extension, and should be JSON with the following format:
   //
   // .. code-block::json
   //   {
   //     "country_code": "country_code" # comment
   //   }
-  //
+  // The country mapping file is JSON containing the ISO code to be mapped from:to so it is possible to override the result
+  // read from the Maxmind database.
   string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
 }
