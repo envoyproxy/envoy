@@ -188,6 +188,8 @@ message TcpProxy {
   // .. warning::
   //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
   //   FIN packets, etc.
+  // It is possible to dynamically override this configuration by setting a per-connection filter
+  // state object for the key ``envoy.tcp_proxy.per_connection_idle_timeout_ms``.
   google.protobuf.Duration idle_timeout = 8;
 
   // [#not-implemented-hide:] The idle timeout for connections managed by the TCP proxy
