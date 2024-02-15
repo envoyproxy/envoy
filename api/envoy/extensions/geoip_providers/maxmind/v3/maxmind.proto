@@ -48,6 +48,7 @@ message MaxMindConfig {
   //   {
   //     "country_code": "country_code" # comment
   //   }
+  //
   // The country mapping file is JSON containing the ISO code to be mapped from:to so it is possible to override the result
   // read from the Maxmind database.
   string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
