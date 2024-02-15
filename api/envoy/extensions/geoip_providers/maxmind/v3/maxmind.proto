@@ -42,9 +42,12 @@ message MaxMindConfig {
       [(validate.rules).message = {required: true}];
 
   // Optional full file path to the config country mappings overrides, e.g. /etc/country-mapping.conf.
-  // File expected to have .conf extension. File should be a json with the following format:
-  // {
-  //   "country_code": "country_code" # comment
-  // }
+  // The file is expected to have a ``.conf`` extension, and should be JSON with the following format:
+  //
+  // .. code-block::json
+  //   {
+  //     "country_code": "country_code" # comment
+  //   }
+  //
   string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
 }
