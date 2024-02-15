@@ -178,5 +178,10 @@ new_features:
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically set a per downstream connection idle timeout period object under the key
+    ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
+    specified in the filter configuration and the default idle timeout.
 
 deprecated:
