@@ -85,6 +85,12 @@ bug_fixes:
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
     received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
     ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: tcp_proxy
+  change: |
+    When tunneling TCP over HTTP, closed the downstream connection (for writing only) when upstream trailers are read
+    to support half close semantics during TCP tunneling.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` to false.
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
