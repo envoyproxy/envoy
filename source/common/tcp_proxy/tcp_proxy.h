@@ -592,8 +592,7 @@ public:
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-           Event::TimerPtr&& idle_timer,
-           absl::optional<std::chrono::milliseconds>& idle_timeout,
+           Event::TimerPtr&& idle_timer, absl::optional<std::chrono::milliseconds>& idle_timeout,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host);
   void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 

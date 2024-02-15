@@ -54,8 +54,7 @@ public:
 
 REGISTER_FACTORY(PerConnectionClusterFactory, StreamInfo::FilterState::ObjectFactory);
 
-class PerConnectionIdleTimeoutMsObjectFactory
-    : public StreamInfo::FilterState::ObjectFactory {
+class PerConnectionIdleTimeoutMsObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
   std::string name() const override { return std::string(PerConnectionIdleTimeoutMs); }
   std::unique_ptr<StreamInfo::FilterState::Object>
