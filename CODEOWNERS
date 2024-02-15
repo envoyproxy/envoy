@@ -323,6 +323,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
+# String matching extensions
+/*/extensions/matching/string/ @ggreenway @UNOWNED
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 # Health checkers
