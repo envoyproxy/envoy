@@ -27,6 +27,9 @@ bug_fixes:
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
     received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
     ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: deps
+  change: |
+    Updated QUICHE dependencies to incorporate fixes for https://github.com/envoyproxy/envoy/issues/32401.
 
 removed_config_or_runtime:
 - area: postgres proxy
