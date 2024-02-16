@@ -7,6 +7,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+Grpc::RawAsyncClientSharedPtr
+getOrThrow(absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error) {
+  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  return client_or_error.value();
+}
+
+RateLimitClientImpl::RateLimitClientImpl(
+    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+    Server::Configuration::FactoryContext& context, absl::string_view domain_name,
+    RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
+    : domain_name_(domain_name),
+      aync_client_(getOrThrow(
+          context.serverFactoryContext()
+              .clusterManager()
+              .grpcAsyncClientManager()
+              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true))),
+      rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
+      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
+
 RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_t> bucket_id) {
   RateLimitQuotaUsageReports report;
   // Build the report from quota bucket cache.
@@ -15,21 +34,25 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
     *usage->mutable_bucket_id() = bucket->bucket_id;
     usage->set_num_requests_allowed(bucket->quota_usage.num_requests_allowed);
     usage->set_num_requests_denied(bucket->quota_usage.num_requests_denied);
+    auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        time_source_.monotonicTime().time_since_epoch());
     // For the newly created bucket (i.e., `bucket_id` input is not null), its time
     // elapsed since last report is 0.
     // This case happens when we send the report to RLQS server immediately.
     if (bucket_id.has_value() && bucket_id.value() == id) {
       *usage->mutable_time_elapsed() = Protobuf::util::TimeUtil::NanosecondsToDuration(0);
     } else {
-      auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-          time_source_.monotonicTime().time_since_epoch());
       *usage->mutable_time_elapsed() = Protobuf::util::TimeUtil::NanosecondsToDuration(
           (now - bucket->quota_usage.last_report).count());
     }
+
+    // Update the last_report time point.
+    bucket->quota_usage.last_report = now;
   }
 
   // Set the domain name.
   report.set_domain(domain_name_);
+  ENVOY_LOG(debug, "The usage report that will be sent to RLQS server:\n{}", report.DebugString());
   return report;
 }
 
@@ -38,11 +61,12 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
   ASSERT(stream_ != nullptr);
   // Build the report and then send the report to RLQS server.
-  // TODO(tyxia) Revisit end_stream, means send and close.
+  // `end_stream` should always be set to false as we don't want to close the stream locally.
   stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
+  ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
   for (const auto& action : response->bucket_action()) {
     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
       ENVOY_LOG(error,
@@ -93,21 +117,25 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
   if (stream_ != nullptr && !stream_closed_) {
+    ENVOY_LOG(debug, "Closing gRPC stream");
     stream_->closeStream();
     stream_closed_ = true;
     stream_->resetStream();
   }
 }
 
-void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
+void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
+                                        const std::string& message) {
   // TODO(tyxia) Revisit later, maybe add some logging.
   stream_closed_ = true;
+  ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
   closeStream();
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Trying to start the new gRPC stream");
     stream_ = aync_client_.start(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),

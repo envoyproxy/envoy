@@ -710,7 +710,8 @@ public:
             least_request_config.has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
-                : absl::nullopt) {
+                : absl::nullopt),
+        selection_method_(least_request_config.selection_method()) {
     initialize();
   }
 
@@ -737,6 +738,8 @@ private:
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
+  HostSharedPtr unweightedHostPickFullScan(const HostVector& hosts_to_use);
+  HostSharedPtr unweightedHostPickNChoices(const HostVector& hosts_to_use);
 
   const uint32_t choice_count_;
 
@@ -746,6 +749,8 @@ private:
   double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
+  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
+      selection_method_{};
 };
 
 /**

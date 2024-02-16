@@ -379,8 +379,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (!config.tlsKeyLogPath().empty()) {
     ENVOY_LOG(debug, "Enable tls key log");
-    tls_keylog_file_ = config.accessLogManager().createAccessLog(
+    auto file_or_error = config.accessLogManager().createAccessLog(
         Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.tlsKeyLogPath()});
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    tls_keylog_file_ = file_or_error.value();
     for (auto& context : tls_contexts_) {
       SSL_CTX* ctx = context.ssl_ctx_.get();
       ASSERT(ctx != nullptr);

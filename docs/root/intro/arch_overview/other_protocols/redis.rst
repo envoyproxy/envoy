@@ -127,13 +127,14 @@ Supported commands
 At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
-At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH and PING
+At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING and ECHO
 are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
 configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream
 authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
-Arguments to PING are not allowed. All other supported commands must contain a key. Supported commands are
-functionally identical to the original Redis command except possibly in failure scenarios.
+Arguments to PING are not allowed. Envoy responds to ECHO immediately with the command argument.
+All other supported commands must contain a key. Supported commands are functionally identical to the
+original Redis command except possibly in failure scenarios.
 
 For details on each command's usage see the official
 `Redis command reference <https://redis.io/commands>`_.
@@ -143,6 +144,7 @@ For details on each command's usage see the official
   :widths: 1, 1
 
   AUTH, Authentication
+  ECHO, Connection
   PING, Connection
   QUIT, Connection
   DEL, Generic

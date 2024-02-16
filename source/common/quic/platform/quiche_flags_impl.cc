@@ -38,6 +38,10 @@ template <> constexpr bool maybeOverride<bool>(absl::string_view name, bool val)
     // Do not include 32-byte per-entry overhead while counting header size.
     return false;
   }
+  if (name == "quic_always_support_server_preferred_address") {
+    // Envoy should send server preferred address without a client option by default.
+    return true;
+  }
 
   return val;
 }
@@ -79,10 +83,6 @@ template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int
 
 #define PROTOCOL_FLAG_MACRO_CHOOSER(...)                                                           \
   GET_6TH_ARG(__VA_ARGS__, DEFINE_PROTOCOL_FLAG_TWO_VALUES, DEFINE_PROTOCOL_FLAG_SINGLE_VALUE)
-
-#define QUIC_PROTOCOL_FLAG(...) PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
-#include "quiche/quic/core/quic_protocol_flags_list.h"
-#undef QUIC_PROTOCOL_FLAG
 
 #define QUICHE_PROTOCOL_FLAG(...) PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 #include "quiche/common/quiche_protocol_flags_list.h"
