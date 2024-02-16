@@ -505,22 +505,25 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
 
 // Validate TLS version mismatch between the client and the server.
 TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestHandshakeFailure) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.google_grpc_disable_tls_13", "true"}});
-  use_client_tls_12_ = true;
   use_server_tls_13_ = true;
   initialize();
   auto request = createRequest(empty_metadata_, false);
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("13")));
+  EXPECT_CALL(*request->child_span_,
+              setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillOnce(InvokeWithoutArgs([this]() {
+    dispatcher_helper_.dispatcher_.exit();
+  }));
+  EXPECT_CALL(*request->child_span_, finishSpan());
   FakeRawConnectionPtr fake_connection;
   ASSERT_TRUE(fake_upstream_->waitForRawConnection(fake_connection));
-  dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   if (fake_connection->connected()) {
     ASSERT_TRUE(fake_connection->waitForDisconnect());
   }
-  EXPECT_CALL(*request->child_span_,
-              setTag(Eq(Tracing::Tags::get().Status), Eq(Tracing::Tags::get().Canceled)));
-  EXPECT_CALL(*request->child_span_, finishSpan());
-  request->grpc_request_->cancel();
+  dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
 #ifdef ENVOY_GOOGLE_GRPC

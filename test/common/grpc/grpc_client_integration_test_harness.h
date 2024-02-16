@@ -564,13 +564,6 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    if (use_client_tls_12_) {
-      auto* tls_params = common_tls_context->mutable_tls_params();
-      tls_params->set_tls_minimum_protocol_version(
-          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
-      tls_params->set_tls_maximum_protocol_version(
-          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
-    }
 
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
         tls_context, factory_context_);
@@ -621,7 +614,6 @@ public:
   }
 
   bool use_client_cert_{};
-  bool use_client_tls_12_{false};
   bool use_server_tls_13_{false};
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
