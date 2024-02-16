@@ -314,6 +314,7 @@ void AsyncOngoingRequestImpl::initialize() {
 }
 
 void AsyncRequestSharedImpl::onComplete() {
+  complete_ = true;
   callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
 
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
@@ -335,6 +336,11 @@ void AsyncRequestSharedImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncRequestSharedImpl::onReset() {
+  if (complete_) {
+    // This request has already been completed; a reset should be ignored.
+    return;
+  }
+
   if (!cancelled_) {
     // Set "error reason" tag related to reset. The tagging for "error true" is done inside the
     // Tracing::HttpTracerUtility::finalizeUpstreamSpan.
