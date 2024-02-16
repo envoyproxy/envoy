@@ -1085,15 +1085,15 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       return;
     }
 
-    // If there are no hosts or a single one, there is no need for an EDF scheduler
-    // (thus lowering memory and CPU overhead), as the (possibly) single host
-    // will be the one always selected by the scheduler.
-    if (hosts.size() <= 1) {
-      return;
-    }
-
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.edf_lb_host_scheduler_init_fix")) {
+      // If there are no hosts or a single one, there is no need for an EDF scheduler
+      // (thus lowering memory and CPU overhead), as the (possibly) single host
+      // will be the one always selected by the scheduler.
+      if (hosts.size() <= 1) {
+        return;
+      }
+
       // Populate the scheduler with the host list with a randomized starting point.
       // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
       // weighted 1. This is because currently we don't refresh host sets if only weights change.
