@@ -20,7 +20,7 @@ MockRouterFilterInterface::MockRouterFilterInterface()
   EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   ON_CALL(callbacks_, connection())
-      .WillByDefault(Return(OptRef<const Network::Connection>{client_connection_}));
+      .WillByDefault(Return(OptRef<Network::Connection>{client_connection_}));
   callbacks_.route_->route_entry_.connect_config_.emplace(RouteEntry::ConnectConfig());
 }
 

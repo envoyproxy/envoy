@@ -521,7 +521,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   ON_CALL(admin_stream_mock, http1StreamEncoderOptions())
       .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options)));
   ON_CALL(callbacks_, connection())
-      .WillByDefault(Return(OptRef<const Network::Connection>{connection_mock}));
+      .WillByDefault(Return(OptRef<Network::Connection>{connection_mock}));
   connection_mock.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       addr_instance_);
 

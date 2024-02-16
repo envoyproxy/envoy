@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/lua/lua.h"
 
@@ -263,16 +264,19 @@ private:
   const Ssl::ConnectionInfo& connection_info_;
 };
 
+class StreamInfoWrapper;
 /**
  * Lua wrapper for Network::Connection.
  */
 class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
 public:
-  ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
+  ConnectionWrapper(Network::Connection* connection) : connection_{connection} {}
 
   // TODO(dio): Remove this in favor of StreamInfo::downstreamSslConnection wrapper since ssl() in
   // envoy/network/connection.h is subject to removal.
-  static ExportedFunctions exportedFunctions() { return {{"ssl", static_luaSsl}}; }
+  static ExportedFunctions exportedFunctions() {
+    return {{"ssl", static_luaSsl}, {"streamInfo", static_luaStreamInfo}};
+  }
 
 private:
   /**
@@ -281,11 +285,164 @@ private:
    */
   DECLARE_LUA_FUNCTION(ConnectionWrapper, luaSsl);
 
-  // Envoy::Lua::BaseLuaObject
-  void onMarkDead() override { ssl_connection_wrapper_.reset(); }
+  /**
+   * Get the StreamInfo wrapper
+   * @return object
+   */
+  DECLARE_LUA_FUNCTION(ConnectionWrapper, luaStreamInfo);
 
-  const Network::Connection* connection_;
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override {
+    ssl_connection_wrapper_.reset();
+    stream_info_wrapper_.reset();
+  }
+
+  Network::Connection* connection_;
   LuaDeathRef<SslConnectionWrapper> ssl_connection_wrapper_;
+  LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
+};
+
+class DynamicMetadataMapWrapper;
+
+/**
+ * Iterator over a dynamic metadata map.
+ */
+class DynamicMetadataMapIterator
+    : public Filters::Common::Lua::BaseLuaObject<DynamicMetadataMapIterator> {
+public:
+  DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent);
+
+  static ExportedFunctions exportedFunctions() { return {}; }
+
+  DECLARE_LUA_CLOSURE(DynamicMetadataMapIterator, luaPairsIterator);
+
+private:
+  DynamicMetadataMapWrapper& parent_;
+  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+};
+
+/**
+ * Lua wrapper for a dynamic metadata.
+ */
+class DynamicMetadataMapWrapper
+    : public Filters::Common::Lua::BaseLuaObject<DynamicMetadataMapWrapper> {
+public:
+  DynamicMetadataMapWrapper(StreamInfoWrapper& parent) : parent_{parent} {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"get", static_luaGet}, {"set", static_luaSet}, {"__pairs", static_luaPairs}};
+  }
+
+private:
+  /**
+   * Get a metadata value from the map.
+   * @param 1 (string): filter name.
+   * @return value if found or nil.
+   */
+  DECLARE_LUA_FUNCTION(DynamicMetadataMapWrapper, luaGet);
+
+  /**
+   * Get a metadata value from the map.
+   * @param 1 (string): filter name.
+   * @param 2 (string or table): key.
+   * @param 3 (string or table): value.
+   * @return nil.
+   */
+  DECLARE_LUA_FUNCTION(DynamicMetadataMapWrapper, luaSet);
+
+  /**
+   * Implementation of the __pairs metamethod so a dynamic metadata wrapper can be iterated over
+   * using pairs().
+   */
+  DECLARE_LUA_FUNCTION(DynamicMetadataMapWrapper, luaPairs);
+
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override {
+    // Iterators do not survive yields.
+    iterator_.reset();
+  }
+
+  // To get reference to parent's (StreamInfoWrapper) stream info member.
+  StreamInfo::StreamInfo& streamInfo();
+
+  StreamInfoWrapper& parent_;
+  Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapIterator> iterator_;
+
+  friend class DynamicMetadataMapIterator;
+};
+
+/**
+ * Lua wrapper for a stream info.
+ */
+class StreamInfoWrapper : public Filters::Common::Lua::BaseLuaObject<StreamInfoWrapper> {
+public:
+  StreamInfoWrapper(StreamInfo::StreamInfo& stream_info) : stream_info_{stream_info} {}
+  static ExportedFunctions exportedFunctions() {
+    return {{"protocol", static_luaProtocol},
+            {"dynamicMetadata", static_luaDynamicMetadata},
+            {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
+            {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
+            {"downstreamRemoteAddress", static_luaDownstreamRemoteAddress},
+            {"downstreamSslConnection", static_luaDownstreamSslConnection},
+            {"requestedServerName", static_luaRequestedServerName}};
+  }
+
+private:
+  /**
+   * Get current protocol being used.
+   * @return string representation of Http::Protocol.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaProtocol);
+
+  /**
+   * Get reference to stream info dynamic metadata object.
+   * @return DynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
+
+  /**
+   * Get reference to stream info downstreamSslConnection.
+   * @return SslConnectionWrapper representation of StreamInfo downstream SSL connection.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamSslConnection);
+
+  /**
+   * Get current downstream local address
+   * @return string representation of downstream local address.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamLocalAddress);
+
+  /**
+   * Get current direct downstream remote address
+   * @return string representation of downstream directly connected address.
+   * This is equivalent to the address of the physical connection.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamDirectRemoteAddress);
+
+  /**
+   * Get current downstream remote address
+   * @return string representation of downstream remote address.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamRemoteAddress);
+
+  /**
+   * Get requested server name
+   * @return requested server name (e.g. SNI in TLS), if any.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
+
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override {
+    dynamic_metadata_wrapper_.reset();
+    downstream_ssl_connection_.reset();
+  }
+
+  StreamInfo::StreamInfo& stream_info_;
+  Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::SslConnectionWrapper>
+      downstream_ssl_connection_;
+
+  friend class DynamicMetadataMapWrapper;
 };
 
 } // namespace Lua

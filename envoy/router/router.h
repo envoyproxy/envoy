@@ -1441,7 +1441,7 @@ public:
   /**
    * @return return the connection for the downstream stream if it exists.
    */
-  virtual OptRef<const Network::Connection> connection() const PURE;
+  virtual OptRef<Network::Connection> connection() const PURE;
   /**
    * @return returns the options to be consulted with for upstream stream creation.
    */

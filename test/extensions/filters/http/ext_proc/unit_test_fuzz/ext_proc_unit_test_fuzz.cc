@@ -22,7 +22,7 @@ public:
   FuzzerMocks()
       : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")), buffer_("foo") {
     ON_CALL(decoder_callbacks_, connection())
-        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+        .WillByDefault(Return(OptRef<Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
     ON_CALL(decoder_callbacks_, addDecodedTrailers()).WillByDefault(ReturnRef(request_trailers_));

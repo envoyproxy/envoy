@@ -296,12 +296,13 @@ TEST_F(LuaHeaderMapWrapperTest, SetHttp1ReasonPhrase) {
 }
 
 class LuaStreamInfoWrapperTest
-    : public Filters::Common::Lua::LuaWrappersTestBase<StreamInfoWrapper> {
+    : public Filters::Common::Lua::LuaWrappersTestBase<Filters::Common::Lua::StreamInfoWrapper> {
 public:
   void setup(const std::string& script) override {
-    Filters::Common::Lua::LuaWrappersTestBase<StreamInfoWrapper>::setup(script);
-    state_->registerType<DynamicMetadataMapWrapper>();
-    state_->registerType<DynamicMetadataMapIterator>();
+    Filters::Common::Lua::LuaWrappersTestBase<Filters::Common::Lua::StreamInfoWrapper>::setup(
+        script);
+    state_->registerType<Filters::Common::Lua::DynamicMetadataMapWrapper>();
+    state_->registerType<Filters::Common::Lua::DynamicMetadataMapIterator>();
   }
 
 protected:
@@ -317,8 +318,8 @@ protected:
 
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
-    Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-        StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+    Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+        Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
     EXPECT_CALL(printer_,
                 testPrint(fmt::format("'{}'", Http::Utility::getProtocolString(protocol.value()))));
     start("callMe");
@@ -366,8 +367,8 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
       downstream_direct_remote);
   stream_info.downstream_connection_info_provider_->setRemoteAddress(downstream_remote);
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint(address->asString()));
   EXPECT_CALL(printer_, testPrint(downstream_direct_remote->asString()));
   EXPECT_CALL(printer_, testPrint(downstream_remote->asString()));
@@ -387,8 +388,8 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnRequestedServerName) {
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setRequestedServerName("some.sni.io");
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint("some.sni.io"));
   start("callMe");
   wrapper.reset();
@@ -422,8 +423,8 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint("userdata"));
   EXPECT_CALL(printer_, testPrint("bar"));
   EXPECT_CALL(printer_, testPrint("cool"));
@@ -465,8 +466,8 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   (*stream_info.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
 
   EXPECT_CALL(printer_, testPrint("Hex Data: 68"));          // h (Hex: 68)
   EXPECT_CALL(printer_, testPrint("Hex Data: 65"));          // e (Hex: 65)
@@ -499,8 +500,8 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint("1234"));
   EXPECT_CALL(printer_, testPrint("baz"));
   EXPECT_CALL(printer_, testPrint("true"));
@@ -546,8 +547,8 @@ TEST_F(LuaStreamInfoWrapperTest, BadTypesInTableForDynamicMetadata) {
   setup(SCRIPT);
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:3: unexpected type 'function' in dynamicMetadata");
 }
@@ -567,8 +568,8 @@ TEST_F(LuaStreamInfoWrapperTest, ModifyDuringIterationForDynamicMetadata) {
   setup(SCRIPT);
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), Filters::Common::Lua::LuaException,
       "[string \"...\"]:5: dynamic metadata map cannot be modified while iterating");
@@ -602,8 +603,8 @@ TEST_F(LuaStreamInfoWrapperTest, ModifyAfterIterationForDynamicMetadata) {
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   Expectation expect_1 = EXPECT_CALL(printer_, testPrint("'envoy.lb' 'hello' 'world'"));
   Expectation expect_2 = EXPECT_CALL(printer_, testPrint("modified")).After(expect_1);
   EXPECT_CALL(printer_, testPrint("'envoy.proxy' 'proto' 'grpc'")).After(expect_2);
@@ -626,8 +627,8 @@ TEST_F(LuaStreamInfoWrapperTest, DontFinishIterationForDynamicMetadata) {
   setup(SCRIPT);
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
-      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::StreamInfoWrapper> wrapper(
+      Filters::Common::Lua::StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), Filters::Common::Lua::LuaException,
       "[string \"...\"]:6: cannot create a second iterator before completing the first");

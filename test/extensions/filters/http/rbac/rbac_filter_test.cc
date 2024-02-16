@@ -250,7 +250,7 @@ on_no_match:
     filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
 
     EXPECT_CALL(callbacks_, connection())
-        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+        .WillRepeatedly(Return(OptRef<Network::Connection>{connection_}));
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }

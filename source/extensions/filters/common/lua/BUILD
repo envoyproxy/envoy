@@ -27,12 +27,18 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "wrappers_lib",
-    srcs = ["wrappers.cc"],
-    hdrs = ["wrappers.h"],
+    srcs = [
+        "wrappers.cc",
+    ],
+    hdrs = [
+        "wrappers.h",
+    ],
     deps = [
         ":lua_lib",
         "//envoy/buffer:buffer_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:hex_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf",
     ],
 )

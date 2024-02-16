@@ -159,7 +159,7 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  OptRef<const Network::Connection> connection() override { return {}; }
+  OptRef<Network::Connection> connection() override { return {}; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                    absl::string_view transport_failure_reason = "") override;

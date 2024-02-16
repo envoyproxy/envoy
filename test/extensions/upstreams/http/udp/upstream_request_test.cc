@@ -210,8 +210,7 @@ TEST_F(UdpConnPoolTest, BindToUpstreamLocalAddress) {
   EXPECT_CALL(mock_callback_, upstreamToDownstream);
   NiceMock<Network::MockConnection> downstream_connection_;
   EXPECT_CALL(mock_callback_.upstream_to_downstream_, connection)
-      .WillRepeatedly(
-          Return(Envoy::OptRef<const Envoy::Network::Connection>(downstream_connection_)));
+      .WillRepeatedly(Return(Envoy::OptRef<Envoy::Network::Connection>(downstream_connection_)));
   EXPECT_CALL(mock_callback_, onPoolReady);
   // Mock syscall to make the bind call succeed.
   NiceMock<Envoy::Api::MockOsSysCalls> mock_os_sys_calls;
