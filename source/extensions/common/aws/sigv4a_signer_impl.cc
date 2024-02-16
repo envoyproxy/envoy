@@ -15,6 +15,7 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
+#include "signer_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +28,8 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
     absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
   return fmt::format(fmt::runtime(SigV4ASignatureConstants::get().SigV4AAuthorizationHeaderFormat),
-                     access_key_id, credential_scope, signed_headers, signature);
+                     createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
+                     signature);
 }
 
 std::string SigV4ASignerImpl::createCredentialScope(
@@ -42,8 +44,8 @@ std::string SigV4ASignerImpl::createStringToSign(const absl::string_view canonic
                                                  const absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      fmt::runtime(SigV4ASignatureConstants::get().SigV4AStringToSignFormat), long_date,
-      credential_scope,
+      fmt::runtime(SigV4ASignatureConstants::get().SigV4AStringToSignFormat), getAlgorithmString(),
+      long_date, credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
@@ -51,6 +53,13 @@ void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap& headers,
                                        const absl::string_view override_region) const {
   headers.addCopy(SigV4ASignatureHeaders::get().RegionSet,
                   override_region.empty() ? getRegion() : override_region);
+}
+
+void SigV4ASignerImpl::addRegionQueryParam(Envoy::Http::Utility::QueryParamsMulti& query_params,
+                                           const absl::string_view override_region) const {
+  query_params.add(SignatureQueryParameters::get().AmzRegionSet,
+                   Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(
+                       override_region.empty() ? getRegion() : override_region));
 }
 
 std::string SigV4ASignerImpl::createSignature(
@@ -80,6 +89,10 @@ std::string SigV4ASignerImpl::createSignature(
       Hex::encode(std::vector<uint8_t>(signature.data(), signature.data() + signature_size)));
 
   return encoded_signature;
+}
+
+absl::string_view SigV4ASignerImpl::getAlgorithmString() const {
+  return SigV4ASignatureConstants::get().SigV4AAlgorithm;
 }
 
 } // namespace Aws

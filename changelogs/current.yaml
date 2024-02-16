@@ -162,5 +162,9 @@ new_features:
     Envoy will select the host with the fewest active requests from the entire host set rather than
     :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     random choices.
+- area: aws_request_signing
+  change: |
+    Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
+    by specifying the ``query_parameters`` configuration section.
 
 deprecated:

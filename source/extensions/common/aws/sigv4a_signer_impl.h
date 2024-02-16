@@ -26,22 +26,20 @@ using SigV4ASignatureHeaders = ConstSingleton<SigV4ASignatureHeaderValues>;
 class SigV4ASignatureConstantValues : public SignatureConstantValues {
 public:
   const std::string SigV4AAuthorizationHeaderFormat{
-      "AWS4-ECDSA-P256-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
+      "AWS4-ECDSA-P256-SHA256 Credential={}, SignedHeaders={}, Signature={}"};
   const std::string SigV4ACredentialScopeFormat{"{}/{}/aws4_request"};
-  const std::string HashedEmptyString{
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
   const std::string SigV4ASignatureVersion{"AWS4A"};
-  const std::string SigV4AStringToSignFormat{"AWS4-ECDSA-P256-SHA256\n{}\n{}\n{}"};
-  const std::string SigV4ALabel = "AWS4-ECDSA-P256-SHA256";
+  const std::string SigV4AStringToSignFormat{"{}\n{}\n{}\n{}"};
+  const std::string SigV4AAlgorithm = "AWS4-ECDSA-P256-SHA256";
 };
+
+using SigV4ASignatureConstants = ConstSingleton<SigV4ASignatureConstantValues>;
 
 enum SigV4AKeyDerivationResult {
   AkdrSuccess,
   AkdrNextCounter,
   AkdrFailure,
 };
-
-using SigV4ASignatureConstants = ConstSingleton<SigV4ASignatureConstantValues>;
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
@@ -54,12 +52,17 @@ class SigV4ASignerImpl : public SignerBaseImpl {
 public:
   SigV4ASignerImpl(absl::string_view service_name, absl::string_view region,
                    const CredentialsProviderSharedPtr& credentials_provider,
-                   TimeSource& time_source, const AwsSigningHeaderExclusionVector& matcher_config)
-      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config) {}
+                   TimeSource& time_source, const AwsSigningHeaderExclusionVector& matcher_config,
+                   const bool query_string = false, const uint16_t expiration_time = 0)
+      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config,
+                       query_string, expiration_time) {}
 
 private:
   void addRegionHeader(Http::RequestHeaderMap& headers,
                        const absl::string_view override_region) const override;
+
+  void addRegionQueryParam(Envoy::Http::Utility::QueryParamsMulti& query_params,
+                           const absl::string_view override_region) const override;
 
   std::string createCredentialScope(const absl::string_view short_date,
                                     const absl::string_view override_region) const override;
@@ -78,6 +81,8 @@ private:
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
+
+  absl::string_view getAlgorithmString() const override;
 };
 
 } // namespace Aws

@@ -14,6 +14,7 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
+#include "signer_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,8 +33,8 @@ std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_requ
                                                 absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      fmt::runtime(SigV4SignatureConstants::get().SigV4StringToSignFormat), long_date,
-      credential_scope,
+      fmt::runtime(SigV4SignatureConstants::get().SigV4StringToSignFormat),
+      SigV4SignatureConstants::get().SigV4Algorithm, long_date, credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
@@ -56,12 +57,18 @@ std::string SigV4SignerImpl::createSignature(
 }
 
 std::string SigV4SignerImpl::createAuthorizationHeader(
-    absl::string_view access_key_id, absl::string_view credential_scope,
+    const absl::string_view access_key_id, const absl::string_view credential_scope,
     const std::map<std::string, std::string>& canonical_headers,
     absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
   return fmt::format(fmt::runtime(SigV4SignatureConstants::get().SigV4AuthorizationHeaderFormat),
-                     access_key_id, credential_scope, signed_headers, signature);
+                     SigV4SignatureConstants::get().SigV4Algorithm,
+                     createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
+                     signature);
+}
+
+absl::string_view SigV4SignerImpl::getAlgorithmString() const {
+  return SigV4SignatureConstants::get().SigV4Algorithm;
 }
 
 } // namespace Aws

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <utility>
 
 #include "source/common/common/logger.h"
@@ -21,10 +22,11 @@ using SigV4SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 class SigV4SignatureConstantValues : public SignatureConstantValues {
 public:
   const std::string SigV4AuthorizationHeaderFormat{
-      "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
+      "{} Credential={}, SignedHeaders={}, Signature={}"};
   const std::string SigV4CredentialScopeFormat{"{}/{}/{}/aws4_request"};
   const std::string SigV4SignatureVersion{"AWS4"};
-  const std::string SigV4StringToSignFormat{"AWS4-HMAC-SHA256\n{}\n{}\n{}"};
+  const std::string SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
+  const std::string SigV4Algorithm{"AWS4-HMAC-SHA256"};
 };
 
 using SigV4SignatureConstants = ConstSingleton<SigV4SignatureConstantValues>;
@@ -39,8 +41,10 @@ class SigV4SignerImpl : public SignerBaseImpl {
 public:
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                   const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-                  const AwsSigningHeaderExclusionVector& matcher_config)
-      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config) {}
+                  const AwsSigningHeaderExclusionVector& matcher_config,
+                  const bool query_string = false, const uint16_t expiration_time = 0)
+      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config,
+                       query_string, expiration_time) {}
 
 private:
   std::string createCredentialScope(const absl::string_view short_date,
@@ -60,6 +64,8 @@ private:
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
+
+  absl::string_view getAlgorithmString() const override;
 };
 
 } // namespace Aws
