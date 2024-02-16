@@ -23,7 +23,7 @@ class SpanContext;
 enum class Decision {
   // IsRecording will be false, the Span will not be recorded and all events and attributes will be
   // dropped.
-  DROP,
+  Drop,
   // IsRecording will be true, but the Sampled flag MUST NOT be set.
   RecordOnly,
   // IsRecording will be true and the Sampled flag MUST be set.

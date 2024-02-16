@@ -152,13 +152,13 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   EXPECT_TRUE(span->sampled());
   EXPECT_STREQ(span->tracestate().c_str(), "this_is=tracesate");
 
-  // shouldSamples return a result containing additional attributes and Decision::DROP
+  // shouldSamples return a result containing additional attributes and Decision::Drop
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
       .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
                    OTelSpanKind, OptRef<const Tracing::TraceContext>,
                    const std::vector<SpanContext>&) {
         SamplingResult res;
-        res.decision = Decision::DROP;
+        res.decision = Decision::Drop;
         std::map<std::string, std::string> attributes;
         attributes["key"] = "value";
         attributes["another_key"] = "another_value";
@@ -214,7 +214,7 @@ TEST(SamplingResultTest, TestSamplingResult) {
   result.decision = Decision::RecordOnly;
   EXPECT_TRUE(result.isRecording());
   EXPECT_FALSE(result.isSampled());
-  result.decision = Decision::DROP;
+  result.decision = Decision::Drop;
   EXPECT_FALSE(result.isRecording());
   EXPECT_FALSE(result.isSampled());
 }
