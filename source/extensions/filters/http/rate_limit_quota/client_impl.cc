@@ -69,7 +69,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
   ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
   for (const auto& action : response->bucket_action()) {
     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
-      ENVOY_LOG(error, "Received a response, but bucket_id is missing : ", response->DebugString());
+      ENVOY_LOG(error, "Received a response, but bucket_id is missing: ", response->DebugString());
       continue;
     }
 
@@ -78,7 +78,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
     if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
       // The response should be matched to the report we sent.
       ENVOY_LOG(error,
-                "Received a response that is not found in the quota "
+                "Received a response, but it is not found in the quota "
                 "cache entry; bucket id: ",
                 action.bucket_id().DebugString());
     } else {
