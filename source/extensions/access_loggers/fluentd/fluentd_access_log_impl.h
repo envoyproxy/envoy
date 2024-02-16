@@ -26,8 +26,8 @@ public:
   Entry& operator=(const Entry&) = delete;
   Entry(uint64_t time, std::vector<uint8_t>&& record) : time_(time), record_(record) {}
 
-  uint64_t time_;
-  std::vector<uint8_t> record_;
+  const uint64_t time_;
+  const std::vector<uint8_t> record_;
 };
 
 using EntryPtr = std::unique_ptr<Entry>;
