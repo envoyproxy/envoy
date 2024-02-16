@@ -201,6 +201,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
         return Envoy::Http::FilterHeadersStatus::StopIteration;
       }
     }
+  } else {
+    ENVOY_LOG(error, "No quota assignment is found from the cache");
   }
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
