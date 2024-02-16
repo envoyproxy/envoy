@@ -1313,6 +1313,34 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseTrailers) {
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(trailer_value));
 }
 
+TEST_P(TcpTunnelingIntegrationTest, DownstreamFinOnUpstreamTrailers) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+
+  initialize();
+
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  sendBidiData(fake_upstream_connection_);
+
+  // Send trailers
+  const std::string trailer_value = "trailer-value";
+  Http::TestResponseTrailerMapImpl response_trailers{{"test-trailer-name", trailer_value}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  // Upstream trailers should close the downstream connection for writing.
+  tcp_client_->waitForHalfClose();
+
+  // Close Connection
+  tcp_client_->close();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+}
+
 TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {
   initialize();
 

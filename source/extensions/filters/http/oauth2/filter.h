@@ -60,13 +60,15 @@ private:
                      Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api) {
     const auto* secret = secret_provider->secret();
     if (secret != nullptr) {
-      value = Config::DataSource::read(secret->secret(), true, api);
+      value =
+          THROW_OR_RETURN_VALUE(Config::DataSource::read(secret->secret(), true, api), std::string);
     }
 
     return secret_provider->addUpdateCallback([secret_provider, &api, &value]() {
       const auto* secret = secret_provider->secret();
       if (secret != nullptr) {
-        value = Config::DataSource::read(secret->secret(), true, api);
+        value = THROW_OR_RETURN_VALUE(Config::DataSource::read(secret->secret(), true, api),
+                                      std::string);
       }
     });
   }

@@ -23,7 +23,6 @@ AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
       cluster_info_(thread_local_cluster_.info()), context_(context),
       connect_timer_(dispatcher.createTimer([this]() { onConnectTimeout(); })),
       enable_half_close_(enable_half_close) {
-  connect_timer_->enableTimer(cluster_info_->connectTimeout());
   cluster_info_->trafficStats()->upstream_cx_active_.inc();
   cluster_info_->trafficStats()->upstream_cx_total_.inc();
 }
@@ -42,6 +41,10 @@ bool AsyncTcpClientImpl::connect() {
   connection_->addReadFilter(std::make_shared<NetworkReadFilter>(*this));
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       cluster_info_->trafficStats()->upstream_cx_connect_ms_, dispatcher_.timeSource());
+
+  if (!connect_timer_) {
+    connect_timer_ = dispatcher_.createTimer([this]() { onConnectTimeout(); });
+  }
 
   connect_timer_->enableTimer(cluster_info_->connectTimeout());
   connection_->setConnectionStats({cluster_info_->trafficStats()->upstream_cx_rx_bytes_total_,
