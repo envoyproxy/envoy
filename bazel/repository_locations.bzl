@@ -1442,7 +1442,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2022-08-29",
+        release_date = "2023-08-29",
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
