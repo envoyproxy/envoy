@@ -49,6 +49,9 @@ bug_fixes:
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
+- area: stateful_session
+  change: |
+    Support 0 TTL for proto-encoded cookies, which disables cookie expiration by Envoy.
 - area: load balancing
   change: |
     Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
