@@ -762,6 +762,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           ->set_value(4);
     }
 
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_idle_network_timeout()
+        ->set_seconds(30);
+
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -769,7 +775,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
     // Set the upstream connections socket receive buffer size. The operating system defaults are
     // usually too small for QUIC.
-    // TODO(32304): We can remove this once core Envoy has better receive buffer defaults.
     // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
     // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
     // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms

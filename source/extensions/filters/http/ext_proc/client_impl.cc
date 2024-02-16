@@ -16,8 +16,10 @@ ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
     const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
     const StreamInfo::StreamInfo& stream_info,
     const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy) {
-  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
-      client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true));
+  auto client_or_error =
+      client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
+  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(client_or_error.value());
   return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info,
                                              retry_policy);
 }

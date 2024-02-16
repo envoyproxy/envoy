@@ -63,8 +63,9 @@ UserMap readHtpasswd(const std::string& htpasswd) {
 Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
     const BasicAuth& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  UserMap users = readHtpasswd(
-      Config::DataSource::read(proto_config.users(), false, context.serverFactoryContext().api()));
+  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(proto_config.users(), false, context.serverFactoryContext().api()),
+      std::string));
   FilterConfigConstSharedPtr config =
       std::make_unique<FilterConfig>(std::move(users), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

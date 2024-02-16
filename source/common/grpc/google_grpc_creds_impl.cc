@@ -16,9 +16,12 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
         CredentialSpecifierCase::kSslCredentials: {
       const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
       const grpc::SslCredentialsOptions ssl_credentials_options = {
-          Config::DataSource::read(ssl_credentials.root_certs(), true, api),
-          Config::DataSource::read(ssl_credentials.private_key(), true, api),
-          Config::DataSource::read(ssl_credentials.cert_chain(), true, api),
+          THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.root_certs(), true, api),
+                                std::string),
+          THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.private_key(), true, api),
+                                std::string),
+          THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.cert_chain(), true, api),
+                                std::string),
       };
       return grpc::SslCredentials(ssl_credentials_options);
     }

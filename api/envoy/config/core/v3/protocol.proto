@@ -56,7 +56,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -102,6 +102,15 @@ message QuicProtocolOptions {
   // A comma-separated list of strings representing QUIC client connection options defined in
   // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>`_ and to be sent by upstream connections.
   string client_connection_options = 7;
+
+  // The duration that a QUIC connection stays idle before it closes itself. If this field is not present, QUICHE
+  // default 600s will be applied.
+  // For internal corporate network, a long timeout is often fine.
+  // But for client facing network, 30s is usually a good choice.
+  google.protobuf.Duration idle_network_timeout = 8 [(validate.rules).duration = {
+    lte {seconds: 600}
+    gte {seconds: 1}
+  }];
 }
 
 message UpstreamHttpProtocolOptions {

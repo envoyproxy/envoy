@@ -1735,7 +1735,7 @@ void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& re
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(response_headers);
 
-  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, response_headers);
+  ENVOY_STREAM_LOG(debug, "encoding 1xx continue headers via codec:\n{}", *this, response_headers);
 
   // Now actually encode via the codec.
   response_encoder_->encode1xxHeaders(response_headers);
