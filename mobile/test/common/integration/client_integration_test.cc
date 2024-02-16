@@ -701,6 +701,21 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
   if (upstreamProtocol() != Http::CodecType::HTTP1) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
+
+  // Close the HTTP3 connection and verify stats are dumped properly.
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    ASSERT_TRUE(upstream_connection_->close());
+    ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+    upstream_connection_.reset();
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    EXPECT_TRUE((absl::StrContains(
+        stats, "http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR: 1")))
+        << stats;
+    EXPECT_TRUE((absl::StrContains(
+        stats, "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED: 1")))
+        << stats;
+  }
 }
 
 TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStream) {
