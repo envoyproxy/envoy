@@ -180,6 +180,8 @@ struct ResponseCodeDetailValues {
   const std::string PathNormalizationFailed = "path_normalization_failed";
   // The request was rejected because it attempted an unsupported upgrade.
   const std::string UpgradeFailed = "upgrade_failed";
+  // The websocket handshake is unsuccessful and only SwitchingProtocols is considering successful.
+  const std::string WebsocketHandshakeUnsuccessful = "websocket_handshake_unsuccessful";
 
   // The request was rejected by the HCM because there was no route configuration found.
   const std::string RouteConfigurationNotFound = "route_configuration_not_found";
