@@ -83,6 +83,8 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
   }
   if (callbacks_->upstreamCallbacks()->pausedForConnect()) {
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  } else if (callbacks_->upstreamCallbacks()->pausedForWebsocketUpgrade()) {
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -152,6 +154,34 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
         (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers)))))) {
     filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);
     filter_.callbacks_->continueDecoding();
+  }
+
+  if (filter_.callbacks_->upstreamCallbacks()->pausedForWebsocketUpgrade()) {
+    const uint64_t status = Http::Utility::getResponseStatus(*headers);
+    const auto protocol = filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().protocol();
+    if (status == static_cast<uint64_t>(Http::Code::SwitchingProtocols) ||
+        (protocol.has_value() && protocol.value() != Envoy::Http::Protocol::Http11)) {
+      // handshake is finished and continue the data processing.
+      filter_.callbacks_->upstreamCallbacks()->setPausedForWebsocketUpgrade(false);
+      filter_.callbacks_->continueDecoding();
+    } else {
+      // Other status, e.g., 426 or 200, indicate a failed handshake, Envoy as a proxy will proxy
+      // back the response header to downstream and then close the request, since WebSocket
+      // just needs headers for handshake per RFC-6455. Note: HTTP/2 200 will be normalized to
+      // 101 before this point in codec and this patch will skip this scenario from the above
+      // proto check.
+      filter_.callbacks_->sendLocalReply(
+          static_cast<Envoy::Http::Code>(status), "",
+          [&headers](Http::ResponseHeaderMap& local_headers) {
+            headers->iterate([&local_headers](const Envoy::Http::HeaderEntry& header) {
+              local_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
+                                    header.value().getStringView());
+              return Envoy::Http::HeaderMap::Iterate::Continue;
+            });
+          },
+          std::nullopt, StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeUnsuccessful);
+      return;
+    }
   }
 
   maybeEndDecode(end_stream);
