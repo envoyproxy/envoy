@@ -17,5 +17,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message Lua {
   // The Lua code that Envoy will execute
-  string inline_code = 1;
+  string inline_code = 1 [(validate.rules).string = {min_len: 1}];
 }

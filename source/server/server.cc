@@ -106,9 +106,14 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+
+  InjectableSingleton<ThreadLocal::SlotAllocator>::initialize(&thread_local_);
+}
 
 InstanceBase::~InstanceBase() {
+  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
+
   terminate();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are

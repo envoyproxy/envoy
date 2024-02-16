@@ -9,6 +9,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
 #include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
 #include "source/common/http/path_utility.h"
 
 #include "absl/strings/match.h"
@@ -201,14 +202,8 @@ bool PathMatcher::match(const absl::string_view path) const {
 }
 
 StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config) {
-  auto factory = Registry::FactoryRegistry<StringMatcherExtensionFactory>::getFactoryByType(
-      config.GetTypeName());
-  if (factory != nullptr) {
-    return factory->createStringMatcher(config);
-  }
-
-  throwEnvoyExceptionOrPanic(
-      absl::StrCat("Could not find extension of type ", config.GetTypeName()));
+  auto factory = Config::Utility::getAndCheckFactory<StringMatcherExtensionFactory>(config, false);
+  return factory->createStringMatcher(config.typed_config());
 }
 
 } // namespace Matchers

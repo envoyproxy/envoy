@@ -195,8 +195,7 @@ private:
 
 class StringMatcherExtensionFactory : public Config::TypedFactory {
 public:
-  virtual StringMatcherPtr
-  createStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config) PURE;
+  virtual StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& config) PURE;
 
   std::string category() const override { return "envoy.matching.string"; }
 };

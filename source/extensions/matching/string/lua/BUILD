@@ -11,8 +11,10 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["match.cc"],
+    hdrs = ["match.h"],
     deps = [
         "//source/common/common:matchers_lib",
+        "//source/extensions/filters/common/lua:lua_lib",
         "@envoy_api//envoy/extensions/matching/string/lua/v3:pkg_cc_proto",
     ],
 )
