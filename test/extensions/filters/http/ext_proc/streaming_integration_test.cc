@@ -37,6 +37,7 @@ class StreamingIntegrationTest : public HttpIntegrationTest,
 protected:
   StreamingIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
   // TODO(yanjunxiang-google): Verify that bypassing virtual dispatch here was intentional
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   ~StreamingIntegrationTest() override { StreamingIntegrationTest::TearDown(); }
 
   void TearDown() override {
