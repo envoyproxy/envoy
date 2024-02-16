@@ -3,10 +3,9 @@
 
 #include "source/common/grpc/google_async_client_impl.h"
 
-#include "test/test_common/test_runtime.h"
-
 #endif
 
+#include "test/test_common/test_runtime.h"
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 
 using testing::Eq;
@@ -486,8 +485,6 @@ INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
 
 // Validate that a simple request-reply unary RPC works with SSL.
 TEST_P(GrpcSslClientIntegrationTest, BasicSslRequest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.google_grpc_disable_tls_13", "true"}});
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
