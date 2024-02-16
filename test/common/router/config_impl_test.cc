@@ -7570,9 +7570,10 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
             ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).value());
 
   route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).IgnoreError(),
-      EnvoyException, "file missing_file does not exist");
+  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
+                .status()
+                .message(),
+            "file missing_file does not exist");
 
   // The default max body size in bytes is 4096 (MaxResponseBodySizeBytes).
   const std::string body(MaxResponseBodySizeBytes + 1, '*');
@@ -7587,10 +7588,10 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   auto filename = TestEnvironment::writeStringToFileForTest("body", body);
   route.mutable_direct_response()->mutable_body()->set_filename(filename);
   expected_message = "file " + filename + " size is 4097 bytes; maximum is 2048";
-  EXPECT_THROW_WITH_MESSAGE(
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2)
-          .IgnoreError(),
-      EnvoyException, expected_message);
+  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2)
+                .status()
+                .message(),
+            expected_message);
 
   // Update the max body size to 4098 bytes (MaxResponseBodySizeBytes + 2), hence the parsing is
   // successful.

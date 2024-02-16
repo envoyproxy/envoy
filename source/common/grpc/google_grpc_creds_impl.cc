@@ -18,9 +18,9 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
     case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelCredentials::
         CredentialSpecifierCase::kSslCredentials: {
       const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
-      const auto root_certs = Config::DataSource::read(ssl_credentials.root_certs(), true, api);
-      const auto private_key = Config::DataSource::read(ssl_credentials.private_key(), true, api);
-      const auto cert_chain = Config::DataSource::read(ssl_credentials.cert_chain(), true, api);
+      const auto root_certs = THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.root_certs(), true, api));
+      const auto private_key =THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.private_key(), true, api));
+      const auto cert_chain = THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.cert_chain(), true, api));
       grpc::experimental::TlsChannelCredentialsOptions options;
       if (!private_key.empty() || !cert_chain.empty()) {
         options.set_certificate_provider(

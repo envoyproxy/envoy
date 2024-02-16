@@ -35,7 +35,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
-#include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
@@ -522,6 +521,9 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
 
+  memory_allocator_ = std::make_unique<Memory::AllocatorManager>(
+      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
+
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
@@ -823,6 +825,15 @@ void InstanceBase::onRuntimeReady() {
       shutdown();
     });
   }
+
+  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
+  if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
+    ENVOY_LOG(warn,
+              "Usage of the deprecated runtime key {}, consider switching to "
+              "`envoy.resource_monitors.downstream_connections` instead."
+              "This runtime key will be removed in future.",
+              Runtime::Keys::GlobalMaxCxRuntimeKey);
+  }
 }
 
 void InstanceBase::startWorkers() {
@@ -908,8 +919,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
-          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
-      !instance.runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");

@@ -33,7 +33,8 @@ public:
     dictionary_map->reserve(dictionaries.size());
 
     for (const auto& source : dictionaries) {
-      const auto data = Config::DataSource::read(source, false, api);
+      const auto data =
+          THROW_OR_RETURN_VALUE(Config::DataSource::read(source, false, api), std::string);
       auto dictionary = DictionarySharedPtr(builder_(data.data(), data.length()));
       auto id = getDictId(dictionary.get());
       // If id == 0, the dictionary is not conform to Zstd specification, or empty.
