@@ -168,6 +168,9 @@ paths:
     - source/common/common/logger_delegates.cc
     - source/common/upstream/health_checker_event_logger.h
     - source/common/upstream/outlier_detection_impl.h
+    - source/common/ssl/certificate_validation_context_config_impl.cc
+    - source/common/grpc/google_grpc_creds_impl.cc
+    - source/common/local_reply/local_reply.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
