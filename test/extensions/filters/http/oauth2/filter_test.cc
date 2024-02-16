@@ -1798,8 +1798,7 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshToken) {
                                    std::chrono::seconds(600));
 }
 
-TEST_P(OAuth2Test,
-       OAuthAccessTokenSucessWithTokensUseRefreshTokenAndDefaultRefreshTokenExpiresIn) {
+TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndDefaultRefreshTokenExpiresIn) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
@@ -1858,8 +1857,7 @@ TEST_P(OAuth2Test,
  * refresh token.
  */
 
-TEST_P(OAuth2Test,
-       OAuthAccessTokenSucessWithTokensUseRefreshTokenAndRefreshTokenExpiresInFromJwt) {
+TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndRefreshTokenExpiresInFromJwt) {
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
@@ -1920,7 +1918,7 @@ TEST_P(OAuth2Test,
 /**
  * Scenario: The Oauth filter doesn't save cookie with refresh token because the token is expired.
  *
- * Expected behavior: the age of the cookie with refresh token is equal to zero.
+ * Expected behavior: The age of the cookie with refresh token is equal to zero.
  */
 
 TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndExpiredRefreshToken) {
@@ -1972,6 +1970,69 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndExpiredRefr
        "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=" + refreshToken + ";version=1;path=/;Max-Age=0;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", refreshToken,
+                                   std::chrono::seconds(600));
+}
+
+/**
+ * Scenario: The Oauth filter receipts the refresh token without exp claim.
+ *
+ * Expected behavior: The age of the cookie with refresh token is equal to default value.
+ */
+
+TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndNoExpClaimInRefreshToken) {
+
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
+                 1200 /* default_refresh_token_expires_in */));
+  TestScopedRuntime scoped_runtime;
+  if (GetParam() == 1) {
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "false"},
+    });
+    oauthHMAC =
+        "N2FlNDRlNzQwZjgyNmI4YTdmZjQ5YTBjOWQ3ZTc0N2UyYTg3YTJiOTg4NThmZmQyZjg1YjFlZmIwMGZlNTdjMg==;";
+  } else {
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
+    });
+    oauthHMAC = "euROdA+Ca4p/9JoMnX50fiqHormIWP/S+Fse+wD+V8I=;";
+  }
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  // host_ must be set, which is guaranteed (ASAN).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
+
+  const std::string refreshToken =
+      "eyJhbGciOiJIUzI1NiJ9."
+      "eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImlhdCI6MTcwODA2"
+      "NDcyOH0.92H-X2Oa4ECNmFLZBWBHP0BJyEHDprLkEIc2JBJYwkI";
+
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauthHMAC + "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=" + refreshToken + ";version=1;path=/;Max-Age=1200;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
   };
 

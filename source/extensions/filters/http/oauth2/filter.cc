@@ -550,7 +550,7 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
                                             const std::chrono::seconds& expires_in) const {
   if (config_->useRefreshToken()) {
     ::google::jwt_verify::Jwt jwt;
-    if (jwt.parseFromString(refresh_token) == ::google::jwt_verify::Status::Ok) {
+    if (jwt.parseFromString(refresh_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
       const std::chrono::seconds expirationFromJwt = std::chrono::seconds{jwt.exp_};
       const std::chrono::seconds now =
           std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
@@ -564,7 +564,8 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
         return "0";
       }
     }
-    ENVOY_LOG(debug, "The refresh token is not JWT. The lifetime of the refresh token is taken from filter configuration");
+    ENVOY_LOG(debug, "The refresh token is not JWT or exp claim is ommited. The lifetime of the "
+                     "refresh token is taken from filter configuration");
     const std::chrono::seconds default_refresh_token_expires_in =
         config_->defaultRefreshTokenExpiresIn();
     return std::to_string(default_refresh_token_expires_in.count());
