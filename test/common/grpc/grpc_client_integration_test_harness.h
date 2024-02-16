@@ -418,8 +418,6 @@ public:
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_, _));
 
-    Http::AsyncClient::RequestOptions options;
-    options.setTimeout(std::chrono::milliseconds(1000));
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
                                                 active_span, Http::AsyncClient::RequestOptions());
     EXPECT_NE(request->grpc_request_, nullptr);
@@ -433,7 +431,6 @@ public:
           fake_upstream_->waitForHttpConnection(*dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
-
     fake_streams_.emplace_back();
     AssertionResult result = fake_connection_->waitForNewStream(*dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
