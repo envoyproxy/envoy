@@ -1,7 +1,7 @@
 package org.chromium.net.testing;
 
 import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED;
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 import static org.chromium.net.testing.CronetTestRule.SERVER_CERT_PEM;
 import static org.chromium.net.testing.CronetTestRule.SERVER_KEY_PKCS8_PEM;
 

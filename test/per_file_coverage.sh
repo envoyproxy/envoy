@@ -11,7 +11,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/event:95.0" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:95.2"
-"source/common/io:57.9" # TODO(#32149): CI has stopped executing this code.
+"source/common/io:57.1" # TODO(#32149): CI has stopped executing this code.
 "source/common/json:94.6"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
@@ -24,6 +24,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/exe:90.3"
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
+"source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
 "source/extensions/common/tap:94.5"
 "source/extensions/common/wasm:88.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"

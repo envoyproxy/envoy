@@ -96,12 +96,17 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller, if the caller hasn't already been notified.
+  signalFailureAndDeleteSelf(reason, transport_failure_reason, host);
+}
+
+void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
+    ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
+    Upstream::HostDescriptionConstSharedPtr host) {
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
   deleteThis();
   if (callbacks != nullptr) {
-    ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(attempt->pool()),
-              host->hostname());
+    ENVOY_LOG(trace, "Passing pool failure up to caller.");
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
   }
 }
@@ -191,6 +196,9 @@ void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(
 
 absl::optional<ConnectivityGrid::StreamCreationResult>
 ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+  if (grid_.destroying_) {
+    return {};
+  }
   absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
   if (!next_pool.has_value()) {
     // If there are no other pools to try, return an empty optional.
@@ -236,9 +244,13 @@ ConnectivityGrid::ConnectivityGrid(
 ConnectivityGrid::~ConnectivityGrid() {
   // Ignore idle callbacks while the pools are destroyed below.
   destroying_ = true;
-  // Callbacks might have pending streams registered with the pools, so cancel and delete
-  // the callback before deleting the pools.
-  wrapped_callbacks_.clear();
+  while (!wrapped_callbacks_.empty()) {
+    // Before tearing down the callbacks, make sure they pass up pool failure to
+    // the caller. We do not call onPoolFailure because it does up-calls to the
+    // (delete-in-process) grid.
+    wrapped_callbacks_.front()->signalFailureAndDeleteSelf(
+        ConnectionPool::PoolFailureReason::LocalConnectionFailure, "grid teardown", host_);
+  }
   pools_.clear();
 }
 
@@ -344,11 +356,6 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
 }
 
 void ConnectivityGrid::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
-  if (draining_) {
-    // A drain callback has already been set, and only needs to happen once.
-    return;
-  }
-
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     // Note that no new pools can be created from this point on
     // as createNextPool fast-fails if `draining_` is true.

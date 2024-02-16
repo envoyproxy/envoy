@@ -154,6 +154,7 @@ open class EngineBuilder: NSObject {
   private var quicHints: [String: Int] = [:]
   private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
+  private var respectSystemProxySettings: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
@@ -363,6 +364,25 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableInterfaceBinding(_ enableInterfaceBinding: Bool) -> Self {
     self.enableInterfaceBinding = enableInterfaceBinding
+    return self
+  }
+
+  ///
+  /// Specify whether system proxy settings should be respected. If yes, Envoy Mobile will
+  /// use iOS APIs to query iOS Proxy settings configured on a device and will
+  /// respect these settings when establishing connections with remote services.
+  ///
+  /// The method is introduced for experimentation purposes and as a safety guard against
+  /// critical issues in the implementation of the proxying feature. It's intended to be removed
+  /// after it's confirmed that proxies on iOS work as expected.
+  ///
+  /// - parameter respectSystemProxySettings: whether to use the system's proxy settings for
+  ///                                         outbound connections.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func respectSystemProxySettings(_ respectSystemProxySettings: Bool) -> Self {
+    self.respectSystemProxySettings = respectSystemProxySettings
     return self
   }
 
@@ -697,7 +717,8 @@ open class EngineBuilder: NSObject {
                                         }
                                       },
                                       eventTracker: self.eventTracker,
-                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue))
+                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue),
+                                      respectSystemProxySettings: self.respectSystemProxySettings)
     let config = self.makeConfig()
 #if canImport(EnvoyCxxSwiftInterop)
     if self.enableSwiftBootstrap {
