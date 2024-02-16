@@ -52,7 +52,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
       if (use_proto) {
         envoy::Cookie cookie;
         cookie.set_address("1.2.3.4:80");
-        cookie.set_expires(1000);
+        // The expiration field is not set in the cookie because TTL is 0 in the config.
         cookie.SerializeToString(&cookie_content);
       } else {
         cookie_content = "1.2.3.4:80";
@@ -176,13 +176,13 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateProtoCookie) {
   EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
   // PROTO format - no "expired field"
-  cookie.set_expires(0);
+  cookie.clear_expires();
   cookie.SerializeToString(&cookie_content);
   request_headers = {{":path", "/path"},
                      {"cookie", "override_host=" + Envoy::Base64::encode(cookie_content.c_str(),
                                                                          cookie_content.length())}};
   session_state = factory.create(request_headers);
-  EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+  EXPECT_EQ("2.3.4.5:80", session_state->upstreamAddress().value());
 
   // PROTO format - pass incorrect format.
   // The content should be treated as "old" style encoding.
