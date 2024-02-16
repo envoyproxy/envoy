@@ -307,6 +307,7 @@ public:
           connection_.detectedCloseType() == Network::DetectedCloseType::LocalReset) {
         rst_disconnected_ = true;
       }
+      std::cout << "CONNECTION CALLBACK DISCONNECTED" << std::endl;
       disconnected_ = true;
     }
   }
