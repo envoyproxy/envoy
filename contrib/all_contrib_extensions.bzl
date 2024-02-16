@@ -28,7 +28,7 @@ PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
 ]
 
-FIPS_SKIP_CONTRIB_TARGETS = [
+FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
 ]
 
