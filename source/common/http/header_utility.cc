@@ -234,7 +234,8 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
-    return (Utility::getResponseStatus(response_headers) >= 100 &&
+  // All 1xx responses from upstream except with 101 status code
+  return (Utility::getResponseStatus(response_headers) >= 100 &&
           Utility::getResponseStatus(response_headers) < 200 &&
           Utility::getResponseStatus(response_headers) != 101);
 }
