@@ -85,9 +85,19 @@ bug_fixes:
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
     received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
     ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: tcp_proxy
+  change: |
+    When tunneling TCP over HTTP, closed the downstream connection (for writing only) when upstream trailers are read
+    to support half close semantics during TCP tunneling.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` to false.
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
+- area: router
+  change: |
+    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
+    controlled by ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
 - area: oauth
   change: |
     The refresh and access tokens are not expired simultaneously so the access token can be updated using
@@ -188,3 +198,7 @@ new_features:
     Added support for the ``ECHO`` command.
 
 deprecated:
+- area: listener
+  change: |
+    deprecated runtime key ``overload.global_downstream_max_connections`` in favor of :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.

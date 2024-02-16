@@ -43,3 +43,17 @@ envoy_objc_library(
         "//test/common/integration:test_server_interface_lib",
     ],
 )
+
+envoy_objc_library(
+    name = "envoy_test_api",
+    testonly = True,
+    srcs = [
+        "EnvoyTestApi.mm",
+    ],
+    hdrs = ["EnvoyTestApi.h"],
+    module_name = "EnvoyTestApi",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//test/common/proxy:test_apple_proxy_settings_lib",
+    ],
+)

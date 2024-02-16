@@ -227,6 +227,7 @@ objc_library(
         "TestExtensions.h",
     ],
     module_name = "TestExtensions",
+    visibility = ["//visibility:public"],
     deps = [
         "@envoy_build_config//:test_extensions_no_autoregister",
     ],
