@@ -212,6 +212,7 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
     std::cout << "QUIC CONNECTION IS NULL IN FILTER MANAGER" << std::endl;
     return;
   }
+  std::cout << "CALLING QUICHE CONNECTION CLOSE" << std::endl;
   quicConnection()->CloseConnection(
       quic::QUIC_NO_ERROR,
       (localCloseReason().empty()

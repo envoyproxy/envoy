@@ -709,7 +709,6 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
     upstream_connection_.reset();
     absl::MutexLock l(&engine_lock_);
     std::string stats = engine_->dumpStats();
-    std::cout << stats << std::endl;
     EXPECT_TRUE((absl::StrContains(
         stats, "http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR: 1")))
         << stats;
