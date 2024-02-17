@@ -707,12 +707,8 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
     ASSERT_TRUE(upstream_connection_->close());
     ASSERT_TRUE(upstream_connection_->waitForDisconnect());
     upstream_connection_.reset();
-    absl::MutexLock l(&engine_lock_);
-    std::string stats = engine_->dumpStats();
     ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", 1));
-    EXPECT_TRUE((absl::StrContains(
-        stats, "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED: 1")))
-        << stats;
+    ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED", 1));
   }
 }
 
