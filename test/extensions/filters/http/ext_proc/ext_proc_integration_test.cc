@@ -2606,6 +2606,12 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadata) {
       sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  EXPECT_EQ(
+      "c",
+      processor_stream_->headers().get(Http::LowerCaseString("b"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "c",
+      processor_stream_->headers().get(Http::LowerCaseString("c"))[0]->value().getStringView());
   handleUpstreamRequest();
 
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
