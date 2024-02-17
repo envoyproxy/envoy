@@ -353,7 +353,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "-c",
             self.slow_config_path,
         )
-        log.info(f"cert path = {IntegrationTest.server_cert}")
+       log.info("Handling certificate information in the test. Certificate path: {IntegrationTest.server_cert}")
         log.info("waiting for envoy ready")
         await _wait_for_envoy_epoch(0)
         log.info("making requests")
