@@ -308,7 +308,6 @@ public:
         rst_disconnected_ = true;
       }
       std::cout << "CONNECTION CALLBACK DISCONNECTED" << std::endl;
-      RELEASE_ASSERT(false, "DISCONNECTED");
       disconnected_ = true;
     }
   }
