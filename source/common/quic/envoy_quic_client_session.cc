@@ -123,7 +123,6 @@ void EnvoyQuicClientSession::connect() {
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
-  std::cout << "ENVOY QUICHE CONNECTION GETTING CLOSED" << std::endl;
   // Latch latest srtt.
   if (OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
@@ -134,7 +133,6 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
     }
   }
   quic::QuicSpdyClientSession::OnConnectionClosed(frame, source);
-  std::cout << "ENVOY QUICHE CONNECTION CLOSE STATS UPDATE" << std::endl;
   quic_stat_names_.chargeQuicConnectionCloseStats(scope_, frame.quic_error_code, source, true);
   onConnectionCloseEvent(frame, source, version());
 }

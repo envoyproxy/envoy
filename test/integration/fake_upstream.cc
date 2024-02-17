@@ -418,7 +418,6 @@ FakeHttpConnection::FakeHttpConnection(
 }
 
 AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
-  std::cout << "FAKE UPSTREAM CLOSE" << std::endl;
   ENVOY_LOG(trace, "FakeConnectionBase close");
   if (!shared_connection_.connected()) {
     return AssertionSuccess();
@@ -532,7 +531,6 @@ AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
     return AssertionFailure() << "Timed out waiting for disconnect.";
   }
   ENVOY_LOG(trace, "FakeConnectionBase done waiting for disconnect");
-  std::cout << "DONE WAITING" << std::endl;
   return AssertionSuccess();
 }
 

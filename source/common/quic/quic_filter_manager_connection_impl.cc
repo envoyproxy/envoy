@@ -72,16 +72,13 @@ bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
-  std::cout << "QUIC CLOSE" << std::endl;
   if (network_connection_ == nullptr) {
     // Already detached from quic connection.
-    std::cout << "DETACHED" << std::endl;
     return;
   }
   if (!initialized_) {
     // Delay close till the first ProcessUdpPacket() call.
     close_type_during_initialize_ = type;
-    std::cout << "UNITIALIZED" << std::endl;
     return;
   }
   const bool delayed_close_timeout_configured = delayed_close_timeout_.count() > 0;
@@ -91,7 +88,6 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
       // timeout.
       if (!inDelayedClose()) {
         // Only set alarm if not in delay close mode yet.
-        std::cout << "DELAYED CLOSE" << std::endl;
         initializeDelayedCloseTimer();
       }
       // Update delay close state according to current call.
@@ -99,7 +95,6 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
       } else {
         ASSERT(type == Network::ConnectionCloseType::FlushWrite);
-        std::cout << "FLUSH WRITE CLOSE";
         delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
       }
     } else {
@@ -119,7 +114,6 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
       }
       delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
     } else {
-      std::cout << "CLOSE IMMEDIATE" << std::endl;
       closeConnectionImmediately();
     }
   }
@@ -209,10 +203,8 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
 
 void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
   if (quicConnection() == nullptr) {
-    std::cout << "QUIC CONNECTION IS NULL IN FILTER MANAGER" << std::endl;
     return;
   }
-  std::cout << "CALLING QUICHE CONNECTION CLOSE" << std::endl;
   quicConnection()->CloseConnection(
       quic::QUIC_NO_ERROR,
       (localCloseReason().empty()
