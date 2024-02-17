@@ -5,8 +5,7 @@ import Foundation
 final class MockEnvoyEngine: NSObject {
   init(runningCallback onEngineRunning: (() -> Void)? = nil,
        logger: ((Int, String) -> Void)? = nil,
-       eventTracker: (([String: String]) -> Void)? = nil, networkMonitoringMode: Int32 = 0,
-       respectSystemProxySettings: Bool = false) {}
+       eventTracker: (([String: String]) -> Void)? = nil, networkMonitoringMode: Int32 = 0) {}
 
   /// Closure called when `run(withConfig:)` is called.
   static var onRunWithConfig: ((_ config: EnvoyConfiguration, _ logLevel: String?) -> Void)?
