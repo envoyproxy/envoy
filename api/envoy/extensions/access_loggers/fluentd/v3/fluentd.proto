@@ -27,14 +27,14 @@ message FluentdAccessLogConfig {
   // The upstream cluster to connect to for streaming the Fluentd messages.
   string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
-  // A tag is a string separated with '.' (e.g. myapp.access) to categorize events.
+  // A tag is a string separated with '.' (e.g. log.type) to categorize events.
   // See: https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
   string tag = 2 [(validate.rules).string = {min_len: 1}];
 
   // The prefix to use when emitting :ref:`statistics <config_access_log_stats>`.
   string stat_prefix = 3 [(validate.rules).string = {min_len: 1}];
 
-  // Interval for flushing access logs to the gRPC stream. Logger will flush requests every time
+  // Interval for flushing access logs to the TCP stream. Logger will flush requests every time
   // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
   // 1 second.
   google.protobuf.Duration buffer_flush_interval = 4 [(validate.rules).duration = {gt {}}];
