@@ -4451,6 +4451,8 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   cleanupUpstreamAndDownstream();
 }
 
+// TODO(alyssawilk) fix windows build before flipping flag.
+#ifndef WIN32
 // A singleton which will fail creation of the Nth socket
 class AllowForceFail : public Api::OsSysCallsImpl {
 public:
@@ -4493,6 +4495,7 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
   cleanupUpstreamAndDownstream();
   fake_upstreams_.clear();
 }
+#endif
 
 TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
