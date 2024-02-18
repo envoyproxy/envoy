@@ -304,7 +304,7 @@ protected:
     return out;
   }
 
-  void setupStreamingRequest(absl::string_view prefix) {
+  MainCommonBase::AdminResponseSharedPtr setupStreamingRequest(absl::string_view prefix) {
     Server::Admin& admin = *main_common_->server()->admin();
     admin.addStreamingHandler(
         std::string(prefix), "streaming api",
@@ -312,13 +312,14 @@ protected:
           return std::make_unique<StreamingAdminRequest>();
         },
         true, false);
+    return main_common_->adminRequest("/stream", "GET");
   }
 
   using ChunksBytes = std::pair<uint64_t, uint64_t>;
-  ChunksBytes adminStreamingRequest(absl::string_view path, absl::string_view method) {
+  ChunksBytes runStreamingRequest(MainCommonBase::AdminResponseSharedPtr response,
+                                  std::function<void()> chunk_hook = nullptr) {
     absl::Notification done;
     std::vector<std::string> out;
-    MainCommonBase::AdminResponsePtr response = main_common_->adminRequest(path, method);
     absl::Notification headers_notify;
     response->getHeaders(
         [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
@@ -337,6 +338,9 @@ protected:
             chunk_notify.Notify();
           });
       chunk_notify.WaitForNotification();
+      if (chunk_hook != nullptr) {
+        chunk_hook();
+      }
     }
 
     return ChunksBytes(num_chunks, num_bytes);
@@ -430,14 +434,82 @@ TEST_P(AdminRequestTest, AdminStreamingRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
 
-  setupStreamingRequest("/stream");
-  ChunksBytes chunks_bytes = adminStreamingRequest("/stream", "GET");
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  ChunksBytes chunks_bytes = runStreamingRequest(response);
   EXPECT_EQ(StreamingAdminRequest::NumChunks, chunks_bytes.first);
   EXPECT_EQ(StreamingAdminRequest::NumChunks * StreamingAdminRequest::BytesPerChunk,
             chunks_bytes.second);
 
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminStreamingQuitDuringChunks) {
+  startEnvoy();
+  started_.WaitForNotification();
+
+  setupStreamingRequest("/stream");
+  int quit_counter = 0;
+  static constexpr int chunks_to_send_before_quitting = 3;
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  ChunksBytes chunks_bytes = runStreamingRequest(response, [&quit_counter, this]() {
+    if (++quit_counter == chunks_to_send_before_quitting) {
+      adminRequest("/quitquitquit", "POST");
+      EXPECT_TRUE(waitForEnvoyToExit());
+    }
+  });
+  EXPECT_EQ(4, chunks_bytes.first);
+  EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
+            chunks_bytes.second);
+}
+
+TEST_P(AdminRequestTest, AdminStreamingCancelDuringChunks) {
+  startEnvoy();
+  started_.WaitForNotification();
+
+  setupStreamingRequest("/stream");
+  int quit_counter = 0;
+  static constexpr int chunks_to_send_before_quitting = 3;
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  ChunksBytes chunks_bytes = runStreamingRequest(response, [response, &quit_counter]() {
+    if (++quit_counter == chunks_to_send_before_quitting) {
+      response->cancel();
+    }
+  });
+  EXPECT_EQ(4, chunks_bytes.first);
+  EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
+            chunks_bytes.second);
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminStreamingCancelBeforeAskingForHeader) {
+  startEnvoy();
+  started_.WaitForNotification();
+
+  setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  response->cancel();
+  int header_calls = 0;
+
+  // After 'cancel', the headers function will not be called.
+  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+  EXPECT_EQ(0, header_calls);
+}
+
+TEST_P(AdminRequestTest, AdminStreamingQuitBeforeHeaders) {
+  startEnvoy();
+  started_.WaitForNotification();
+
+  setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+  ChunksBytes chunks_bytes = runStreamingRequest(response);
+  EXPECT_EQ(1, chunks_bytes.first);
+  EXPECT_EQ(0, chunks_bytes.second);
 }
 
 // no signals on Windows -- could probably make this work with GenerateConsoleCtrlEvent

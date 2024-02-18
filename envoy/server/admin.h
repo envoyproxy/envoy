@@ -282,8 +282,6 @@ public:
    */
   virtual void closeSocket() PURE;
 
-  virtual GenRequestFn createRequestFunction() const PURE;
-
   /**
    * Creates a Request from the request in the admin stream.
    */

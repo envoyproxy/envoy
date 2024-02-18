@@ -34,17 +34,65 @@ public:
   bool run();
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  class AdminResponse {
+  class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
   public:
     virtual ~AdminResponse() = default;
 
+    /**
+     * Requests the headers for the response. This can be called from any
+     * thread, and HeaderFn may also be called from any thread.
+     *
+     * HeadersFn will not be called after cancel(). It is invalid to
+     * to call nextChunk from within HeadersFn -- the caller must trigger
+     * such a call on another thread, after HeadersFn returns. Calling
+     * nextChunk from HeadersFn may deadlock.
+     *
+     * If the server is shut down during the operation, headersFn will
+     * be called with a 503.
+     *
+     * It is a programming error to call getHeaders after calling cancel.
+     *
+     * @param fn The function to be called with the headers and status code.
+     */
     using HeadersFn = std::function<void(Http::Code, Http::ResponseHeaderMap& map)>;
     virtual void getHeaders(HeadersFn fn) PURE;
 
+    /**
+     * Requests a new chunk. This can be called from any thread, and the BodyFn
+     * callback may also be called from any thread. BodyFn will be called in a
+     * loop until the Buffer passed to it is fully drained. When 'false' is
+     * passed as the second arg to BodyFn, that signifies the end of the
+     * response, and nextChunk must not be called again.
+     *
+     * BodyFn will not be called after cancel(). It is invalid to
+     * to call nextChunk from within BodyFn -- the caller must trigger
+     * such a call on another thread, after BodyFn returns. Calling
+     * nextChunk from BodyFn may deadlock.
+     *
+     * If the server is shut down during the operation, bodyFn will
+     * be called with an empty body and 'false' for more_data.
+     *
+     * It is a programming error to call nextChunk after calling cancel.
+     *
+     * @param fn A function to be called on each chunk.
+     */
     using BodyFn = std::function<void(Buffer::Instance&, bool)>;
     virtual void nextChunk(BodyFn fn) PURE;
+
+    /**
+     * Requests that any outstanding callbacks be dropped. This can be called
+     * when the context in which the request is made is destroyed. This can be
+     * useful to allow an application above to register a timeout. The Response
+     * itself is held as a shared_ptr as that makes it much easier to manage
+     * cancellation across multiple threads.
+     */
+    virtual void cancel() PURE;
+
+    // Called when the server is terminated. The response remains
+    // valid after this.
+    virtual void terminate() PURE;
   };
-  using AdminResponsePtr = std::unique_ptr<AdminResponse>;
+  using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 
   using AdminRequestFn =
       std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
@@ -63,7 +111,20 @@ public:
   // semantics, rather than a handler callback.
   void adminRequest(absl::string_view path_and_query, absl::string_view method,
                     const AdminRequestFn& handler);
-  AdminResponsePtr adminRequest(absl::string_view path_and_query, absl::string_view method);
+  AdminResponseSharedPtr adminRequest(absl::string_view path_and_query, absl::string_view method);
+
+  // Called when a streaming response is terminated, either by completing normally
+  // or having the caller call cancel on it. Either way it needs to be removed from
+  // the set that will be used by terminateAdminRequests below.
+  void detachResponse(AdminResponse*);
+
+private:
+  // Called after the server run-loop finishes; any outstanding streaming admin requests
+  // will otherwise hang as the main-thread dispatcher loop will no longer run.
+  void terminateAdminRequests();
+
+  absl::Mutex mutex_;
+  absl::flat_hash_set<AdminResponse*> response_set_ ABSL_GUARDED_BY(mutex_);
 #endif
 };
 
@@ -95,8 +156,8 @@ public:
                     const MainCommonBase::AdminRequestFn& handler) {
     base_.adminRequest(path_and_query, method, handler);
   }
-  MainCommonBase::AdminResponsePtr adminRequest(absl::string_view path_and_query,
-                                                absl::string_view method) {
+  MainCommonBase::AdminResponseSharedPtr adminRequest(absl::string_view path_and_query,
+                                                      absl::string_view method) {
     return base_.adminRequest(path_and_query, method);
   }
 #endif

@@ -40,7 +40,6 @@ public:
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(void, closeSocket, ());
-  MOCK_METHOD(GenRequestFn, createRequestFunction, (), (const));
   MOCK_METHOD(RequestPtr, makeRequest, (AdminStream & admin_stream), (const));
 
   NiceMock<MockConfigTracker> config_tracker_;
