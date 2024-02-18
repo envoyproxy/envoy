@@ -27,7 +27,8 @@ message FluentdAccessLogConfig {
   // The upstream cluster to connect to for streaming the Fluentd messages.
   string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
-  // A string that the messages forwarded to the upstream cluster are tagged with.
+  // A tag is a string separated with '.' (e.g. myapp.access) to categorize events.
+  // See: https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
   string tag = 2 [(validate.rules).string = {min_len: 1}];
 
   // The prefix to use when emitting :ref:`statistics <config_access_log_stats>`.

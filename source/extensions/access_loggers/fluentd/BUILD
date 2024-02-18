@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "substitution_formatter_lib",
     srcs = ["substitution_formatter.cc"],
     hdrs = ["substitution_formatter.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/formatter:substitution_formatter_interface",
         "//source/common/json:json_loader_lib",
@@ -27,7 +26,6 @@ envoy_cc_library(
     external_deps = [
         "msgpack",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         ":substitution_formatter_lib",
         "//envoy/access_log:access_log_interface",
@@ -41,10 +39,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # This is core code for the purposes of testing.
-    extra_visibility = [
-        "//test:__subpackages__",
-    ],
     deps = [
         ":fluentd_access_log_lib",
         ":substitution_formatter_lib",

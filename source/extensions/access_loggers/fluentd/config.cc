@@ -62,8 +62,7 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
 }
 
 ProtobufTypes::MessagePtr FluentdAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{
-      new envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig()};
+  return std::make_unique<envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig>();
 }
 
 std::string FluentdAccessLogFactory::name() const { return "envoy.access_loggers.fluentd"; }
@@ -71,8 +70,8 @@ std::string FluentdAccessLogFactory::name() const { return "envoy.access_loggers
 /**
  * Static registration for the fluentd access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(FluentdAccessLogFactory, AccessLog::AccessLogInstanceFactory,
-                        "envoy.fluentd_access_log");
+REGISTER_FACTORY(FluentdAccessLogFactory,
+                 AccessLog::AccessLogInstanceFactory){"envoy.fluentd_access_log"};
 
 } // namespace Fluentd
 } // namespace AccessLoggers
