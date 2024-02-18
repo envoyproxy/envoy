@@ -642,22 +642,34 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
       break;
     }
 
-    switch (static_cast<OpCodes>(opcode.value())) {
+    const auto op = static_cast<OpCodes>(opcode.value());
+    switch (op) {
     case OpCodes::Create:
-      status = parseCreateRequest(data, offset, len, OpCodes::Create);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::Create);
+    case OpCodes::Create2:
+    case OpCodes::CreateContainer:
+    case OpCodes::CreateTtl:
+      status = parseCreateRequest(data, offset, len, op);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     case OpCodes::SetData:
       status = parseSetRequest(data, offset, len);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::SetData);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     case OpCodes::Check:
       status = parseCheckRequest(data, offset, len);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::Check);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     case OpCodes::Delete:
       status = parseDeleteRequest(data, offset, len);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::Delete);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
+      break;
+    case OpCodes::GetChildren:
+      status = parseGetChildrenRequest(data, offset, len, false);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
+      break;
+    case OpCodes::GetData:
+      status = parseGetDataRequest(data, offset, len);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     default:
       callbacks_.onDecodeError(absl::nullopt);
