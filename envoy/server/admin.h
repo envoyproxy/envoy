@@ -283,7 +283,7 @@ public:
   virtual void closeSocket() PURE;
 
   /**
-   * Creates a Request from the request in the admin stream.
+   * Creates a streaming request context from the url path in the admin stream.
    */
   virtual RequestPtr makeRequest(AdminStream& admin_stream) const PURE;
 };

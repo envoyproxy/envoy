@@ -60,13 +60,16 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                        std::move(process_context), createFunction()) {}
 
 bool MainCommonBase::run() {
-  // Avoid returning from cases due to gcc warnings and uncovered lines.
+  // Avoid returning from inside switch cases to minimize uncovered lines
+  // while avoid gcc warnings by hitting the final return.
   bool ret = true;
 
   switch (options_.mode()) {
   case Server::Mode::Serve:
     runServer();
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     terminateAdminRequests();
+#endif
     break;
   case Server::Mode::Validate:
     ret = Server::validateConfig(
