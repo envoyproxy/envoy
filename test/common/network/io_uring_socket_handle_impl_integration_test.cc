@@ -23,14 +23,7 @@ public:
 
   void SetUp() override {
     if (should_skip_) {
-      std::string version;
-      std::ifstream file("/proc/version");
-      if (file.is_open()) {
-        std::getline(file, version);
-        file.close();
-      }
-      GTEST_SKIP_(fmt::format("Kernel 5.6 is required to use io_uring. Your kernel is {}.", version)
-                      .c_str());
+      GTEST_SKIP();
     }
   }
 
