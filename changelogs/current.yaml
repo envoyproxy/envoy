@@ -57,6 +57,11 @@ bug_fixes:
     Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
     a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.edf_lb_locality_scheduler_init_fix`` to false.
+- area: load balancing
+  change: |
+    Added randomization in host load-balancing initialization. This helps desynchronizing Envoys across
+    a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.edf_lb_host_scheduler_init_fix`` to false.
 - area: UDP and TCP tunneling
   change: |
     fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
