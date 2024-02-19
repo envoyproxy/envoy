@@ -9,12 +9,9 @@ bool isIoUringSupported() {
   struct io_uring_params p {};
   struct io_uring ring;
 
-  int ret = io_uring_queue_init_params(2, &ring, &p);
-  bool is_supported = ret == 0;
+  bool is_supported = io_uring_queue_init_params(2, &ring, &p) == 0;
   if (is_supported) {
     io_uring_queue_exit(&ring);
-  } else {
-    printf("Failed to initialize io_uring, errno %d\n", ret);
   }
 
   return is_supported;
