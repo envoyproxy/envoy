@@ -34,10 +34,10 @@ public:
   bool run();
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  // Holds context for a streaming response from the admin system, enablimg
+  // Holds context for a streaming response from the admin system, enabling
   // flow-control into another system. This is particularly important when the
   // generated response is very large, such that holding it in memory may cause
-  // fragmention or out-of-memory failures. It is possible to interleave xDS
+  // fragmentation or out-of-memory failures. It is possible to interleave xDS
   // response handling, overload management, and other admin requests during the
   // streaming of a long admin response.
   //
@@ -102,7 +102,7 @@ public:
      */
     virtual void cancel() PURE;
 
-   private:
+  private:
     friend class MainCommonBase;
 
     /**
