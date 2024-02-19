@@ -45,23 +45,6 @@ const std::string& outOfMemoryPattern() {
 }
 #endif
 
-class StreamingAdminRequest : public Envoy::Server::Admin::Request {
-public:
-  static constexpr uint64_t NumChunks = 10;
-  static constexpr uint64_t BytesPerChunk = 10000;
-
-  StreamingAdminRequest() : chunk_(BytesPerChunk, 'a') {}
-  Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
-  bool nextChunk(Buffer::Instance& response) override {
-    response.add(chunk_);
-    return --chunks_remaining_ > 0;
-  }
-
-private:
-  const std::string chunk_;
-  uint64_t chunks_remaining_{NumChunks};
-};
-
 } // namespace
 
 /**
@@ -240,6 +223,16 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 #endif
 }
 
+// Verifies that the Logger::Registry is usable after constructing and
+// destructing MainCommon.
+TEST_P(MainCommonTest, ConstructDestructLogger) {
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+
+  const std::string logger_name = "logger";
+  spdlog::details::log_msg log_msg(logger_name, spdlog::level::level_enum::err, "error");
+  Logger::Registry::getSink()->log(log_msg);
+}
+
 // Test that std::set_new_handler() was called and the callback functions as expected.
 // This test fails under TSAN and ASAN, so don't run it in that build:
 //   [  DEATH   ] ==845==ERROR: ThreadSanitizer: requested allocation size 0x3e800000000
@@ -304,48 +297,6 @@ protected:
     return out;
   }
 
-  MainCommonBase::AdminResponseSharedPtr setupStreamingRequest(absl::string_view prefix) {
-    Server::Admin& admin = *main_common_->server()->admin();
-    admin.addStreamingHandler(
-        std::string(prefix), "streaming api",
-        [](Server::AdminStream&) -> Server::Admin::RequestPtr {
-          return std::make_unique<StreamingAdminRequest>();
-        },
-        true, false);
-    return main_common_->adminRequest("/stream", "GET");
-  }
-
-  using ChunksBytes = std::pair<uint64_t, uint64_t>;
-  ChunksBytes runStreamingRequest(MainCommonBase::AdminResponseSharedPtr response,
-                                  std::function<void()> chunk_hook = nullptr) {
-    absl::Notification done;
-    std::vector<std::string> out;
-    absl::Notification headers_notify;
-    response->getHeaders(
-        [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
-    headers_notify.WaitForNotification();
-    bool cont = true;
-    uint64_t num_chunks = 0;
-    uint64_t num_bytes = 0;
-    while (cont) {
-      absl::Notification chunk_notify;
-      response->nextChunk(
-          [&chunk_notify, &num_chunks, &num_bytes, &cont](Buffer::Instance& chunk, bool more) {
-            cont = more;
-            num_bytes += chunk.length();
-            chunk.drain(chunk.length());
-            ++num_chunks;
-            chunk_notify.Notify();
-          });
-      chunk_notify.WaitForNotification();
-      if (chunk_hook != nullptr) {
-        chunk_hook();
-      }
-    }
-
-    return ChunksBytes(num_chunks, num_bytes);
-  }
-
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
     envoy_thread_ = Thread::threadFactoryForTest().createThread([this]() {
@@ -405,6 +356,11 @@ protected:
     return envoy_return_;
   }
 
+  void quitAndWait() {
+    adminRequest("/quitquitquit", "POST");
+    EXPECT_TRUE(waitForEnvoyToExit());
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
@@ -426,90 +382,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
-  adminRequest("/quitquitquit", "POST");
-  EXPECT_TRUE(waitForEnvoyToExit());
-}
-
-TEST_P(AdminRequestTest, AdminStreamingRequestGetStatsAndQuit) {
-  startEnvoy();
-  started_.WaitForNotification();
-
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
-  ChunksBytes chunks_bytes = runStreamingRequest(response);
-  EXPECT_EQ(StreamingAdminRequest::NumChunks, chunks_bytes.first);
-  EXPECT_EQ(StreamingAdminRequest::NumChunks * StreamingAdminRequest::BytesPerChunk,
-            chunks_bytes.second);
-
-  adminRequest("/quitquitquit", "POST");
-  EXPECT_TRUE(waitForEnvoyToExit());
-}
-
-TEST_P(AdminRequestTest, AdminStreamingQuitDuringChunks) {
-  startEnvoy();
-  started_.WaitForNotification();
-
-  setupStreamingRequest("/stream");
-  int quit_counter = 0;
-  static constexpr int chunks_to_send_before_quitting = 3;
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
-  ChunksBytes chunks_bytes = runStreamingRequest(response, [&quit_counter, this]() {
-    if (++quit_counter == chunks_to_send_before_quitting) {
-      adminRequest("/quitquitquit", "POST");
-      EXPECT_TRUE(waitForEnvoyToExit());
-    }
-  });
-  EXPECT_EQ(4, chunks_bytes.first);
-  EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
-            chunks_bytes.second);
-}
-
-TEST_P(AdminRequestTest, AdminStreamingCancelDuringChunks) {
-  startEnvoy();
-  started_.WaitForNotification();
-
-  setupStreamingRequest("/stream");
-  int quit_counter = 0;
-  static constexpr int chunks_to_send_before_quitting = 3;
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
-  ChunksBytes chunks_bytes = runStreamingRequest(response, [response, &quit_counter]() {
-    if (++quit_counter == chunks_to_send_before_quitting) {
-      response->cancel();
-    }
-  });
-  EXPECT_EQ(4, chunks_bytes.first);
-  EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
-            chunks_bytes.second);
-  adminRequest("/quitquitquit", "POST");
-  EXPECT_TRUE(waitForEnvoyToExit());
-}
-
-TEST_P(AdminRequestTest, AdminStreamingCancelBeforeAskingForHeader) {
-  startEnvoy();
-  started_.WaitForNotification();
-
-  setupStreamingRequest("/stream");
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
-  response->cancel();
-  int header_calls = 0;
-
-  // After 'cancel', the headers function will not be called.
-  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
-  adminRequest("/quitquitquit", "POST");
-  EXPECT_TRUE(waitForEnvoyToExit());
-  EXPECT_EQ(0, header_calls);
-}
-
-TEST_P(AdminRequestTest, AdminStreamingQuitBeforeHeaders) {
-  startEnvoy();
-  started_.WaitForNotification();
-
-  setupStreamingRequest("/stream");
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
-  adminRequest("/quitquitquit", "POST");
-  EXPECT_TRUE(waitForEnvoyToExit());
-  ChunksBytes chunks_bytes = runStreamingRequest(response);
-  EXPECT_EQ(1, chunks_bytes.first);
-  EXPECT_EQ(0, chunks_bytes.second);
+  quitAndWait();
 }
 
 // no signals on Windows -- could probably make this work with GenerateConsoleCtrlEvent
@@ -600,8 +473,7 @@ TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
 
   // We don't get a notification when run(), so it's not safe to check whether the
   // admin handler is called until after we quit.
-  adminRequest("/quitquitquit", "POST");
-  EXPECT_TRUE(waitForEnvoyToExit());
+  quitAndWait();
   EXPECT_TRUE(admin_handler_was_called);
 
   // This just checks that some stat output was reported. We could pick any stat.
@@ -656,14 +528,139 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_EQ(1, lambda_destroy_count);
 }
 
-// Verifies that the Logger::Registry is usable after constructing and
-// destructing MainCommon.
-TEST_P(MainCommonTest, ConstructDestructLogger) {
-  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+class AdminStreamingTest : public AdminRequestTest {
+protected:
+  class StreamingAdminRequest : public Envoy::Server::Admin::Request {
+  public:
+    static constexpr uint64_t NumChunks = 10;
+    static constexpr uint64_t BytesPerChunk = 10000;
 
-  const std::string logger_name = "logger";
-  spdlog::details::log_msg log_msg(logger_name, spdlog::level::level_enum::err, "error");
-  Logger::Registry::getSink()->log(log_msg);
+    StreamingAdminRequest() : chunk_(BytesPerChunk, 'a') {}
+    Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
+    bool nextChunk(Buffer::Instance& response) override {
+      response.add(chunk_);
+      return --chunks_remaining_ > 0;
+    }
+
+  private:
+    const std::string chunk_;
+    uint64_t chunks_remaining_{NumChunks};
+  };
+
+  MainCommonBase::AdminResponseSharedPtr setupStreamingRequest(absl::string_view prefix) {
+    startEnvoy();
+    started_.WaitForNotification();
+    Server::Admin& admin = *main_common_->server()->admin();
+    admin.addStreamingHandler(
+        std::string(prefix), "streaming api",
+        [](Server::AdminStream&) -> Server::Admin::RequestPtr {
+          return std::make_unique<StreamingAdminRequest>();
+        },
+        true, false);
+    return main_common_->adminRequest(prefix, "GET");
+  }
+
+  using ChunksBytes = std::pair<uint64_t, uint64_t>;
+  ChunksBytes runStreamingRequest(MainCommonBase::AdminResponseSharedPtr response,
+                                  std::function<void()> chunk_hook = nullptr) {
+    absl::Notification done;
+    std::vector<std::string> out;
+    absl::Notification headers_notify;
+    response->getHeaders(
+        [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
+    headers_notify.WaitForNotification();
+    bool cont = true;
+    uint64_t num_chunks = 0;
+    uint64_t num_bytes = 0;
+    while (cont) {
+      absl::Notification chunk_notify;
+      response->nextChunk(
+          [&chunk_notify, &num_chunks, &num_bytes, &cont](Buffer::Instance& chunk, bool more) {
+            cont = more;
+            num_bytes += chunk.length();
+            chunk.drain(chunk.length());
+            ++num_chunks;
+            chunk_notify.Notify();
+          });
+      chunk_notify.WaitForNotification();
+      if (chunk_hook != nullptr) {
+        chunk_hook();
+      }
+    }
+
+    return ChunksBytes(num_chunks, num_bytes);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStreamingTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(AdminStreamingTest, AdminStreamingRequestGetStatsAndQuit) {
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  ChunksBytes chunks_bytes = runStreamingRequest(response);
+  EXPECT_EQ(StreamingAdminRequest::NumChunks, chunks_bytes.first);
+  EXPECT_EQ(StreamingAdminRequest::NumChunks * StreamingAdminRequest::BytesPerChunk,
+            chunks_bytes.second);
+  quitAndWait();
+}
+
+TEST_P(AdminStreamingTest, AdminStreamingQuitDuringChunks) {
+  int quit_counter = 0;
+  static constexpr int chunks_to_send_before_quitting = 3;
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  ChunksBytes chunks_bytes = runStreamingRequest(response, [&quit_counter, this]() {
+    if (++quit_counter == chunks_to_send_before_quitting) {
+      quitAndWait();
+    }
+  });
+  EXPECT_EQ(4, chunks_bytes.first);
+  EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
+            chunks_bytes.second);
+}
+
+TEST_P(AdminStreamingTest, AdminStreamingCancelDuringChunks) {
+  int quit_counter = 0;
+  static constexpr int chunks_to_send_before_quitting = 3;
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  ChunksBytes chunks_bytes = runStreamingRequest(response, [response, &quit_counter]() {
+    if (++quit_counter == chunks_to_send_before_quitting) {
+      response->cancel();
+    }
+  });
+  EXPECT_EQ(4, chunks_bytes.first);
+  EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
+            chunks_bytes.second);
+  quitAndWait();
+}
+
+TEST_P(AdminStreamingTest, AdminStreamingCancelBeforeAskingForHeader) {
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  response->cancel();
+  int header_calls = 0;
+
+  // After 'cancel', the headers function will not be called.
+  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+  quitAndWait();
+  EXPECT_EQ(0, header_calls);
+}
+
+TEST_P(AdminStreamingTest, AdminStreamingQuitBeforeHeaders) {
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  quitAndWait();
+  ChunksBytes chunks_bytes = runStreamingRequest(response);
+  EXPECT_EQ(1, chunks_bytes.first);
+  EXPECT_EQ(0, chunks_bytes.second);
+}
+
+TEST_P(AdminStreamingTest, QuitTerminateRace) {
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  // Initiates a streaming quit on the main thread, but do not wait for it.
+  MainCommonBase::AdminResponseSharedPtr quit_response =
+      main_common_->adminRequest("/quitquitquit", "POST");
+  quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
+  response.reset(); // Races with the quitquitquit
+  EXPECT_TRUE(waitForEnvoyToExit());
 }
 
 } // namespace Envoy

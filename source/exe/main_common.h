@@ -146,6 +146,7 @@ private:
 
   absl::Mutex mutex_;
   absl::flat_hash_set<AdminResponse*> response_set_ ABSL_GUARDED_BY(mutex_);
+  bool accepting_admin_requests_ ABSL_GUARDED_BY(mutex_) = true;
 #endif
 };
 

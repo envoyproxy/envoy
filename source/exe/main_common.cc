@@ -200,11 +200,16 @@ public:
   void terminate() override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
 
+    // To handle a potential race of Envoy terminate() destruction, we set
+    // detaching_ first in the destructor and check here to avoid writing to the
+    // object as it is being destroyed. If terminate() locks first, the
+    // destructor will block on it and then early exit. If the destructor hits
+    // during the loop in terminateAdminRequests, it will first set
+    // detaching_=true, and then call MainCommonBase::detachResponse which will
+    // acquire MainCommonBase::mutex_, held by terminateAdminRequests. This
+    // will allow the loop to complete cleanly before detachResponse attempts
+    // to mutate the set.
     absl::MutexLock lock(&mutex_);
-
-    // If the Envoy server termination races with destruction, we set detaching_
-    // first in the destructor and check here to avoid writing to the object as
-    // it is being destroyed.
     if (detaching_) {
       return;
     }
@@ -309,6 +314,7 @@ void MainCommonBase::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   absl::MutexLock lock(&mutex_);
+  accepting_admin_requests_ = false;
   for (AdminResponse* response : response_set_) {
     // Consider the possibility of response being deleted due to its creator
     // dropping its last reference right here. From its destructor it will call
@@ -316,11 +322,17 @@ void MainCommonBase::terminateAdminRequests() {
     // memory becomes invalid, the call to terminate will complete.
     response->terminate();
   }
+  response_set_.clear();
 }
 
 void MainCommonBase::detachResponse(AdminResponse* response) {
   absl::MutexLock lock(&mutex_);
-  response_set_.erase(response);
+
+  // In a race between ~AdminResponseImpl and terminateAdminRequests,
+  // the response_set_ may already have been cleared and the erasure
+  // below will not have any effect; this is OK.
+  int erased = response_set_.erase(response);
+  ASSERT(erased == 1 || !accepting_admin_requests_);
 }
 
 MainCommonBase::AdminResponseSharedPtr
@@ -329,7 +341,11 @@ MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view
       *server(), path_and_query, method,
       [this](AdminResponse* response) { detachResponse(response); });
   absl::MutexLock lock(&mutex_);
-  response_set_.insert(response.get());
+  if (accepting_admin_requests_) {
+    response_set_.insert(response.get());
+  } else {
+    response->terminate();
+  }
   return response;
 }
 #endif
