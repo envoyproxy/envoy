@@ -14,7 +14,8 @@ namespace Ssl {
 namespace {
 std::vector<uint8_t> readOcspStaple(const envoy::config::core::v3::DataSource& source,
                                     Api::Api& api) {
-  std::string staple = Config::DataSource::read(source, true, api);
+  std::string staple =
+      THROW_OR_RETURN_VALUE(Config::DataSource::read(source, true, api), std::string);
   if (source.specifier_case() ==
       envoy::config::core::v3::DataSource::SpecifierCase::kInlineString) {
     throwEnvoyExceptionOrPanic("OCSP staple cannot be provided via inline_string");
@@ -29,17 +30,21 @@ static const std::string INLINE_STRING = "<inline>";
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api)
-    : certificate_chain_(Config::DataSource::read(config.certificate_chain(), true, api)),
+    : certificate_chain_(THROW_OR_RETURN_VALUE(
+          Config::DataSource::read(config.certificate_chain(), true, api), std::string)),
       certificate_chain_path_(
           Config::DataSource::getPath(config.certificate_chain())
               .value_or(certificate_chain_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      private_key_(Config::DataSource::read(config.private_key(), true, api)),
+      private_key_(THROW_OR_RETURN_VALUE(Config::DataSource::read(config.private_key(), true, api),
+                                         std::string)),
       private_key_path_(Config::DataSource::getPath(config.private_key())
                             .value_or(private_key_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      pkcs12_(Config::DataSource::read(config.pkcs12(), true, api)),
+      pkcs12_(
+          THROW_OR_RETURN_VALUE(Config::DataSource::read(config.pkcs12(), true, api), std::string)),
       pkcs12_path_(Config::DataSource::getPath(config.pkcs12())
                        .value_or(pkcs12_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      password_(Config::DataSource::read(config.password(), true, api)),
+      password_(THROW_OR_RETURN_VALUE(Config::DataSource::read(config.password(), true, api),
+                                      std::string)),
       password_path_(Config::DataSource::getPath(config.password())
                          .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)),
       ocsp_staple_(readOcspStaple(config.ocsp_staple(), api)),

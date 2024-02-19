@@ -98,9 +98,9 @@ public:
                              Tracing::Decision tracing_decision) override;
 
 private:
-  datadog::tracing::Span extract_or_create_span(datadog::tracing::Tracer& tracer,
-                                                const datadog::tracing::SpanConfig& span_config,
-                                                const datadog::tracing::DictReader& reader);
+  datadog::tracing::Span extractOrCreateSpan(datadog::tracing::Tracer& tracer,
+                                             const datadog::tracing::SpanConfig& span_config,
+                                             const datadog::tracing::DictReader& reader);
 
   TracerStats tracer_stats_;
   ThreadLocal::TypedSlotPtr<ThreadLocalTracer> thread_local_slot_;
