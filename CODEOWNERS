@@ -249,9 +249,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/common/rbac @yangminzhu @yanavlasov
 # tap
-/*/extensions/filters/http/tap @mattklein123 @daixiang0
-/*/extensions/common/tap @mattklein123 @daixiang0
-/*/extensions/transport_sockets/tap @mattklein123 @daixiang0
+/*/extensions/filters/http/tap @mattklein123 @xu1zhou
+/*/extensions/common/tap @mattklein123 @xu1zhou
+/*/extensions/transport_sockets/tap @mattklein123 @xu1zhou
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
