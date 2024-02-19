@@ -43,6 +43,10 @@ minor_behavior_changes:
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
     grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
     xDS region will take preference. aws_request_signer documentation now reflects the region chain.
+- area: http
+  change: |
+    Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
+    previously used HTTP/1 parser).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
