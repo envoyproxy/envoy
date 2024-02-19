@@ -129,8 +129,6 @@ public:
     // to call terminate, so we'll track that here and skip calling
     // cleanup_ in that case.
     if (!terminated_) {
-      detaching_ = true;
-
       // If there is a terminate/destruct race, calling cleanup_ below
       // will lock MainCommonBase::mutex_, which is being held by
       // terminateAdminRequests, so will block here until all the
@@ -199,20 +197,7 @@ public:
   // resulting in 503 and an empty body.
   void terminate() override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
-
-    // To handle a potential race of Envoy terminate() destruction, we set
-    // detaching_ first in the destructor and check here to avoid writing to the
-    // object as it is being destroyed. If terminate() locks first, the
-    // destructor will block on it and then early exit. If the destructor hits
-    // during the loop in terminateAdminRequests, it will first set
-    // detaching_=true, and then call MainCommonBase::detachResponse which will
-    // acquire MainCommonBase::mutex_, held by terminateAdminRequests. This
-    // will allow the loop to complete cleanly before detachResponse attempts
-    // to mutate the set.
     absl::MutexLock lock(&mutex_);
-    if (detaching_) {
-      return;
-    }
     terminated_ = true;
     sendErrorLockHeld();
     sendAbortChunkLockHeld();
@@ -296,13 +281,19 @@ private:
   // callbacks are never called after cancel().
   bool cancelled_ ABSL_GUARDED_BY(mutex_) = false;
 
-  // True if the Envoy server has stopped running its main loop. Headers
-  // and boxy callbacks are called after this.
+  // True if the Envoy server has stopped running its main loop. Headers and
+  // body requests can be initiated and called back are called after terminate,
+  // so callers do not have to special case this -- the request will simply fail
+  // with an empty response.
   bool terminated_ ABSL_GUARDED_BY(mutex_) = false;
-  bool detaching_ ABSL_GUARDED_BY(mutex_) = false;
 
-  // bool sent_headers_ ABSL_GUARDED_BY(mutex_) = false;
+  // Used to indicate whether the body function has been called with false
+  // as its second argument. That must always happen at most once, even
+  // if terminate races with the normal end-of-stream marker. more=false
+  // may never be sent if the request is cancelled, nor deleted prior to
+  // it being requested.
   bool sent_end_stream_ ABSL_GUARDED_BY(mutex_) = false;
+
   HeadersFn headers_fn_ ABSL_GUARDED_BY(mutex_);
   BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
   absl::Mutex mutex_;
@@ -327,12 +318,14 @@ void MainCommonBase::terminateAdminRequests() {
 
 void MainCommonBase::detachResponse(AdminResponse* response) {
   absl::MutexLock lock(&mutex_);
-
-  // In a race between ~AdminResponseImpl and terminateAdminRequests,
-  // the response_set_ may already have been cleared and the erasure
-  // below will not have any effect; this is OK.
   int erased = response_set_.erase(response);
-  ASSERT(erased == 1 || !accepting_admin_requests_);
+  ASSERT(erased == 1);
+
+  // We cannot be detaching a response after we've stopped
+  // admitting new requests. Once we have terminated the
+  // active requests, they won't call back to detachResponse.
+  // See the terminated_ check in the destructor.
+  ASSERT(accepting_admin_requests_);
 }
 
 MainCommonBase::AdminResponseSharedPtr

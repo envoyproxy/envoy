@@ -530,6 +530,8 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
 
 class AdminStreamingTest : public AdminRequestTest {
 protected:
+  static constexpr absl::string_view StreamingEndpoint = "/stream";
+
   class StreamingAdminRequest : public Envoy::Server::Admin::Request {
   public:
     static constexpr uint64_t NumChunks = 10;
@@ -547,17 +549,16 @@ protected:
     uint64_t chunks_remaining_{NumChunks};
   };
 
-  MainCommonBase::AdminResponseSharedPtr setupStreamingRequest(absl::string_view prefix) {
+  AdminStreamingTest() {
     startEnvoy();
     started_.WaitForNotification();
     Server::Admin& admin = *main_common_->server()->admin();
     admin.addStreamingHandler(
-        std::string(prefix), "streaming api",
+        std::string(StreamingEndpoint), "streaming api",
         [](Server::AdminStream&) -> Server::Admin::RequestPtr {
           return std::make_unique<StreamingAdminRequest>();
         },
         true, false);
-    return main_common_->adminRequest(prefix, "GET");
   }
 
   using ChunksBytes = std::pair<uint64_t, uint64_t>;
@@ -597,7 +598,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStreamingTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStreamingTest, AdminStreamingRequestGetStatsAndQuit) {
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
   ChunksBytes chunks_bytes = runStreamingRequest(response);
   EXPECT_EQ(StreamingAdminRequest::NumChunks, chunks_bytes.first);
   EXPECT_EQ(StreamingAdminRequest::NumChunks * StreamingAdminRequest::BytesPerChunk,
@@ -608,7 +610,8 @@ TEST_P(AdminStreamingTest, AdminStreamingRequestGetStatsAndQuit) {
 TEST_P(AdminStreamingTest, AdminStreamingQuitDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
   ChunksBytes chunks_bytes = runStreamingRequest(response, [&quit_counter, this]() {
     if (++quit_counter == chunks_to_send_before_quitting) {
       quitAndWait();
@@ -622,7 +625,8 @@ TEST_P(AdminStreamingTest, AdminStreamingQuitDuringChunks) {
 TEST_P(AdminStreamingTest, AdminStreamingCancelDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
   ChunksBytes chunks_bytes = runStreamingRequest(response, [response, &quit_counter]() {
     if (++quit_counter == chunks_to_send_before_quitting) {
       response->cancel();
@@ -635,7 +639,8 @@ TEST_P(AdminStreamingTest, AdminStreamingCancelDuringChunks) {
 }
 
 TEST_P(AdminStreamingTest, AdminStreamingCancelBeforeAskingForHeader) {
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
   response->cancel();
   int header_calls = 0;
 
@@ -646,7 +651,8 @@ TEST_P(AdminStreamingTest, AdminStreamingCancelBeforeAskingForHeader) {
 }
 
 TEST_P(AdminStreamingTest, AdminStreamingQuitBeforeHeaders) {
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
   quitAndWait();
   ChunksBytes chunks_bytes = runStreamingRequest(response);
   EXPECT_EQ(1, chunks_bytes.first);
@@ -654,7 +660,8 @@ TEST_P(AdminStreamingTest, AdminStreamingQuitBeforeHeaders) {
 }
 
 TEST_P(AdminStreamingTest, QuitDeleteRace) {
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
   // Initiates a streaming quit on the main thread, but do not wait for it.
   MainCommonBase::AdminResponseSharedPtr quit_response =
       main_common_->adminRequest("/quitquitquit", "POST");
@@ -664,13 +671,32 @@ TEST_P(AdminStreamingTest, QuitDeleteRace) {
 }
 
 TEST_P(AdminStreamingTest, QuitCancelRace) {
-  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
   // Initiates a streaming quit on the main thread, but do not wait for it.
   MainCommonBase::AdminResponseSharedPtr quit_response =
       main_common_->adminRequest("/quitquitquit", "POST");
   quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
   response->cancel(); // Races with the quitquitquit
   EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminStreamingTest, QuitBeforeCreatingResponse) {
+  // Initiates a streaming quit on the main thread, and wait for headers, which
+  // will trigger the termination of the event loop, and subsequent nulling of
+  // main_common_. However we can pause the test infrastructure after the quit
+  // takes hold leaving main_common_ in tact, to reproduce a potential race.
+  pause_after_run_ = true;
+  adminRequest("/quitquitquit", "POST");
+  pause_point_.WaitForNotification(); // run() finished, but main_common_ still exists.
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
+  ChunksBytes chunks_bytes = runStreamingRequest(response);
+  EXPECT_EQ(1, chunks_bytes.first);
+  EXPECT_EQ(0, chunks_bytes.second);
+  resume_.Notify();
+  EXPECT_TRUE(waitForEnvoyToExit());
+  response.reset();
 }
 
 } // namespace Envoy
