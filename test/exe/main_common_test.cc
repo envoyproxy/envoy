@@ -653,13 +653,23 @@ TEST_P(AdminStreamingTest, AdminStreamingQuitBeforeHeaders) {
   EXPECT_EQ(0, chunks_bytes.second);
 }
 
-TEST_P(AdminStreamingTest, QuitTerminateRace) {
+TEST_P(AdminStreamingTest, QuitDeleteRace) {
   MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
   // Initiates a streaming quit on the main thread, but do not wait for it.
   MainCommonBase::AdminResponseSharedPtr quit_response =
       main_common_->adminRequest("/quitquitquit", "POST");
   quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
   response.reset(); // Races with the quitquitquit
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminStreamingTest, QuitCancelRace) {
+  MainCommonBase::AdminResponseSharedPtr response = setupStreamingRequest("/stream");
+  // Initiates a streaming quit on the main thread, but do not wait for it.
+  MainCommonBase::AdminResponseSharedPtr quit_response =
+      main_common_->adminRequest("/quitquitquit", "POST");
+  quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
+  response->cancel(); // Races with the quitquitquit
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
