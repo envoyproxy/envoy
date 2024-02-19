@@ -40,6 +40,9 @@
 namespace Envoy {
 namespace TcpProxy {
 
+constexpr absl::string_view PerConnectionIdleTimeoutMs =
+    "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+
 /**
  * All tcp proxy stats. @see stats_macros.h
  */
@@ -656,6 +659,7 @@ protected:
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
@@ -670,6 +674,7 @@ public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
           Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
+          absl::optional<std::chrono::milliseconds> idle_timeout,
           const Upstream::HostDescriptionConstSharedPtr& upstream_host);
 
   void onEvent(Network::ConnectionEvent event);
@@ -683,7 +688,8 @@ private:
   UpstreamDrainManager& parent_;
   std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  Event::TimerPtr timer_;
+  Event::TimerPtr idle_timer_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Config::SharedConfigSharedPtr config_;
 };
@@ -696,7 +702,7 @@ public:
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-           Event::TimerPtr&& idle_timer,
+           Event::TimerPtr&& idle_timer, absl::optional<std::chrono::milliseconds> idle_timeout,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host);
   void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 

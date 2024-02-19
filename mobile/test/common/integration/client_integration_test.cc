@@ -939,10 +939,8 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1, false);
   upstream_request_->encodeResetStream();
-  if (getCodecType() != Http::CodecType::HTTP3) {
-    // Make sure the headers are sent up.
-    headers_callback.waitReady();
-  }
+  // Make sure the headers are sent up.
+  headers_callback.waitReady();
 
   // Encoding data should not be problematic.
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -1021,6 +1019,14 @@ TEST_P(ClientIntegrationTest, TestStats) {
     EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
   }
 }
+
+#if defined(__APPLE__)
+TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
+  builder_.respectSystemProxySettings(true);
+  initialize();
+  ASSERT_TRUE(Envoy::Api::External::retrieveApi("envoy_proxy_resolver") != nullptr);
+}
+#endif
 
 } // namespace
 } // namespace Envoy

@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
@@ -9,11 +10,9 @@ import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 class SetLoggerTest {
-
   init {
     JniLibrary.loadTestLibrary()
   }

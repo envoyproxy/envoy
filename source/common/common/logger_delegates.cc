@@ -12,8 +12,11 @@ namespace Logger {
 FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
                                    AccessLog::AccessLogManager& log_manager,
                                    DelegatingLogSinkSharedPtr log_sink)
-    : SinkDelegate(log_sink), log_file_(log_manager.createAccessLog(Filesystem::FilePathAndType{
-                                  Filesystem::DestinationType::File, log_path})) {
+    : SinkDelegate(log_sink) {
+  auto file_or_error = log_manager.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, log_path});
+  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  log_file_ = file_or_error.value();
   setDelegate();
 }
 

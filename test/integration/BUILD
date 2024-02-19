@@ -11,6 +11,7 @@ load(
     "envoy_select_enable_http3",
     "envoy_select_enable_yaml",
     "envoy_select_envoy_mobile_listener",
+    "envoy_select_linkstatic",
     "envoy_sh_test",
 )
 
@@ -82,6 +83,7 @@ envoy_cc_test(
     name = "alpn_integration_test",
     size = "large",
     srcs = ["alpn_integration_test.cc"],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -363,6 +365,7 @@ envoy_cc_test_binary(
     external_deps = [
         "abseil_symbolize",
     ],
+    linkstatic = envoy_select_linkstatic(),
     deps = [
         "//source/exe:main_common_lib",
         "//source/exe:platform_impl_lib",
