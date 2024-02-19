@@ -134,9 +134,10 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
 // https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 //
 RegionProviderChain::RegionProviderChain() {
-  add(createEnvironmentRegionProvider());
-  add(createAWSCredentialsFileRegionProvider());
-  add(createAWSConfigFileRegionProvider());
+  // TODO(nbaws): Verify that bypassing virtual dispatch here was intentional
+  add(RegionProviderChain::createEnvironmentRegionProvider());
+  add(RegionProviderChain::createAWSCredentialsFileRegionProvider());
+  add(RegionProviderChain::createAWSConfigFileRegionProvider());
 }
 
 absl::optional<std::string> RegionProviderChain::getRegion() {
