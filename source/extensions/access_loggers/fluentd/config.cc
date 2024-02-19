@@ -23,10 +23,12 @@ SINGLETON_MANAGER_REGISTRATION(fluentd_access_logger_cache);
 FluentdAccessLoggerCacheSharedPtr
 getAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<FluentdAccessLoggerCacheImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(fluentd_access_logger_cache), [&context] {
+      SINGLETON_MANAGER_REGISTERED_NAME(fluentd_access_logger_cache),
+      [&context] {
         return std::make_shared<FluentdAccessLoggerCacheImpl>(
             context.clusterManager(), context.scope(), context.threadLocal());
-      }, /* pin = */ true);
+      },
+      /* pin = */ true);
 }
 
 AccessLog::InstanceSharedPtr
