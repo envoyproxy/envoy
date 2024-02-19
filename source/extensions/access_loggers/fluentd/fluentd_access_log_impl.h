@@ -42,6 +42,7 @@ public:
   virtual void log(EntryPtr&& entry) PURE;
 };
 
+using FluentdAccessLoggerWeakPtr = std::weak_ptr<FluentdAccessLogger>;
 using FluentdAccessLoggerSharedPtr = std::shared_ptr<FluentdAccessLogger>;
 
 #define ACCESS_LOG_FLUENTD_STATS(COUNTER, GAUGE)                                                   \
@@ -119,7 +120,7 @@ private:
 
     Event::Dispatcher& dispatcher_;
     // Access loggers indexed by the hash of logger's configuration.
-    absl::flat_hash_map<std::size_t, FluentdAccessLoggerSharedPtr> access_loggers_;
+    absl::flat_hash_map<std::size_t, FluentdAccessLoggerWeakPtr> access_loggers_;
   };
 
   Upstream::ClusterManager& cluster_manager_;

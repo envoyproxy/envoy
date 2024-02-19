@@ -122,7 +122,7 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
   const auto cache_key = MessageUtil::hash(*config);
   const auto it = cache.access_loggers_.find(cache_key);
   if (it != cache.access_loggers_.end()) {
-    return it->second;
+    return it->second.expired() ? nullptr : it->second.lock();
   }
 
   auto client =
@@ -140,7 +140,7 @@ FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatt
                                    ThreadLocal::SlotAllocator& tls,
                                    FluentdAccessLoggerCacheSharedPtr access_logger_cache)
     : ImplBase(std::move(filter)), formatter_(std::move(formatter)), tls_slot_(tls.allocateSlot()),
-      config_(config), access_logger_cache_(std::move(access_logger_cache)) {
+      config_(config), access_logger_cache_(access_logger_cache) {
   tls_slot_->set(
       [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
         return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(config));
