@@ -35,8 +35,8 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {

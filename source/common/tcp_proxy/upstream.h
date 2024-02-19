@@ -16,8 +16,8 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/hash_policy.h"
-#include "source/common/network/utility.h"
 #include "source/common/http/null_route_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/router.h"
@@ -213,23 +213,10 @@ protected:
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
 
 private:
-  // const Router::VirtualCluster* requestVcluster() const override { return nullptr; }
-  // const Router::RouteStatsContextOptRef routeStatsContext() const override {
-  //   return Router::RouteStatsContextOptRef();
-  // }
-  // const Router::Route* route() const override { return route_; }
-  // const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
-  //   // static const std::list<UpstreamRequestPtr> requests;
-  //   return upstream_requests_;
-  // }
-  // const UpstreamRequest* finalUpstreamRequest() const override { return nullptr; }
-  // TimeSource& timeSource() override { return config().timeSource(); }
-
   Upstream::ClusterInfoConstSharedPtr cluster_;
   class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
-    // Http::ResponseDecoder
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       bool is_valid_response = parent_.isValidResponse(*headers);
