@@ -34,6 +34,23 @@ public:
   bool run();
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
+  // Holds context for a streaming response from the admin system, enablimg
+  // flow-control into another system. This is particularly important when the
+  // generated response is very large, such that holding it in memory may cause
+  // fragmention or out-of-memory failures. It is possible to interleave xDS
+  // response handling, overload management, and other admin requests during the
+  // streaming of a long admin response.
+  //
+  // There can be be multiple AdminResponses at a time; each are separately
+  // managed. However they will obtain their data from Envoy functions that
+  // run on the main thread.
+  //
+  // Responses may still be active after the server has shut down, and is no
+  // longer running its main thread dispatcher. In this state, the callbacks
+  // will be called with appropriate error codes.
+  //
+  // Requests can also be cancelled explicitly by calling cancel(). After
+  // cancel() is called, no further callbacks will be called by the response.
   class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
   public:
     virtual ~AdminResponse() = default;
@@ -47,10 +64,8 @@ public:
      * such a call on another thread, after HeadersFn returns. Calling
      * nextChunk from HeadersFn may deadlock.
      *
-     * If the server is shut down during the operation, headersFn will
-     * be called with a 503.
-     *
-     * It is a programming error to call getHeaders after calling cancel.
+     * If the server is shut down during the operation, headersFn may
+     * be called with a 503, if it has not already been called.
      *
      * @param fn The function to be called with the headers and status code.
      */
@@ -70,9 +85,8 @@ public:
      * nextChunk from BodyFn may deadlock.
      *
      * If the server is shut down during the operation, bodyFn will
-     * be called with an empty body and 'false' for more_data.
-     *
-     * It is a programming error to call nextChunk after calling cancel.
+     * be called with an empty body and 'false' for more_data, if
+     * this has not already occurred.
      *
      * @param fn A function to be called on each chunk.
      */
@@ -81,15 +95,22 @@ public:
 
     /**
      * Requests that any outstanding callbacks be dropped. This can be called
-     * when the context in which the request is made is destroyed. This can be
-     * useful to allow an application above to register a timeout. The Response
-     * itself is held as a shared_ptr as that makes it much easier to manage
-     * cancellation across multiple threads.
+     * when the context in which the request is made is destroyed. This enables
+     * an application to implement a. The Response itself is held as a
+     * shared_ptr as that makes it much easier to manage cancellation across
+     * multiple threads.
      */
     virtual void cancel() PURE;
 
-    // Called when the server is terminated. The response remains
-    // valid after this.
+   private:
+    friend class MainCommonBase;
+
+    /**
+     * Called when the server is terminated. This calls any outstanding
+     * callbacks to be called. If nextChunk is called after termination,
+     * its callback is called false for the second arg, indicating
+     * end of stream.
+     */
     virtual void terminate() PURE;
   };
   using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;

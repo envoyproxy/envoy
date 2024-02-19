@@ -106,6 +106,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 }
 
 namespace {
+
 class AdminResponseImpl : public MainCommonBase::AdminResponse {
 public:
   using CleanupFn = std::function<void(AdminResponseImpl*)>;
@@ -118,6 +119,29 @@ public:
   }
 
   ~AdminResponseImpl() {
+    // MainCommonBase::response_set_ holds a raw pointer to all outstanding
+    // responses (not a shared_ptr). So when destructing the response
+    // we must call cleanup on MainCommonBase if this has not already
+    // occurred.
+    //
+    // Note it's also possible for MainCommonBase to be deleted before
+    // AdminResponseImpl, in which case it will use its resposne_set_
+    // to call terminate, so we'll track that here and skip calling
+    // cleanup_ in that case.
+    //
+    // We must consider a race between MainCommonBase::terminateAdminRequests
+    // and the this destructor. Note that terminateAdminRequests takes
+    // FIX ME
+
+    if (!terminated_) {
+      cleanup_(this);
+    }
+
+
+    // cleanup_(this);
+    // cleanup_ = null;
+    // }
+    /*
     bool call_cleanup = false;
     {
       absl::MutexLock lock(&mutex_);
@@ -128,6 +152,10 @@ public:
     if (call_cleanup) {
       cleanup_(this);
     }
+    */
+    //if (main_common_ != nullptr) {
+    //  main_common_->detachResponse(this);
+    //]   }
   }
 
   void getHeaders(HeadersFn fn) override {
@@ -185,25 +213,13 @@ public:
   // admin response, and so calls to getHeader and nextChunk remain valid,
   // resulting in 503 and an empty body.
   void terminate() override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+
     absl::MutexLock lock(&mutex_);
     terminated_ = true;
     sendErrorLockHeld();
     sendAbortChunkLockHeld();
   }
-
-  /*void handleBody(Buffer::Instance& chunk, bool more) {
-    // This always gets called from the main thread since that's
-    // where admin runs. But the caller may delete the Response
-    // from any thread.
-    absl::MutexLock lock(&mutex_);
-    if (!cancelled_ && body_fn_ != nullptr) {
-      if (more || !sent_end_stream_) {
-        sent_end_stream_ = !more;
-        body_fn_(chunk, more);
-      }
-      body_fn_ = nullptr;
-    }
-    }*/
 
 private:
   void requestHeaders() {
@@ -291,16 +307,25 @@ private:
   BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
   absl::Mutex mutex_;
 };
+
 } // namespace
 
 void MainCommonBase::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  absl::flat_hash_set<AdminResponse*> response_set;
-  absl::MutexLock lock(&mutex_);
-  while (!response_set_.empty()) {
-    auto iter = response_set_.begin();
-    (*iter)->terminate();
-    response_set_.erase(iter);
+
+  // Move the response-set into a local so we can terminate the
+  // responses without holding our mutex, as the response-termination
+  // can call back into MainCommonBase without deadlocking.
+  //absl::flat_hash_set<AdminResponse*> response_set;
+  {
+    absl::MutexLock lock(&mutex_);
+    //response_set = std::move(response_set_);
+    //response_set_.clear();
+    //  }
+
+    for (AdminResponse* response : response_set_) {
+      response->terminate();
+    }
   }
 }
 
@@ -311,7 +336,7 @@ void MainCommonBase::detachResponse(AdminResponse* response) {
 
 MainCommonBase::AdminResponseSharedPtr
 MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method) {
-  auto response = std::make_unique<AdminResponseImpl>(
+  auto response = std::make_shared<AdminResponseImpl>(
       *server(), path_and_query, method,
       [this](AdminResponse* response) { detachResponse(response); });
   absl::MutexLock lock(&mutex_);
