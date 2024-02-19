@@ -34,6 +34,7 @@
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -52,6 +53,22 @@ public:
 };
 
 REGISTER_FACTORY(PerConnectionClusterFactory, StreamInfo::FilterState::ObjectFactory);
+
+class PerConnectionIdleTimeoutMsObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(PerConnectionIdleTimeoutMs); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    uint64_t duration_in_milliseconds = 0;
+    if (absl::SimpleAtoi(data, &duration_in_milliseconds)) {
+      return std::make_unique<StreamInfo::UInt64AccessorImpl>(duration_in_milliseconds);
+    }
+
+    return nullptr;
+  }
+};
+
+REGISTER_FACTORY(PerConnectionIdleTimeoutMsObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
     : parent_(parent), cluster_name_(cluster_name) {}
@@ -755,7 +772,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
         conn_data->connection().state() != Network::Connection::State::Closed) {
       config_->drainManager().add(config_->sharedConfig(), std::move(conn_data),
                                   std::move(upstream_callbacks_), std::move(idle_timer_),
-                                  read_callbacks_->upstreamHost());
+                                  idle_timeout_, read_callbacks_->upstreamHost());
     }
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
@@ -829,7 +846,15 @@ void Filter::onUpstreamConnection() {
                  read_callbacks_->connection(),
                  getStreamInfo().downstreamAddressProvider().requestedServerName());
 
-  if (config_->idleTimeout()) {
+  idle_timeout_ = config_->idleTimeout();
+  if (const auto* per_connection_idle_timeout =
+          getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
+              PerConnectionIdleTimeoutMs);
+      per_connection_idle_timeout != nullptr) {
+    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
+  }
+
+  if (idle_timeout_) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into
     // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
     // the call to either TcpProxy or to Drainer, depending on the current state.
@@ -905,8 +930,8 @@ void Filter::disableAccessLogFlushTimer() {
 
 void Filter::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
-    ASSERT(config_->idleTimeout());
-    idle_timer_->enableTimer(config_->idleTimeout().value());
+    ASSERT(idle_timeout_);
+    idle_timer_->enableTimer(idle_timeout_.value());
   }
 }
 
@@ -943,9 +968,10 @@ void UpstreamDrainManager::add(const Config::SharedConfigSharedPtr& config,
                                Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
                                const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
                                Event::TimerPtr&& idle_timer,
+                               absl::optional<std::chrono::milliseconds> idle_timeout,
                                const Upstream::HostDescriptionConstSharedPtr& upstream_host) {
   DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_conn_data),
-                                 std::move(idle_timer), upstream_host));
+                                 std::move(idle_timer), idle_timeout, upstream_host));
   callbacks->drain(*drainer);
 
   // Use temporary to ensure we get the pointer before we move it out of drainer
@@ -963,9 +989,11 @@ void UpstreamDrainManager::remove(Drainer& drainer, Event::Dispatcher& dispatche
 Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
                  const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
                  Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
+                 absl::optional<std::chrono::milliseconds> idle_timeout,
                  const Upstream::HostDescriptionConstSharedPtr& upstream_host)
     : parent_(parent), callbacks_(callbacks), upstream_conn_data_(std::move(conn_data)),
-      timer_(std::move(idle_timer)), upstream_host_(upstream_host), config_(config) {
+      idle_timer_(std::move(idle_timer)), idle_timeout_(idle_timeout),
+      upstream_host_(upstream_host), config_(config) {
   ENVOY_CONN_LOG(trace, "draining the upstream connection", upstream_conn_data_->connection());
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
@@ -974,8 +1002,8 @@ Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedP
 void Drainer::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    if (timer_ != nullptr) {
-      timer_->disableTimer();
+    if (idle_timer_ != nullptr) {
+      idle_timer_->disableTimer();
     }
     config_->stats().upstream_flush_active_.dec();
     parent_.remove(*this, upstream_conn_data_->connection().dispatcher());
@@ -998,8 +1026,8 @@ void Drainer::onIdleTimeout() {
 }
 
 void Drainer::onBytesSent() {
-  if (timer_ != nullptr) {
-    timer_->enableTimer(config_->idleTimeout().value());
+  if (idle_timer_ != nullptr) {
+    idle_timer_->enableTimer(idle_timeout_.value());
   }
 }
 
