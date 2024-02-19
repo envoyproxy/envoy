@@ -125,44 +125,29 @@ public:
     // occurred.
     //
     // Note it's also possible for MainCommonBase to be deleted before
-    // AdminResponseImpl, in which case it will use its resposne_set_
+    // AdminResponseImpl, in which case it will use its response_set_
     // to call terminate, so we'll track that here and skip calling
     // cleanup_ in that case.
-    //
-    // We must consider a race between MainCommonBase::terminateAdminRequests
-    // and the this destructor. Note that terminateAdminRequests takes
-    // FIX ME
-
     if (!terminated_) {
-      cleanup_(this);
-    }
+      detaching_ = true;
 
-
-    // cleanup_(this);
-    // cleanup_ = null;
-    // }
-    /*
-    bool call_cleanup = false;
-    {
-      absl::MutexLock lock(&mutex_);
-      if (!terminated_) {
-        call_cleanup = true;
-      }
+      // If there is a terminate/destruct race, calling cleanup_ below
+      // will lock MainCommonBase::mutex_, which is being held by
+      // terminateAdminRequests, so will block here until all the
+      // terminate calls are made. Once terminateAdminRequests
+      // release its lock, cleanup_ will return and the object
+      // can be safely destructed.
+      cleanup_(this); // lock in MainCommonBase
     }
-    if (call_cleanup) {
-      cleanup_(this);
-    }
-    */
-    //if (main_common_ != nullptr) {
-    //  main_common_->detachResponse(this);
-    //]   }
   }
 
   void getHeaders(HeadersFn fn) override {
+    // First check for cancelling or termination.
     {
       absl::MutexLock lock(&mutex_);
       ASSERT(headers_fn_ == nullptr);
       if (cancelled_) {
+        // We do not call callbacks after cancel().
         return;
       }
       headers_fn_ = fn;
@@ -195,7 +180,7 @@ public:
     // in which case the callbacks, held in a shared_ptr, will be cancelled
     // from the destructor. If that happens *before* we post to the main thread,
     // we will just skip and never call fn.
-    server_.dispatcher().post([this, response = shared_from_this()]() { RequestNextChunk(); });
+    server_.dispatcher().post([this, response = shared_from_this()]() { requestNextChunk(); });
   }
 
   // Called by the user if it is not longer interested in the result of the
@@ -216,6 +201,13 @@ public:
     ASSERT_IS_MAIN_OR_TEST_THREAD();
 
     absl::MutexLock lock(&mutex_);
+
+    // If the Envoy server termination races with destruction, we set detaching_
+    // first in the destructor and check here to avoid writing to the object as
+    // it is being destroyed.
+    if (detaching_) {
+      return;
+    }
     terminated_ = true;
     sendErrorLockHeld();
     sendAbortChunkLockHeld();
@@ -223,6 +215,7 @@ public:
 
 private:
   void requestHeaders() {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     {
       absl::MutexLock lock(&mutex_);
       if (cancelled_ || terminated_) {
@@ -243,7 +236,8 @@ private:
     }
   }
 
-  void RequestNextChunk() {
+  void requestNextChunk() {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     {
       absl::MutexLock lock(&mutex_);
       if (cancelled_ || terminated_) {
@@ -300,6 +294,7 @@ private:
   // True if the Envoy server has stopped running its main loop. Headers
   // and boxy callbacks are called after this.
   bool terminated_ ABSL_GUARDED_BY(mutex_) = false;
+  bool detaching_ ABSL_GUARDED_BY(mutex_) = false;
 
   // bool sent_headers_ ABSL_GUARDED_BY(mutex_) = false;
   bool sent_end_stream_ ABSL_GUARDED_BY(mutex_) = false;
@@ -313,19 +308,13 @@ private:
 void MainCommonBase::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
-  // Move the response-set into a local so we can terminate the
-  // responses without holding our mutex, as the response-termination
-  // can call back into MainCommonBase without deadlocking.
-  //absl::flat_hash_set<AdminResponse*> response_set;
-  {
-    absl::MutexLock lock(&mutex_);
-    //response_set = std::move(response_set_);
-    //response_set_.clear();
-    //  }
-
-    for (AdminResponse* response : response_set_) {
-      response->terminate();
-    }
+  absl::MutexLock lock(&mutex_);
+  for (AdminResponse* response : response_set_) {
+    // Consider the possibility of response being deleted due to its creator
+    // dropping its last reference right here. From its destructor it will call
+    // detachResponse(), which is mutex-ed against this loop, so before the
+    // memory becomes invalid, the call to terminate will complete.
+    response->terminate();
   }
 }
 
