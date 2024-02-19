@@ -279,7 +279,9 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
     : config_(config), type_(type), decoder_filter_callbacks_(&stream_decoder_callbacks),
       upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info),
       route_(std::make_shared<Http::NullRouteImpl>(
-          thread_local_cluster.info()->name(), config.serverFactoryContext().singletonManager())) {
+          thread_local_cluster.info()->name(),
+          *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()})) {
+  // config.serverFactoryContext().singletonManager())) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
