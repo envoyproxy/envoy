@@ -162,10 +162,10 @@ public:
     {
       absl::MutexLock lock(&mutex_);
       ASSERT(body_fn_ == nullptr);
-      body_fn_ = fn;
       if (cancelled_) {
         return;
       }
+      body_fn_ = fn;
       if (terminated_ || !opt_admin_) {
         sendAbortChunkLockHeld();
         return;
@@ -225,11 +225,12 @@ private:
     code_ = request_->start(*response_headers_);
     {
       absl::MutexLock lock(&mutex_);
-      if (headers_fn_ != nullptr && !cancelled_) {
-        Server::Utility::populateFallbackResponseHeaders(code_, *response_headers_);
-        headers_fn_(code_, *response_headers_);
-        headers_fn_ = nullptr;
+      if (headers_fn_ == nullptr || cancelled_) {
+        return;
       }
+      Server::Utility::populateFallbackResponseHeaders(code_, *response_headers_);
+      headers_fn_(code_, *response_headers_);
+      headers_fn_ = nullptr;
     }
   }
 
@@ -246,7 +247,7 @@ private:
     }
     {
       absl::MutexLock lock(&mutex_);
-      if (sent_end_stream_ || cancelled_ || terminated_) {
+      if (sent_end_stream_ || cancelled_) {
         return;
       }
       sent_end_stream_ = !more_data_;

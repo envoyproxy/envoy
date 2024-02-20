@@ -615,6 +615,41 @@ protected:
         [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
   }
 
+  /**
+   * To hit an early exit after the second lock in
+   * AdminResponseImpl::requestNextChunk and AdminResponseImpl::requestHeaders
+   * we, need to post a cancel request to the main thread, but block that on the
+   * resume_ notification. This allows a subsequent test call to getHeaders or
+   * nextChunk initiate a post to main thread, but runs the cancel call on the
+   * response before headers_fn_ or body_fn_ runs.
+   *
+   * @param response the response to cancel after resume_.
+   */
+  void
+  blockMainThreadAndCancelResponseAfterResume(MainCommonBase::AdminResponseSharedPtr response) {
+    main_common_->dispatcherForTest().post([response, this] {
+      resume_.WaitForNotification();
+      response->cancel();
+    });
+  }
+
+  MainCommonBase::AdminResponseSharedPtr streamingResponse() {
+    return main_common_->adminRequest(StreamingEndpoint, "GET");
+  }
+
+  void waitForHeaders(MainCommonBase::AdminResponseSharedPtr response) {
+    absl::Notification headers_notify;
+    response->getHeaders(
+        [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
+    headers_notify.WaitForNotification();
+  }
+
+  void quitAndRequestHeaders() {
+    MainCommonBase::AdminResponseSharedPtr quit_response =
+        main_common_->adminRequest("/quitquitquit", "POST");
+    quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
+  }
+
   std::function<void()> next_chunk_hook_ = []() {};
 };
 
@@ -623,8 +658,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStreamingTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStreamingTest, RequestGetStatsAndQuit) {
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   ChunksBytes chunks_bytes = runStreamingRequest(response);
   EXPECT_EQ(StreamingAdminRequest::NumChunks, chunks_bytes.first);
   EXPECT_EQ(StreamingAdminRequest::NumChunks * StreamingAdminRequest::BytesPerChunk,
@@ -635,8 +669,7 @@ TEST_P(AdminStreamingTest, RequestGetStatsAndQuit) {
 TEST_P(AdminStreamingTest, QuitDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   ChunksBytes chunks_bytes = runStreamingRequest(response, [&quit_counter, this]() {
     if (++quit_counter == chunks_to_send_before_quitting) {
       quitAndWait();
@@ -650,8 +683,7 @@ TEST_P(AdminStreamingTest, QuitDuringChunks) {
 TEST_P(AdminStreamingTest, CancelDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   ChunksBytes chunks_bytes = runStreamingRequest(response, [response, &quit_counter]() {
     if (++quit_counter == chunks_to_send_before_quitting) {
       response->cancel();
@@ -663,10 +695,9 @@ TEST_P(AdminStreamingTest, CancelDuringChunks) {
   quitAndWait();
 }
 
-TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader) {
+TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader1) {
   blockMainThreadUntilResume(StreamingEndpoint, "GET");
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   response->cancel();
   resume_.Notify();
   int header_calls = 0;
@@ -677,9 +708,18 @@ TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader) {
   EXPECT_EQ(0, header_calls);
 }
 
+TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader2) {
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  blockMainThreadAndCancelResponseAfterResume(response);
+  int header_calls = 0;
+  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+  resume_.Notify();
+  quitAndWait();
+  EXPECT_EQ(0, header_calls);
+}
+
 TEST_P(AdminStreamingTest, CancelAfterAskingForHeader) {
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   int header_calls = 0;
   blockMainThreadUntilResume(StreamingEndpoint, "GET");
   response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
@@ -689,41 +729,30 @@ TEST_P(AdminStreamingTest, CancelAfterAskingForHeader) {
   EXPECT_EQ(0, header_calls);
 }
 
-TEST_P(AdminStreamingTest, CancelBeforeAskingForChunk) {
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
-  absl::Notification headers_notify;
-  response->getHeaders(
-      [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
-  headers_notify.WaitForNotification();
-
-  // To hit an early exit in AdminResponseImpl::requestNextChunk we need to
-  // allow its posting to the main thread, but not let it run. To do that we
-  // queue up a main-thread callback that blocks on a notification, thus pausing
-  // Envoy's main thread.
-  absl::Notification block_cancel;
-  main_common_->dispatcherForTest().post([response, &block_cancel] {
-    block_cancel.WaitForNotification();
-    response->cancel();
-  });
-
+TEST_P(AdminStreamingTest, CancelBeforeAskingForChunk1) {
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  waitForHeaders(response);
+  response->cancel();
   int chunk_calls = 0;
   response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
+  quitAndWait();
+  EXPECT_EQ(0, chunk_calls);
+}
 
-  // Now that we have issued the request for the nextChunk call, we can unblock
-  // our callback, which will hit the early exit in the chunk handler.
-  block_cancel.Notify();
+TEST_P(AdminStreamingTest, CancelBeforeAskingForChunk2) {
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  waitForHeaders(response);
+  blockMainThreadAndCancelResponseAfterResume(response);
+  int chunk_calls = 0;
+  response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
+  resume_.Notify();
   quitAndWait();
   EXPECT_EQ(0, chunk_calls);
 }
 
 TEST_P(AdminStreamingTest, CancelAfterAskingForChunk) {
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
-  absl::Notification headers_notify;
-  response->getHeaders(
-      [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
-  headers_notify.WaitForNotification();
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  waitForHeaders(response);
   blockMainThreadUntilResume(StreamingEndpoint, "GET");
   int chunk_calls = 0;
 
@@ -737,8 +766,7 @@ TEST_P(AdminStreamingTest, CancelAfterAskingForChunk) {
 }
 
 TEST_P(AdminStreamingTest, QuitBeforeHeaders) {
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   quitAndWait();
   ChunksBytes chunks_bytes = runStreamingRequest(response);
   EXPECT_EQ(1, chunks_bytes.first);
@@ -746,23 +774,16 @@ TEST_P(AdminStreamingTest, QuitBeforeHeaders) {
 }
 
 TEST_P(AdminStreamingTest, QuitDeleteRace) {
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   // Initiates a streaming quit on the main thread, but do not wait for it.
-  MainCommonBase::AdminResponseSharedPtr quit_response =
-      main_common_->adminRequest("/quitquitquit", "POST");
-  quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
+  quitAndRequestHeaders();
   response.reset(); // Races with the quitquitquit
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
 TEST_P(AdminStreamingTest, QuitCancelRace) {
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
-  // Initiates a streaming quit on the main thread, but do not wait for it.
-  MainCommonBase::AdminResponseSharedPtr quit_response =
-      main_common_->adminRequest("/quitquitquit", "POST");
-  quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  quitAndRequestHeaders();
   response->cancel(); // Races with the quitquitquit
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -775,8 +796,7 @@ TEST_P(AdminStreamingTest, QuitBeforeCreatingResponse) {
   pause_after_run_ = true;
   adminRequest("/quitquitquit", "POST");
   pause_point_.WaitForNotification(); // run() finished, but main_common_ still exists.
-  MainCommonBase::AdminResponseSharedPtr response =
-      main_common_->adminRequest(StreamingEndpoint, "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   ChunksBytes chunks_bytes = runStreamingRequest(response);
   EXPECT_EQ(1, chunks_bytes.first);
   EXPECT_EQ(0, chunks_bytes.second);
