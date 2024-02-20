@@ -331,7 +331,8 @@ void UpstreamRequest::clearStream(bool close_connection) {
   // connection close event will not be handled.
   response_complete_ = true;
 
-  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request");
+  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request ()",
+            close_connection);
 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};

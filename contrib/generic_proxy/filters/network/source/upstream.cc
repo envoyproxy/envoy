@@ -5,13 +5,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-UpstreamConnection::~UpstreamConnection() {
-  // Do clean up here again to ensure the cleanUp is called. This is safe to call
-  // multiple times because of the is_cleand_up_ flag.
-  // TODO(wbpcode): Clarify/resolve bypassing of virtual dispatch
-  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
-  this->cleanUp(true);
-}
+UpstreamConnection::~UpstreamConnection() { ASSERT(tcp_pool_handle_ == nullptr); }
 
 void UpstreamConnection::initialize() {
   if (!initialized_) {
@@ -35,7 +29,6 @@ void UpstreamConnection::cleanUp(bool close_connection) {
     ASSERT(tcp_pool_handle_ == nullptr);
     owned_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
-  owned_conn_data_.reset();
 
   if (tcp_pool_handle_ != nullptr) {
     ENVOY_LOG(debug, "generic proxy upstream manager: cacel upstream connection");
