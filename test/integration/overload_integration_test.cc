@@ -20,7 +20,7 @@ class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                 public HttpProtocolIntegrationTest {
 protected:
   void initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
-                                 std::optional<bool> appendLocalOverloadHeader = std::nullopt) {
+                                 absl::optional<bool> appendLocalOverloadHeader = std::nullopt) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
