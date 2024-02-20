@@ -74,10 +74,8 @@ void UberFilterFuzzer::fuzz(
     // Clean-up config with filter-specific logic before it runs through validations.
     cleanFuzzedConfig(proto_config.name(), message.get());
     auto cb_or = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
-    if (!cb_or.ok()) {
-      return;
-    }
-    cb_ = *cb_or;
+    THROW_IF_STATUS_NOT_OK(cb_or, throw);
+    cb_ = cb_or.value();
     cb_(filter_callback_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception {}", e.what());
