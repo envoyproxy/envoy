@@ -23,6 +23,16 @@ namespace {
 inline bool isResponseNotModified(const Http::ResponseHeaderMap& response_headers) {
   return Http::Utility::getResponseStatus(response_headers) == enumToInt(Http::Code::NotModified);
 }
+
+// This value is only used if there is no encoderBufferLimit on the stream;
+// without *some* constraint here, a very large chunk can be requested and
+// attempt to load into a memory buffer.
+//
+// This default is quite large to minimize the chance of being a surprise
+// behavioral change when a constraint is added.
+//
+// And everyone knows 64MB should be enough for anyone.
+static const size_t MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST = 64 * 1024 * 1024;
 } // namespace
 
 struct CacheResponseCodeDetailValues {
@@ -328,11 +338,9 @@ void CacheFilter::getBody() {
 
   // We don't want to request more than a buffer-size at a time from the cache.
   uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
-  // If there is no buffer size limit, we probably still want *some* constraint,
-  // because reading a gigabyte of cache entry in one go is always going to cause
-  // some kind of problem. Everyone knows 64MB should be enough for anyone.
+  // If there is no buffer size limit, we still want *some* constraint.
   if (fetch_size_limit == 0) {
-    fetch_size_limit = 64 * 1024 * 1024;
+    fetch_size_limit = MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST;
   }
   AdjustedByteRange fetch_range = {remaining_ranges_[0].begin(),
                                    (remaining_ranges_[0].length() > fetch_size_limit)
