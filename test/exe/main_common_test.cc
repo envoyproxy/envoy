@@ -593,7 +593,7 @@ protected:
   }
 
   /**
-   * In order to trigger certain early-exit critiera in a test, we can exploit
+   * In order to trigger certain early-exit criteria in a test, we can exploit
    * the fact that all the admin responses are delivered on the main thread.
    * So we can pause those by blocking the main thread indefinitely.
    *
@@ -605,9 +605,8 @@ protected:
     MainCommonBase::AdminResponseSharedPtr blocked_response =
         main_common_->adminRequest(url, method);
     absl::Notification block_main_thread;
-    blocked_response->getHeaders([this](Http::Code, Http::ResponseHeaderMap&) {
-      resume_.WaitForNotification();
-    });
+    blocked_response->getHeaders(
+        [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
   }
 };
 
@@ -684,8 +683,8 @@ TEST_P(AdminStreamingTest, CancelAfterAskingForChunk) {
   MainCommonBase::AdminResponseSharedPtr response =
       main_common_->adminRequest(StreamingEndpoint, "GET");
   absl::Notification headers_notify;
-  response->getHeaders([&headers_notify](Http::Code, Http::ResponseHeaderMap&) {
-    headers_notify.Notify(); });
+  response->getHeaders(
+      [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
   headers_notify.WaitForNotification();
   blockMainThreadUntilResume(StreamingEndpoint, "GET");
   int chunk_calls = 0;
