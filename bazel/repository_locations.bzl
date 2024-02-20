@@ -464,7 +464,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.compression.qatzip.compressor"],
         cpe = "N/A",
         license = "BSD-3-Clause",
-        license_url = "https://github.com/intel/QATzip/blob/{version}/LICENSE",
+        license_url = "https://github.com/intel/QATzip/blob/v{version}/LICENSE",
     ),
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",

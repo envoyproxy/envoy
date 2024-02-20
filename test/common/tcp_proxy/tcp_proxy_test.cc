@@ -816,7 +816,7 @@ TEST_P(TcpProxyTest, UpstreamConnectionLimit) {
   EXPECT_EQ(access_log_data_, "UO");
 }
 
-TEST_F(TcpProxyTest, IdleTimeoutObjectFactory) {
+TEST_P(TcpProxyTest, IdleTimeoutObjectFactory) {
   const std::string name = "envoy.tcp_proxy.per_connection_idle_timeout_ms";
   auto* factory =
       Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
@@ -828,7 +828,7 @@ TEST_F(TcpProxyTest, IdleTimeoutObjectFactory) {
   EXPECT_EQ(duration_in_milliseconds, object->serializeAsString());
 }
 
-TEST_F(TcpProxyTest, InvalidIdleTimeoutObjectFactory) {
+TEST_P(TcpProxyTest, InvalidIdleTimeoutObjectFactory) {
   const std::string name = "envoy.tcp_proxy.per_connection_idle_timeout_ms";
   auto* factory =
       Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
@@ -837,7 +837,7 @@ TEST_F(TcpProxyTest, InvalidIdleTimeoutObjectFactory) {
   ASSERT_EQ(nullptr, factory->createFromBytes("not_a_number"));
 }
 
-TEST_F(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
+TEST_P(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
