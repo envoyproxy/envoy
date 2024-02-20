@@ -46,6 +46,8 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
   return it->second;
 }
 
+// If restart_epoch is 0 there is no parent, so it's effectively already
+// drained and terminated.
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                        const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
@@ -169,7 +171,7 @@ void HotRestartingChild::registerParentDrainedCallback(
 
 void HotRestartingChild::allDrainsImplicitlyComplete() {
   for (auto& drain_action : on_drained_actions_) {
-    // call the callback.
+    // Call the callback.
     std::move(drain_action.second)();
   }
   on_drained_actions_.clear();
@@ -181,7 +183,6 @@ HotRestartingChild::sendParentAdminShutdownRequest() {
   if (parent_terminated_) {
     return absl::nullopt;
   }
-  allDrainsImplicitlyComplete();
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_shutdown_admin();
@@ -211,15 +212,17 @@ void HotRestartingChild::sendParentTerminateRequest() {
 
   // Note that the 'generation' counter needs to retain the contribution from
   // the parent.
-  stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
+  if (stat_merger_ != nullptr) {
+    stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
 
-  // Now it is safe to forget our stat transferral state.
-  //
-  // This destruction is actually important far beyond memory efficiency. The
-  // scope-based temporary counter logic relies on the StatMerger getting
-  // destroyed once hot restart's stat merging is all done. (See stat_merger.h
-  // for details).
-  stat_merger_.reset();
+    // Now it is safe to forget our stat transferral state.
+    //
+    // This destruction is actually important far beyond memory efficiency. The
+    // scope-based temporary counter logic relies on the StatMerger getting
+    // destroyed once hot restart's stat merging is all done. (See stat_merger.h
+    // for details).
+    stat_merger_.reset();
+  }
 }
 
 void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,

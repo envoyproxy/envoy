@@ -44,7 +44,8 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
         socket_->connectionInfoProvider().localAddress(),
         [this, &dispatcher, alive = std::weak_ptr<void>(destruction_checker_)]() {
           dispatcher.post([this, alive = std::move(alive)]() {
-            if (alive.lock()) {
+            auto still_alive = alive.lock();
+            if (still_alive != nullptr) {
               unpause();
             }
           });

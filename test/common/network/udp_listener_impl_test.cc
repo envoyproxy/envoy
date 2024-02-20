@@ -452,7 +452,8 @@ TEST_P(HotRestartedUdpListenerImplTest, EnableAndDisableDuringParentDrainShouldD
 }
 
 /**
- * Mostly the same as the test above, but in disabled state when drain ends.
+ * Mostly the same as EnableAndDisableDuringParentDrainShouldDoNothing, but in disabled state when
+ * drain ends.
  */
 TEST_P(HotRestartedUdpListenerImplTest, EndingParentDrainedWhileDisabledShouldNotStartReading) {
   setup();
