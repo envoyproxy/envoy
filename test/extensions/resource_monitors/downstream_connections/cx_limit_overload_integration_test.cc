@@ -104,7 +104,7 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitSetViaRuntimeKeyAndOve
   config_helper_.addRuntimeOverride("overload.global_downstream_max_connections", "3");
   initializeOverloadManager(2);
   const std::string log_line =
-      "Global downstream connections limits is configured via runtime key "
+      "Global downstream connections limits is configured via deprecated runtime key "
       "overload.global_downstream_max_connections and in "
       "envoy.resource_monitors.global_downstream_max_connections. Using overload manager "
       "config.";

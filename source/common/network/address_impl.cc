@@ -219,7 +219,7 @@ bool force_ipv4_unsupported_for_test = false;
 Cleanup Ipv4Instance::forceProtocolUnsupportedForTest(bool new_val) {
   bool old_val = force_ipv4_unsupported_for_test;
   force_ipv4_unsupported_for_test = new_val;
-  return Cleanup([old_val]() { force_ipv4_unsupported_for_test = old_val; });
+  return {[old_val]() { force_ipv4_unsupported_for_test = old_val; }};
 }
 
 absl::Status Ipv4Instance::validateProtocolSupported() {
@@ -341,7 +341,7 @@ bool force_ipv6_unsupported_for_test = false;
 Cleanup Ipv6Instance::forceProtocolUnsupportedForTest(bool new_val) {
   bool old_val = force_ipv6_unsupported_for_test;
   force_ipv6_unsupported_for_test = new_val;
-  return Cleanup([old_val]() { force_ipv6_unsupported_for_test = old_val; });
+  return {[old_val]() { force_ipv6_unsupported_for_test = old_val; }};
 }
 
 absl::Status Ipv6Instance::validateProtocolSupported() {
