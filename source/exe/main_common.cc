@@ -145,7 +145,6 @@ public:
       absl::MutexLock lock(&mutex_);
       ASSERT(headers_fn_ == nullptr);
       if (cancelled_) {
-        // We do not call callbacks after cancel().
         return;
       }
       headers_fn_ = fn;
@@ -164,7 +163,10 @@ public:
       absl::MutexLock lock(&mutex_);
       ASSERT(body_fn_ == nullptr);
       body_fn_ = fn;
-      if (terminated_ || cancelled_ || !opt_admin_) {
+      if (cancelled_) {
+        return;
+      }
+      if (terminated_ || !opt_admin_) {
         sendAbortChunkLockHeld();
         return;
       }
@@ -189,6 +191,11 @@ public:
     cancelled_ = true;
     headers_fn_ = nullptr;
     body_fn_ = nullptr;
+  }
+
+  bool cancelled() const override {
+    absl::MutexLock lock(&mutex_);
+    return cancelled_;
   }
 
   // Called from MainCommonBase::terminateAdminRequests when the Envoy server
@@ -296,7 +303,7 @@ private:
 
   HeadersFn headers_fn_ ABSL_GUARDED_BY(mutex_);
   BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
-  absl::Mutex mutex_;
+  mutable absl::Mutex mutex_;
 };
 
 } // namespace

@@ -102,6 +102,11 @@ public:
      */
     virtual void cancel() PURE;
 
+    /**
+     * @return whether the request was cancelled.
+     */
+    virtual bool cancelled() const PURE;
+
   private:
     friend class MainCommonBase;
 

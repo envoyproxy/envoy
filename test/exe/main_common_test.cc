@@ -579,7 +579,7 @@ protected:
     bool cont = true;
     uint64_t num_chunks = 0;
     uint64_t num_bytes = 0;
-    while (cont) {
+    while (cont && !response->cancelled()) {
       absl::Notification chunk_notify;
       response->nextChunk(
           [&chunk_notify, &num_chunks, &num_bytes, &cont](Buffer::Instance& chunk, bool more) {
@@ -657,16 +657,18 @@ TEST_P(AdminStreamingTest, CancelDuringChunks) {
       response->cancel();
     }
   });
-  EXPECT_EQ(4, chunks_bytes.first);
+  EXPECT_EQ(3, chunks_bytes.first); // no final call to the chunk handler after cancel.
   EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
             chunks_bytes.second);
   quitAndWait();
 }
 
 TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader) {
+  blockMainThreadUntilResume(StreamingEndpoint, "GET");
   MainCommonBase::AdminResponseSharedPtr response =
       main_common_->adminRequest(StreamingEndpoint, "GET");
   response->cancel();
+  resume_.Notify();
   int header_calls = 0;
 
   // After 'cancel', the headers function will not be called.
@@ -685,6 +687,34 @@ TEST_P(AdminStreamingTest, CancelAfterAskingForHeader) {
   resume_.Notify();
   quitAndWait();
   EXPECT_EQ(0, header_calls);
+}
+
+TEST_P(AdminStreamingTest, CancelBeforeAskingForChunk) {
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
+  absl::Notification headers_notify;
+  response->getHeaders(
+      [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
+  headers_notify.WaitForNotification();
+
+  // To hit an early exit in AdminResponseImpl::requestNextChunk we need to
+  // allow its posting to the main thread, but not let it run. To do that we
+  // queue up a main-thread callback that blocks on a notification, thus pausing
+  // Envoy's main thread.
+  absl::Notification block_cancel;
+  main_common_->dispatcherForTest().post([response, &block_cancel] {
+    block_cancel.WaitForNotification();
+    response->cancel();
+  });
+
+  int chunk_calls = 0;
+  response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
+
+  // Now that we have issued the request for the nextChunk call, we can unblock
+  // our callback, which will hit the early exit in the chunk handler.
+  block_cancel.Notify();
+  quitAndWait();
+  EXPECT_EQ(0, chunk_calls);
 }
 
 TEST_P(AdminStreamingTest, CancelAfterAskingForChunk) {
