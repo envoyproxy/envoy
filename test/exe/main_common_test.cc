@@ -591,13 +591,31 @@ protected:
 
     return ChunksBytes(num_chunks, num_bytes);
   }
+
+  /**
+   * In order to trigger certain early-exit critiera in a test, we can exploit
+   * the fact that all the admin responses are delivered on the main thread.
+   * So we can pause those by blocking the main thread indefinitely.
+   *
+   * To resume the main thread, call resume_.Notify();
+   *
+   * @param url the stats endpoint to initiate.
+   */
+  void blockMainThreadUntilResume(absl::string_view url, absl::string_view method) {
+    MainCommonBase::AdminResponseSharedPtr blocked_response =
+        main_common_->adminRequest(url, method);
+    absl::Notification block_main_thread;
+    blocked_response->getHeaders([this](Http::Code, Http::ResponseHeaderMap&) {
+      resume_.WaitForNotification();
+    });
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStreamingTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AdminStreamingTest, AdminStreamingRequestGetStatsAndQuit) {
+TEST_P(AdminStreamingTest, RequestGetStatsAndQuit) {
   MainCommonBase::AdminResponseSharedPtr response =
       main_common_->adminRequest(StreamingEndpoint, "GET");
   ChunksBytes chunks_bytes = runStreamingRequest(response);
@@ -607,7 +625,7 @@ TEST_P(AdminStreamingTest, AdminStreamingRequestGetStatsAndQuit) {
   quitAndWait();
 }
 
-TEST_P(AdminStreamingTest, AdminStreamingQuitDuringChunks) {
+TEST_P(AdminStreamingTest, QuitDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
   MainCommonBase::AdminResponseSharedPtr response =
@@ -622,7 +640,7 @@ TEST_P(AdminStreamingTest, AdminStreamingQuitDuringChunks) {
             chunks_bytes.second);
 }
 
-TEST_P(AdminStreamingTest, AdminStreamingCancelDuringChunks) {
+TEST_P(AdminStreamingTest, CancelDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
   MainCommonBase::AdminResponseSharedPtr response =
@@ -638,7 +656,7 @@ TEST_P(AdminStreamingTest, AdminStreamingCancelDuringChunks) {
   quitAndWait();
 }
 
-TEST_P(AdminStreamingTest, AdminStreamingCancelBeforeAskingForHeader) {
+TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader) {
   MainCommonBase::AdminResponseSharedPtr response =
       main_common_->adminRequest(StreamingEndpoint, "GET");
   response->cancel();
@@ -650,7 +668,35 @@ TEST_P(AdminStreamingTest, AdminStreamingCancelBeforeAskingForHeader) {
   EXPECT_EQ(0, header_calls);
 }
 
-TEST_P(AdminStreamingTest, AdminStreamingQuitBeforeHeaders) {
+TEST_P(AdminStreamingTest, CancelAfterAskingForHeader) {
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
+  int header_calls = 0;
+  blockMainThreadUntilResume(StreamingEndpoint, "GET");
+  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+  response->cancel();
+  resume_.Notify();
+  quitAndWait();
+  EXPECT_EQ(0, header_calls);
+}
+
+TEST_P(AdminStreamingTest, CancelAfterAskingForChunk) {
+  MainCommonBase::AdminResponseSharedPtr response =
+      main_common_->adminRequest(StreamingEndpoint, "GET");
+  absl::Notification headers_notify;
+  response->getHeaders([&headers_notify](Http::Code, Http::ResponseHeaderMap&) {
+    headers_notify.Notify(); });
+  headers_notify.WaitForNotification();
+  blockMainThreadUntilResume(StreamingEndpoint, "GET");
+  int chunk_calls = 0;
+  response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
+  response->cancel();
+  resume_.Notify();
+  quitAndWait();
+  EXPECT_EQ(0, chunk_calls);
+}
+
+TEST_P(AdminStreamingTest, QuitBeforeHeaders) {
   MainCommonBase::AdminResponseSharedPtr response =
       main_common_->adminRequest(StreamingEndpoint, "GET");
   quitAndWait();

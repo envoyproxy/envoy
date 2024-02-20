@@ -62,7 +62,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
 bool MainCommonBase::run() {
   // Avoid returning from inside switch cases to minimize uncovered lines
   // while avoid gcc warnings by hitting the final return.
-  bool ret = true;
+  bool ret = false;
 
   switch (options_.mode()) {
   case Server::Mode::Serve:
@@ -70,6 +70,7 @@ bool MainCommonBase::run() {
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
     terminateAdminRequests();
 #endif
+    ret = true;
     break;
   case Server::Mode::Validate:
     ret = Server::validateConfig(
@@ -79,9 +80,8 @@ bool MainCommonBase::run() {
     break;
   case Server::Mode::InitOnly:
     PERF_DUMP();
+    ret = true;
     break;
-  default:
-    ret = false;
   }
   return ret;
 }
