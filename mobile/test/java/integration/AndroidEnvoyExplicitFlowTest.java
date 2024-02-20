@@ -1,6 +1,6 @@
 package test.kotlin.integration;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
@@ -204,7 +204,7 @@ public class AndroidEnvoyExplicitFlowTest {
     assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
     assertThat(response.getBodyAsString()).isEmpty();
     assertThat(response.getEnvoyError()).isNull();
-    assertThat(response.getNbResponseChunks()).isZero();
+    assertThat(response.getNbResponseChunks()).isEqualTo(0);
   }
 
   @Test
@@ -400,7 +400,7 @@ public class AndroidEnvoyExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     assertThat(response.isCancelled()).isTrue();
-    assertThat(response.getRequestChunkSent()).isZero();
+    assertThat(response.getRequestChunkSent()).isEqualTo(0);
     assertThat(response.getEnvoyError()).isNull();
   }
 
@@ -416,7 +416,7 @@ public class AndroidEnvoyExplicitFlowTest {
     Response response = sendRequest(requestScenario);
 
     assertThat(response.isCancelled()).isTrue();
-    assertThat(response.getRequestChunkSent()).isOne();
+    assertThat(response.getRequestChunkSent()).isEqualTo(1);
     assertThat(response.getEnvoyError()).isNull();
   }
 

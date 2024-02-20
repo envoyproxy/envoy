@@ -1783,7 +1783,7 @@ TEST_F(HostImplTest, HealthStatus) {
   EXPECT_EQ(Host::HealthStatus::DRAINING, host->edsHealthStatus());
   EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
   // Old EDS flags should be cleared and new flag will be set.
-  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH));
+  EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING));
 
   // Setting an active unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -3651,7 +3651,7 @@ public:
           updateHostsParams(hosts_, hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*hosts_),
                             hosts_per_locality_),
-          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+          {}, hosts_added, hosts_removed, random_.random(), absl::nullopt, absl::nullopt);
     }
 
     // Remove the host from P1.
@@ -3664,12 +3664,13 @@ public:
           updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
                             std::make_shared<const HealthyHostVector>(*empty_hosts),
                             HostsPerLocalityImpl::empty()),
-          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
+          {}, hosts_added, hosts_removed, random_.random(), absl::nullopt, absl::nullopt);
     }
   }
 
   HostVectorSharedPtr hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_;
+  TestRandomGenerator random_;
 };
 
 // Test creating and extending a priority set.
@@ -3717,11 +3718,12 @@ TEST(PrioritySet, Extend) {
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
 
-    priority_set.updateHosts(
-        1,
-        updateHostsParams(hosts, hosts_per_locality,
-                          std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt, fake_cross_priority_host_map);
+    priority_set.updateHosts(1,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, 0, absl::nullopt, absl::nullopt,
+                             fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
@@ -3786,7 +3788,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+                             {}, hosts_added, hosts_removed, 0, absl::nullopt);
   }
 
   // Only mutable host map can be updated directly. Read only host map will not be updated before
@@ -3807,7 +3809,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+                             {}, hosts_added, hosts_removed, 0, absl::nullopt);
   }
 
   // New mutable host map will be created and all update will be applied to new mutable host map.
@@ -5539,7 +5541,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
   auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
   host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality), locality_weights,
-                        {}, {}, absl::nullopt);
+                        {}, {}, 0, absl::nullopt);
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
@@ -5575,7 +5577,7 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
           HostsPerLocalityImpl::empty(),
           makeHostsFromHostsPerLocality<ExcludedHostVector>(excluded_hosts_per_locality),
           excluded_hosts_per_locality),
-      locality_weights, {}, {}, absl::nullopt);
+      locality_weights, {}, {}, 0, absl::nullopt);
   // We should RR between localities with equal weight.
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
@@ -5598,7 +5600,7 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
   host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
+                        locality_weights, {}, {}, 0, absl::nullopt);
   // Verify that we are not RRing between localities.
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
@@ -5619,7 +5621,7 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {});
+                        locality_weights, {}, {}, 0);
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
@@ -5642,7 +5644,7 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
+                        locality_weights, {}, {}, 0, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
@@ -5666,7 +5668,7 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
+                        locality_weights, {}, {}, 0, absl::nullopt);
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
@@ -5694,13 +5696,84 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
+                        locality_weights, {}, {}, 0, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+}
+
+// Validates that with weighted initialization all localities are chosen
+// proportionally to their weight.
+TEST_F(HostSetImplLocalityTest, WeightedAllChosen) {
+  // This test should remain when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
+  // is deprecated.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "true"}});
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  envoy::config::core::v3::Locality zone_c;
+  zone_b.set_zone("C");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
+  // Set weights of 10%, 60% and 30% to the three zones.
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 6, 3}};
+
+  // Keep track of how many times each locality is picked, initialized to 0.
+  uint32_t locality_picked_count[] = {0, 0, 0};
+
+  // Create the load-balancer 10 times, each with a different seed number (from
+  // 0 to 10), do a single pick, and validate that the number of picks equals
+  // to the weights assigned to the localities.
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  for (uint32_t i = 0; i < 10; ++i) {
+    host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                            std::make_shared<const HealthyHostVector>(hosts),
+                                            hosts_per_locality),
+                          locality_weights, {}, {}, i, absl::nullopt);
+    locality_picked_count[host_set_.chooseHealthyLocality().value()]++;
+  }
+  EXPECT_EQ(locality_picked_count[0], 1);
+  EXPECT_EQ(locality_picked_count[1], 6);
+  EXPECT_EQ(locality_picked_count[2], 3);
+}
+
+// Validates that the non-randomized initialization works. This test should be
+// removed when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
+// is deprecated.
+TEST_F(HostSetImplLocalityTest, WeightedNoRandomization) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "false"}});
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
+
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
+  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
+  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
+                                          std::make_shared<const HealthyHostVector>(hosts),
+                                          hosts_per_locality),
+                        locality_weights, {}, {}, 0, absl::nullopt);
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
 // Gentle failover between localities as health diminishes.
@@ -5732,7 +5805,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
                                             makeHostsFromHostsPerLocality<HealthyHostVector>(
                                                 healthy_hosts_per_locality),
                                             healthy_hosts_per_locality),
-                          locality_weights, {}, {}, absl::nullopt);
+                          locality_weights, {}, {}, 0, absl::nullopt);
   };
 
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
@@ -5785,7 +5858,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
     host_set.updateHosts(updateHostsParams(std::make_shared<const HostVector>(hosts),
                                            hosts_per_locality, healthy_hosts,
                                            healthy_hosts_per_locality),
-                         locality_weights, {}, {}, absl::nullopt);
+                         locality_weights, {}, {}, 0, absl::nullopt);
     uint32_t cnts[] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
       absl::optional<uint32_t> locality_index = host_set.chooseHealthyLocality();
@@ -5821,6 +5894,7 @@ TEST(HostPartitionTest, PartitionHosts) {
                    makeTestHost(info, "tcp://127.0.0.1:81", *time_source, zone_a),
                    makeTestHost(info, "tcp://127.0.0.1:82", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:83", *time_source, zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b),
                    makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b)};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -5829,24 +5903,26 @@ TEST(HostPartitionTest, PartitionHosts) {
   hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
   hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[5]->healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   auto hosts_per_locality =
-      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
+      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4], hosts[5]}});
 
   auto update_hosts_params =
       HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
 
-  EXPECT_EQ(5, update_hosts_params.hosts->size());
+  EXPECT_EQ(6, update_hosts_params.hosts->size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
   EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
   EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
-  EXPECT_EQ(2, update_hosts_params.excluded_hosts->get().size());
+  EXPECT_EQ(3, update_hosts_params.excluded_hosts->get().size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts->get()[1]);
+  EXPECT_EQ(hosts[5], update_hosts_params.excluded_hosts->get()[2]);
 
   EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
-  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
+  EXPECT_EQ(4, update_hosts_params.hosts_per_locality->get()[1].size());
 
   EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
@@ -5857,9 +5933,10 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
 
   EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(2, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(3, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
+  EXPECT_EQ(hosts[5], update_hosts_params.excluded_hosts_per_locality->get()[1][2]);
 }
 
 TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
@@ -5953,9 +6030,11 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   cluster->initialize([] {});
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
+  NiceMock<Random::MockRandomGenerator> random;
   // Make priority state manager and fill it with the initial state of the cluster and the added
   // hosts
-  PriorityStateManager priority_state_manager(*cluster, server_context_.local_info_, nullptr);
+  PriorityStateManager priority_state_manager(*cluster, server_context_.local_info_, nullptr,
+                                              random);
 
   auto current_hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   HostVector hosts_added{makeTestHost(cluster->info(), "tcp://127.0.0.1:81", simTime(), zone_b),

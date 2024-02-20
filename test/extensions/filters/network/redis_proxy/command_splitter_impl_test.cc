@@ -406,6 +406,22 @@ TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   EXPECT_EQ(nullptr, handle_);
 };
 
+TEST_F(RedisSingleServerRequestTest, EchoSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"echo", "foobar"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::BulkString);
+  response.asString() = "foobar";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+};
+
 TEST_F(RedisSingleServerRequestTest, Time) {
   InSequence s;
 

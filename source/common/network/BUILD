@@ -20,6 +20,7 @@ envoy_cc_library(
         ":socket_interface_lib",
         "//envoy/network:address_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",
@@ -79,6 +80,7 @@ envoy_cc_library(
     srcs = ["connection_impl_base.cc"],
     hdrs = ["connection_impl_base.h"],
     deps = [
+        ":common_connection_filter_states_lib",
         ":connection_socket_lib",
         ":filter_manager_lib",
         "//envoy/common:scope_tracker_interface",
@@ -601,5 +603,16 @@ envoy_cc_library(
     hdrs = ["generic_listener_filter_impl_base.h"],
     deps = [
         "//envoy/network:filter_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "common_connection_filter_states_lib",
+    srcs = ["common_connection_filter_states.cc"],
+    hdrs = ["common_connection_filter_states.h"],
+    deps = [
+        "//envoy/common:execution_context",
+        "//envoy/network:connection_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )

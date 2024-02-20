@@ -25,6 +25,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -531,7 +532,6 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
       !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
 
   if (HeaderUtility::isSpecial1xx(*headers)) {
-    ASSERT(!remote_end_stream_);
     response_decoder_.decode1xxHeaders(std::move(headers));
   } else {
     response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
@@ -1106,6 +1106,9 @@ enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
 }
 
 Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
+  ENVOY_CONN_LOG(trace, "recv frame type=PING", connection_);
+  ASSERT(connection_.state() == Network::Connection::State::Open);
+
   if (is_ack) {
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, opaque_data);
 
@@ -1114,9 +1117,10 @@ Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
   return okStatus();
 }
 
-Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t flags,
                                    size_t padding) {
-  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, type, flags, padding));
+  ENVOY_CONN_LOG(trace, "recv frame type=DATA stream_id={}", connection_, stream_id);
+  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, NGHTTP2_DATA, flags, padding));
 
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
@@ -1132,6 +1136,7 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t typ
 }
 
 Status ConnectionImpl::onGoAway(uint32_t error_code) {
+  ENVOY_CONN_LOG(trace, "recv frame type=GOAWAY", connection_);
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
   // notifications are the same as a normal GOAWAY.
   // TODO: handle multiple GOAWAY frames.
@@ -1190,11 +1195,12 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
 }
 
 Status ConnectionImpl::onRstStream(int32_t stream_id, uint32_t error_code) {
-  ENVOY_CONN_LOG(trace, "remote reset: {} {}", connection_, stream_id, error_code);
+  ENVOY_CONN_LOG(trace, "recv frame type=RST_STREAM stream_id={}", connection_, stream_id);
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
     return okStatus();
   }
+  ENVOY_CONN_LOG(trace, "remote reset: {} {}", connection_, stream_id, error_code);
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(/*frame_length=*/4 + H2_FRAME_HEADER_SIZE);
   stream->remote_rst_ = true;
@@ -1220,8 +1226,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return onPing(data, frame->ping.hd.flags & NGHTTP2_FLAG_ACK);
   }
   if (frame->hd.type == NGHTTP2_DATA) {
-    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags,
-                       frame->data.padlen);
+    return onBeginData(frame->hd.stream_id, frame->hd.length, frame->hd.flags, frame->data.padlen);
   }
   if (frame->hd.type == NGHTTP2_GOAWAY) {
     ASSERT(frame->hd.stream_id == 0);
@@ -1487,7 +1492,6 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 
     } else if (stream->defer_processing_backedup_streams_ && !stream->reset_reason_.has_value() &&
                stream->stream_manager_.hasBufferedBodyOrTrailers()) {
-      ASSERT(error_code == NGHTTP2_NO_ERROR);
       ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
       // Buffer the call, rely on the stream->process_buffered_data_callback_
       // to end up invoking.
@@ -1925,6 +1929,10 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
       options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
 }
 
+ExecutionContext* ConnectionImpl::executionContext() const {
+  return getConnectionExecutionContext(connection_);
+}
+
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "Http2::ConnectionImpl " << this << DUMP_MEMBER(max_headers_kb_)
@@ -2096,7 +2104,7 @@ int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 }
 
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
-  connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  connection_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
 
   return StreamResetReason::ProtocolError;
 }

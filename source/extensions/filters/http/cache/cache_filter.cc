@@ -641,7 +641,7 @@ void CacheFilter::encodeCachedResponse() {
           ? static_cast<Http::StreamFilterCallbacks*>(decoder_callbacks_)
           : static_cast<Http::StreamFilterCallbacks*>(encoder_callbacks_);
 
-  callbacks->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter);
+  callbacks->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
   callbacks->streamInfo().setResponseCodeDetails(
       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
 

@@ -11,6 +11,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -728,7 +729,7 @@ public:
         0,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
+        {}, empty_host_vector_, empty_host_vector_, random_.random(), absl::nullopt);
   }
 
   void peekThenPick(std::vector<int> picks) {
@@ -1096,11 +1097,11 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().healthy_hosts_[1]->weight(1);
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   // Add a host, it should participate in next round of scheduling.
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 3));
@@ -1115,9 +1116,9 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   // Remove last two hosts, add a new one with different weights.
   HostVector removed_hosts = {hostSet().hosts_[1], hostSet().hosts_[2]};
   hostSet().healthy_hosts_.pop_back();
@@ -1154,6 +1155,68 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
+// Validate that the RNG seed influences pick order when weighted RR without
+// the envoy.reloadable_features.edf_lb_host_scheduler_init_fix.
+// This test should be removed once
+// envoy.reloadable_features.edf_lb_host_scheduler_init_fix is deprecated.
+TEST_P(RoundRobinLoadBalancerTest, WeightedSeedOldInit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_host_scheduler_init_fix", "false"}});
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
+  init(false);
+  // Initial weights respected.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
+// Validate that low weighted hosts will be chosen when the LB is created.
+TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.locality_routing_use_new_routing_logic",
+                               GetParam().use_new_locality_routing ? "true" : "false"}});
+  // This test should be kept just the runtime override removed once the
+  // feature-flag is deprecated.
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_host_scheduler_init_fix", "true"}});
+  // Add 3 hosts with weights {6, 3, 1}. Out of 10 refreshes with consecutive
+  // random value, 6 times the first host will be chosen, 3 times the second
+  // host will be chosen, and 1 time the third host will be chosen.
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 6),
+      makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 3),
+      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 1),
+  };
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  absl::flat_hash_map<HostConstSharedPtr, uint32_t> host_picked_count_map;
+  for (const auto& host : hostSet().healthy_hosts_) {
+    host_picked_count_map[host] = 0;
+  }
+  // When random returns x, the initialization of the lb will invoke pickAndAdd
+  // x times. The test validates the result of the next call (the x+1 call).
+  // Initiate 10 load-balancers with different random values.
+  for (int i = 0; i < 10; ++i) {
+    EXPECT_CALL(random_, random()).Times(2).WillRepeatedly(Return(i));
+    RoundRobinLoadBalancer lb(priority_set_, local_priority_set_.get(), stats_, runtime_, random_,
+                              common_config_, round_robin_lb_config_, simTime());
+    const auto& host = lb.chooseHost(nullptr);
+    host_picked_count_map[host]++;
+  }
+  // Ensure that the number of times each host was picked is as expected.
+  {
+    EXPECT_EQ(host_picked_count_map[hostSet().healthy_hosts_[0]], 6);
+    EXPECT_EQ(host_picked_count_map[hostSet().healthy_hosts_[1]], 3);
+    EXPECT_EQ(host_picked_count_map[hostSet().healthy_hosts_[2]], 1);
+  }
 }
 
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
@@ -2878,6 +2941,96 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
       .WillOnce(Return(2))
       .WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, DefaultSelectionMethod) {
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  EXPECT_EQ(lr_lb_config.selection_method(),
+            envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::N_CHOICES);
+}
+
+TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(4);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(2);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[4]->stats().rq_active_.set(5);
+
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+
+  // Enable FULL_SCAN on hosts.
+  lr_lb_config.set_selection_method(
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
+
+  LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
+                              random_,       1,       lr_lb_config, simTime()};
+
+  // With FULL_SCAN we will always choose the host with least number of active requests.
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[4]->stats().rq_active_.set(1);
+
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+
+  // Enable FULL_SCAN on hosts.
+  lr_lb_config.set_selection_method(
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::FULL_SCAN);
+
+  auto random = Random::RandomGeneratorImpl();
+
+  LeastRequestLoadBalancer lb{priority_set_, nullptr, stats_,       runtime_,
+                              random,        1,       lr_lb_config, simTime()};
+
+  // Make 1 million selections. Then, check that the selection probability is
+  // approximately equal among the 3 hosts tied for least requests.
+  // Accept a +/-0.5% deviation from the expected selection probability (33.3..%).
+  size_t num_selections = 1000000;
+  size_t expected_approx_selections_per_tied_host = num_selections / 3;
+  size_t abs_error = 5000;
+
+  size_t host_2_counts = 0;
+  size_t host_3_counts = 0;
+  size_t host_4_counts = 0;
+
+  for (size_t i = 0; i < num_selections; ++i) {
+    auto selected_host = lb.chooseHost(nullptr);
+
+    if (selected_host == hostSet().healthy_hosts_[2]) {
+      ++host_2_counts;
+    } else if (selected_host == hostSet().healthy_hosts_[3]) {
+      ++host_3_counts;
+    } else if (selected_host == hostSet().healthy_hosts_[4]) {
+      ++host_4_counts;
+    } else {
+      FAIL() << "Must only select hosts with least requests";
+    }
+  }
+
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_2_counts, abs_error);
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_3_counts, abs_error);
+  EXPECT_NEAR(expected_approx_selections_per_tied_host, host_4_counts, abs_error);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {

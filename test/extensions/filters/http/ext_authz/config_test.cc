@@ -35,8 +35,8 @@ public:
                              const Grpc::StatNames& stat_names,
                              const Bootstrap::GrpcAsyncClientManagerConfig& config)
       : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names, config) {}
-  Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
-                                                    Stats::Scope&, bool) override {
+  absl::StatusOr<Grpc::AsyncClientFactoryPtr>
+  factoryForGrpcService(const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
   }
 };
@@ -211,8 +211,9 @@ private:
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service());
     Grpc::RawAsyncClientSharedPtr async_client =
-        async_client_manager_->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
-                                                                    context_.scope(), false);
+        async_client_manager_
+            ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.scope(), false)
+            .value();
     Grpc::MockAsyncClient* mock_async_client =
         dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());
     EXPECT_NE(mock_async_client, nullptr);

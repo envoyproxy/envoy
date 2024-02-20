@@ -9,8 +9,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
-
-#include "quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -252,7 +251,7 @@ void EnvoyQuicClientSession::setHttp3Options(
   }
   static_cast<EnvoyQuicClientConnection*>(connection())
       ->setNumPtosForPortMigration(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 4));
+          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 0));
 
   if (http3_options_->quic_protocol_options().has_connection_keepalive()) {
     const uint64_t initial_interval = PROTOBUF_GET_MS_OR_DEFAULT(
