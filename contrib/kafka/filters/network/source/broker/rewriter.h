@@ -21,7 +21,7 @@ namespace Broker {
  */
 class ResponseRewriter : public ResponseCallback {
 public:
-  virtual ~ResponseRewriter() = default;
+  ~ResponseRewriter() override = default;
 
   /**
    * Performs any desired payload changes.
