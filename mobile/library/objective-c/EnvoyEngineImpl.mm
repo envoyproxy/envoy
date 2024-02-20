@@ -407,8 +407,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-                  networkMonitoringMode:(int)networkMonitoringMode
-             respectSystemProxySettings:(BOOL)respectSystemProxySettings {
+                  networkMonitoringMode:(int)networkMonitoringMode {
   self = [super init];
   if (!self) {
     return nil;
@@ -438,10 +437,6 @@ static void ios_track_event(envoy_map map, const void *context) {
 
   _engine = new Envoy::InternalEngine(native_callbacks, native_logger, native_event_tracker);
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
-
-  if (respectSystemProxySettings) {
-    registerAppleProxyResolver();
-  }
 
   if (networkMonitoringMode == 1) {
     [_networkMonitor startReachability];
@@ -517,6 +512,10 @@ static void ios_track_event(envoy_map map, const void *context) {
 
   for (NSString *name in config.keyValueStores) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
+  }
+
+  if (config.respectSystemProxySettings) {
+    registerAppleProxyResolver();
   }
 }
 

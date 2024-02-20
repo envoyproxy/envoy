@@ -24,7 +24,7 @@ protected:
   GrpcMuxFailoverTest()
       // The GrpcMuxFailover test uses a the GrpcMuxFailover with mocked GrpcStream objects.
       : primary_stream_owner_(std::make_unique<MockGrpcStream<RequestType, ResponseType>>()),
-        primary_stream_(*primary_stream_owner_.get()),
+        primary_stream_(*primary_stream_owner_),
         grpc_mux_failover_(
             /*primary_stream_creator=*/
             [this](GrpcStreamCallbacks<ResponseType>* callbacks)

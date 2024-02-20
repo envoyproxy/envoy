@@ -1097,11 +1097,11 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().healthy_hosts_[1]->weight(1);
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   // Add a host, it should participate in next round of scheduling.
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 3));
@@ -1116,9 +1116,9 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   // Remove last two hosts, add a new one with different weights.
   HostVector removed_hosts = {hostSet().hosts_[1], hostSet().hosts_[2]};
   hostSet().healthy_hosts_.pop_back();
@@ -1155,6 +1155,68 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
+// Validate that the RNG seed influences pick order when weighted RR without
+// the envoy.reloadable_features.edf_lb_host_scheduler_init_fix.
+// This test should be removed once
+// envoy.reloadable_features.edf_lb_host_scheduler_init_fix is deprecated.
+TEST_P(RoundRobinLoadBalancerTest, WeightedSeedOldInit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_host_scheduler_init_fix", "false"}});
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
+  init(false);
+  // Initial weights respected.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
+// Validate that low weighted hosts will be chosen when the LB is created.
+TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.locality_routing_use_new_routing_logic",
+                               GetParam().use_new_locality_routing ? "true" : "false"}});
+  // This test should be kept just the runtime override removed once the
+  // feature-flag is deprecated.
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.edf_lb_host_scheduler_init_fix", "true"}});
+  // Add 3 hosts with weights {6, 3, 1}. Out of 10 refreshes with consecutive
+  // random value, 6 times the first host will be chosen, 3 times the second
+  // host will be chosen, and 1 time the third host will be chosen.
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 6),
+      makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 3),
+      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 1),
+  };
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  absl::flat_hash_map<HostConstSharedPtr, uint32_t> host_picked_count_map;
+  for (const auto& host : hostSet().healthy_hosts_) {
+    host_picked_count_map[host] = 0;
+  }
+  // When random returns x, the initialization of the lb will invoke pickAndAdd
+  // x times. The test validates the result of the next call (the x+1 call).
+  // Initiate 10 load-balancers with different random values.
+  for (int i = 0; i < 10; ++i) {
+    EXPECT_CALL(random_, random()).Times(2).WillRepeatedly(Return(i));
+    RoundRobinLoadBalancer lb(priority_set_, local_priority_set_.get(), stats_, runtime_, random_,
+                              common_config_, round_robin_lb_config_, simTime());
+    const auto& host = lb.chooseHost(nullptr);
+    host_picked_count_map[host]++;
+  }
+  // Ensure that the number of times each host was picked is as expected.
+  {
+    EXPECT_EQ(host_picked_count_map[hostSet().healthy_hosts_[0]], 6);
+    EXPECT_EQ(host_picked_count_map[hostSet().healthy_hosts_[1]], 3);
+    EXPECT_EQ(host_picked_count_map[hostSet().healthy_hosts_[2]], 1);
+  }
 }
 
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {

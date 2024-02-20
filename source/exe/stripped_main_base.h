@@ -53,7 +53,7 @@ public:
                    std::unique_ptr<Server::Platform> platform_impl,
                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
                    std::unique_ptr<ProcessContext> process_context,
-                   CreateInstanceFunction createInstance);
+                   CreateInstanceFunction create_instance);
 
   void runServer() {
     ASSERT(options_.mode() == Server::Mode::Serve);
