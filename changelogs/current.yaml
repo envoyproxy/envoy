@@ -117,6 +117,9 @@ bug_fixes:
 - area: deps
   change: |
     Updated QUICHE dependencies to incorporate fixes for https://github.com/envoyproxy/envoy/issues/32401.
+- area: tracing
+  change: |
+    Dynatrace resource detector: Only log warning message when no enrichment attributes are found.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
