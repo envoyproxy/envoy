@@ -537,9 +537,14 @@ protected:
     static constexpr uint64_t NumChunks = 10;
     static constexpr uint64_t BytesPerChunk = 10000;
 
-    StreamingAdminRequest() : chunk_(BytesPerChunk, 'a') {}
+    /*StreamingAdminRequest(OptRef<absl::Notification>& pause_chunk)
+        : chunk_(BytesPerChunk, 'a'),
+        pause_chunk_(pause_chunk) {}*/
+    StreamingAdminRequest(std::function<void()>& next_chunk_hook)
+        : chunk_(BytesPerChunk, 'a'), next_chunk_hook_(next_chunk_hook) {}
     Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
     bool nextChunk(Buffer::Instance& response) override {
+      next_chunk_hook_();
       response.add(chunk_);
       return --chunks_remaining_ > 0;
     }
@@ -547,6 +552,7 @@ protected:
   private:
     const std::string chunk_;
     uint64_t chunks_remaining_{NumChunks};
+    std::function<void()>& next_chunk_hook_;
   };
 
   AdminStreamingTest() {
@@ -555,8 +561,8 @@ protected:
     Server::Admin& admin = *main_common_->server()->admin();
     admin.addStreamingHandler(
         std::string(StreamingEndpoint), "streaming api",
-        [](Server::AdminStream&) -> Server::Admin::RequestPtr {
-          return std::make_unique<StreamingAdminRequest>();
+        [this](Server::AdminStream&) -> Server::Admin::RequestPtr {
+          return std::make_unique<StreamingAdminRequest>(next_chunk_hook_);
         },
         true, false);
   }
@@ -608,6 +614,8 @@ protected:
     blocked_response->getHeaders(
         [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
   }
+
+  std::function<void()> next_chunk_hook_ = []() {};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStreamingTest,
@@ -688,8 +696,11 @@ TEST_P(AdminStreamingTest, CancelAfterAskingForChunk) {
   headers_notify.WaitForNotification();
   blockMainThreadUntilResume(StreamingEndpoint, "GET");
   int chunk_calls = 0;
+
+  // Cause the /streaming handler to pause while yielding the next chunk, to hit
+  // an early exit in MainCommonBase::requestNextChunk.
+  next_chunk_hook_ = [response]() { response->cancel(); };
   response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
-  response->cancel();
   resume_.Notify();
   quitAndWait();
   EXPECT_EQ(0, chunk_calls);
