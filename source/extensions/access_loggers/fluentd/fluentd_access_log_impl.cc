@@ -121,8 +121,8 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
   const auto cache_key = MessageUtil::hash(*config);
   const auto it = cache.access_loggers_.find(cache_key);
-  if (it != cache.access_loggers_.end()) {
-    return it->second.expired() ? nullptr : it->second.lock();
+  if (it != cache.access_loggers_.end() && !it->second.expired()) {
+    return it->second.lock();
   }
 
   auto client =
