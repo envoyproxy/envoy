@@ -114,7 +114,7 @@ void ValidationInstance::initialize(const Options& options,
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
-  THROW_IF_NOT_OK(creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());

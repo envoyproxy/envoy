@@ -31,8 +31,9 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    headers.addCopy(Http::LowerCaseString("secret"),
-                    Config::DataSource::read(config_provider_->secret()->secret(), true, api_));
+    headers.addCopy(
+        Http::LowerCaseString("secret"),
+        Config::DataSource::read(config_provider_->secret()->secret(), true, api_).value());
     return Http::FilterHeadersStatus::Continue;
   }
 

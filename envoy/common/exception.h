@@ -60,4 +60,12 @@ public:
   if (!variable.ok()) {                                                                            \
     return variable;                                                                               \
   }
+
+template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
+  THROW_IF_STATUS_NOT_OK(type_or_error, throw);
+  return type_or_error.value();
+}
+
+#define THROW_OR_RETURN_VALUE(expression, type) returnOrThrow<type>(expression)
+
 } // namespace Envoy

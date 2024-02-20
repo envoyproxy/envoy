@@ -35,6 +35,10 @@
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
 
+#if defined(__APPLE__)
+#include "library/common/network/apple_proxy_resolution.h"
+#endif
+
 namespace Envoy {
 namespace Platform {
 
@@ -373,6 +377,13 @@ EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.emplace_back(std::move(guard), value);
   return *this;
 }
+
+#if defined(__APPLE__)
+EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
+  respect_system_proxy_settings_ = value;
+  return *this;
+}
+#endif
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
   // The yaml utilities have non-relevant thread asserts.
@@ -893,6 +904,12 @@ EngineSharedPtr EngineBuilder::build() {
       Envoy::Api::External::registerApi(name.c_str(), api);
     }
   }
+
+#if defined(__APPLE__)
+  if (respect_system_proxy_settings_) {
+    registerAppleProxyResolver();
+  }
+#endif
 
   Engine* engine = new Engine(envoy_engine);
 

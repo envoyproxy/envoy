@@ -254,6 +254,7 @@ run:
   mobile-core:
     paths:
     - "**/*"
+    - "*"
   mobile-format:
     paths:
     - .bazelrc
