@@ -40,8 +40,8 @@ is used as a region set. A region set is a single region, or comma seperated lis
 such as ``us-east-*`` or even ``*``. By using ``AWS_SIGV4A`` and wildcarded regions it is possible to simplify the overall envoy configuration for
 multi-region implementations.
 
-Signing can be added to the query string, rather than in the headers, by enabling :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
-Query string signing adds an additional parameter :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string.expiration_time>` which determines the
+Signing can be added to the query string, rather than in the headers, by enabling :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString>`
+Query string signing adds an additional parameter :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString.expiration_time>` which determines the
 length of time in seconds after which this URL becomes invalid, starting from the time the URL is signed.
 The default expiration time is 5 seconds, and it is recommended to keep this value as small as practicable, as the URL is replayable before this time expires.
 

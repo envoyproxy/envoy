@@ -27,6 +27,7 @@ public:
         message_(new Http::RequestMessageImpl()), credentials_("akid", "secret"),
         token_credentials_("akid", "secret", "token") {
     // 20180102T030405Z
+    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 

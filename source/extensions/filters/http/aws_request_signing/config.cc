@@ -31,9 +31,10 @@ bool isARegionSet(std::string region) {
   return false;
 }
 
-void throwIfExpirationExceedsMax(uint16_t expiration_time) {
-  if (expiration_time > 3600) {
-    throw EnvoyException("Expiration time can be a maximum of 3600 seconds. It is recommended to "
+void throwIfExpirationOutOfBounds(uint16_t expiration_time) {
+  if (expiration_time > 3600 || expiration_time < 1) {
+    throw EnvoyException("Expiration time can be a minimum of 1 second or a maximum of 3600 "
+                         "seconds. It is recommended to "
                          "keep expiration_time as short as possible.");
   }
 }
@@ -64,7 +65,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   bool query_string = config.has_query_string();
   uint16_t expiration_time =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.query_string(), expiration_time, 5);
-  throwIfExpirationExceedsMax(expiration_time);
+  throwIfExpirationOutOfBounds(expiration_time);
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
@@ -128,7 +129,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   bool query_string = per_route_config.aws_request_signing().has_query_string();
   uint16_t expiration_time = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       per_route_config.aws_request_signing().query_string(), expiration_time, 5);
-  throwIfExpirationExceedsMax(expiration_time);
+  throwIfExpirationOutOfBounds(expiration_time);
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
