@@ -98,7 +98,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_EQ(0U, response->body().size());
 }
 
-TEST_P(OverloadIntegrationTest, AppendOverloadHeader) {
+TEST_P(OverloadIntegrationTest, AppendLocalOverloadHeader) {
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
       name: "envoy.overload_actions.stop_accepting_requests"
