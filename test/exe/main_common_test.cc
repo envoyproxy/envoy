@@ -599,6 +599,13 @@ protected:
   }
 
   /**
+   * @return a streaming response to a GET of StreamingEndpoint.
+   */
+  MainCommonBase::AdminResponseSharedPtr streamingResponse() {
+    return main_common_->adminRequest(StreamingEndpoint, "GET");
+  }
+
+  /**
    * In order to trigger certain early-exit criteria in a test, we can exploit
    * the fact that all the admin responses are delivered on the main thread.
    * So we can pause those by blocking the main thread indefinitely.
@@ -633,10 +640,11 @@ protected:
     });
   }
 
-  MainCommonBase::AdminResponseSharedPtr streamingResponse() {
-    return main_common_->adminRequest(StreamingEndpoint, "GET");
-  }
-
+  /**
+   * Requests the headers and waits until the headers have been sent.
+   *
+   * @param response the response from which to get headers.
+   */
   void waitForHeaders(MainCommonBase::AdminResponseSharedPtr response) {
     absl::Notification headers_notify;
     response->getHeaders(
@@ -644,12 +652,21 @@ protected:
     headers_notify.WaitForNotification();
   }
 
+  /**
+   * Initiates a '/quitquitquit' call and requests the headers for that call,
+   * but does not wait for the call to complete. We avoid waiting in order to
+   * trigger a potential race to ensure that MainCommon handles it properly.
+   */
   void quitAndRequestHeaders() {
     MainCommonBase::AdminResponseSharedPtr quit_response =
         main_common_->adminRequest("/quitquitquit", "POST");
     quit_response->getHeaders([](Http::Code, Http::ResponseHeaderMap&) {});
   }
 
+  // This variable provides a hook to allow a test method to specify a hook to
+  // run when nextChunk() is called. This is currently used only for one test,
+  // CancelAfterAskingForChunk, that initiates a cancel() from within the chunk
+  // handler.
   std::function<void()> next_chunk_hook_ = []() {};
 };
 
