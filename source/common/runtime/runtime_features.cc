@@ -147,6 +147,10 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 // TODO(panting): flip this to true after some test time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 
+// A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
+// compliance restrictions.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
