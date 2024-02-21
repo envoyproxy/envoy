@@ -318,6 +318,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_nghttp2_nghttp2()
+    _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_alibaba_hessian2_codec()
@@ -733,6 +734,16 @@ def _com_github_nghttp2_nghttp2():
     native.bind(
         name = "nghttp2",
         actual = "@envoy//bazel/foreign_cc:nghttp2",
+    )
+
+def _com_github_msgpack_cpp():
+    external_http_archive(
+        name = "com_github_msgpack_cpp",
+        build_file = "@envoy//bazel/external:msgpack.BUILD",
+    )
+    native.bind(
+        name = "msgpack",
+        actual = "@com_github_msgpack_cpp//:msgpack",
     )
 
 def _io_hyperscan():
