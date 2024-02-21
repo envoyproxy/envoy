@@ -8,24 +8,14 @@ namespace Zstd {
 namespace Compressor {
 
 ZstdCompressorImplBase::ZstdCompressorImplBase(uint32_t compression_level, bool enable_checksum,
-                                               uint32_t strategy,
-                                               const ZstdCDictManagerPtr& cdict_manager,
-                                               uint32_t chunk_size)
+                                               uint32_t strategy, uint32_t chunk_size)
     : Common::Base(chunk_size), cctx_(ZSTD_createCCtx(), &ZSTD_freeCCtx),
-      cdict_manager_(cdict_manager), compression_level_(compression_level) {
+      compression_level_(compression_level) {
   size_t result;
   result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_checksumFlag, enable_checksum);
   RELEASE_ASSERT(!ZSTD_isError(result), "");
 
   result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_strategy, strategy);
-  RELEASE_ASSERT(!ZSTD_isError(result), "");
-
-  if (cdict_manager_) {
-    ZSTD_CDict* cdict = cdict_manager_->getFirstDictionary();
-    result = ZSTD_CCtx_refCDict(cctx_.get(), cdict);
-  } else {
-    result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_compressionLevel, compression_level_);
-  }
   RELEASE_ASSERT(!ZSTD_isError(result), "");
 }
 

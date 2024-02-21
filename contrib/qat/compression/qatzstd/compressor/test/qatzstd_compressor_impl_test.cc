@@ -65,7 +65,6 @@ protected:
   static constexpr uint32_t default_strategy_{0};
   uint32_t default_input_size_{796};
   uint32_t default_input_round_{10};
-  ZstdCDictManagerPtr default_cdict_manager_{nullptr};
   Zstd::Decompressor::ZstdDDictManagerPtr default_ddict_manager_{nullptr};
   bool enable_qat_zstd{true};
   uint32_t qat_zstd_fallback_threshold{0};
@@ -107,43 +106,6 @@ TEST_P(QatzstdConfigTest, LoadConfigAndVerifyWithDecompressor) {
   EXPECT_EQ("qatzstd.", qatzstd_compressor_factory->statsPrefix());
 
   verifyWithDecompressor(qatzstd_compressor_factory->createCompressor());
-}
-
-TEST_F(QatzstdCompressorImplTest, IllegalConfig) {
-  envoy::extensions::compression::qatzstd::compressor::v3alpha::Qatzstd qatzstd;
-  Qatzstd::Compressor::QatzstdCompressorLibraryFactory lib_factory;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
-  std::string json;
-
-  json = R"EOF({
-  "compression_level": 7,
-  "enable_checksum": true,
-  "strategy":"default",
-  "chunk_size": 4096,
-  "dictionary": {
-    "inline_string": ""
-  },
-  enable_qat_zstd: true,
-  qat_zstd_fallback_threshold: 1024,
-})EOF";
-  TestUtility::loadFromJson(json, qatzstd);
-  EXPECT_THROW_WITH_MESSAGE(lib_factory.createCompressorFactoryFromProto(qatzstd, mock_context),
-                            EnvoyException, "DataSource cannot be empty");
-
-  json = R"EOF({
-  "compression_level": 7,
-  "enable_checksum": true,
-  "strategy":"default",
-  "chunk_size": 4096,
-  "dictionary": {
-    "inline_string": "123321123"
-  },
-  enable_qat_zstd: true,
-  qat_zstd_fallback_threshold: 1024,
-})EOF";
-  TestUtility::loadFromJson(json, qatzstd);
-  EXPECT_DEATH({ lib_factory.createCompressorFactoryFromProto(qatzstd, mock_context); },
-               "assert failure: id != 0. Details: Illegal Zstd dictionary");
 }
 
 } // namespace

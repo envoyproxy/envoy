@@ -38,9 +38,9 @@ envoy_cc_library(
     deps = [
         ":qat-zstd",
         "//envoy/compression/compressor:compressor_interface",
+        "//envoy/server:factory_context_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/compression/zstd/common:zstd_base_lib",
-        "//source/common/compression/zstd/common:zstd_dictionary_manager_lib",
         "//source/common/compression/zstd/compressor:compressor_base",
     ],
 )

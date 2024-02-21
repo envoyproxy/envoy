@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.compression.qatzstd.compressor.v3alpha;
 
-import "envoy/config/core/v3/base.proto";
-
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -52,13 +50,6 @@ message Qatzstd {
   // resulting in stronger and slower compression.
   // Special: value 0 means "use default strategy".
   Strategy strategy = 3 [(validate.rules).enum = {defined_only: true}];
-
-  // A dictionary for compression. Zstd offers dictionary compression, which greatly improves
-  // efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
-  // that can be used to search the same dictionary during decompression.
-  // Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
-  // to train a specific dictionary for compression.
-  config.core.v3.DataSource dictionary = 4;
 
   // Value for compressor's next output buffer. If not set, defaults to 4096.
   google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];

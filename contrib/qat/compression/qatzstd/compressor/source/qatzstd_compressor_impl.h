@@ -5,7 +5,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/compression/zstd/common/base.h"
-#include "source/common/compression/zstd/common/dictionary_manager.h"
 #include "source/common/compression/zstd/compressor/zstd_compressor_impl_base.h"
 
 #include "qatseqprod.h"
@@ -16,11 +15,6 @@ namespace Compression {
 namespace Qatzstd {
 namespace Compressor {
 
-using ZstdCDictManager =
-    Envoy::Compression::Zstd::Common::DictionaryManager<ZSTD_CDict, ZSTD_freeCDict,
-                                                        ZSTD_getDictID_fromCDict>;
-using ZstdCDictManagerPtr = std::unique_ptr<ZstdCDictManager>;
-
 /**
  * Implementation of compressor's interface.
  */
@@ -28,9 +22,8 @@ class QatzstdCompressorImpl : public Envoy::Compression::Zstd::Compressor::ZstdC
                               public Logger::Loggable<Logger::Id::compression> {
 public:
   QatzstdCompressorImpl(uint32_t compression_level, bool enable_checksum, uint32_t strategy,
-                        const ZstdCDictManagerPtr& cdict_manager, uint32_t chunk_size,
-                        bool enable_qat_zstd, uint32_t qat_zstd_fallback_threshold,
-                        void* sequenceProducerState);
+                        uint32_t chunk_size, bool enable_qat_zstd,
+                        uint32_t qat_zstd_fallback_threshold, void* sequenceProducerState);
 
 private:
   void compressPreprocess(Buffer::Instance& buffer,

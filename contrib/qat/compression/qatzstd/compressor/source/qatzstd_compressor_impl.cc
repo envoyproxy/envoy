@@ -7,17 +7,19 @@ namespace Qatzstd {
 namespace Compressor {
 
 QatzstdCompressorImpl::QatzstdCompressorImpl(uint32_t compression_level, bool enable_checksum,
-                                             uint32_t strategy,
-                                             const ZstdCDictManagerPtr& cdict_manager,
-                                             uint32_t chunk_size, bool enable_qat_zstd,
+                                             uint32_t strategy, uint32_t chunk_size,
+                                             bool enable_qat_zstd,
                                              uint32_t qat_zstd_fallback_threshold,
                                              void* sequenceProducerState)
-    : ZstdCompressorImplBase(compression_level, enable_checksum, strategy, cdict_manager,
-                             chunk_size),
+    : ZstdCompressorImplBase(compression_level, enable_checksum, strategy, chunk_size),
       enable_qat_zstd_(enable_qat_zstd), qat_zstd_fallback_threshold_(qat_zstd_fallback_threshold),
       sequenceProducerState_(sequenceProducerState), input_ptr_{std::make_unique<uint8_t[]>(
                                                          chunk_size)},
       input_len_(0), chunk_size_(chunk_size) {
+  size_t result;
+  result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_compressionLevel, compression_level_);
+  RELEASE_ASSERT(!ZSTD_isError(result), "");
+
   ENVOY_LOG(debug,
             "zstd new ZstdCompressorImpl, compression_level: {}, strategy: {}, chunk_size: "
             "{}, enable_qat_zstd: {}, qat_zstd_fallback_threshold: {}",
@@ -25,7 +27,7 @@ QatzstdCompressorImpl::QatzstdCompressorImpl(uint32_t compression_level, bool en
   if (enable_qat_zstd_) {
     /* register qatSequenceProducer */
     ZSTD_registerSequenceProducer(cctx_.get(), sequenceProducerState_, qatSequenceProducer);
-    size_t result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_enableSeqProducerFallback, 1);
+    result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_enableSeqProducerFallback, 1);
     RELEASE_ASSERT(!ZSTD_isError(result), "");
   }
 }

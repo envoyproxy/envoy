@@ -17,14 +17,3 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "zstd_dictionary_manager_lib",
-    hdrs = ["dictionary_manager.h"],
-    external_deps = ["zstd"],
-    deps = [
-        "//envoy/event:dispatcher_interface",
-        "//envoy/thread_local:thread_local_interface",
-        "//source/common/config:datasource_lib",
-    ],
-)

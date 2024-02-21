@@ -6,7 +6,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/compression/zstd/common/base.h"
-#include "source/common/compression/zstd/common/dictionary_manager.h"
+#include "source/extensions/compression/zstd/common/dictionary_manager.h"
 
 #include "zstd_errors.h"
 
@@ -17,8 +17,7 @@ namespace Zstd {
 namespace Decompressor {
 
 using ZstdDDictManager =
-    Envoy::Compression::Zstd::Common::DictionaryManager<ZSTD_DDict, ZSTD_freeDDict,
-                                                        ZSTD_getDictID_fromDDict>;
+    Common::DictionaryManager<ZSTD_DDict, ZSTD_freeDDict, ZSTD_getDictID_fromDDict>;
 using ZstdDDictManagerPtr = std::unique_ptr<ZstdDDictManager>;
 
 /**

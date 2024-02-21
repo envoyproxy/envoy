@@ -35,7 +35,7 @@ class QatzstdCompressorFactory : public Envoy::Compression::Compressor::Compress
 public:
   QatzstdCompressorFactory(
       const envoy::extensions::compression::qatzstd::compressor::v3alpha::Qatzstd& qatzstd,
-      Event::Dispatcher& dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls);
+      ThreadLocal::SlotAllocator& tls);
 
   // Envoy::Compression::Compressor::CompressorFactory
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override;
@@ -57,7 +57,6 @@ private:
   const bool enable_checksum_;
   const uint32_t strategy_;
   const uint32_t chunk_size_;
-  ZstdCDictManagerPtr cdict_manager_{nullptr};
   const bool enable_qat_zstd_;
   const uint32_t qat_zstd_fallback_threshold_;
   ThreadLocal::TypedSlotPtr<QatzstdThreadLocal> tls_slot_;
