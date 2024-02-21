@@ -739,7 +739,9 @@ envoy_cc_fuzz_test(
         ":round_robin_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/fuzz:utility_lib",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
@@ -760,6 +762,8 @@ envoy_cc_fuzz_test(
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
 

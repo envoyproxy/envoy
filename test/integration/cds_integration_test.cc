@@ -763,5 +763,101 @@ TEST_P(CdsIntegrationTest, DISABLED_CdsClusterDownWithLotsOfConnectingConnection
   // validates.
 }
 
+// Test that an invalid config (aggression in RoundRobin and LeastRequest LB
+// config) is rejected properly, and Envoy doesn't crash.
+TEST_P(CdsIntegrationTest, InvalidLbAggressionValue) {
+  initialize();
+  // Validate "old-style" RoundRobin.
+  {
+    envoy::config::cluster::v3::Cluster cluster2;
+    cluster2.CopyFrom(cluster2_);
+    // Set cluster_2 with incorrect aggression value.
+    auto* slow_start_config = cluster2.mutable_round_robin_lb_config()->mutable_slow_start_config();
+    slow_start_config->mutable_slow_start_window()->set_seconds(123);
+    slow_start_config->mutable_aggression()->set_default_value(1e-300);
+    slow_start_config->mutable_aggression()->set_runtime_key("abc");
+    // Send the update with cluster_2.
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster1_, cluster2}, {cluster2}, {}, "3");
+    // Validate that the config was rejected.
+    test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+    // cluster_2 should not be active.
+    EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
+  }
+  // Validate "old-style" LeastRequest.
+  {
+    envoy::config::cluster::v3::Cluster cluster2;
+    cluster2.CopyFrom(cluster2_);
+    cluster2.set_lb_policy(envoy::config::cluster::v3::Cluster::LEAST_REQUEST);
+    // Set cluster_2 with incorrect aggression value.
+    auto* slow_start_config =
+        cluster2.mutable_least_request_lb_config()->mutable_slow_start_config();
+    slow_start_config->mutable_slow_start_window()->set_seconds(123);
+    slow_start_config->mutable_aggression()->set_default_value(1e-300);
+    slow_start_config->mutable_aggression()->set_runtime_key("abc");
+    // Send the update with cluster_2.
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster1_, cluster2}, {cluster2}, {}, "4");
+    // Validate that the config was rejected.
+    test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 2);
+    // cluster_2 should not be active.
+    EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
+  }
+  // Validate "new-style" RoundRobin.
+  {
+    envoy::config::cluster::v3::Cluster cluster2;
+    cluster2.CopyFrom(cluster2_);
+    cluster2.clear_lb_policy();
+    auto* policy = cluster2.mutable_load_balancing_policy();
+    const std::string policy_yaml = R"EOF(
+    policies:
+    - typed_extension_config:
+        name: envoy.load_balancing_policies.round_robin
+        typed_config:
+            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
+            slow_start_config:
+              slow_start_window: 123s
+              aggression:
+                default_value: 1e-300
+                runtime_key: abc
+    )EOF";
+    TestUtility::loadFromYaml(policy_yaml, *policy);
+    // Send the update with cluster_2.
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster1_, cluster2}, {cluster2}, {}, "5");
+    // Validate that the config was rejected.
+    test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 3);
+    // cluster_2 should not be active.
+    EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
+  }
+  // Validate "new-style" LeastRequest.
+  {
+    envoy::config::cluster::v3::Cluster cluster2;
+    cluster2.CopyFrom(cluster2_);
+    cluster2.clear_lb_policy();
+    auto* policy = cluster2.mutable_load_balancing_policy();
+    const std::string policy_yaml = R"EOF(
+    policies:
+    - typed_extension_config:
+        name: envoy.load_balancing_policies.least_request
+        typed_config:
+            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
+            slow_start_config:
+              slow_start_window: 123s
+              aggression:
+                default_value: 1e-300
+                runtime_key: abc
+    )EOF";
+    TestUtility::loadFromYaml(policy_yaml, *policy);
+    // Send the update with cluster_2.
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster1_, cluster2}, {cluster2}, {}, "6");
+    // Validate that the config was rejected.
+    test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 4);
+    // cluster_2 should not be active.
+    EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
+  }
+}
+
 } // namespace
 } // namespace Envoy

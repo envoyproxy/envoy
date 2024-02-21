@@ -1,8 +1,11 @@
 #include <memory>
 
+#include "source/extensions/load_balancing_policies/least_request/config.h"
+
 #include "test/common/upstream/least_request_load_balancer_fuzz.pb.validate.h"
 #include "test/common/upstream/zone_aware_load_balancer_fuzz_base.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -55,6 +58,20 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
   }
   const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
       input.zone_aware_load_balancer_test_case();
+
+  // Load the config using the factory (does extra validation).
+  try {
+    envoy::config::cluster::v3::Cluster cluster;
+    cluster.mutable_common_lb_config()->CopyFrom(
+        zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config());
+    cluster.mutable_least_request_lb_config()->CopyFrom(input.least_request_lb_config());
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    Envoy::Extensions::LoadBalancingPolices::LeastRequest::Factory factory;
+    auto lb_config = factory.loadConfig(cluster, context.messageValidationVisitor());
+  } catch (EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException while loading config; {}", e.what());
+    return;
+  }
 
   ZoneAwareLoadBalancerFuzzBase zone_aware_load_balancer_fuzz = ZoneAwareLoadBalancerFuzzBase(
       zone_aware_load_balancer_test_case.need_local_priority_set(),

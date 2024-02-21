@@ -64,11 +64,20 @@ public:
     auto active_or_legacy = Common::ActiveOrLegacy<RoundRobinLbProto, ClusterProto>::get(&config);
     ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
 
-    return active_or_legacy.hasLegacy()
-               ? Upstream::LoadBalancerConfigPtr{new LegacyRoundRobinLbConfig(
-                     *active_or_legacy.legacy())}
-               : Upstream::LoadBalancerConfigPtr{
-                     new TypedRoundRobinLbConfig(*active_or_legacy.active())};
+    if (active_or_legacy.hasLegacy()) {
+      auto legacy_config = std::make_unique<LegacyRoundRobinLbConfig>(*active_or_legacy.legacy());
+      if (legacy_config->lbConfig().has_value()) {
+        THROW_IF_NOT_OK(Upstream::LoadBalancerConfigHelper::validateSlowStartConfig(
+            legacy_config->lbConfig().ref()));
+      }
+      return Upstream::LoadBalancerConfigPtr{std::move(legacy_config)};
+    } else {
+      ASSERT(active_or_legacy.hasActive());
+      THROW_IF_NOT_OK(
+          Upstream::LoadBalancerConfigHelper::validateSlowStartConfig(*active_or_legacy.active()));
+      return Upstream::LoadBalancerConfigPtr{
+          new TypedRoundRobinLbConfig(*active_or_legacy.active())};
+    }
   }
 };
 

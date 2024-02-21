@@ -63,6 +63,26 @@ public:
     return proto_config.slow_start_config();
   }
 
+  /**
+   * Validates a given config that supports SlowStartConfig (currently
+   * RoundRobin and LeastRequest LBs are supporting it) is valid.
+   */
+  template <class Proto> static absl::Status validateSlowStartConfig(const Proto& proto_config) {
+    if (!proto_config.has_slow_start_config()) {
+      return {};
+    }
+    // Validates the value of the Aggression field.
+    const auto& slow_start_config = proto_config.slow_start_config();
+    if (slow_start_config.has_aggression()) {
+      const auto& aggression = slow_start_config.aggression();
+      if (aggression.default_value() < 1e-30) {
+        return absl::InvalidArgumentError(fmt::format(
+            "Aggression value ({}) cannot be smaller than 1e-30", aggression.default_value()));
+      }
+    }
+    return absl::OkStatus();
+  }
+
   static absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
   localityLbConfigFromCommonLbConfig(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
