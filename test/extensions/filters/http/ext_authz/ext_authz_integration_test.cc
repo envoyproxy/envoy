@@ -889,6 +889,48 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   cleanup();
 }
 
+TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_seconds=*/1);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  // Wait for the ext_authz request as a result of the client request.
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Do not sendExtAuthzResponse(). Envoy should reject the request after 1 second.
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
+  initializeConfig(false, /*failure_mode_allow=*/true, /*timeout_seconds=*/1);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  // Wait for the ext_authz request as a result of the client request.
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Do not sendExtAuthzResponse(). Envoy should eventually proxy the request upstream as if the
+  // authz service approved the request.
+  waitForSuccessfulUpstreamResponse("200", {}, {}, {}, {}, {},
+                                    /*failure_mode_allowed_header=*/true);
+
+  cleanup();
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
   // Set up ext_authz filter.
   initializeConfig(false, true);
@@ -1091,6 +1133,47 @@ TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("301", response_->headers().Status()->value().getStringView());
   EXPECT_EQ("http://host/redirect", response_->headers().getLocationValue());
+}
+
+TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailClosed) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_seconds=*/1);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  // Do not sendExtAuthzResponse(). Envoy should reject the request after 1 second.
+  ASSERT_TRUE(response_->waitForEndStream(Envoy::Seconds(10)));
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
+  initializeConfig(false, /*failure_mode_allow=*/true, /*timeout_seconds=*/1);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  // Do not sendExtAuthzResponse(). Envoy should eventually proxy the request upstream as if the
+  // authz service approved the request.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_THAT(upstream_request_->headers(),
+              Http::HeaderValueOf("x-envoy-auth-failure-mode-allowed", "true"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanup();
 }
 
 class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
