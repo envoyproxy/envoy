@@ -14,7 +14,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: HTTP1 codec configuration for Generic Proxy]
-// [#extension: envoy.generic_proxy.codecs.http]
+// [#extension: envoy.generic_proxy.codecs.http1]
 
 // Configuration for HTTP codec. This HTTP1 codec is used to parse and serialize HTTP1 messages
 // for the generic proxy filter.
