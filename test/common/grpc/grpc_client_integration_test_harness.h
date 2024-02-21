@@ -394,7 +394,8 @@ public:
 
   virtual void expectExtraHeaders(FakeStream&) {}
 
-  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata) {
+  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata,
+                                     bool expect_upstream_request = true) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -420,6 +421,10 @@ public:
     request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
                                                 active_span, Http::AsyncClient::RequestOptions());
     EXPECT_NE(request->grpc_request_, nullptr);
+
+    if (!expect_upstream_request) {
+      return request;
+    }
 
     if (!fake_connection_) {
       AssertionResult result =
@@ -556,6 +561,7 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
+
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
         tls_context, factory_context_);
 
@@ -587,6 +593,13 @@ public:
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
+    if (use_server_tls_13_) {
+      auto* tls_params = common_tls_context->mutable_tls_params();
+      tls_params->set_tls_minimum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+      tls_params->set_tls_maximum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+    }
 
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
@@ -598,6 +611,7 @@ public:
   }
 
   bool use_client_cert_{};
+  bool use_server_tls_13_{false};
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
