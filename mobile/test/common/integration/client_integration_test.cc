@@ -1020,5 +1020,13 @@ TEST_P(ClientIntegrationTest, TestStats) {
   }
 }
 
+#if defined(__APPLE__)
+TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
+  builder_.respectSystemProxySettings(true);
+  initialize();
+  ASSERT_TRUE(Envoy::Api::External::retrieveApi("envoy_proxy_resolver") != nullptr);
+}
+#endif
+
 } // namespace
 } // namespace Envoy

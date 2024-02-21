@@ -41,7 +41,9 @@ template <class T> struct OptRef {
    *
    * @return a ref to the converted object.
    */
-  template <class U> operator OptRef<U>() { return OptRef<U>(*ptr_); }
+  template <class U> operator OptRef<U>() {
+    return ptr_ == nullptr ? absl::nullopt : OptRef<U>(*ptr_);
+  }
 
   /**
    * Helper to call a const method on T. The caller is responsible for ensuring

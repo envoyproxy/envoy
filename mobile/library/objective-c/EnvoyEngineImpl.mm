@@ -10,6 +10,8 @@
 #import "library/cc/engine_builder.h"
 #import "library/common/internal_engine.h"
 
+#include "library/common/network/apple_proxy_resolution.h"
+
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
 #endif
@@ -510,6 +512,10 @@ static void ios_track_event(envoy_map map, const void *context) {
 
   for (NSString *name in config.keyValueStores) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
+  }
+
+  if (config.respectSystemProxySettings) {
+    registerAppleProxyResolver();
   }
 }
 

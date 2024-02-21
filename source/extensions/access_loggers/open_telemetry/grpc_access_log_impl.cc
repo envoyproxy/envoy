@@ -88,10 +88,11 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
   // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
   // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
   // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
-  // the main thread if necessary.
-  auto client = async_client_manager_
-                    .factoryForGrpcService(config.common_config().grpc_service(), scope_, true)
-                    ->createUncachedRawAsyncClient();
+  // the main thread if necessary to ensure it does not throw here.
+  auto factory_or_error = async_client_manager_.factoryForGrpcService(
+      config.common_config().grpc_service(), scope_, true);
+  THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+  auto client = factory_or_error.value()->createUncachedRawAsyncClient();
   return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, local_info_,
                                                 scope_);
 }
