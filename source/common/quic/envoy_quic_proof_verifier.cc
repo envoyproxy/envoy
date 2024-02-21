@@ -90,7 +90,10 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(certs[0]);
-  ASSERT(cert_view != nullptr);
+  if (cert_view == nullptr) {
+    *error_details = "unable to parse certificate";
+    return quic::QUIC_FAILURE;
+  }
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), error_details);
   if (sign_alg == 0) {
     return quic::QUIC_FAILURE;
