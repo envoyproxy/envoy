@@ -537,12 +537,14 @@ protected:
     static constexpr uint64_t NumChunks = 10;
     static constexpr uint64_t BytesPerChunk = 10000;
 
-    /*StreamingAdminRequest(OptRef<absl::Notification>& pause_chunk)
-        : chunk_(BytesPerChunk, 'a'),
-        pause_chunk_(pause_chunk) {}*/
-    StreamingAdminRequest(std::function<void()>& next_chunk_hook)
-        : chunk_(BytesPerChunk, 'a'), next_chunk_hook_(next_chunk_hook) {}
-    Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
+    StreamingAdminRequest(std::function<void()>& get_headers_hook,
+                          std::function<void()>& next_chunk_hook)
+        : chunk_(BytesPerChunk, 'a'), get_headers_hook_(get_headers_hook),
+          next_chunk_hook_(next_chunk_hook) {}
+    Http::Code start(Http::ResponseHeaderMap&) override {
+      get_headers_hook_();
+      return Http::Code::OK;
+    }
     bool nextChunk(Buffer::Instance& response) override {
       next_chunk_hook_();
       response.add(chunk_);
@@ -552,6 +554,7 @@ protected:
   private:
     const std::string chunk_;
     uint64_t chunks_remaining_{NumChunks};
+    std::function<void()>& get_headers_hook_;
     std::function<void()>& next_chunk_hook_;
   };
 
@@ -562,7 +565,7 @@ protected:
     admin.addStreamingHandler(
         std::string(StreamingEndpoint), "streaming api",
         [this](Server::AdminStream&) -> Server::Admin::RequestPtr {
-          return std::make_unique<StreamingAdminRequest>(next_chunk_hook_);
+          return std::make_unique<StreamingAdminRequest>(get_headers_hook_, next_chunk_hook_);
         },
         true, false);
   }
@@ -667,6 +670,7 @@ protected:
   // run when nextChunk() is called. This is currently used only for one test,
   // CancelAfterAskingForChunk, that initiates a cancel() from within the chunk
   // handler.
+  std::function<void()> get_headers_hook_ = []() {};
   std::function<void()> next_chunk_hook_ = []() {};
 };
 
@@ -713,7 +717,7 @@ TEST_P(AdminStreamingTest, CancelDuringChunks) {
 }
 
 TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader1) {
-  blockMainThreadUntilResume(StreamingEndpoint, "GET");
+  blockMainThreadUntilResume("/ready", "GET");
   MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   response->cancel();
   resume_.Notify();
@@ -735,13 +739,24 @@ TEST_P(AdminStreamingTest, CancelBeforeAskingForHeader2) {
   EXPECT_EQ(0, header_calls);
 }
 
-TEST_P(AdminStreamingTest, CancelAfterAskingForHeader) {
-  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+TEST_P(AdminStreamingTest, CancelAfterAskingForHeader1) {
   int header_calls = 0;
-  blockMainThreadUntilResume(StreamingEndpoint, "GET");
+  blockMainThreadUntilResume("/ready", "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
   response->cancel();
   resume_.Notify();
+  quitAndWait();
+  EXPECT_EQ(0, header_calls);
+}
+
+TEST_P(AdminStreamingTest, CancelAfterAskingForHeader2) {
+  int header_calls = 0;
+  // blockMainThreadUntilResume("/ready", "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  get_headers_hook_ = [&response]() { response->cancel(); };
+  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+  // resume_.Notify();
   quitAndWait();
   EXPECT_EQ(0, header_calls);
 }
@@ -770,7 +785,7 @@ TEST_P(AdminStreamingTest, CancelBeforeAskingForChunk2) {
 TEST_P(AdminStreamingTest, CancelAfterAskingForChunk) {
   MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   waitForHeaders(response);
-  blockMainThreadUntilResume(StreamingEndpoint, "GET");
+  blockMainThreadUntilResume("/ready", "GET");
   int chunk_calls = 0;
 
   // Cause the /streaming handler to pause while yielding the next chunk, to hit
