@@ -24,6 +24,7 @@
 #include "source/common/http/http1/header_formatter.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
@@ -130,11 +131,8 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
   ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_allow_codec_error_response_after_1xx_headers")) {
-    // Don't consider 100-continue responses as the actual response.
-    started_response_ = false;
-  }
+  // Don't consider 100-continue responses as the actual response.
+  started_response_ = false;
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
@@ -978,6 +976,10 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
+ExecutionContext* ConnectionImpl::executionContext() const {
+  return getConnectionExecutionContext(connection_);
+}
+
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
@@ -1140,12 +1142,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_absolute_url_with_mixed_scheme")) {
-      headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
-    } else {
-      headers.setScheme(absolute_url.scheme());
-    }
+    headers.setScheme(absl::AsciiStrToLower(absolute_url.scheme()));
     if (!Utility::schemeIsValid(headers.getSchemeValue())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
       return codecProtocolError("http/1.1 protocol error: invalid scheme");

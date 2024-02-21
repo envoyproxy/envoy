@@ -9,9 +9,8 @@
 #include "library/common/api/external.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
-#include "library/common/engine.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/main_interface.h"
+#include "library/common/internal_engine.h"
 
 using testing::_;
 using testing::HasSubstr;
@@ -160,8 +159,7 @@ TEST_F(MainInterfaceTest, BasicStream) {
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
                                     &engine_cbs_context /*context*/};
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
-  envoy_engine_t engine_handle = reinterpret_cast<envoy_engine_t>(engine.get());
+  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
   engine->run(BUFFERED_TEST_CONFIG.c_str(), level.c_str());
 
   ASSERT_TRUE(
@@ -197,56 +195,15 @@ TEST_F(MainInterfaceTest, BasicStream) {
   Http::TestRequestTrailerMapImpl trailers;
   envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
 
-  envoy_stream_t stream = init_stream(engine_handle);
+  envoy_stream_t stream = engine->initStream();
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  engine->startStream(stream, stream_cbs, false);
 
-  send_headers(engine_handle, stream, c_headers, false);
-  send_data(engine_handle, stream, c_data, false);
-  send_trailers(engine_handle, stream, c_trailers);
+  engine->sendHeaders(stream, c_headers, false);
+  engine->sendData(stream, c_data, false);
+  engine->sendTrailers(stream, c_trailers);
 
   ASSERT_TRUE(on_complete_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
-
-  engine->terminate();
-
-  ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
-}
-
-TEST_F(MainInterfaceTest, SendMetadata) {
-  engine_test_context engine_cbs_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<engine_test_context*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<engine_test_context*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &engine_cbs_context /*context*/};
-
-  // There is nothing functional about the config used to run the engine, as the created stream is
-  // only used for send_metadata.
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
-  envoy_engine_t engine_handle = reinterpret_cast<envoy_engine_t>(engine.get());
-  engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
-
-  ASSERT_TRUE(
-      engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
-
-  envoy_http_callbacks stream_cbs{
-      nullptr /* on_headers */,  nullptr /* on_data */,
-      nullptr /* on_metadata */, nullptr /* on_trailers */,
-      nullptr /* on_error */,    nullptr /* on_complete */,
-      nullptr /* on_cancel */,   nullptr /* on_send_window_available */,
-      nullptr /* context */,
-  };
-
-  envoy_stream_t stream = init_stream(engine_handle);
-
-  start_stream(engine_handle, stream, stream_cbs, false);
-
-  EXPECT_EQ(ENVOY_FAILURE, send_metadata(engine_handle, stream, {}));
 
   engine->terminate();
 
@@ -268,8 +225,7 @@ TEST_F(MainInterfaceTest, ResetStream) {
 
   // There is nothing functional about the config used to run the engine, as the created stream is
   // immediately reset.
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
-  envoy_engine_t engine_handle = reinterpret_cast<envoy_engine_t>(engine.get());
+  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(
@@ -291,39 +247,17 @@ TEST_F(MainInterfaceTest, ResetStream) {
       nullptr /* on_send_window_available */,
       &on_cancel_notification /* context */};
 
-  envoy_stream_t stream = init_stream(engine_handle);
+  envoy_stream_t stream = engine->initStream();
 
-  start_stream(engine_handle, stream, stream_cbs, false);
+  engine->startStream(stream, stream_cbs, false);
 
-  reset_stream(engine_handle, stream);
+  engine->cancelStream(stream);
 
   ASSERT_TRUE(on_cancel_notification.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   engine->terminate();
 
   ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
-}
-
-TEST_F(MainInterfaceTest, UsingMainInterfaceWithoutARunningEngine) {
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
-
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-
-  Http::TestRequestTrailerMapImpl trailers;
-  envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
-
-  EXPECT_EQ(ENVOY_FAILURE, send_headers(0, 0, c_headers, false));
-  EXPECT_EQ(ENVOY_FAILURE, send_data(0, 0, c_data, false));
-  EXPECT_EQ(ENVOY_FAILURE, send_trailers(0, 0, c_trailers));
-  EXPECT_EQ(ENVOY_FAILURE, reset_stream(0, 0));
-
-  // Release memory
-  release_envoy_headers(c_headers);
-  release_envoy_data(c_data);
-  release_envoy_headers(c_trailers);
 }
 
 TEST_F(MainInterfaceTest, RegisterPlatformApi) {
@@ -340,22 +274,18 @@ TEST_F(MainInterfaceTest, RegisterPlatformApi) {
                                     &engine_cbs_context /*context*/};
 
   // Using the minimal envoy mobile config that allows for running the engine.
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
+  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(
       engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   uint64_t fake_api;
-  EXPECT_EQ(ENVOY_SUCCESS, register_platform_api("api", &fake_api));
+  Envoy::Api::External::registerApi("api", &fake_api);
 
   engine->terminate();
 
   ASSERT_TRUE(engine_cbs_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
-}
-
-TEST_F(MainInterfaceTest, PreferredNetwork) {
-  EXPECT_EQ(ENVOY_SUCCESS, set_preferred_network(0, ENVOY_NET_WLAN));
 }
 
 TEST(EngineTest, RecordCounter) {
@@ -370,13 +300,11 @@ TEST(EngineTest, RecordCounter) {
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
                                     &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE, record_counter_inc(0, "counter", envoy_stats_notags, 1));
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
-  envoy_engine_t engine_handle = reinterpret_cast<envoy_engine_t>(engine.get());
+  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
 
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  EXPECT_EQ(ENVOY_SUCCESS, record_counter_inc(engine_handle, "counter", envoy_stats_notags, 1));
+  EXPECT_EQ(ENVOY_SUCCESS, engine->recordCounterInc("counter", envoy_stats_notags, 1));
 
   engine->terminate();
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -396,7 +324,7 @@ TEST(EngineTest, Logger) {
                                     } /*on_exit*/,
                                     &test_context /*context*/};
 
-  envoy_logger logger{[](envoy_data data, const void* context) -> void {
+  envoy_logger logger{[](envoy_log_level, envoy_data data, const void* context) -> void {
                         auto* test_context =
                             static_cast<engine_test_context*>(const_cast<void*>(context));
                         release_envoy_data(data);
@@ -410,7 +338,7 @@ TEST(EngineTest, Logger) {
                         test_context->on_logger_release.Notify();
                       } /* release */,
                       &test_context};
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, logger, {}));
+  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, logger, {}));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -436,7 +364,7 @@ TEST(EngineTest, EventTrackerRegistersDefaultAPI) {
                                     } /*on_exit*/,
                                     &test_context /*context*/};
 
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
+  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   // A default event tracker is registered in external API registry.
@@ -480,7 +408,8 @@ TEST(EngineTest, EventTrackerRegistersAPI) {
                                     } /*track*/,
                                     &test_context /*context*/};
 
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, event_tracker));
+  std::unique_ptr<Envoy::InternalEngine> engine(
+      new Envoy::InternalEngine(engine_cbs, {}, event_tracker));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -523,7 +452,8 @@ TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
       } /*track*/,
       &test_context /*context*/};
 
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, event_tracker));
+  std::unique_ptr<Envoy::InternalEngine> engine(
+      new Envoy::InternalEngine(engine_cbs, {}, event_tracker));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -563,7 +493,8 @@ TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
                                     } /*track*/,
                                     &test_context /*context*/};
 
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, event_tracker));
+  std::unique_ptr<Envoy::InternalEngine> engine(
+      new Envoy::InternalEngine(engine_cbs, {}, event_tracker));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -590,12 +521,11 @@ TEST_F(MainInterfaceTest, ResetConnectivityState) {
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
                                     &test_context /*context*/};
-  std::unique_ptr<Envoy::Engine> engine(new Envoy::Engine(engine_cbs, {}, {}));
-  envoy_engine_t engine_handle = reinterpret_cast<envoy_engine_t>(engine.get());
+  std::unique_ptr<Envoy::InternalEngine> engine(new Envoy::InternalEngine(engine_cbs, {}, {}));
   engine->run(MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  ASSERT_EQ(ENVOY_SUCCESS, reset_connectivity_state(engine_handle));
+  ASSERT_EQ(ENVOY_SUCCESS, engine->resetConnectivityState());
 
   engine->terminate();
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));

@@ -80,6 +80,8 @@ TEST_P(AdminInstanceTest, ClustersJsonAndText) {
       .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::EDS_STATUS_DRAINING))
+      .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
       .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
@@ -171,7 +173,7 @@ TEST_P(AdminInstanceTest, ClustersJsonAndText) {
       }
      ],
      "health_status": {
-      "eds_health_status": "DEGRADED",
+      "eds_health_status": "DRAINING",
       "failed_active_health_check": true,
       "failed_outlier_check": true,
       "failed_active_degraded_check": true,
@@ -228,7 +230,7 @@ fake_cluster::1.2.3.4:80::rest_counter::10
 fake_cluster::1.2.3.4:80::test_counter::10
 fake_cluster::1.2.3.4:80::test_gauge::11
 fake_cluster::1.2.3.4:80::hostname::foo.com
-fake_cluster::1.2.3.4:80::health_flags::/failed_active_hc/failed_outlier_check/degraded_active_hc/degraded_eds_health/pending_dynamic_removal
+fake_cluster::1.2.3.4:80::health_flags::/failed_active_hc/failed_outlier_check/degraded_active_hc/degraded_eds_health/pending_dynamic_removal/eds_status_draining
 fake_cluster::1.2.3.4:80::weight::5
 fake_cluster::1.2.3.4:80::region::test_region
 fake_cluster::1.2.3.4:80::zone::test_zone

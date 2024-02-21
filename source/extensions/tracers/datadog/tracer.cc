@@ -63,8 +63,9 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
       thread_local_slot_(
           ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
   const bool allow_added_via_api = true;
-  Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster, cluster_manager,
-                                allow_added_via_api);
+  THROW_IF_STATUS_NOT_OK(Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster,
+                                                       cluster_manager, allow_added_via_api),
+                         throw);
 
   thread_local_slot_->set([&logger = ENVOY_LOGGER(), collector_cluster, collector_reference_host,
                            config, &tracer_stats = tracer_stats_, &cluster_manager,
@@ -99,7 +100,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
 
   TraceContextReader reader{trace_context};
   datadog::tracing::Span span =
-      extract_or_create_span(*thread_local_tracer.tracer, span_config, reader);
+      extractOrCreateSpan(*thread_local_tracer.tracer, span_config, reader);
 
   // If we did not extract a sampling decision, and if Envoy is telling us to
   // drop the trace, then we treat that as a "user drop" (manual override).
@@ -114,10 +115,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   return std::make_unique<Span>(std::move(span));
 }
 
-datadog::tracing::Span
-Tracer::extract_or_create_span(datadog::tracing::Tracer& tracer,
-                               const datadog::tracing::SpanConfig& span_config,
-                               const datadog::tracing::DictReader& reader) {
+datadog::tracing::Span Tracer::extractOrCreateSpan(datadog::tracing::Tracer& tracer,
+                                                   const datadog::tracing::SpanConfig& span_config,
+                                                   const datadog::tracing::DictReader& reader) {
   datadog::tracing::Expected<datadog::tracing::Span> maybe_span =
       tracer.extract_span(reader, span_config);
   if (datadog::tracing::Error* error = maybe_span.if_error()) {

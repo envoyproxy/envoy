@@ -5,11 +5,12 @@
 
 #include "library/common/api/c_types.h"
 
-#import "library/common/main_interface.h"
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
 #import "library/cc/engine_builder.h"
-#import "library/common/engine.h"
+#import "library/common/internal_engine.h"
+
+#include "library/common/network/apple_proxy_resolution.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -38,12 +39,12 @@ static void ios_on_exit(void *context) {
   }
 }
 
-static void ios_on_log(envoy_data data, const void *context) {
+static void ios_on_log(envoy_log_level log_level, envoy_data data, const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
   @autoreleasepool {
     EnvoyLogger *logger = (__bridge EnvoyLogger *)context;
-    logger.log(to_ios_string(data));
+    logger.log(log_level, to_ios_string(data));
   }
 }
 
@@ -399,12 +400,12 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
-  Envoy::Engine *_engine;
+  Envoy::InternalEngine *_engine;
   EnvoyNetworkMonitor *_networkMonitor;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
-                                 logger:(nullable void (^)(NSString *))logger
+                                 logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode {
   self = [super init];
@@ -434,7 +435,7 @@ static void ios_track_event(envoy_map map, const void *context) {
     native_event_tracker.context = CFBridgingRetain(objcEventTracker);
   }
 
-  _engine = new Envoy::Engine(native_callbacks, native_logger, native_event_tracker);
+  _engine = new Envoy::InternalEngine(native_callbacks, native_logger, native_event_tracker);
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
   if (networkMonitoringMode == 1) {
@@ -473,7 +474,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   api->static_context = CFBridgingRetain(filterFactory);
   api->instance_context = NULL;
 
-  register_platform_api(filterFactory.filterName.UTF8String, api);
+  Envoy::Api::External::registerApi(filterFactory.filterName.UTF8String, api);
   return kEnvoySuccess;
 }
 
@@ -485,7 +486,8 @@ static void ios_track_event(envoy_map map, const void *context) {
   accessorStruct->get_string = ios_get_string;
   accessorStruct->context = CFBridgingRetain(accessor);
 
-  return register_platform_api(name.UTF8String, accessorStruct);
+  Envoy::Api::External::registerApi(name.UTF8String, accessorStruct);
+  return ENVOY_SUCCESS;
 }
 
 - (int)registerKeyValueStore:(NSString *)name keyValueStore:(id<EnvoyKeyValueStore>)keyValueStore {
@@ -495,7 +497,8 @@ static void ios_track_event(envoy_map map, const void *context) {
   api->remove = ios_kv_store_remove;
   api->context = CFBridgingRetain(keyValueStore);
 
-  return register_platform_api(name.UTF8String, api);
+  Envoy::Api::External::registerApi(name.UTF8String, api);
+  return ENVOY_SUCCESS;
 }
 
 - (void)performRegistrationsForConfig:(EnvoyConfiguration *)config {
@@ -509,6 +512,10 @@ static void ios_track_event(envoy_map map, const void *context) {
 
   for (NSString *name in config.keyValueStores) {
     [self registerKeyValueStore:name keyValueStore:config.keyValueStores[name]];
+  }
+
+  if (config.respectSystemProxySettings) {
+    registerAppleProxyResolver();
   }
 }
 
@@ -556,29 +563,24 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
                             explicitFlowControl:(BOOL)explicitFlowControl {
-  return [[EnvoyHTTPStreamImpl alloc] initWithHandle:init_stream(_engineHandle)
-                                              engine:_engineHandle
+  return [[EnvoyHTTPStreamImpl alloc] initWithHandle:_engine->initStream()
+                                              engine:reinterpret_cast<envoy_engine_t>(_engine)
                                            callbacks:callbacks
                                  explicitFlowControl:explicitFlowControl];
 }
 
 - (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count {
   // TODO: update to use real tag array when the API layer change is ready.
-  return record_counter_inc(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), count);
+  return _engine->recordCounterInc(elements.UTF8String, toNativeStatsTags(tags), count);
 }
 
 - (NSString *)dumpStats {
-  envoy_data data;
-  envoy_status_t status = dump_stats(_engineHandle, &data);
-  if (status != ENVOY_SUCCESS) {
+  std::string status = _engine->dumpStats();
+  if (status == "") {
     return @"";
   }
 
-  NSString *stringCopy = [[NSString alloc] initWithBytes:data.bytes
-                                                  length:data.length
-                                                encoding:NSUTF8StringEncoding];
-  release_envoy_data(data);
-  return stringCopy;
+  return @(status.c_str());
 }
 
 - (void)terminate {
@@ -586,7 +588,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 }
 
 - (void)resetConnectivityState {
-  reset_connectivity_state(_engineHandle);
+  _engine->resetConnectivityState();
 }
 
 #pragma mark - Private

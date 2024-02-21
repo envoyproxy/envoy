@@ -63,8 +63,8 @@ actual mechanics of the release itself.
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist))    |
 | 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123)              |
 | 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                   |
-| 2022 Q3 | Boteng Yao ([botengyao](https://github.com/botengyao))         | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))              |
-| 2022 Q4 | Paul Merrison ([pmerrison](https://github.com/pmerrison))      | Brian Sonnenberg ([briansonnenberg](https://github.com/briansonnenberg)) |
+| 2023 Q3 | Boteng Yao ([botengyao](https://github.com/botengyao))         | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))              |
+| 2023 Q4 | Paul Merrison ([pmerrison](https://github.com/pmerrison))      | Brian Sonnenberg ([briansonnenberg](https://github.com/briansonnenberg)) |
 
 ## Major release schedule
 
@@ -127,8 +127,6 @@ envoy-dev@googlegroups.com
 envoy-maintainers@googlegroups.com -
 include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
 * Announce in [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH) and [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76) slack channels.
-* Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
-  post.
 
 
 ## Security release schedule

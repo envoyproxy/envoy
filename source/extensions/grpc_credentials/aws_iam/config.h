@@ -27,9 +27,6 @@ public:
   }
 
   std::string name() const override { return "envoy.grpc_credentials.aws_iam"; }
-
-private:
-  static std::string getRegion(const envoy::config::grpc_credential::v3::AwsIamConfig& config);
 };
 
 /**

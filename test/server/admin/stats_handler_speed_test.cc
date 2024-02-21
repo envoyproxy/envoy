@@ -149,6 +149,11 @@ public:
       }
     }
     store_->mergeHistograms([]() {});
+  }
+
+  void initClusterInfo() {
+    ENVOY_LOG_MISC(error, "Initializing cluster info; slow to construct and destruct...");
+    endpoint_stats_initialized_ = true;
 
     cm_.store_.fixed_tags_ = Stats::TagVector{{"fixed-tag", "fixed-value"}};
     for (uint32_t i = 0; i < NumClusters; i++) {
@@ -169,7 +174,12 @@ public:
     }
   }
 
-  void setPerEndpointStats(bool enabled) { cm_.per_endpoint_enabled_ = enabled; }
+  void setPerEndpointStats(bool enabled) {
+    if (enabled && !endpoint_stats_initialized_) {
+      initClusterInfo();
+    }
+    cm_.per_endpoint_enabled_ = enabled;
+  }
 
   /**
    * Issues an admin request against the stats saved in store_.
@@ -196,6 +206,7 @@ public:
   std::vector<Stats::ScopeSharedPtr> scopes_;
   Envoy::Stats::CustomStatNamespacesImpl custom_namespaces_;
   FastMockClusterManager cm_;
+  bool endpoint_stats_initialized_{false};
 };
 
 } // namespace Server
@@ -408,8 +419,8 @@ BENCHMARK_CAPTURE(BM_FilteredCountersPrometheus, per_endpoint_stats_enabled, tru
     ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_HistogramsJson(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext(false);
+static void BM_HistogramsJson(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=json&type=Histograms&histogram_buckets=detailed", response);
@@ -424,4 +435,7 @@ static void BM_HistogramsJson(benchmark::State& state) {
   auto label = absl::StrCat("output per iteration: ", count);
   state.SetLabel(label);
 }
-BENCHMARK(BM_HistogramsJson)->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_HistogramsJson, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_HistogramsJson, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);

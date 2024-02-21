@@ -169,7 +169,7 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
     delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
-    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
+    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected);
     auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
     (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
         fault_settings_->filterMetadata();
@@ -470,7 +470,7 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
 void FaultFilter::abortWithStatus(Http::Code http_status_code,
                                   absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   recordAbortsInjectedStats();
-  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
+  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected);
   auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
   (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
       fault_settings_->filterMetadata();

@@ -409,6 +409,9 @@ InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(envoy_network
   return std::make_pair("", nullptr);
 }
 
+// TODO(abeyad): pass OsSysCallsImpl in as a class dependency instead of directly using
+// Api::OsSysCallsSingleton. That'll make it easier to create tests that mock out the
+// sys calls behavior.
 std::vector<InterfacePair>
 ConnectivityManagerImpl::enumerateInterfaces([[maybe_unused]] unsigned short family,
                                              [[maybe_unused]] unsigned int select_flags,
@@ -421,7 +424,10 @@ ConnectivityManagerImpl::enumerateInterfaces([[maybe_unused]] unsigned short fam
 
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+  if (rc.return_value_ != 0) {
+    ENVOY_LOG_EVERY_POW_2(warn, "getifaddrs error: {}", rc.errno_);
+    return pairs;
+  }
 
   for (const auto& interface_address : interface_addresses) {
     const auto family_version = family == AF_INET ? Envoy::Network::Address::IpVersion::v4

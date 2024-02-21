@@ -1,4 +1,4 @@
-#include "request_trailers_builder.h"
+#include "library/cc/request_trailers_builder.h"
 
 namespace Envoy {
 namespace Platform {

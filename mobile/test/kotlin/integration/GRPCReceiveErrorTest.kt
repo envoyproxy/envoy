@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertWithMessage
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -17,8 +18,7 @@ import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.Assert.fail
 import org.junit.Test
 
 private const val PBF_TYPE =
@@ -107,16 +107,16 @@ class GRPCReceiveErrorTest {
     callbackReceivedError.await(10, TimeUnit.SECONDS)
     engine.terminate()
 
-    assertThat(filterReceivedError.count)
-      .withFailMessage("Missing call to onError filter callback")
+    assertWithMessage("Missing call to onError filter callback")
+      .that(filterReceivedError.count)
       .isEqualTo(0)
 
-    assertThat(filterNotCancelled.count)
-      .withFailMessage("Unexpected call to onCancel filter callback")
+    assertWithMessage("Unexpected call to onCancel filter callback")
+      .that(filterNotCancelled.count)
       .isEqualTo(1)
 
-    assertThat(callbackReceivedError.count)
-      .withFailMessage("Missing call to onError response callback")
+    assertWithMessage("Missing call to onError response callback")
+      .that(callbackReceivedError.count)
       .isEqualTo(0)
   }
 }

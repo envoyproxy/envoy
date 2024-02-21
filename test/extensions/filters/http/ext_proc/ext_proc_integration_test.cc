@@ -1,6 +1,9 @@
 #include <algorithm>
+#include <iostream>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -48,6 +51,7 @@ struct ConfigOptions {
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
   bool http1_codec = false;
+  bool add_metadata = false;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -79,7 +83,7 @@ protected:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_raw_value", header_raw_value_}});
     scoped_runtime_.mergeValues(
-        {{"envoy_reloadable_features_immediate_response_use_filter_mutation_rule",
+        {{"envoy.reloadable_features.immediate_response_use_filter_mutation_rule",
           filter_mutation_rule_}});
 
     config_helper_.addConfigModifier([this, config_option](
@@ -115,6 +119,38 @@ protected:
       ext_proc_filter.set_name(ext_proc_filter_name);
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+
+      // Add set_metadata filter to inject dynamic metadata used for testing
+      if (config_option.add_metadata) {
+        envoy::config::listener::v3::Filter set_metadata_filter;
+        std::string set_metadata_filter_name = "envoy.filters.http.set_metadata";
+        set_metadata_filter.set_name(set_metadata_filter_name);
+
+        envoy::extensions::filters::http::set_metadata::v3::Config set_metadata_config;
+        auto* untyped_md = set_metadata_config.add_metadata();
+        untyped_md->set_metadata_namespace("forwarding_ns_untyped");
+        untyped_md->set_allow_overwrite(true);
+        ProtobufWkt::Struct test_md_val;
+        (*test_md_val.mutable_fields())["foo"].set_string_value("value from set_metadata");
+        (*untyped_md->mutable_value()) = test_md_val;
+
+        auto* typed_md = set_metadata_config.add_metadata();
+        typed_md->set_metadata_namespace("forwarding_ns_typed");
+        typed_md->set_allow_overwrite(true);
+        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
+        typed_md_to_stuff.set_metadata_namespace("typed_value from set_metadata");
+        typed_md->mutable_typed_value()->PackFrom(typed_md_to_stuff);
+
+        set_metadata_filter.mutable_typed_config()->PackFrom(set_metadata_config);
+        config_helper_.prependFilter(
+            MessageUtil::getJsonStringFromMessageOrError(set_metadata_filter));
+
+        // Add filter that dumps streamInfo into headers so we can check our receiving
+        // namespaces
+        config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+        )EOF"));
+      }
 
       // Add logging test filter only in Envoy gRPC mode.
       // gRPC side stream logging is only supported in Envoy gRPC mode at the moment.
@@ -247,6 +283,25 @@ protected:
     ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
     ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  }
+
+  void processGenericMessage(
+      FakeUpstream& grpc_upstream, bool first_message,
+      absl::optional<std::function<bool(const ProcessingRequest&, ProcessingResponse&)>> cb) {
+    ProcessingRequest request;
+    if (first_message) {
+      ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
+      ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    }
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    if (first_message) {
+      processor_stream_->startGrpcStream();
+    }
+    ProcessingResponse response;
+    const bool sendReply = !cb || (*cb)(request, response);
+    if (sendReply) {
+      processor_stream_->sendGrpcMessage(response);
+    }
   }
 
   void processRequestHeadersMessage(
@@ -1836,6 +1891,28 @@ TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-envoy-foo", "bar"));
 }
 
+// Test the filter using an ext_proc server that responds to the request_header message
+// by sending back an immediate_response message with x-envoy header mutation.
+// The deprecated default checker allows x-envoy headers to be mutated and should
+// override config-level checkers if the runtime guard is disabled.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithDefaultHeaderMutationChecker) {
+  // this is default, but setting explicitly for test clarity
+  filter_mutation_rule_ = "false";
+  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    auto* hdr = immediate.mutable_headers()->add_set_headers();
+    // Adding x-envoy header is allowed since default overrides config.
+    hdr->mutable_header()->set_key("x-envoy-foo");
+    hdr->mutable_header()->set_value("bar");
+  });
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_FALSE(response->headers().get(LowerCaseString("x-envoy-foo")).empty());
+}
+
 // Test the filter with request body buffering enabled using
 // an ext_proc server that responds to the request_body message
 // by modifying a header that should cause an error.
@@ -3284,5 +3361,152 @@ TEST_P(ExtProcIntegrationTest, SendBodyBufferedPartialWithTrailer) {
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
+
+TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_forwarding_namespaces()->add_untyped("forwarding_ns_untyped");
+  md_opts->mutable_forwarding_namespaces()->add_typed("forwarding_ns_typed");
+  md_opts->mutable_receiving_namespaces()->add_untyped("receiving_ns_untyped");
+
+  ConfigOptions config_option = {};
+  config_option.add_metadata = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProtobufWkt::Struct test_md_struct;
+  (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
+
+  ProtobufWkt::Value md_val;
+  *(md_val.mutable_struct_value()) = test_md_struct;
+
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Verify the processing request contains the untyped metadata we injected.
+        EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
+        const ProtobufWkt::Struct& fwd_metadata =
+            req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
+        EXPECT_EQ(1, fwd_metadata.fields_size());
+        EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
+        EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
+
+        // Verify the processing request contains the typed metadata we injected.
+        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+        const ProtobufWkt::Any& fwd_typed_metadata =
+            req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
+        EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
+                  fwd_typed_metadata.type_url());
+        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
+        fwd_typed_metadata.UnpackTo(&typed_md_from_req);
+        EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
+
+        // Spoof the response to contain receiving metadata.
+        HeadersResponse headers_resp;
+        (*resp.mutable_request_headers()) = headers_resp;
+        auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
+        (*mut_md_fields).emplace("receiving_ns_untyped", md_val);
+
+        return true;
+      });
+
+  handleUpstreamRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  // Verify the response received contains the headers from dynamic metadata we expect.
+  ASSERT_FALSE((*response).headers().empty());
+  auto md_header_result =
+      (*response).headers().get(Http::LowerCaseString("receiving_ns_untyped.foo"));
+  ASSERT_EQ(1, md_header_result.size());
+  EXPECT_EQ("value from ext_proc", md_header_result[0]->value().getStringView());
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+#if defined(USE_CEL_PARSER)
+TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_request_attributes()->Add("request.path");
+  proto_config_.mutable_request_attributes()->Add("request.method");
+  proto_config_.mutable_request_attributes()->Add("request.scheme");
+  proto_config_.mutable_request_attributes()->Add("connection.mtls");
+  proto_config_.mutable_request_attributes()->Add("response.code");
+  proto_config_.mutable_response_attributes()->Add("response.code");
+  proto_config_.mutable_response_attributes()->Add("response.code_details");
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  // Handle request headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_request_headers()) = headers_resp;
+
+        EXPECT_TRUE(req.has_request_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
+        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
+        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
+        EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
+        // Make sure we did not include the attribute which was not yet available.
+        EXPECT_EQ(proto_struct.fields().size(), 4);
+        EXPECT_FALSE(proto_struct.fields().contains("response.code"));
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.request_headers().attributes().empty());
+        return true;
+      });
+
+  handleUpstreamRequestWithTrailer();
+
+  // Handle response headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], false, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_response_headers()) = headers_resp;
+
+        EXPECT_TRUE(req.has_response_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
+        EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(),
+                  StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+
+        // Make sure we didn't include request attributes in the response-path processing request.
+        EXPECT_FALSE(proto_struct.fields().contains("request.method"));
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.response_headers().attributes().empty());
+        return true;
+      });
+
+  // Handle response trailers message, making sure we did not send request or response attributes
+  // again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Add something to the response so the message isn't seen as spurious
+                          envoy::service::ext_proc::v3::TrailersResponse trailer_resp;
+                          *(resp.mutable_response_trailers()) = trailer_resp;
+
+                          EXPECT_TRUE(req.has_response_trailers());
+                          EXPECT_TRUE(req.attributes().empty());
+                          return true;
+                        });
+
+  verifyDownstreamResponse(*response, 200);
+}
+#endif
 
 } // namespace Envoy
