@@ -61,7 +61,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
           "Multiple trust bundles are given for one trust domain for ", domain.name()));
     }
 
-    auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
+    auto cert = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(domain.trust_bundle(), true, config->api()), std::string);
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(

@@ -612,7 +612,7 @@ private:
     std::list<ActiveWriteFilterPtr> write_filters_;
 
   private:
-    std::shared_ptr<Network::ConnectionInfoSetterImpl> CreateDownstreamConnectionInfoProvider();
+    std::shared_ptr<Network::ConnectionInfoSetterImpl> createDownstreamConnectionInfoProvider();
     void onAccessLogFlushInterval();
     void rearmAccessLogFlushTimer();
     void disableAccessLogFlushTimer();

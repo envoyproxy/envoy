@@ -261,10 +261,11 @@ class RepoNotifier(runner.Runner):
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*Stalled PRs* (PRs with review out-SLO, please address)\n{stalled}"))
+            num_issues = await self.track_open_issues()
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(
-                    f"*Untriaged Issues* (please tag and cc area experts)\n<{ISSUE_LINK}|{ISSUE_LINK}>"
+                    f"*{num_issues} Untriaged Issues* (please tag and cc area experts)\n<{ISSUE_LINK}|{ISSUE_LINK}>"
                 ))
         except SlackApiError as e:
             self.log.error(f"Unexpected error {e.response['error']}")
@@ -277,6 +278,11 @@ class RepoNotifier(runner.Runner):
         return (
             f"<{pull['html_url']}|{html.escape(pull['title'])}> has been waiting "
             f"{markup}{days} days {hours} hours{markup}")
+
+    async def track_open_issues(self):
+        response = await self.session.get(
+            "https://api.github.com/repos/envoyproxy/envoy/issues?labels=triage")
+        return len(await response.json())
 
     async def run(self):
         if not self.github_token:

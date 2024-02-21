@@ -668,7 +668,7 @@ protected:
     EXPECT_CALL(restart_, drainParentListeners);
   }
 
-  ~ServerInstanceImplWorkersTest() {
+  ~ServerInstanceImplWorkersTest() override {
     server_->dispatcher().post([&] { server_->shutdown(); });
     server_thread_->join();
   }
@@ -1345,10 +1345,10 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
-  server_.reset(new InstanceImpl(
+  server_ = std::make_unique<InstanceImpl>(
       *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
       std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr));
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
   EXPECT_THROW_WITH_MESSAGE(
       server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                           component_factory_),
