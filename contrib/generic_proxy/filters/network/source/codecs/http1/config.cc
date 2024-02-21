@@ -56,6 +56,7 @@ bool Utility::isChunked(const Http::RequestOrResponseHeaderMap& headers, bool bo
 
 absl::Status Utility::validateHeaders(const Http::RequestHeaderMap& headers) {
   // No upgrade and connect support for now.
+  // TODO(wbpcode): add support for upgrade and connect in the future.
   if (Http::Utility::isUpgrade(headers) ||
       headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     return absl::InvalidArgumentError("upgrade or connect are not supported");

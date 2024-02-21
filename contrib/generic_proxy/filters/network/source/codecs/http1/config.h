@@ -395,6 +395,8 @@ public:
       return Http::Http1::CallbackResult::Error;
     }
 
+    // TODO(wbpcode): the response requires more complex handling to check if it has body or not.
+    // For example, 204 No Content, 304 Not Modified, 1xx, etc.
     const bool non_end_stream = parser_->isChunked() || parser_->contentLength().value_or(0) > 0;
 
     ENVOY_LOG(debug, "decoding response headers complete (end_stream={}):\n{}", !non_end_stream,
