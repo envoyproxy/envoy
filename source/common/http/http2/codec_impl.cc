@@ -2120,8 +2120,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
-      should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
-          "envoy.load_shed_points.http2_server_go_away_on_dispatch")) {
+      should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().H2SeverGoAwayOnDispatch)) {
   ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
                     "found. Is it configured?");
