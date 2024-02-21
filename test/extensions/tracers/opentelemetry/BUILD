@@ -16,8 +16,16 @@ envoy_extension_cc_test(
     srcs = [
         "opentelemetry_tracer_impl_test.cc",
     ],
+    copts = [
+        # Make sure that headers included from opentelemetry-api use Abseil from Envoy
+        # https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.14.0/api/BUILD#L32
+        "-DHAVE_ABSEIL",
+    ],
     extension_names = ["envoy.tracers.opentelemetry"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_optional",
+        "opentelemetry_api",
+    ],
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -90,19 +98,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "tracestate_test",
-    srcs = [
-        "kv_properties_test.cc",
-        "trace_state_test.cc",
-    ],
-    extension_names = ["envoy.tracers.opentelemetry"],
-    deps = [
-        "//source/extensions/tracers/opentelemetry:trace_state_lib",
         "//test/test_common:utility_lib",
     ],
 )
