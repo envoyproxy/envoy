@@ -37,7 +37,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"sync/atomic"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
@@ -46,33 +45,60 @@ var ErrDupRequestKey = errors.New("dup request key")
 
 var Requests = &requestMap{}
 
+var (
+	initialized      = false
+	envoyConcurrency uint32
+)
+
+// EnvoyConcurrency returns the concurrency Envoy was set to run at. This can be used to optimize HTTP filters that need
+// memory per worker thread to avoid locks.
+//
+// Note: Do not use inside of an `init()` function, the value will not be populated yet. Use within the filters
+// `StreamFilterFactory` or `StreamFilterConfigParser`
+func EnvoyConcurrency() uint32 {
+	if !initialized {
+		panic("concurrency has not yet been initialized, do not access within an init()")
+	}
+	return envoyConcurrency
+}
+
 type requestMap struct {
-	m sync.Map // *C.httpRequest -> *httpRequest
+	initOnce sync.Once
+	requests []map[*C.httpRequest]*httpRequest
+}
+
+func (f *requestMap) initialize(concurrency uint32) {
+	f.initOnce.Do(func() {
+		initialized = true
+		envoyConcurrency = concurrency
+		f.requests = make([]map[*C.httpRequest]*httpRequest, concurrency)
+		for i := uint32(0); i < concurrency; i++ {
+			f.requests[i] = map[*C.httpRequest]*httpRequest{}
+		}
+	})
 }
 
 func (f *requestMap) StoreReq(key *C.httpRequest, req *httpRequest) error {
-	if _, loaded := f.m.LoadOrStore(key, req); loaded {
+	m := f.requests[key.worker_id]
+	if _, ok := m[key]; ok {
 		return ErrDupRequestKey
 	}
+	m[key] = req
 	return nil
 }
 
 func (f *requestMap) GetReq(key *C.httpRequest) *httpRequest {
-	if v, ok := f.m.Load(key); ok {
-		return v.(*httpRequest)
-	}
-	return nil
+	return f.requests[key.worker_id][key]
 }
 
 func (f *requestMap) DeleteReq(key *C.httpRequest) {
-	f.m.Delete(key)
+	delete(f.requests[key.worker_id], key)
 }
 
 func (f *requestMap) Clear() {
-	f.m.Range(func(key, _ interface{}) bool {
-		f.m.Delete(key)
-		return true
-	})
+	for idx := range f.requests {
+		f.requests[idx] = map[*C.httpRequest]*httpRequest{}
+	}
 }
 
 func requestFinalize(r *httpRequest) {
@@ -83,6 +109,7 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	req := &httpRequest{
 		req: r,
 	}
+	req.cond.L = &req.waitingLock
 	// NP: make sure filter will be deleted.
 	runtime.SetFinalizer(req, requestFinalize)
 
@@ -92,8 +119,8 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	}
 
 	configId := uint64(r.configId)
-	filterFactory := getOrCreateHttpFilterFactory(req.pluginName(), configId)
-	f := filterFactory(req)
+	filterFactory, config := getHttpFilterFactoryAndConfig(req.pluginName(), configId)
+	f := filterFactory(config, req)
 	req.httpFilter = f
 
 	return req
@@ -214,9 +241,6 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 	}
 
 	defer req.RecoverPanic()
-	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
-		req.sema.Done()
-	}
 
 	v := api.AccessLogType(logType)
 
@@ -238,9 +262,8 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.RecoverPanic()
-	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
-		req.sema.Done()
-	}
+
+	req.resumeWaitCallback()
 
 	v := api.DestroyReason(reason)
 
@@ -259,7 +282,5 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 func envoyGoRequestSemaDec(r *C.httpRequest) {
 	req := getRequest(r)
 	defer req.RecoverPanic()
-	if atomic.CompareAndSwapInt32(&req.waitingOnEnvoy, 1, 0) {
-		req.sema.Done()
-	}
+	req.resumeWaitCallback()
 }

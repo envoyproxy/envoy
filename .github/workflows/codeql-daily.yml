@@ -8,7 +8,7 @@ on:
   - cron: '0 12 * * 4'
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
 
@@ -28,6 +28,12 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+
+    - name: Free disk space
+      uses: envoyproxy/toolshed/gh-actions/diskspace@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
+      with:
+        to_remove: |
+          /usr/local/lib/android
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL

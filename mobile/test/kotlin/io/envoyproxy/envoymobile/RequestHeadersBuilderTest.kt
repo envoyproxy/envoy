@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile
 
-import org.assertj.core.api.Assertions.assertThat
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class RequestHeadersBuilderTest {
@@ -170,7 +170,7 @@ class RequestHeadersBuilderTest {
         .addRetryPolicy(retryPolicy)
         .build()
 
-    assertThat(headers.caseSensitiveHeaders()).containsAllEntriesOf(retryPolicyHeaders)
+    assertThat(headers.caseSensitiveHeaders()).containsAtLeastEntriesIn(retryPolicyHeaders)
   }
 
   @Test

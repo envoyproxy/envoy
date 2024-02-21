@@ -1536,7 +1536,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.97 * million_);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.99 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

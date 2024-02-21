@@ -18,6 +18,7 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
     "envoy.filters.http.rate_limit_quota",
+    "envoy.filters.http.ext_proc",
     "envoy.formatter.cel",
     "envoy.matching.inputs.cel_data_input",
     "envoy.matching.matchers.cel_matcher",
@@ -223,7 +224,11 @@ def envoy_repo():
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
-    external_http_archive("com_google_protoconverter")
+    external_http_archive(
+        name = "com_google_protoconverter",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:com_google_protoconverter.patch"],
+    )
     external_http_archive("com_google_protofieldextraction")
     external_http_archive("ocp")
     native.bind(
@@ -313,6 +318,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_nghttp2_nghttp2()
+    _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_alibaba_hessian2_codec()
@@ -357,11 +363,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("envoy_build_tools")
     _com_github_maxmind_libmaxminddb()
 
-    # TODO(keith): Remove patch when we update rules_pkg
-    external_http_archive(
-        "rules_pkg",
-        patches = ["@envoy//bazel:rules_pkg.patch"],
-    )
+    external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive(
         "aspect_bazel_lib",
@@ -732,6 +734,16 @@ def _com_github_nghttp2_nghttp2():
     native.bind(
         name = "nghttp2",
         actual = "@envoy//bazel/foreign_cc:nghttp2",
+    )
+
+def _com_github_msgpack_cpp():
+    external_http_archive(
+        name = "com_github_msgpack_cpp",
+        build_file = "@envoy//bazel/external:msgpack.BUILD",
+    )
+    native.bind(
+        name = "msgpack",
+        actual = "@com_github_msgpack_cpp//:msgpack",
     )
 
 def _io_hyperscan():
@@ -1479,5 +1491,5 @@ def _com_github_maxmind_libmaxminddb():
     )
     native.bind(
         name = "maxmind",
-        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux_darwin",
     )

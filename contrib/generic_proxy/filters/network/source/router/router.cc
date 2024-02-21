@@ -286,7 +286,8 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, GenericUpstreamSharedPtr 
   expects_response_ = !options.oneWayStream();
 
   // Set tracing config.
-  if (tracing_config_ = parent_.callbacks_->tracingConfig(); tracing_config_.has_value()) {
+  tracing_config_ = parent_.callbacks_->tracingConfig();
+  if (tracing_config_.has_value() && tracing_config_->spawnUpstreamSpan()) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
@@ -555,20 +556,21 @@ void RouterFilter::resetStream(StreamResetReason reason) {
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ProtocolError:
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionFailure:
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
+    callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionTermination:
     callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamConnectionTermination);
+        StreamInfo::CoreResponseFlag::UpstreamConnectionTermination);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::Overflow:
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   }
@@ -580,7 +582,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
     filter_complete_ = true;
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
     callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     return;
   }
@@ -612,7 +614,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
       auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
       if (!pool_data.has_value()) {
         filter_complete_ = true;
-        callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+        callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
         callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
         return;
       }
@@ -632,7 +634,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
     if (!pool_data.has_value()) {
       filter_complete_ = true;
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+      callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
       callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
       return;
     }
@@ -671,7 +673,7 @@ FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
 
   ENVOY_LOG(debug, "No route for current request and send local reply");
   filter_complete_ = true;
-  callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+  callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "route_not_found"));
   return FilterStatus::StopIteration;
 }

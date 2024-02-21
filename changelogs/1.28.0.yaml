@@ -132,6 +132,11 @@ minor_behavior_changes:
   change: |
     When emitting grpc logs, only downstream HTTP filter state was used. Now, both downstream and upstream HTTP filter states
     will be tried to find the keys configured in filter_state_objects_to_log.
+- area: http
+  change: |
+    Abort the HTTP filter chain iteration when the stream is reset by ``resetStream()`` of filter callbacks.
+    This behavior can be reverted by setting
+    runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` to ``false``.
 
 bug_fixes:
 - area: connection limit

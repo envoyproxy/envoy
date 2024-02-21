@@ -31,7 +31,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     if (runtime_.threadsafeSnapshot()->get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
       ENVOY_LOG_ONCE_MISC(
           warn,
-          "Global downstream connections limits is configured via runtime key {} and in "
+          "Global downstream connections limits is configured via deprecated runtime key {} and in "
           "{}. Using overload manager config.",
           Runtime::Keys::GlobalMaxCxRuntimeKey,
           Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);

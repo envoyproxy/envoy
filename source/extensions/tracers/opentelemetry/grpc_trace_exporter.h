@@ -69,7 +69,7 @@ public:
       if (stream_->stream_->isAboveWriteBufferHighWatermark()) {
         return false;
       }
-      stream_->stream_->sendMessage(request, false);
+      stream_->stream_->sendMessage(request, true);
     } else {
       stream_.reset();
     }

@@ -18,6 +18,14 @@ envoy_cc_test(
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            # For the TestProxyResolutionApi test.
+            "-Wl,-framework,CoreFoundation",
+            "-Wl,-framework,CFNetwork",
+        ],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     shard_count = 6,
     deps = [
@@ -172,6 +180,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",

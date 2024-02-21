@@ -19,8 +19,10 @@ envoy_cc_library(
         "ext_proc.h",
         "processor_state.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         ":client_interface",
+        ":matching_utils_lib",
         ":mutation_utils_lib",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
@@ -44,6 +46,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    tags = ["skip_on_windows"],
     deps = [
         ":client_lib",
         ":ext_proc",
@@ -55,6 +58,7 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/grpc:status",
@@ -81,9 +85,36 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "matching_utils_lib",
+    srcs = ["matching_utils.cc"],
+    hdrs = ["matching_utils.h"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//source/common/protobuf",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
+    ] + select(
+        {
+            "//bazel:windows_x86_64": [],
+            "//conditions:default": [
+                "@com_google_cel_cpp//parser",
+            ],
+        },
+    ),
+)
+
+envoy_cc_library(
     name = "client_lib",
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
+    tags = ["skip_on_windows"],
     deps = [
         ":client_interface",
         "//envoy/grpc:async_client_interface",

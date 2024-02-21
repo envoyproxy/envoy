@@ -170,6 +170,7 @@ run:
     - envoy/**/*
     - source/**/*
     - test/**/*
+    - VERSION.txt
   build-macos:
     paths:
     - .bazelrc
@@ -253,6 +254,7 @@ run:
   mobile-core:
     paths:
     - "**/*"
+    - "*"
   mobile-format:
     paths:
     - .bazelrc
@@ -342,6 +344,7 @@ run:
     - examples/**/*
     - source/**/*
     - tools/**/*
+    - VERSION.txt
   verify:
     paths:
     - .bazelrc
@@ -355,6 +358,7 @@ run:
     - examples/**/*
     - source/**/*
     - tools/**/*
+    - VERSION.txt
     push: paths
 
 tables:

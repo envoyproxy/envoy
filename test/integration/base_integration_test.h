@@ -570,7 +570,7 @@ protected:
   bool use_real_stats_{};
 
   // If true, skip checking stats for missing tag-extraction rules.
-  bool skip_tag_extraction_rule_check_{};
+  bool skip_tag_extraction_rule_check_{true};
 
   // By default, node metadata (node name, cluster name, locality) for the test server gets set to
   // hard-coded values in the OptionsImpl ("node_name", "cluster_name", etc.). Set to true if your

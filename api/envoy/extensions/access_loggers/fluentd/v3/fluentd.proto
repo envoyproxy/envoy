@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.fluentd.v3;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.fluentd.v3";
+option java_outer_classname = "FluentdProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/fluentd/v3;fluentdv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Fluentd access log]
+
+// Configuration for the *envoy.access_loggers.fluentd* :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`.
+// This access log extension will send the emitted access logs over a TCP connection to an upstream that is accepting
+// the Fluentd Forward Protocol as described in: `Fluentd Forward Protocol Specification
+// <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
+// [#extension: envoy.access_loggers.fluentd]
+// [#next-free-field: 7]
+message FluentdAccessLogConfig {
+  // The upstream cluster to connect to for streaming the Fluentd messages.
+  string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+  // A tag is a string separated with '.' (e.g. log.type) to categorize events.
+  // See: https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
+  string tag = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The prefix to use when emitting :ref:`statistics <config_access_log_stats>`.
+  string stat_prefix = 3 [(validate.rules).string = {min_len: 1}];
+
+  // Interval for flushing access logs to the TCP stream. Logger will flush requests every time
+  // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
+  // 1 second.
+  google.protobuf.Duration buffer_flush_interval = 4 [(validate.rules).duration = {gt {}}];
+
+  // Soft size limit in bytes for access log entries buffer. The logger will buffer requests until
+  // this limit it hit, or every time flush interval is elapsed, whichever comes first. When the buffer
+  // limit is hit, the logger will immediately flush the buffer contents. Setting it to zero effectively
+  // disables the batching. Defaults to 16384.
+  google.protobuf.UInt32Value buffer_size_bytes = 5;
+
+  // A struct that represents the record that is sent for each log entry.
+  // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#entry
+  // Values are rendered as strings, numbers, or boolean values as appropriate.
+  // Nested JSON objects may be produced by some command operators (e.g. FILTER_STATE or DYNAMIC_METADATA).
+  // See :ref:`format string<config_access_log_format_strings>` documentation for a specific command operator details.
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig
+  //
+  //   record:
+  //     status: "%RESPONSE_CODE%"
+  //     message: "%LOCAL_REPLY_BODY%"
+  //
+  // The following msgpack record would be created:
+  //
+  // .. code-block:: json
+  //
+  //  {
+  //    "status": 500,
+  //    "message": "My error message"
+  //  }
+  google.protobuf.Struct record = 6 [(validate.rules).message = {required: true}];
+}

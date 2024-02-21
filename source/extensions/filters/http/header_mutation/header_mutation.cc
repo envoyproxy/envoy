@@ -50,7 +50,6 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
     }
   } else {
     for (const auto* route_config : route_configs_) {
-      ASSERT(route_config != nullptr);
       route_config->mutations().mutateRequestHeaders(headers, ctx,
                                                      decoder_callbacks_->streamInfo());
     }
@@ -75,7 +74,6 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
     }
   } else {
     for (const auto* route_config : route_configs_) {
-      ASSERT(route_config != nullptr);
       route_config->mutations().mutateResponseHeaders(headers, ctx,
                                                       encoder_callbacks_->streamInfo());
     }

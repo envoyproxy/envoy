@@ -35,7 +35,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param networkMonitoringMode Configure how the engines observe network reachability.
  */
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
-                                 logger:(nullable void (^)(NSString *))logger
+                                 logger:(nullable void (^)(NSInteger, NSString *))logger
                            eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
                   networkMonitoringMode:(int)networkMonitoringMode;
 /**

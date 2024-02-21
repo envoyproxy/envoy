@@ -321,7 +321,7 @@ response: {}
     const std::string route_name("route-name-test");
     ON_CALL(stream_info, getRouteName()).WillByDefault(ReturnRef(route_name));
 
-    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+    ON_CALL(stream_info, hasResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
     stream_info.onRequestComplete();
 

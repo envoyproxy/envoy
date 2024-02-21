@@ -1,4 +1,4 @@
-FROM node:21.5-bookworm-slim@sha256:c88704924204ee6d4e9da02275a8fd27355502f7177e4175cd0d3a4375a9c9c8 as node-base
+FROM node:21.6-bookworm-slim@sha256:6b35c9b34836d7d4a686d8a899cb503533040d43d8cb0dcb51ef832108573a86 as node-base
 
 
 FROM node-base as node-http-auth
@@ -18,7 +18,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 COPY --chmod=755 ./scripts/entrypoint.sh /entrypoint.sh
 COPY --chmod=755 ./scripts/build.sh /usr/local/bin/build.sh
 COPY --chmod=755 ./scripts/dev.sh /usr/local/bin/dev.sh
-COPY ./routes.jq /usr/local/share/routes.jq
+COPY --chmod=644 ./routes.jq /usr/local/share/routes.jq
 RUN apt-get update \
     && apt-get -qq install -y --no-install-recommends gosu jq netcat-traditional yq
 ENTRYPOINT ["/entrypoint.sh"]

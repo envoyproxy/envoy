@@ -37,11 +37,11 @@ alias(
     actual = "@bazel_tools//tools/zip:zipper",
 )
 
-# Don't depend on these directly, use //library/common/jni:jni_import_lib.
+# Don't depend on these directly, use //library/jni:jni_import_lib.
 alias(
     name = "jni",
     actual = "@bazel_tools//tools/jdk:jni",
-    visibility = ["//library/common/jni/import:__pkg__"],
+    visibility = ["//library/jni/import:__pkg__"],
 )
 
 # autoformat requires that there be no @bazel_tools references outside of //bazel,

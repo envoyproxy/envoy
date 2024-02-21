@@ -272,7 +272,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->max_response_headers_count_ = 200;
   if (!http2_options.has_value()) {
     http2_options = Http2::Utility::initializeAndValidateOptions(
-        envoy::config::core::v3::Http2ProtocolOptions());
+                        envoy::config::core::v3::Http2ProtocolOptions())
+                        .value();
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
 #ifdef ENVOY_ENABLE_QUIC
@@ -388,8 +389,7 @@ void HttpIntegrationTest::initialize() {
   quic_connection_persistent_info->quic_config_.SetInitialStreamFlowControlWindowToSend(
       Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
   // Adjust timeouts.
-  quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromSeconds(5 * TSAN_TIMEOUT_FACTOR);
+  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromSeconds(5 * TIMEOUT_FACTOR);
   quic_connection_persistent_info->quic_config_.set_max_time_before_crypto_handshake(
       connect_timeout);
   quic_connection_persistent_info->quic_config_.set_max_idle_time_before_crypto_handshake(

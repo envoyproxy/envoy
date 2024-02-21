@@ -90,18 +90,23 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   }
 
   // If the next connection attempt does not immediately fail, let it proceed.
-  if (tryAnotherConnection()) {
+  if (tryAnotherConnection().has_value()) {
     return;
   }
 
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller, if the caller hasn't already been notified.
+  signalFailureAndDeleteSelf(reason, transport_failure_reason, host);
+}
+
+void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
+    ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
+    Upstream::HostDescriptionConstSharedPtr host) {
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
   deleteThis();
   if (callbacks != nullptr) {
-    ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(attempt->pool()),
-              host->hostname());
+    ENVOY_LOG(trace, "Passing pool failure up to caller.");
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
   }
 }
@@ -189,19 +194,22 @@ void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(
   connection_attempts_.clear();
 }
 
-bool ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+absl::optional<ConnectivityGrid::StreamCreationResult>
+ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+  if (grid_.destroying_) {
+    return {};
+  }
   absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
   if (!next_pool.has_value()) {
-    // If there are no other pools to try, return false.
-    return false;
+    // If there are no other pools to try, return an empty optional.
+    return {};
   }
   // Create a new connection attempt for the next pool. If we reach this point
   // return true regardless of if newStream resulted in an immediate result or
   // an async call, as either way the attempt will result in success/failure
   // callbacks.
   current_ = next_pool.value();
-  newStream();
-  return true;
+  return newStream();
 }
 
 ConnectivityGrid::ConnectivityGrid(
@@ -213,15 +221,15 @@ ConnectivityGrid::ConnectivityGrid(
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
     Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
-    : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
-      priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
+    : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
+      transport_socket_options_(transport_socket_options), state_(state),
+      next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
               host_->address()->ip()->port()),
-      quic_info_(quic_info) {
+      quic_info_(quic_info), priority_(priority) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
@@ -236,9 +244,13 @@ ConnectivityGrid::ConnectivityGrid(
 ConnectivityGrid::~ConnectivityGrid() {
   // Ignore idle callbacks while the pools are destroyed below.
   destroying_ = true;
-  // Callbacks might have pending streams registered with the pools, so cancel and delete
-  // the callback before deleting the pools.
-  wrapped_callbacks_.clear();
+  while (!wrapped_callbacks_.empty()) {
+    // Before tearing down the callbacks, make sure they pass up pool failure to
+    // the caller. We do not call onPoolFailure because it does up-calls to the
+    // (delete-in-process) grid.
+    wrapped_callbacks_.front()->signalFailureAndDeleteSelf(
+        ConnectionPool::PoolFailureReason::LocalConnectionFailure, "grid teardown", host_);
+  }
   pools_.clear();
 }
 
@@ -327,7 +339,12 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
-    wrapped_callbacks_.front()->tryAnotherConnection();
+    absl::optional<StreamCreationResult> result =
+        wrapped_callbacks_.front()->tryAnotherConnection();
+    if (result.has_value() && result.value() == StreamCreationResult::ImmediateResult) {
+      // As above, if we have an immediate success, return nullptr.
+      return nullptr;
+    }
   }
   return ret;
 }
@@ -339,11 +356,6 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
 }
 
 void ConnectivityGrid::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
-  if (draining_) {
-    // A drain callback has already been set, and only needs to happen once.
-    return;
-  }
-
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     // Note that no new pools can be created from this point on
     // as createNextPool fast-fails if `draining_` is true.

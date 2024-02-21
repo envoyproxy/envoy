@@ -33,3 +33,17 @@ The file access log has statistics rooted at the *filesystem.* namespace.
   flushed_by_timer, Counter, Total number of times internal flush buffers are written to a file due to flush timeout
   reopen_failed, Counter, Total number of times a file was failed to be opened
   write_total_buffered, Gauge, Current total size of internal flush buffer in bytes
+
+Fluentd access log statistics
+-----------------------------
+
+The Fluentd access log has statistics rooted at the *access_logs.fluentd.<stat_prefix>.* namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  entries_lost, Counter, Total number of times an access log entry was discarded due to unavailable connection.
+  entries_buffered, Counter, Total number of entries (access log record) that was buffered/
+  events_sent, Counter, Total number of events (Fluentd Forward Mode events) sent to the upstream.
+  connections_closed, Counter, Total number of times a connection to the upstream cluster was closed.
