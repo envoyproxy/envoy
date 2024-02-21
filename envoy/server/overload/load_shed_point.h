@@ -24,7 +24,7 @@ public:
 
   // Envoy will send a GOAWAY while processing HTTP2 requests at the codec level which will
   // eventually drain the HTTP/2 connection.
-  const std::string H2SeverGoAwayOnDispatch =
+  const std::string H2ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http2_server_go_away_on_dispatch";
 };
 
