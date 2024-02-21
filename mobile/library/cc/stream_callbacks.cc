@@ -118,7 +118,7 @@ envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
       &c_on_complete,
       &c_on_cancel,
       &c_on_send_window_available,
-      new StreamCallbacksSharedPtr(shared_from_this()),
+      shared_from_this(),
   };
 }
 
