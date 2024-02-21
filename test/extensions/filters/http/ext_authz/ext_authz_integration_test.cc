@@ -35,8 +35,10 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void initializeConfig(bool disable_with_metadata = false, bool failure_mode_allow = false) {
-    config_helper_.addConfigModifier([this, disable_with_metadata, failure_mode_allow](
+  void initializeConfig(bool disable_with_metadata = false, bool failure_mode_allow = false,
+                        uint64_t timeout_seconds = 300) {
+    config_helper_.addConfigModifier([this, disable_with_metadata, failure_mode_allow,
+                                      timeout_seconds](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -46,6 +48,10 @@ public:
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz_cluster",
                      fake_upstreams_.back()->localAddress());
+
+      // Override timeout if needed.
+      proto_config_.mutable_grpc_service()->mutable_timeout()->CopyFrom(
+          Protobuf::util::TimeUtil::SecondsToDuration(timeout_seconds));
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
@@ -62,6 +68,7 @@ public:
       proto_config_.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       proto_config_.set_failure_mode_allow(failure_mode_allow);
+      proto_config_.set_failure_mode_allow_header_add(failure_mode_allow);
 
       // Add labels and verify they are passed.
       std::map<std::string, std::string> labels;
@@ -202,7 +209,8 @@ public:
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream =
           Http::TestRequestHeaderMapImpl{},
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple =
-          Http::TestRequestHeaderMapImpl{}) {
+          Http::TestRequestHeaderMapImpl{},
+      bool failure_mode_allowed_header = false) {
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -217,6 +225,11 @@ public:
                                         {"set-cookie", "cookie1=snickerdoodle"}},
         false);
     upstream_request_->encodeData(response_size_, true);
+
+    if (failure_mode_allowed_header) {
+      EXPECT_THAT(upstream_request_->headers(),
+                  Http::HeaderValueOf("x-envoy-auth-failure-mode-allowed", "true"));
+    }
 
     for (const auto& header_to_add : headers_to_add) {
       EXPECT_THAT(upstream_request_->headers(),
@@ -550,7 +563,9 @@ public:
                           .get(Http::LowerCaseString(std::string("regex-fool")))[0]
                           ->value()
                           .getStringView());
+  }
 
+  void sendExtAuthzResponse() {
     // Send back authorization response with "baz" and "bat" headers.
     // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
     // Also tell Envoy to remove "remove-me" header before sending to upstream.
@@ -575,8 +590,10 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  void initializeConfig(bool legacy_allowed_headers = true) {
-    config_helper_.addConfigModifier([this, legacy_allowed_headers](
+  void initializeConfig(bool legacy_allowed_headers = true, bool failure_mode_allow = true,
+                        uint64_t timeout_seconds = 300) {
+    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow,
+                                      timeout_seconds](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -587,6 +604,11 @@ public:
       } else {
         TestUtility::loadFromYaml(default_config_, proto_config_);
       }
+      proto_config_.set_failure_mode_allow(failure_mode_allow);
+      proto_config_.set_failure_mode_allow_header_add(failure_mode_allow);
+      proto_config_.mutable_http_service()->mutable_server_uri()->mutable_timeout()->CopyFrom(
+          Protobuf::util::TimeUtil::SecondsToDuration(timeout_seconds));
+
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
@@ -602,6 +624,7 @@ public:
 
     initiateClientConnection();
     waitForExtAuthzRequest();
+    sendExtAuthzResponse();
 
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -663,7 +686,6 @@ public:
     server_uri:
       uri: "ext_authz:9000"
       cluster: "ext_authz"
-      timeout: 300s
 
     authorization_request:
       allowed_headers:
@@ -684,8 +706,6 @@ public:
         patterns:
         - exact: bat
         - prefix: x-append
-
-  failure_mode_allow: true
   )EOF";
   const std::string default_config_ = R"EOF(
   transport_api_version: V3
@@ -702,7 +722,6 @@ public:
     server_uri:
       uri: "ext_authz:9000"
       cluster: "ext_authz"
-      timeout: 300s
     authorization_response:
       allowed_upstream_headers:
         patterns:
@@ -712,7 +731,6 @@ public:
         patterns:
         - exact: bat
         - prefix: x-append
-  failure_mode_allow: true
   with_request_body:
     max_request_bytes: 1024
     allow_partial_message: true
@@ -955,6 +973,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyDirectReponse)
   HttpIntegrationTest::initialize();
   initiateClientConnection();
   waitForExtAuthzRequest();
+  sendExtAuthzResponse();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
@@ -976,6 +995,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyRedirectRespon
   HttpIntegrationTest::initialize();
   initiateClientConnection();
   waitForExtAuthzRequest();
+  sendExtAuthzResponse();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
@@ -1043,6 +1063,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
   HttpIntegrationTest::initialize();
   initiateClientConnection();
   waitForExtAuthzRequest();
+  sendExtAuthzResponse();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
@@ -1064,6 +1085,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
   HttpIntegrationTest::initialize();
   initiateClientConnection();
   waitForExtAuthzRequest();
+  sendExtAuthzResponse();
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
