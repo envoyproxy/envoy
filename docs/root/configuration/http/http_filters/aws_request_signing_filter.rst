@@ -42,8 +42,9 @@ multi-region implementations.
 
 Signing can be added to the query string, rather than in the headers, by enabling :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString>`
 Query string signing adds an additional parameter :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString.expiration_time>` which determines the
-length of time in seconds after which this URL becomes invalid, starting from the time the URL is signed.
-The default expiration time is 5 seconds, and it is recommended to keep this value as small as practicable, as the URL is replayable before this time expires.
+length of time after which this URL becomes invalid, starting from the time the URL is signed.
+The default expiration time is 5 seconds, with a maximum of 3600 seconds. It is recommended to keep this value as small as practicable,
+as the generated URL is replayable before this time expires.
 
 Example configuration
 ---------------------

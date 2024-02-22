@@ -57,9 +57,9 @@ void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap& headers,
 
 void SigV4ASignerImpl::addRegionQueryParam(Envoy::Http::Utility::QueryParamsMulti& query_params,
                                            const absl::string_view override_region) const {
-  query_params.add(SignatureQueryParameters::get().AmzRegionSet,
-                   Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(
-                       override_region.empty() ? getRegion() : override_region));
+  query_params.add(
+      SignatureQueryParameters::get().AmzRegionSet,
+      Utility::encodeQueryParam(override_region.empty() ? getRegion() : override_region));
 }
 
 std::string SigV4ASignerImpl::createSignature(

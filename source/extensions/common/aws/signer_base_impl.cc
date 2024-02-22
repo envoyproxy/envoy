@@ -166,19 +166,17 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   query_params.add(SignatureQueryParameters::get().AmzExpires, std::to_string(expiration_time));
 
   // These three parameters can contain characters that require URL encoding
-  if (!session_token->empty()) {
+  if (session_token.has_value()) {
     // X-Amz-Security-Token
-    query_params.add(
-        SignatureQueryParameters::get().AmzSecurityToken,
-        Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(session_token.value()));
+    query_params.add(SignatureQueryParameters::get().AmzSecurityToken,
+                     Utility::encodeQueryParam(session_token.value()));
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameters::get().AmzCredential,
-                   Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(credential));
+                   Utility::encodeQueryParam(credential));
   // X-Amz-SignedHeaders
   query_params.add(SignatureQueryParameters::get().AmzSignedHeaders,
-                   Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(
-                       Utility::joinCanonicalHeaderNames(signed_headers)));
+                   Utility::encodeQueryParam(Utility::joinCanonicalHeaderNames(signed_headers)));
 }
 
 } // namespace Aws

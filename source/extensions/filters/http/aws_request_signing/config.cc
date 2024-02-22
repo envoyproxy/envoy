@@ -63,8 +63,9 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   }
 
   bool query_string = config.has_query_string();
+
   uint16_t expiration_time =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.query_string(), expiration_time, 5);
+      PROTOBUF_GET_SECONDS_OR_DEFAULT(config.query_string(), expiration_time, 5);
   throwIfExpirationOutOfBounds(expiration_time);
 
   auto credentials_provider =
@@ -127,7 +128,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   }
 
   bool query_string = per_route_config.aws_request_signing().has_query_string();
-  uint16_t expiration_time = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+  uint16_t expiration_time = PROTOBUF_GET_SECONDS_OR_DEFAULT(
       per_route_config.aws_request_signing().query_string(), expiration_time, 5);
   throwIfExpirationOutOfBounds(expiration_time);
 

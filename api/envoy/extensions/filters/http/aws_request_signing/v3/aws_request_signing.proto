@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.aws_request_signing.v3;
 
 import "envoy/type/matcher/v3/string.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -35,10 +36,10 @@ message AwsRequestSigning {
   }
 
   message QueryString {
-    // Optional expiration time for the query string parameters, in seconds. As query string parameter based requests are replayable, in effect representing
+    // Optional expiration time for the query string parameters. As query string parameter based requests are replayable, in effect representing
     // an API call that has already been authenticated, it is recommended to keep this expiration time as short as feasible.
     // This value will default to 5 seconds and has a maximum value of 3600 seconds (1 hour).
-    google.protobuf.UInt32Value expiration_time = 1;
+    google.protobuf.Duration expiration_time = 1;
   }
 
   // The `service namespace

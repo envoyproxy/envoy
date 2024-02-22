@@ -140,7 +140,7 @@ service_name: s3
 region: us-west-2
 host_rewrite: new-host
 query_string:
-  expiration_time: 100
+  expiration_time: 100s
 use_unsigned_payload: true
 match_excluded_headers:
   - prefix: x-envoy
@@ -159,7 +159,7 @@ match_excluded_headers:
   expected_config.add_match_excluded_headers()->set_prefix("x-envoy");
   expected_config.add_match_excluded_headers()->set_exact("foo");
   expected_config.add_match_excluded_headers()->set_exact("bar");
-  expected_config.mutable_query_string()->mutable_expiration_time()->set_value(100);
+  expected_config.mutable_query_string()->mutable_expiration_time()->set_seconds(100);
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
