@@ -13,6 +13,12 @@ envoy_contrib_package()
 make(
     name = "qat-zstd",
     build_data = ["@com_github_qat_zstd//:all"],
+    env = select({
+        "//bazel:clang_build": {
+            "CFLAGS": "-Wno-error=newline-eof -Wno-error=strict-prototypes -Wno-error=unused-but-set-variable",
+        },
+        "//conditions:default": {},
+    }),
     includes = [],
     lib_source = "@com_github_qat_zstd//:all",
     out_static_libs = ["libqatseqprod.a"],
