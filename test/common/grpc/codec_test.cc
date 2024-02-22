@@ -239,7 +239,7 @@ TEST(GrpcCodecTest, decodeSingleFrameOverLimit) {
   Decoder decoder = Decoder(32 * 1024);
   // The decoder doesn't successfully decode due to oversized frame.
   EXPECT_FALSE(decoder.decode(buffer, frames));
-  EXPECT_EQ(size, buffer.length());
+  EXPECT_EQ(buffer.length(), size);
 }
 
 TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
@@ -270,12 +270,14 @@ TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
   EXPECT_FALSE(decoder.decode(buffer, frames));
   // When the decoder doesn't successfully decode, it puts valid frames up until
   // an oversized frame into output frame vector.
-  EXPECT_EQ(1, frames.size());
+  ASSERT_EQ(frames.size(), 1);
+  // First frame is successfully decoded.
+  EXPECT_EQ(frames[0].length_, request.ByteSize());
   // Buffer does not get drained due to it returning false.
-  EXPECT_EQ(size, buffer.length());
+  EXPECT_EQ(buffer.length(), size);
   // Only part of the buffer represented a valid frame. Thus, the frame length should not equal the
   // buffer length.
-  EXPECT_NE(size, frames[0].length_);
+  EXPECT_NE(frames[0].length_, size);
 }
 
 TEST(GrpcCodecTest, FrameInspectorTest) {
