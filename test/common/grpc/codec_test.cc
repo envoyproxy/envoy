@@ -236,7 +236,9 @@ TEST(GrpcCodecTest, decodeSingleFrameOverLimit) {
 
   std::vector<Frame> frames;
   // Configure decoder with 32kb max_frame_length.
-  Decoder decoder = Decoder(32 * 1024);
+  Decoder decoder;
+  decoder.setMaxFrameLength(32 * 1024);
+
   // The decoder doesn't successfully decode due to oversized frame.
   EXPECT_FALSE(decoder.decode(buffer, frames));
   EXPECT_EQ(buffer.length(), size);
@@ -265,7 +267,9 @@ TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
   size_t size = buffer.length();
 
   std::vector<Frame> frames;
-  Decoder decoder = Decoder(32 * 1024);
+  Decoder decoder;
+  decoder.setMaxFrameLength(32 * 1024);
+
   EXPECT_FALSE(decoder.decode(buffer, frames));
   // When the decoder doesn't successfully decode, it puts valid frames up until
   // an oversized frame into output frame vector.

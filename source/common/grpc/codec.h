@@ -82,8 +82,6 @@ enum class State {
 
 class FrameInspector {
 public:
-  FrameInspector() = default;
-  FrameInspector(uint32_t max_frame_length) : max_frame_length_(max_frame_length) {}
   // Inspects the given buffer with GRPC data frame and updates the frame count.
   // Invokes visitor callbacks for each frame in the following sequence:
   //   "frameStart frameDataStart frameData* frameDataEnd"
@@ -124,8 +122,6 @@ protected:
 
 class Decoder : public FrameInspector {
 public:
-  Decoder() = default;
-  Decoder(uint32_t max_frame_length) : FrameInspector(max_frame_length) {}
   // Decodes the given buffer with GRPC data frame. Drains the input buffer when
   // decoding succeeded (returns true). If the input is not sufficient to make a
   // complete GRPC data frame, it will be buffered in the decoder. If a decoding
@@ -142,6 +138,9 @@ public:
 
   // Indicates whether it has buffered any partial data.
   bool hasBufferedData() const { return state_ != State::FhFlag; }
+
+  // Configures the maximum frame length.
+  void setMaxFrameLength(uint32_t max_frame_length) { max_frame_length_ = max_frame_length; }
 
 protected:
   bool frameStart(uint8_t) override;
