@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.aws_request_signing.v3;
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
