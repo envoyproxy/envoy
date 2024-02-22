@@ -43,6 +43,10 @@ minor_behavior_changes:
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
     grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
     xDS region will take preference. aws_request_signer documentation now reflects the region chain.
+- area: http
+  change: |
+    Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
+    previously used HTTP/1 parser).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -57,6 +61,11 @@ bug_fixes:
     Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
     a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.edf_lb_locality_scheduler_init_fix`` to false.
+- area: load balancing
+  change: |
+    Added randomization in host load-balancing initialization. This helps desynchronizing Envoys across
+    a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.edf_lb_host_scheduler_init_fix`` to false.
 - area: UDP and TCP tunneling
   change: |
     fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
@@ -105,6 +114,9 @@ bug_fixes:
   change: |
     Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
     controlled by ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
+- area: deps
+  change: |
+    Updated QUICHE dependencies to incorporate fixes for https://github.com/envoyproxy/envoy/issues/32401.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -192,9 +204,18 @@ new_features:
     Envoy will select the host with the fewest active requests from the entire host set rather than
     :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     random choices.
+- area: access_loggers
+  change: |
+    Added :ref:`Fluentd access logger <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`
+    to support flushing access logs in `Fluentd format <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically set a per downstream connection idle timeout period object under the key
+    ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
+    specified in the filter configuration and the default idle timeout.
 
 deprecated:
 - area: listener

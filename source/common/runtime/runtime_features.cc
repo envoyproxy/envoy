@@ -39,6 +39,7 @@ RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 RUNTIME_GUARD(envoy_reloadable_features_detect_and_raise_rst_tcp_connection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_first_resolve_complete);
+RUNTIME_GUARD(envoy_reloadable_features_edf_lb_host_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_edf_lb_locality_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_connect_udp_support);
@@ -105,6 +106,8 @@ RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
+// TODO(alyssawilk) flip true after server side is handled.
+FALSE_RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 // Execution context is optional and must be enabled explicitly.
 // See https://github.com/envoyproxy/envoy/issues/32012.
 FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
@@ -143,6 +146,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 // TODO(panting): flip this to true after some test time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
+
+// A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
+// compliance restrictions.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
