@@ -243,7 +243,6 @@ TEST(GrpcCodecTest, decodeSingleFrameOverLimit) {
 }
 
 TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
-
   Buffer::OwnedImpl buffer;
   std::array<uint8_t, 5> header;
   Encoder encoder;
