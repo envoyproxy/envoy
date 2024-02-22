@@ -52,7 +52,6 @@ struct ConfigOptions {
   bool add_logging_filter = false;
   bool http1_codec = false;
   bool add_metadata = false;
-  bool allow_all_routing = false;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -118,9 +117,6 @@ protected:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
       ext_proc_filter.set_name(ext_proc_filter_name);
-
-      proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(
-          config_option.allow_all_routing);
 
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
@@ -813,15 +809,24 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, GetAndSetRoutingHeader) {
-  ConfigOptions config_option = {};
-  config_option.allow_all_routing = true;
-  initializeConfig(config_option);
+TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
+  proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+  initializeConfig();
+  std::string vhost_domain = "new_host";
+  config_helper_.addConfigModifier([&vhost_domain](HttpConnectionManager& cm) {
+    // Set up vhost domain.
+    auto* vhost = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    vhost->set_name("vhost");
+    vhost->clear_domains();
+    vhost->add_domains(vhost_domain);
+  });
+
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      *grpc_upstreams_[0], true,
+      [&vhost_domain](const HttpHeaders& headers, HeadersResponse& headers_resp) {
         Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                                 {":method", "GET"},
                                                                 {"host", "host"},
@@ -830,17 +835,14 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRoutingHeader) {
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* mut1 = response_header_mutation->add_set_headers();
-        mut1->mutable_header()->set_key(":scheme");
-        mut1->mutable_header()->set_value("https");
 
-        auto* mut2 = response_header_mutation->add_set_headers();
-        mut2->mutable_header()->set_key(":authority");
-        mut2->mutable_header()->set_value("new_host");
+        // Set host header to match the domain of virtual host in routing configuration.
+        auto* mut = response_header_mutation->add_set_headers();
+        mut->mutable_header()->set_key(":authority");
+        mut->mutable_header()->set_value(vhost_domain);
 
-        auto* mut3 = response_header_mutation->add_set_headers();
-        mut3->mutable_header()->set_key(":method");
-        mut3->mutable_header()->set_value("POST");
+        // Clear the route cache to trigger the route re-pick.
+        headers_resp.mutable_response()->set_clear_route_cache(true);
         return true;
       });
 
@@ -848,10 +850,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRoutingHeader) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // Routing headers are not updated when `allow_all_routing` mutation rule is false.
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "https"));
+  // Host header is updated when `allow_all_routing` mutation rule is true.
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "new_host"));
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "POST"));
+
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
@@ -865,6 +866,49 @@ TEST_P(ExtProcIntegrationTest, GetAndSetRoutingHeader) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
+  proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+  initializeConfig();
+  // Set up the route config.
+  std::string vhost_domain = "new_host";
+  config_helper_.addConfigModifier([&vhost_domain](HttpConnectionManager& cm) {
+    // Set up vhost domain.
+    auto* vhost = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    vhost->set_name("vhost");
+    vhost->clear_domains();
+    vhost->add_domains(vhost_domain);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+
+        // Set host header to the wrong value that doesn't match the domain of virtual host in route
+        // configuration.
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key(":authority");
+        mut1->mutable_header()->set_value("wrong_host");
+
+        // Clear the route cache to trigger the route re-pick.
+        headers_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+
+  // The routing to upstream is expected to fail and 500 is returned to downstream client, since no
+  // route is found for mismatched vhost.
+  verifyDownstreamResponse(*response, 500);
+}
+
 TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -873,9 +917,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
 
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-        Http::TestRequestHeaderMapImpl expected_request_headers{
-            {":scheme", "http"},          {":method", "GET"}, {"host", "host"}, {":path", "/"}, ,
-            {"x-forwarded-proto", "http"}};
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
@@ -903,8 +949,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
 
   // Path header is updated.
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":path", "/mutated_path/bluh"));
-  // Routing headers are not updated when `allow_all_routing` mutation rule is false.
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "https"));
+  // Routing headers are not updated by ext_proc when `allow_all_routing` mutation rule is false
+  // (default value).
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "http"));
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "host"));
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "GET"));
 
