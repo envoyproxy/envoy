@@ -167,20 +167,18 @@ TEST_F(MainInterfaceTest, BasicStream) {
 
   absl::Notification on_complete_notification;
   envoy_http_callbacks stream_cbs{
-      [](envoy_headers c_headers, bool end_stream, envoy_stream_intel, void*) -> void* {
+      [](envoy_headers c_headers, bool end_stream, envoy_stream_intel, void*) -> void {
         auto response_headers = toResponseHeaders(c_headers);
         EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
         EXPECT_TRUE(end_stream);
-        return nullptr;
       } /* on_headers */,
       nullptr /* on_data */,
       nullptr /* on_metadata */,
       nullptr /* on_trailers */,
       nullptr /* on_error */,
-      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void* {
+      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
         auto* on_complete_notification = static_cast<absl::Notification*>(context);
         on_complete_notification->Notify();
-        return nullptr;
       } /* on_complete */,
       nullptr /* on_cancel */,
       nullptr /* on_send_window_available*/,
@@ -239,10 +237,9 @@ TEST_F(MainInterfaceTest, ResetStream) {
       nullptr /* on_trailers */,
       nullptr /* on_error */,
       nullptr /* on_complete */,
-      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void* {
+      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
         auto* on_cancel_notification = static_cast<absl::Notification*>(context);
         on_cancel_notification->Notify();
-        return nullptr;
       } /* on_cancel */,
       nullptr /* on_send_window_available */,
       &on_cancel_notification /* context */};
