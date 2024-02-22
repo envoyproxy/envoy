@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = select({
         "//bazel:linux": ["config_test.cc"],
+        "//bazel:darwin_any": ["config_test.cc"],
         "//conditions:default": [],
     }),
     data = [
@@ -36,6 +37,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = select({
         "//bazel:linux": ["geoip_provider_test.cc"],
+        "//bazel:darwin_any": ["geoip_provider_test.cc"],
         "//conditions:default": [],
     }),
     data = [
