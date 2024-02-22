@@ -117,7 +117,6 @@ protected:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
       ext_proc_filter.set_name(ext_proc_filter_name);
-
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 
