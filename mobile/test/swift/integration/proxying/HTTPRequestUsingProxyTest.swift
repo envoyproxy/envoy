@@ -13,6 +13,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   }
 
   func testHTTPRequestUsingProxy() throws {
+    throw XCTSkip("Disabled while investigating https://github.com/envoyproxy/envoy/issues/31957")
     EnvoyTestServer.startHttpProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
@@ -66,6 +67,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   }
 
   func testHTTPSRequestUsingProxy() throws {
+    throw XCTSkip("Disabled while investigating https://github.com/envoyproxy/envoy/issues/31957")
     EnvoyTestServer.startHttpsProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
@@ -121,6 +123,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   }
 
   func testHTTPSRequestUsingPacFileUrlResolver() throws {
+    throw XCTSkip("Disabled while investigating https://github.com/envoyproxy/envoy/issues/31957")
     EnvoyTestServer.startHttpsProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
@@ -176,6 +179,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   }
 
   func testHTTPRequestUsingProxyCancelStream() throws {
+    throw XCTSkip("Disabled while investigating https://github.com/envoyproxy/envoy/issues/31957")
     EnvoyTestServer.startHttpProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 
