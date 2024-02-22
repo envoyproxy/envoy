@@ -20,16 +20,25 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
   const std::string per_policy_final_shadow_prefix =
       Envoy::statPrefixJoin(final_shadow_prefix, "policy.");
 
-  Stats::StatNameDynamicPool pool(scope.symbolTable());
-  const Stats::StatName per_policy_stat(pool.add(per_policy_final_prefix));
-  const Stats::StatName per_policy_shadow_stat(pool.add(per_policy_final_shadow_prefix));
-
+  // Create a StatNameSet with name Rbac - the name is unused but matches the filter name
+  Stats::StatNameSetPtr stat_name_set = scope.symbolTable().makeSet("Rbac");
+  const Stats::StatName per_policy_stat(stat_name_set->add(per_policy_final_prefix));
+  const Stats::StatName per_policy_shadow_stat(stat_name_set->add(per_policy_final_shadow_prefix));
+  const Stats::StatName unknown_policy_allowed_(stat_name_set->add("unknown_allowed"));
+  const Stats::StatName unknown_policy_denied_(stat_name_set->add("unknown_denied"));
+  const Stats::StatName unknown_shadow_policy_allowed_(
+      stat_name_set->add("unknown_shadow_allowed"));
+  const Stats::StatName unknown_shadow_policy_denied_(stat_name_set->add("unknown_shadow_denied"));
   return {
       ENFORCE_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))
           SHADOW_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_shadow_prefix)) scope,
       std::move(per_policy_stat),
       std::move(per_policy_shadow_stat),
-      std::move(pool),
+      std::move(stat_name_set),
+      std::move(unknown_policy_allowed_),
+      std::move(unknown_policy_denied_),
+      std::move(unknown_shadow_policy_allowed_),
+      std::move(unknown_shadow_policy_denied_),
   };
 }
 
