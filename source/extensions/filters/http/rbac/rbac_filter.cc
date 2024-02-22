@@ -68,7 +68,14 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
                                                   action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
-          proto_config, context, validation_visitor, action_validation_visitor_)) {}
+          proto_config, context, validation_visitor, action_validation_visitor_)) {
+  for (const auto& policy : proto_config.rules().policies()) {
+    stats().add_policy(policy.first);
+  }
+  for (const auto& policy : proto_config.shadow_rules().policies()) {
+    stats().add_shadow_policy(policy.first);
+  }
+}
 
 const Filters::Common::RBAC::RoleBasedAccessControlEngine*
 RoleBasedAccessControlFilterConfig::engine(const Http::StreamFilterCallbacks* callbacks,
