@@ -221,6 +221,63 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
   }
 }
 
+TEST(GrpcCodecTest, decodeSingleFrameOverLimit) {
+  helloworld::HelloRequest request;
+  std::string test_str = std::string(64 * 1024, 'a');
+  request.set_name(test_str);
+
+  Buffer::OwnedImpl buffer;
+  std::array<uint8_t, 5> header;
+  Encoder encoder;
+  encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize(), header);
+  buffer.add(header.data(), 5);
+  buffer.add(request.SerializeAsString());
+  size_t size = buffer.length();
+
+  std::vector<Frame> frames;
+  // Configure decoder with 32kb max_frame_length.
+  Decoder decoder = Decoder(32 * 1024);
+  // The decoder doesn't successfully decode due to oversized frame.
+  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(size, buffer.length());
+}
+
+TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
+
+  Buffer::OwnedImpl buffer;
+  std::array<uint8_t, 5> header;
+  Encoder encoder;
+
+  // First frame is valid (i.e. within max_frame_length limit).
+  helloworld::HelloRequest request;
+  request.set_name("hello");
+  encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize(), header);
+  buffer.add(header.data(), 5);
+  buffer.add(request.SerializeAsString());
+
+  // Second frame is invalid (i.e. exceeds max_frame_length).
+  helloworld::HelloRequest overlimit_request;
+  std::string test_str = std::string(64 * 1024, 'a');
+  overlimit_request.set_name(test_str);
+  encoder.newFrame(GRPC_FH_DEFAULT, overlimit_request.ByteSize(), header);
+  buffer.add(header.data(), 5);
+  buffer.add(overlimit_request.SerializeAsString());
+
+  size_t size = buffer.length();
+
+  std::vector<Frame> frames;
+  Decoder decoder = Decoder(32 * 1024);
+  EXPECT_FALSE(decoder.decode(buffer, frames));
+  // When the decoder doesn't successfully decode, it puts valid frames up until
+  // an oversized frame into output frame vector.
+  EXPECT_EQ(1, frames.size());
+  // Buffer does not get drained due to it returning false.
+  EXPECT_EQ(size, buffer.length());
+  // Only part of the buffer represented a valid frame. Thus, the frame length should not equal the
+  // buffer length.
+  EXPECT_NE(size, frames[0].length_);
+}
+
 TEST(GrpcCodecTest, FrameInspectorTest) {
   {
     Buffer::OwnedImpl buffer;
