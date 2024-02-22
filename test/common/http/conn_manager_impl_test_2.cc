@@ -2489,10 +2489,64 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
   EXPECT_EQ(1, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointCanCloseConnection) {
+  Server::MockLoadShedPoint close_connection_creating_codec_point;
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
+      .WillOnce(Return(&close_connection_creating_codec_point));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
+      .WillOnce(Return(nullptr));
+
+  setup(false, "");
+
+  EXPECT_CALL(close_connection_creating_codec_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input, false);
+
+  delete codec_;
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection().streamInfo().hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointBypasscheck) {
+  Server::MockLoadShedPoint close_connection_creating_codec_point;
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
+      .WillOnce(Return(&close_connection_creating_codec_point));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
+      .WillOnce(Return(nullptr));
+
+  setup(false, "");
+
+  EXPECT_CALL(close_connection_creating_codec_point, shouldShedLoad()).WillOnce(Return(false));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    conn_manager_->newStream(response_encoder_);
+    data.drain(2);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("12");
+  conn_manager_->onData(fake_input, false);
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_overload_close_.value());
+  EXPECT_FALSE(filter_callbacks_.connection().streamInfo().hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
 TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStreams) {
   Server::MockLoadShedPoint accept_new_stream_point;
-  EXPECT_CALL(overload_manager_, getLoadShedPoint(testing::_))
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
       .WillOnce(Return(&accept_new_stream_point));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
+      .WillOnce(Return(nullptr));
 
   setup(false, "");
   setupFilterChain(1, 0);
