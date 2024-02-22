@@ -61,7 +61,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
 
 bool MainCommonBase::run() {
   // Avoid returning from inside switch cases to minimize uncovered lines
-  // while avoid gcc warnings by hitting the final return.
+  // while avoiding gcc warnings by hitting the final return.
   bool ret = false;
 
   switch (options_.mode()) {
@@ -105,209 +105,169 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   });
 }
 
-namespace {
+MainCommonBase::AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
+                                             absl::string_view method, CleanupFn cleanup)
+    : server_(server), opt_admin_(server.admin()), cleanup_(cleanup) {
+  request_headers_->setMethod(method);
+  request_headers_->setPath(path);
+}
 
-class AdminResponseImpl : public MainCommonBase::AdminResponse {
-public:
-  using CleanupFn = std::function<void(AdminResponseImpl*)>;
-
-  AdminResponseImpl(Server::Instance& server, absl::string_view path, absl::string_view method,
-                    CleanupFn cleanup)
-      : server_(server), opt_admin_(server.admin()), cleanup_(cleanup) {
-    request_headers_->setMethod(method);
-    request_headers_->setPath(path);
+MainCommonBase::AdminResponse::~AdminResponse() {
+  // MainCommonBase::response_set_ holds a raw pointer to all outstanding
+  // responses (not a shared_ptr). So when destructing the response
+  // we must call cleanup on MainCommonBase if this has not already
+  // occurred.
+  //
+  // Note it's also possible for MainCommonBase to be deleted before
+  // AdminResponse, in which case it will use its response_set_
+  // to call terminate, so we'll track that here and skip calling
+  // cleanup_ in that case.
+  absl::MutexLock lock(&mutex_);
+  if (!terminated_) {
+    // If there is a terminate/destruct race, calling cleanup_ below
+    // will lock MainCommonBase::mutex_, which is being held by
+    // terminateAdminRequests, so will block here until all the
+    // terminate calls are made. Once terminateAdminRequests
+    // release its lock, cleanup_ will return and the object
+    // can be safely destructed.
+    cleanup_(this); // lock in MainCommonBase
   }
+}
 
-  ~AdminResponseImpl() {
-    // MainCommonBase::response_set_ holds a raw pointer to all outstanding
-    // responses (not a shared_ptr). So when destructing the response
-    // we must call cleanup on MainCommonBase if this has not already
-    // occurred.
-    //
-    // Note it's also possible for MainCommonBase to be deleted before
-    // AdminResponseImpl, in which case it will use its response_set_
-    // to call terminate, so we'll track that here and skip calling
-    // cleanup_ in that case.
-    if (!terminated_) {
-      // If there is a terminate/destruct race, calling cleanup_ below
-      // will lock MainCommonBase::mutex_, which is being held by
-      // terminateAdminRequests, so will block here until all the
-      // terminate calls are made. Once terminateAdminRequests
-      // release its lock, cleanup_ will return and the object
-      // can be safely destructed.
-      cleanup_(this); // lock in MainCommonBase
-    }
-  }
-
-  void getHeaders(HeadersFn fn) override {
-    // First check for cancelling or termination.
-    {
-      absl::MutexLock lock(&mutex_);
-      ASSERT(headers_fn_ == nullptr);
-      if (cancelled_) {
-        return;
-      }
-      headers_fn_ = fn;
-      if (terminated_ || !opt_admin_) {
-        sendErrorLockHeld();
-        return;
-      }
-    }
-    server_.dispatcher().post([this, response = shared_from_this()]() { requestHeaders(); });
-  }
-
-  void nextChunk(BodyFn fn) override {
-    // Note the caller may race a call to nextChunk with the server being
-    // terminated.
-    {
-      absl::MutexLock lock(&mutex_);
-      ASSERT(body_fn_ == nullptr);
-      if (cancelled_) {
-        return;
-      }
-      body_fn_ = fn;
-      if (terminated_ || !opt_admin_) {
-        sendAbortChunkLockHeld();
-        return;
-      }
-    }
-
-    // Note that nextChunk may be called from any thread -- it's the callers choice,
-    // including the Envoy main thread, which would occur if the caller initiates
-    // the request of a chunk upon receipt of the previous chunk.
-    //
-    // In that case it may race against the AdminResponse object being deleted,
-    // in which case the callbacks, held in a shared_ptr, will be cancelled
-    // from the destructor. If that happens *before* we post to the main thread,
-    // we will just skip and never call fn.
-    server_.dispatcher().post([this, response = shared_from_this()]() { requestNextChunk(); });
-  }
-
-  // Called by the user if it is not longer interested in the result of the
-  // admin request. After calling cancel() the caller must not call nextChunk or
-  // getHeaders.
-  void cancel() override {
+void MainCommonBase::AdminResponse::getHeaders(HeadersFn fn) {
+  // First check for cancelling or termination.
+  {
     absl::MutexLock lock(&mutex_);
-    cancelled_ = true;
+    ASSERT(headers_fn_ == nullptr);
+    if (cancelled_) {
+      return;
+    }
+    headers_fn_ = fn;
+    if (terminated_ || !opt_admin_) {
+      sendErrorLockHeld();
+      return;
+    }
+  }
+  server_.dispatcher().post([this, response = shared_from_this()]() { requestHeaders(); });
+}
+
+void MainCommonBase::AdminResponse::nextChunk(BodyFn fn) {
+  // Note the caller may race a call to nextChunk with the server being
+  // terminated.
+  {
+    absl::MutexLock lock(&mutex_);
+    ASSERT(body_fn_ == nullptr);
+    if (cancelled_) {
+      return;
+    }
+    body_fn_ = fn;
+    if (terminated_ || !opt_admin_) {
+      sendAbortChunkLockHeld();
+      return;
+    }
+  }
+
+  // Note that nextChunk may be called from any thread -- it's the callers choice,
+  // including the Envoy main thread, which would occur if the caller initiates
+  // the request of a chunk upon receipt of the previous chunk.
+  //
+  // In that case it may race against the AdminResponse object being deleted,
+  // in which case the callbacks, held in a shared_ptr, will be cancelled
+  // from the destructor. If that happens *before* we post to the main thread,
+  // we will just skip and never call fn.
+  server_.dispatcher().post([this, response = shared_from_this()]() { requestNextChunk(); });
+}
+
+// Called by the user if it is not longer interested in the result of the
+// admin request. After calling cancel() the caller must not call nextChunk or
+// getHeaders.
+void MainCommonBase::AdminResponse::cancel() {
+  absl::MutexLock lock(&mutex_);
+  cancelled_ = true;
+  headers_fn_ = nullptr;
+  body_fn_ = nullptr;
+}
+
+bool MainCommonBase::AdminResponse::cancelled() const {
+  absl::MutexLock lock(&mutex_);
+  return cancelled_;
+}
+
+// Called from MainCommonBase::terminateAdminRequests when the Envoy server
+// terminates. After this is called, the caller may need to complete the
+// admin response, and so calls to getHeader and nextChunk remain valid,
+// resulting in 503 and an empty body.
+void MainCommonBase::AdminResponse::terminate() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  absl::MutexLock lock(&mutex_);
+  terminated_ = true;
+  sendErrorLockHeld();
+  sendAbortChunkLockHeld();
+}
+
+void MainCommonBase::AdminResponse::requestHeaders() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  {
+    absl::MutexLock lock(&mutex_);
+    if (cancelled_ || terminated_) {
+      return;
+    }
+  }
+  Server::AdminFilter filter(*opt_admin_);
+  filter.decodeHeaders(*request_headers_, false);
+  request_ = opt_admin_->makeRequest(filter);
+  code_ = request_->start(*response_headers_);
+  {
+    absl::MutexLock lock(&mutex_);
+    if (headers_fn_ == nullptr || cancelled_) {
+      return;
+    }
+    Server::Utility::populateFallbackResponseHeaders(code_, *response_headers_);
+    headers_fn_(code_, *response_headers_);
     headers_fn_ = nullptr;
+  }
+}
+
+void MainCommonBase::AdminResponse::requestNextChunk() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  {
+    absl::MutexLock lock(&mutex_);
+    if (cancelled_ || terminated_) {
+      return;
+    }
+  }
+  while (response_.length() == 0 && more_data_) {
+    more_data_ = request_->nextChunk(response_);
+  }
+  {
+    absl::MutexLock lock(&mutex_);
+    if (sent_end_stream_ || cancelled_) {
+      return;
+    }
+    sent_end_stream_ = !more_data_;
+    body_fn_(response_, more_data_);
+    ASSERT(response_.length() == 0);
     body_fn_ = nullptr;
   }
+}
 
-  bool cancelled() const override {
-    absl::MutexLock lock(&mutex_);
-    return cancelled_;
+void MainCommonBase::AdminResponse::sendAbortChunkLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  if (!sent_end_stream_ && body_fn_ != nullptr) {
+    response_.drain(response_.length());
+    body_fn_(response_, false);
+    sent_end_stream_ = true;
   }
+  body_fn_ = nullptr;
+}
 
-  // Called from MainCommonBase::terminateAdminRequests when the Envoy server
-  // terminates. After this is called, the caller may need to complete the
-  // admin response, and so calls to getHeader and nextChunk remain valid,
-  // resulting in 503 and an empty body.
-  void terminate() override {
-    ASSERT_IS_MAIN_OR_TEST_THREAD();
-    absl::MutexLock lock(&mutex_);
-    terminated_ = true;
-    sendErrorLockHeld();
-    sendAbortChunkLockHeld();
+void MainCommonBase::AdminResponse::sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  if (headers_fn_ != nullptr) {
+    code_ = Http::Code::InternalServerError;
+    Server::Utility::populateFallbackResponseHeaders(code_, *response_headers_);
+    headers_fn_(code_, *response_headers_);
+    headers_fn_ = nullptr;
   }
-
-private:
-  void requestHeaders() {
-    ASSERT_IS_MAIN_OR_TEST_THREAD();
-    {
-      absl::MutexLock lock(&mutex_);
-      if (cancelled_ || terminated_) {
-        return;
-      }
-    }
-    Server::AdminFilter filter(*opt_admin_);
-    filter.decodeHeaders(*request_headers_, false);
-    request_ = opt_admin_->makeRequest(filter);
-    code_ = request_->start(*response_headers_);
-    {
-      absl::MutexLock lock(&mutex_);
-      if (headers_fn_ == nullptr || cancelled_) {
-        return;
-      }
-      Server::Utility::populateFallbackResponseHeaders(code_, *response_headers_);
-      headers_fn_(code_, *response_headers_);
-      headers_fn_ = nullptr;
-    }
-  }
-
-  void requestNextChunk() {
-    ASSERT_IS_MAIN_OR_TEST_THREAD();
-    {
-      absl::MutexLock lock(&mutex_);
-      if (cancelled_ || terminated_) {
-        return;
-      }
-    }
-    while (response_.length() == 0 && more_data_) {
-      more_data_ = request_->nextChunk(response_);
-    }
-    {
-      absl::MutexLock lock(&mutex_);
-      if (sent_end_stream_ || cancelled_) {
-        return;
-      }
-      sent_end_stream_ = !more_data_;
-      body_fn_(response_, more_data_);
-      ASSERT(response_.length() == 0);
-      body_fn_ = nullptr;
-    }
-  }
-
-  void sendAbortChunkLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-    if (!sent_end_stream_ && body_fn_ != nullptr) {
-      response_.drain(response_.length());
-      body_fn_(response_, false);
-      sent_end_stream_ = true;
-    }
-    body_fn_ = nullptr;
-  }
-
-  void sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-    if (headers_fn_ != nullptr) {
-      code_ = Http::Code::InternalServerError;
-      Server::Utility::populateFallbackResponseHeaders(code_, *response_headers_);
-      headers_fn_(code_, *response_headers_);
-      headers_fn_ = nullptr;
-    }
-  }
-
-  Server::Instance& server_;
-  OptRef<Server::Admin> opt_admin_;
-  Buffer::OwnedImpl response_;
-  Http::Code code_;
-  Server::Admin::RequestPtr request_;
-  CleanupFn cleanup_;
-  Http::RequestHeaderMapPtr request_headers_{Http::RequestHeaderMapImpl::create()};
-  Http::ResponseHeaderMapPtr response_headers_{Http::ResponseHeaderMapImpl::create()};
-  bool more_data_ = true;
-
-  // True if cancel() was explicitly called by the user; headers and body
-  // callbacks are never called after cancel().
-  bool cancelled_ ABSL_GUARDED_BY(mutex_) = false;
-
-  // True if the Envoy server has stopped running its main loop. Headers and
-  // body requests can be initiated and called back are called after terminate,
-  // so callers do not have to special case this -- the request will simply fail
-  // with an empty response.
-  bool terminated_ ABSL_GUARDED_BY(mutex_) = false;
-
-  // Used to indicate whether the body function has been called with false
-  // as its second argument. That must always happen at most once, even
-  // if terminate races with the normal end-of-stream marker. more=false
-  // may never be sent if the request is cancelled, nor deleted prior to
-  // it being requested.
-  bool sent_end_stream_ ABSL_GUARDED_BY(mutex_) = false;
-
-  HeadersFn headers_fn_ ABSL_GUARDED_BY(mutex_);
-  BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
-  mutable absl::Mutex mutex_;
-};
-
-} // namespace
+}
 
 void MainCommonBase::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -338,7 +298,7 @@ void MainCommonBase::detachResponse(AdminResponse* response) {
 
 MainCommonBase::AdminResponseSharedPtr
 MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method) {
-  auto response = std::make_shared<AdminResponseImpl>(
+  auto response = std::make_shared<AdminResponse>(
       *server(), path_and_query, method,
       [this](AdminResponse* response) { detachResponse(response); });
   absl::MutexLock lock(&mutex_);

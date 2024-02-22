@@ -53,7 +53,11 @@ public:
   // cancel() is called, no further callbacks will be called by the response.
   class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
   public:
-    virtual ~AdminResponse() = default;
+    using CleanupFn = std::function<void(AdminResponse*)>;
+
+    AdminResponse(Server::Instance& server, absl::string_view path, absl::string_view method,
+                  CleanupFn cleanup);
+    ~AdminResponse();
 
     /**
      * Requests the headers for the response. This can be called from any
@@ -70,7 +74,7 @@ public:
      * @param fn The function to be called with the headers and status code.
      */
     using HeadersFn = std::function<void(Http::Code, Http::ResponseHeaderMap& map)>;
-    virtual void getHeaders(HeadersFn fn) PURE;
+    void getHeaders(HeadersFn fn);
 
     /**
      * Requests a new chunk. This can be called from any thread, and the BodyFn
@@ -91,7 +95,7 @@ public:
      * @param fn A function to be called on each chunk.
      */
     using BodyFn = std::function<void(Buffer::Instance&, bool)>;
-    virtual void nextChunk(BodyFn fn) PURE;
+    void nextChunk(BodyFn fn);
 
     /**
      * Requests that any outstanding callbacks be dropped. This can be called
@@ -100,12 +104,12 @@ public:
      * shared_ptr as that makes it much easier to manage cancellation across
      * multiple threads.
      */
-    virtual void cancel() PURE;
+    void cancel();
 
     /**
      * @return whether the request was cancelled.
      */
-    virtual bool cancelled() const PURE;
+    bool cancelled() const;
 
   private:
     friend class MainCommonBase;
@@ -116,7 +120,43 @@ public:
      * its callback is called false for the second arg, indicating
      * end of stream.
      */
-    virtual void terminate() PURE;
+    void terminate();
+
+    void requestHeaders();
+    void requestNextChunk();
+    void sendAbortChunkLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+    void sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+
+    Server::Instance& server_;
+    OptRef<Server::Admin> opt_admin_;
+    Buffer::OwnedImpl response_;
+    Http::Code code_;
+    Server::Admin::RequestPtr request_;
+    CleanupFn cleanup_;
+    Http::RequestHeaderMapPtr request_headers_{Http::RequestHeaderMapImpl::create()};
+    Http::ResponseHeaderMapPtr response_headers_{Http::ResponseHeaderMapImpl::create()};
+    bool more_data_ = true;
+
+    // True if cancel() was explicitly called by the user; headers and body
+    // callbacks are never called after cancel().
+    bool cancelled_ ABSL_GUARDED_BY(mutex_) = false;
+
+    // True if the Envoy server has stopped running its main loop. Headers and
+    // body requests can be initiated and called back are called after terminate,
+    // so callers do not have to special case this -- the request will simply fail
+    // with an empty response.
+    bool terminated_ ABSL_GUARDED_BY(mutex_) = false;
+
+    // Used to indicate whether the body function has been called with false
+    // as its second argument. That must always happen at most once, even
+    // if terminate races with the normal end-of-stream marker. more=false
+    // may never be sent if the request is cancelled, nor deleted prior to
+    // it being requested.
+    bool sent_end_stream_ ABSL_GUARDED_BY(mutex_) = false;
+
+    HeadersFn headers_fn_ ABSL_GUARDED_BY(mutex_);
+    BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
+    mutable absl::Mutex mutex_;
   };
   using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 
