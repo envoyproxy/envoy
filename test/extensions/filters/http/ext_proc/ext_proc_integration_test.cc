@@ -52,6 +52,7 @@ struct ConfigOptions {
   bool add_logging_filter = false;
   bool http1_codec = false;
   bool add_metadata = false;
+  bool allow_all_routing = false;
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -117,6 +118,10 @@ protected:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
       ext_proc_filter.set_name(ext_proc_filter_name);
+
+      proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(
+          config_option.allow_all_routing);
+
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
 
@@ -794,6 +799,114 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 
   EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetRoutingHeader) {
+  ConfigOptions config_option = {};
+  config_option.allow_all_routing = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key(":scheme");
+        mut1->mutable_header()->set_value("https");
+
+        auto* mut2 = response_header_mutation->add_set_headers();
+        mut2->mutable_header()->set_key(":authority");
+        mut2->mutable_header()->set_value("new_host");
+
+        auto* mut3 = response_header_mutation->add_set_headers();
+        mut3->mutable_header()->set_key(":method");
+        mut3->mutable_header()->set_value("POST");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Routing headers are not updated when `allow_all_routing` mutation rule is false.
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "https"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "new_host"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "POST"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"},          {":method", "GET"}, {"host", "host"}, {":path", "/"}, ,
+            {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key(":path");
+        mut1->mutable_header()->set_value("/mutated_path/bluh");
+
+        auto* mut2 = response_header_mutation->add_set_headers();
+        mut2->mutable_header()->set_key(":scheme");
+        mut2->mutable_header()->set_value("https");
+
+        auto* mut3 = response_header_mutation->add_set_headers();
+        mut3->mutable_header()->set_key(":authority");
+        mut3->mutable_header()->set_value("new_host");
+
+        auto* mut4 = response_header_mutation->add_set_headers();
+        mut4->mutable_header()->set_key(":method");
+        mut4->mutable_header()->set_value("POST");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Path header is updated.
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":path", "/mutated_path/bluh"));
+  // Routing headers are not updated when `allow_all_routing` mutation rule is false.
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "https"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "host"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "GET"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
