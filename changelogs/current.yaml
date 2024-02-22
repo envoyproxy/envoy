@@ -216,6 +216,10 @@ new_features:
     added an option to dynamically set a per downstream connection idle timeout period object under the key
     ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
     specified in the filter configuration and the default idle timeout.
+- area: load shed point
+  change: |
+    Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
+    the system is under pressure.
 
 deprecated:
 - area: listener

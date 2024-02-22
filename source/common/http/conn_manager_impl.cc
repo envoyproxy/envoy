@@ -484,7 +484,7 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   requests_during_dispatch_count_ = 0;
   if (!codec_) {
-    // Close connections if codec is not created and the system is under pressure.
+    // Close connections if the system is under pressure before creating codec.
     if (hcm_ondata_creating_codec_ != nullptr && hcm_ondata_creating_codec_->shouldShedLoad()) {
       stats_.named_.downstream_rq_overload_close_.inc();
       handleCodecOverloadError("onData codec creation overload");

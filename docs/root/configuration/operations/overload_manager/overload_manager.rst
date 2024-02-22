@@ -166,7 +166,8 @@ The following core load shed points are supported:
       level which will eventually drain the HTTP/2 connection.
 
   * - envoy.load_shed_points.hcm_ondata_creating_codec
-    - Envoy will close the connection if codec cannot be created under pressure.
+    - Envoy will close the connections before creating codec if the system is
+      under pressure.
 
 .. _config_overload_manager_reducing_timeouts:
 
