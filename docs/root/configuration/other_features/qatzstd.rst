@@ -29,6 +29,6 @@ When new http package come, one worker thread will process it using its Qatzstd 
 Qat hardware using standard zstd api.
 
 Installing and using QAT-ZSTD-Plugin
-------------------------
+------------------------------------
 
 For information on how to build/install and use QAT-ZSTD-Plugin see `introduction <https://github.com/intel/QAT-ZSTD-Plugin/tree/main#introduction>`_.
