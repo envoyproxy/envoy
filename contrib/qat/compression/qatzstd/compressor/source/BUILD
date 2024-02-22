@@ -15,7 +15,7 @@ make(
     build_data = ["@com_github_qat_zstd//:all"],
     env = select({
         "//bazel:clang_build": {
-            "CFLAGS": "-Wno-error=newline-eof -Wno-error=strict-prototypes -Wno-error=unused-but-set-variable",
+            "CFLAGS": "-Wno-error=unused-parameter",
         },
         "//conditions:default": {},
     }),
