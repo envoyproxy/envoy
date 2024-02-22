@@ -40,9 +40,9 @@ AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<AccessLog>(
-      std::move(filter), proto_config, context.getServerFactoryContext().threadLocal(),
-      getAccessLoggerCacheSingleton(context.getServerFactoryContext()));
+  return std::make_shared<AccessLog>(std::move(filter), proto_config,
+                                     context.serverFactoryContext().threadLocal(),
+                                     getAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {

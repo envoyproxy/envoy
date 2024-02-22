@@ -397,19 +397,35 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 
-  // Trigger the periodical report.
-  // TODO(tyxia) Make interval configurable. It is 60s in ValidMatcherConfig.
-  simTime().advanceTimeWait(std::chrono::milliseconds(60000));
-  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  // TODO(tyxia) Make interval configurable in the test. It is currently 60s in
+  // ValidMatcherConfig.
+  int report_interval_sec = 60;
+  // Trigger the report periodically, 10 times.
+  for (int i = 0; i < 10; ++i) {
+    // Advance the time by report_interval.
+    simTime().advanceTimeWait(std::chrono::milliseconds(report_interval_sec * 1000));
+    // Checks that the rate limit server has received the periodical reports.
+    ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
-  // Build the response.
-  envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response2;
-  auto* bucket_action2 = rlqs_response2.add_bucket_action();
+    // Verify the usage report content.
+    for (const auto& usage : reports.bucket_quota_usages()) {
+      // We only send single downstream client request and it is allowed.
+      EXPECT_EQ(usage.num_requests_allowed(), 1);
+      EXPECT_EQ(usage.num_requests_denied(), 0);
+      // time_elapsed equals to periodical reporting interval.
+      EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
+                report_interval_sec);
+    }
 
-  for (const auto& [key, value] : custom_headers_cpy) {
-    (*bucket_action2->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+    // Build the rlqs server response.
+    envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response2;
+    auto* bucket_action2 = rlqs_response2.add_bucket_action();
+
+    for (const auto& [key, value] : custom_headers_cpy) {
+      (*bucket_action2->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+    }
+    rlqs_stream_->sendGrpcMessage(rlqs_response2);
   }
-  rlqs_stream_->sendGrpcMessage(rlqs_response2);
 }
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {

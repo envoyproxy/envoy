@@ -26,6 +26,8 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+NID
+NIST
 bm
 BSON
 BPF
@@ -349,6 +351,8 @@ QDCOUNT
 QPACK
 QUIC
 QoS
+qat
+qatzip
 RAII
 RANLUX
 RBAC
@@ -743,6 +747,7 @@ exe
 execlp
 exprfor
 expectable
+extensibility
 extrahelp
 faceplant
 facto
@@ -764,6 +769,8 @@ fixdate
 fixup
 flatbuffer
 flatc
+fluentd
+Fluentd
 fmt
 fmtlib
 fn
@@ -960,6 +967,7 @@ moveable
 msec
 msg
 msghdr
+msgpack
 multi
 multicast
 multikill
@@ -988,6 +996,7 @@ netblocks
 netfilter
 netlink
 netmask
+NLB
 NLMSG
 nonblocking
 noncopyable
@@ -1237,6 +1246,9 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+sigv
+sigv4
+sigv4a
 siloed
 sim
 sinked

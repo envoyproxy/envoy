@@ -64,7 +64,10 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
 
   switch (sink_type_) {
   case ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin:
-    ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
+    if (admin_streamer == nullptr) {
+      throw EnvoyException(fmt::format("Output sink type BufferedAdmin requires that the admin "
+                                       "output will be configured via admin"));
+    }
     // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
     // admin stream output with the wrong format.
     RELEASE_ASSERT(
@@ -75,7 +78,10 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     sink_to_use_ = admin_streamer;
     break;
   case ProtoOutputSink::OutputSinkTypeCase::kStreamingAdmin:
-    ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
+    if (admin_streamer == nullptr) {
+      throw EnvoyException(fmt::format("Output sink type StreamingAdmin requires that the admin "
+                                       "output will be configured via admin"));
+    }
     // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
     // admin stream output with the wrong format.
     // TODO(davidpeet8): Simple change to enable PROTO_BINARY_LENGTH_DELIMITED format -
@@ -109,7 +115,8 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           absl::get<HttpContextRef>(context).get();
       config = Config::Utility::translateAnyToFactoryConfig(
           sinks[0].custom_sink().typed_config(),
-          http_context.messageValidationContext().staticValidationVisitor(), tap_sink_factory);
+          http_context.serverFactoryContext().messageValidationContext().staticValidationVisitor(),
+          tap_sink_factory);
     }
 
     sink_ = tap_sink_factory.createSinkPtr(*config, context);

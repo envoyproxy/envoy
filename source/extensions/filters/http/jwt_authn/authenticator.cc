@@ -377,7 +377,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     header_added |=
         addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
   }
-  if (provider.clear_route_cache() && header_added) {
+  if (provider.clear_route_cache() && (header_added || !provider.payload_in_metadata().empty())) {
     clear_route_cache_ = true;
   }
 
@@ -405,7 +405,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
 void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload) {
   const auto& provider = jwks_data_->getJwtProvider();
   const auto& normalize = provider.normalize_payload_in_metadata();
-  if (normalize.space_delimited_claims().size() == 0) {
+  if (normalize.space_delimited_claims().empty()) {
     set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_payload);
   }
   // Make a temporary copy to normalize the JWT struct.

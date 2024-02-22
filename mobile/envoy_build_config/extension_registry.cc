@@ -1,13 +1,5 @@
 #include "extension_registry.h"
 
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "source/extensions/compression/brotli/compressor/config.h"
-#include "source/extensions/compression/gzip/compressor/config.h"
-#include "source/extensions/filters/http/composite/action.h"
-#include "source/extensions/filters/http/composite/config.h"
-#include "source/extensions/filters/http/compressor/config.h"
-#endif
-
 #include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
@@ -29,6 +21,7 @@
 #include "source/extensions/http/header_formatters/preserve_case/config.h"
 #include "source/extensions/http/header_validators/envoy_default/config.h"
 #include "source/extensions/http/original_ip_detection/xff/config.h"
+#include "source/extensions/load_balancing_policies/cluster_provided/config.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
@@ -38,11 +31,10 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
-#include "source/extensions/load_balancing_policies/cluster_provided/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
 #endif
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -53,7 +45,7 @@
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
 #include "extension_registry_platform_additions.h"
@@ -210,15 +202,6 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 #endif
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
-#endif
-
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  // These are factories required for request decompression.
-  Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
-  Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
-  Extensions::HttpFilters::Composite::forceRegisterCompositeFilterFactory();
-  Extensions::HttpFilters::Composite::forceRegisterExecuteFilterActionFactory();
-  Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
 #endif
 
 #ifdef ENVOY_MOBILE_XDS

@@ -11,6 +11,18 @@
 namespace Envoy {
 namespace Quic {
 
+// Used to defer deleting connection socket to avoid deleting IoHandle in a read loop.
+class DeferredDeletableSocket : public Event::DeferredDeletable {
+public:
+  explicit DeferredDeletableSocket(std::unique_ptr<Network::ConnectionSocket> socket)
+      : socket_(std::move(socket)) {}
+
+  void deleteIsPending() override { socket_->close(); }
+
+private:
+  std::unique_ptr<Network::ConnectionSocket> socket_;
+};
+
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id,
     Network::Address::InstanceConstSharedPtr& initial_peer_address,
@@ -75,7 +87,7 @@ uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
 void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket& connection_socket,
                                                       OptRef<PacketsToReadDelegate> delegate) {
   delegate_ = delegate;
-  if (connection_socket.ioHandle().isOpen()) {
+  if (connection_socket.isOpen()) {
     connection_socket.ioHandle().initializeFileEvent(
         dispatcher_,
         [this, &connection_socket](uint32_t events) -> void {
@@ -90,7 +102,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
       connection_socket.close();
     }
   }
-  if (!connection_socket.ioHandle().isOpen()) {
+  if (!connection_socket.isOpen()) {
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }
@@ -188,6 +200,10 @@ void EnvoyQuicClientConnection::onPathValidationFailure(
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
+  std::unique_ptr<Network::ConnectionSocket> probing_socket =
+      static_cast<EnvoyQuicPathValidationContext*>(context.get())->releaseSocket();
+  // Extend the socket life time till the end of the current event loop.
+  dispatcher_.deferredDelete(std::make_unique<DeferredDeletableSocket>(std::move(probing_socket)));
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events,

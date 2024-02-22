@@ -57,9 +57,10 @@ private:
   friend class ClusterTest;
 
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+          Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cacahe,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager);
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();
@@ -160,8 +161,7 @@ private:
 
   void
   addOrUpdateHost(absl::string_view host,
-                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-                  std::unique_ptr<Upstream::HostVector>& hosts_added)
+                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   void updatePriorityState(const Upstream::HostVector& hosts_added,

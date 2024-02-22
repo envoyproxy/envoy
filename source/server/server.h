@@ -194,6 +194,7 @@ public:
   Http::Context& httpContext() override { return server_.httpContext(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Router::Context& routerContext() override { return server_.routerContext(); }
+  ProcessContextOptRef processContext() override { return server_.processContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
@@ -249,6 +250,7 @@ public:
 
   virtual void maybeCreateHeapShrinker() PURE;
   virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
 
   void run() override;
 
@@ -313,6 +315,9 @@ public:
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
+
+protected:
+  const Configuration::MainImpl& config() { return config_; }
 
 private:
   Network::DnsResolverSharedPtr getOrCreateDnsResolver();

@@ -34,6 +34,7 @@ filegroup(
             "root/configuration/other_features/_include/hyperscan_matcher.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
             "root/configuration/other_features/_include/hyperscan_regex_engine.yaml",
+            "root/configuration/other_features/_include/qatzip.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
             "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
             "root/configuration/overview/_include/xds_api/oauth-sds-example.yaml",
@@ -159,6 +160,8 @@ pkg_files(
     srcs = glob([
         "root/**/*.css",
         "root/**/*.ico",
+        "root/**/*.jpeg",
+        "root/**/*.jpg",
         "root/**/*.js",
         "root/**/*.json",
         "root/**/*.pb",

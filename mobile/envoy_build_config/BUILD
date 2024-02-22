@@ -4,7 +4,6 @@ load(
     "envoy_mobile_package",
     "envoy_select_enable_http3",
     "envoy_select_envoy_mobile_listener",
-    "envoy_select_envoy_mobile_request_compression",
     "envoy_select_envoy_mobile_xds",
 )
 
@@ -59,19 +58,11 @@ envoy_cc_library(
             "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         ],
         "@envoy",
-    ) + envoy_select_envoy_mobile_request_compression(
-        [
-            "@envoy//source/extensions/compression/brotli/compressor:config",
-            "@envoy//source/extensions/compression/gzip/compressor:config",
-            "@envoy//source/extensions/filters/http/compressor:config",
-            "@envoy//source/extensions/filters/http/composite:config",
-        ],
-        "@envoy",
     ) + envoy_select_envoy_mobile_listener(
         [
             "@envoy//source/extensions/udp_packet_writer/default:config",
-            "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
-            "@envoy//source/extensions/listener_managers/listener_manager:connection_handler_lib",
+            "@envoy//source/common/listener_manager:listener_manager_lib",
+            "@envoy//source/common/listener_manager:connection_handler_lib",
         ],
         "@envoy",
     ) + envoy_select_envoy_mobile_xds(

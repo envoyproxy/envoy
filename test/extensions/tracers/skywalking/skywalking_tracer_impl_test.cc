@@ -77,10 +77,10 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 
   {
     auto previous_header_value = SkyWalkingTestHelper::createPropagatedSW8HeaderValue(false, "");
-    Http::TestRequestHeaderMapImpl request_headers{{"sw8", previous_header_value},
-                                                   {":path", "/path"},
-                                                   {":method", "GET"},
-                                                   {":authority", "test.com"}};
+    Tracing::TestTraceContextImpl request_headers{{"sw8", previous_header_value},
+                                                  {":path", "/path"},
+                                                  {":method", "GET"},
+                                                  {":authority", "test.com"}};
     ON_CALL(mock_tracing_config_, operationName())
         .WillByDefault(Return(Tracing::OperationName::Ingress));
 
@@ -110,7 +110,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 
   {
     // Create new span segment with no previous span context.
-    Http::TestRequestHeaderMapImpl new_request_headers{
+    Tracing::TestTraceContextImpl new_request_headers{
         {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
 
     Tracing::SpanPtr org_span =
@@ -132,11 +132,10 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 
   {
     // Create new span segment with error propagation header.
-    Http::TestRequestHeaderMapImpl error_request_headers{
-        {":path", "/path"},
-        {":method", "GET"},
-        {":authority", "test.com"},
-        {"sw8", "xxxxxx-error-propagation-header"}};
+    Tracing::TestTraceContextImpl error_request_headers{{":path", "/path"},
+                                                        {":method", "GET"},
+                                                        {":authority", "test.com"},
+                                                        {"sw8", "xxxxxx-error-propagation-header"}};
     Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, error_request_headers,
                                                    stream_info_, "TEST_OP", decision);
     Span* span = dynamic_cast<Span*>(org_span.get());
@@ -155,7 +154,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
 
   {
     // Create new span segment with error propagation header.
-    Http::TestRequestHeaderMapImpl error_request_headers{
+    Tracing::TestTraceContextImpl error_request_headers{
         {":path", "/path"},
         {":method", "GET"},
         {":authority", "test.com"},
@@ -180,7 +179,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   {
     // Create null span with disabled tracing.
     decision.traced = false;
-    Http::TestRequestHeaderMapImpl request_headers{
+    Tracing::TestTraceContextImpl request_headers{
         {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
     Tracing::SpanPtr org_null_span = driver_->startSpan(mock_tracing_config_, request_headers,
                                                         stream_info_, "TEST_OP", decision);
@@ -194,11 +193,10 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   {
     // Create null span with disabled tracing.
     decision.traced = false;
-    Http::TestRequestHeaderMapImpl error_request_headers{
-        {":path", "/path"},
-        {":method", "GET"},
-        {":authority", "test.com"},
-        {"sw8", "xxxxxx-error-propagation-header"}};
+    Tracing::TestTraceContextImpl error_request_headers{{":path", "/path"},
+                                                        {":method", "GET"},
+                                                        {":authority", "test.com"},
+                                                        {"sw8", "xxxxxx-error-propagation-header"}};
     Tracing::SpanPtr org_null_span = driver_->startSpan(mock_tracing_config_, error_request_headers,
                                                         stream_info_, "TEST_OP", decision);
 
@@ -211,7 +209,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   {
     // Create null span with disabled tracing.
     decision.traced = false;
-    Http::TestRequestHeaderMapImpl error_request_headers{
+    Tracing::TestTraceContextImpl error_request_headers{
         {":path", "/path"},
         {":method", "GET"},
         {":authority", "test.com"},
@@ -239,7 +237,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
   decision.reason = Tracing::Reason::Sampling;
   decision.traced = true;
 
-  Http::TestRequestHeaderMapImpl request_headers{
+  Tracing::TestTraceContextImpl request_headers{
       {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
 
   Tracing::SpanPtr org_span =

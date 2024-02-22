@@ -28,7 +28,6 @@ load(
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
     _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
-    _envoy_select_envoy_mobile_request_compression = "envoy_select_envoy_mobile_request_compression",
     _envoy_select_envoy_mobile_xds = "envoy_select_envoy_mobile_xds",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
@@ -53,6 +52,10 @@ load(
     _envoy_py_test = "envoy_py_test",
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
+)
+load(
+    ":envoy_internal.bzl",
+    _envoy_linkstatic = "envoy_linkstatic",
 )
 load(
     ":envoy_mobile_defines.bzl",
@@ -234,7 +237,6 @@ envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
-envoy_select_envoy_mobile_request_compression = _envoy_select_envoy_mobile_request_compression
 envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
 envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
 envoy_select_boringssl = _envoy_select_boringssl
@@ -252,6 +254,7 @@ envoy_select_wasm_v8 = _envoy_select_wasm_v8
 envoy_select_wasm_wamr = _envoy_select_wasm_wamr
 envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
+envoy_select_linkstatic = _envoy_linkstatic
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary

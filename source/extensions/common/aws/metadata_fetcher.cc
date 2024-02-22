@@ -23,7 +23,8 @@ public:
   MetadataFetcherImpl(Upstream::ClusterManager& cm, absl::string_view cluster_name)
       : cm_(cm), cluster_name_(std::string(cluster_name)) {}
 
-  ~MetadataFetcherImpl() override { cancel(); }
+  // TODO(suniltheta): Verify that bypassing virtual dispatch here was intentional
+  ~MetadataFetcherImpl() override { MetadataFetcherImpl::cancel(); }
 
   void cancel() override {
     if (request_ && !complete_) {
@@ -49,7 +50,6 @@ public:
   void fetch(Http::RequestMessage& message, Tracing::Span& parent_span,
              MetadataFetcher::MetadataReceiver& receiver) override {
     ASSERT(!request_);
-    ASSERT(!receiver_);
     complete_ = false;
     receiver_ = makeOptRef(receiver);
     const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster_name_);
@@ -70,8 +70,15 @@ public:
     const auto path = message.headers().getPathValue();
     const auto scheme = message.headers().getSchemeValue();
     const auto method = message.headers().getMethodValue();
-    ENVOY_LOG(debug, "fetch AWS Metadata at [uri = {}]: start from cluster {}",
-              fmt::format("{}://{}{}", scheme, host, path), cluster_name_);
+
+    const size_t query_offset = path.find('?');
+    // Sanitize the path before logging.
+    // However, the route debug log will still display the entire path.
+    // So safely store the Envoy logs at debug level.
+    const absl::string_view sanitized_path =
+        query_offset != absl::string_view::npos ? path.substr(0, query_offset) : path;
+    ENVOY_LOG(debug, "fetch AWS Metadata from the cluster {} at [uri = {}]", cluster_name_,
+              fmt::format("{}://{}{}", scheme, host, sanitized_path));
 
     Http::RequestHeaderMapPtr headersPtr =
         Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
@@ -116,6 +123,7 @@ public:
 
   // HTTP async receive method on success.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override {
+    ASSERT(receiver_);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
     if (status_code == enumToInt(Http::Code::OK)) {
@@ -145,6 +153,7 @@ public:
   // HTTP async receive method on failure.
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override {
+    ASSERT(receiver_);
     ENVOY_LOG(debug, "{}: fetch AWS Metadata [cluster = {}]: network error {}", __func__,
               cluster_name_, enumToInt(reason));
     complete_ = true;
@@ -162,10 +171,7 @@ private:
   OptRef<MetadataFetcher::MetadataReceiver> receiver_;
   OptRef<Http::AsyncClient::Request> request_;
 
-  void reset() {
-    request_.reset();
-    receiver_.reset();
-  }
+  void reset() { request_.reset(); }
 };
 } // namespace
 

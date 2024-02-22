@@ -108,7 +108,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "ext_authz_close");
     filter_callbacks_->connection().streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+        StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
     filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
         response->status == Filters::Common::ExtAuthz::CheckStatus::Denied
             ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied

@@ -18,16 +18,27 @@ envoy_cc_test(
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            # For the TestProxyResolutionApi test.
+            "-Wl,-framework,CoreFoundation",
+            "-Wl,-framework,CFNetwork",
+        ],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
+    shard_count = 6,
     deps = [
         ":base_client_integration_test_lib",
         "//test/common/mocks/common:common_mocks",
         "@envoy//source/common/quic:active_quic_listener_lib",
         "@envoy//source/common/quic:client_connection_factory_lib",
         "@envoy//source/common/quic:quic_server_factory_lib",
+        "@envoy//source/common/quic:quic_server_transport_socket_factory_lib",
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/quic:udp_gso_batch_writer_lib",
         "@envoy//source/extensions/udp_packet_writer/gso:config",
+        "@envoy//test/test_common:test_random_generator_lib",
     ],
 )
 
@@ -51,6 +62,7 @@ envoy_cc_test(
     deps = [
         ":xds_integration_test_lib",
         "@envoy//test/test_common:environment_lib",
+        "@envoy//test/test_common:test_runtime_lib",
         "@envoy//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
@@ -168,6 +180,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",

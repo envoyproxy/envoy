@@ -20,7 +20,7 @@ public:
                     Formatter::FormatterBasePtr<Context>&& formatter,
                     AccessLog::AccessLogManager& log_manager)
       : filter_(std::move(filter)), formatter_(std::move(formatter)) {
-    log_file_ = log_manager.createAccessLog(access_log_file_info);
+    log_file_ = log_manager.createAccessLog(access_log_file_info).value();
   }
 
   void log(const Context& context, const StreamInfo::StreamInfo& stream_info) override {
@@ -94,7 +94,7 @@ public:
     Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, typed_config.path()};
     return std::make_shared<FileAccessLogBase<Context>>(
         file_info, std::move(filter), std::move(formatter),
-        context.getServerFactoryContext().accessLogManager());
+        context.serverFactoryContext().accessLogManager());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

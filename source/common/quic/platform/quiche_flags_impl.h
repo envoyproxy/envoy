@@ -9,6 +9,8 @@
 #include <atomic>
 #include <string>
 
+#include "source/common/quic/platform/quiche_flags_constants.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/flags/declare.h"
 #include "absl/flags/flag.h"
@@ -19,10 +21,6 @@
   quiche::TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(#flag, value, help);
 
 namespace quiche {
-
-const std::string EnvoyQuicheReloadableFlagPrefix =
-    "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_";
-const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 
 using ReloadableFlag = absl::Flag<bool>;
 
@@ -48,10 +46,6 @@ private:
 #define QUIC_FLAG(flag, ...) ABSL_DECLARE_FLAG(bool, envoy_##flag);
 #include "quiche/quic/core/quic_flags_list.h"
 #undef QUIC_FLAG
-
-#define QUIC_PROTOCOL_FLAG(type, flag, ...) ABSL_DECLARE_FLAG(type, envoy_##flag);
-#include "quiche/quic/core/quic_protocol_flags_list.h"
-#undef QUIC_PROTOCOL_FLAG
 
 #define QUICHE_PROTOCOL_FLAG(type, flag, ...) ABSL_DECLARE_FLAG(type, envoy_##flag);
 #include "quiche/common/quiche_protocol_flags_list.h"

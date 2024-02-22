@@ -174,7 +174,7 @@ inline int getifaddrs(ifaddrs** result) {
     memset(&addrRequest, 0, sizeof(addrRequest));
     addrRequest.netlinkHeader.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH;
     addrRequest.netlinkHeader.nlmsg_type = RTM_GETADDR;
-    addrRequest.netlinkHeader.nlmsg_len = NLMSG_ALIGN(NLMSG_LENGTH(sizeof(addrRequest)));
+    addrRequest.netlinkHeader.nlmsg_len = NLMSG_ALIGN(NLMSG_LENGTH(sizeof(ifaddrmsg)));
     addrRequest.msg.ifa_family = AF_UNSPEC; // All families.
     addrRequest.msg.ifa_index = 0; // All interfaces.
     if (!sendNetlinkMessage(fd.get(), &addrRequest, addrRequest.netlinkHeader.nlmsg_len)) {

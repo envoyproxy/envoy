@@ -41,6 +41,31 @@ private:
   absl::optional<size_t> max_length_;
 };
 
+class GenericStatusCodeFormatterProvider : public FormatterProvider {
+public:
+  GenericStatusCodeFormatterProvider() = default;
+
+  // FormatterProvider
+  absl::optional<std::string> formatWithContext(const FormatterContext& context,
+                                                const StreamInfo::StreamInfo&) const override {
+    if (context.response_ == nullptr) {
+      return absl::nullopt;
+    }
+
+    const int code = context.response_->status().code();
+    return std::to_string(code);
+  }
+  ProtobufWkt::Value formatValueWithContext(const FormatterContext& context,
+                                            const StreamInfo::StreamInfo&) const override {
+    if (context.response_ == nullptr) {
+      return ValueUtil::nullValue();
+    }
+
+    const int code = context.response_->status().code();
+    return ValueUtil::numberValue(code);
+  }
+};
+
 class SimpleCommandParser : public CommandParser {
 public:
   using ProviderFunc =
@@ -116,7 +141,7 @@ private:
                      if (!context.request_) {
                        return absl::nullopt;
                      }
-                     auto optional_view = context.request_->getByKey(key);
+                     auto optional_view = context.request_->get(key);
                      if (!optional_view.has_value()) {
                        return absl::nullopt;
                      }
@@ -132,12 +157,19 @@ private:
                      if (!context.response_) {
                        return absl::nullopt;
                      }
-                     auto optional_view = context.response_->getByKey(key);
+                     auto optional_view = context.response_->get(key);
                      if (!optional_view.has_value()) {
                        return absl::nullopt;
                      }
                      return std::string(optional_view.value());
                    });
+             }},
+            // A formatter for the response status code. This supports the case where the response
+            // code is minus value and will override the common RESPONSE_CODE formatter for generic
+            // proxy.
+            {"RESPONSE_CODE",
+             [](absl::string_view, absl::optional<size_t>) -> FormatterProviderPtr {
+               return std::make_unique<GenericStatusCodeFormatterProvider>();
              }},
         });
   }

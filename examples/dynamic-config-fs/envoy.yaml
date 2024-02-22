@@ -4,9 +4,11 @@ node:
 
 dynamic_resources:
   cds_config:
+    resource_api_version: V3
     path_config_source:
       path: /var/lib/envoy/cds.yaml
   lds_config:
+    resource_api_version: V3
     path_config_source:
       path: /var/lib/envoy/lds.yaml
 

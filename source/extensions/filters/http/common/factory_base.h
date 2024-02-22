@@ -127,11 +127,12 @@ public:
 
   struct DualInfo {
     DualInfo(Server::Configuration::UpstreamFactoryContext& context)
-        : init_manager(context.initManager()), scope(context.scope()) {}
+        : init_manager(context.initManager()), scope(context.scope()), is_upstream(true) {}
     DualInfo(Server::Configuration::FactoryContext& context)
-        : init_manager(context.initManager()), scope(context.scope()) {}
+        : init_manager(context.initManager()), scope(context.scope()), is_upstream(false) {}
     Init::Manager& init_manager;
     Stats::Scope& scope;
+    bool is_upstream;
   };
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
@@ -141,7 +142,7 @@ public:
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
                                              stats_prefix, DualInfo(context),
-                                             context.getServerFactoryContext());
+                                             context.serverFactoryContext());
   }
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
@@ -150,8 +151,8 @@ public:
                                Server::Configuration::UpstreamFactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
-            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
-        stats_prefix, DualInfo(context), context.getServerFactoryContext());
+            proto_config, context.serverFactoryContext().messageValidationVisitor()),
+        stats_prefix, DualInfo(context), context.serverFactoryContext());
   }
 
   virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>

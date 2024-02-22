@@ -200,7 +200,9 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   absl::flat_hash_set<std::string> effective_resources;
   for (const auto& resource : resources) {
     if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
-      auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource);
+      auto xdstp_resource_or_error = XdsResourceIdentifier::decodeUrn(resource);
+      THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
+      auto xdstp_resource = xdstp_resource_or_error.value();
       if (options.add_xdstp_node_context_params_) {
         const auto context = XdsContextParams::encodeResource(
             local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
@@ -355,6 +357,9 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          OptRef<XdsResourcesDelegate>, bool use_eds_resources_cache) override {
+    absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
+        Utility::parseRateLimitSettings(ads_config);
+    THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
         /*dispatcher_=*/dispatcher,
@@ -362,7 +367,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
         /*local_info_=*/local_info,
-        /*rate_limit_settings_=*/Utility::parseRateLimitSettings(ads_config),
+        /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
         /*scope_=*/scope,
         /*config_validators_=*/std::move(config_validators),
         /*xds_resources_delegate_=*/absl::nullopt,

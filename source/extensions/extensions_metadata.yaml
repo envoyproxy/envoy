@@ -12,6 +12,13 @@ envoy.access_loggers.extension_filters.cel:
   status: alpha
   type_urls:
   - envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+envoy.access_loggers.fluentd:
+  categories:
+  - envoy.access_loggers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig
 envoy.access_loggers.http_grpc:
   categories:
   - envoy.access_loggers
@@ -197,16 +204,20 @@ envoy.filters.http.alternate_protocols_cache:
 envoy.filters.http.aws_lambda:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_lambda.v3.Config
   - envoy.extensions.filters.http.aws_lambda.v3.PerRouteConfig
 envoy.filters.http.aws_request_signing:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
@@ -1021,7 +1032,7 @@ envoy.resource_monitors.downstream_connections:
   categories:
   - envoy.resource_monitors
   security_posture: data_plane_agnostic
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
 envoy.resource_monitors.fixed_heap:
@@ -1073,6 +1084,13 @@ envoy.route.early_data_policy.default:
   status: stable
   type_urls:
   - envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
+envoy.router.cluster_specifier_plugin.lua:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.cluster_specifiers.lua.v3.LuaConfig
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks

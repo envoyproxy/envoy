@@ -525,7 +525,7 @@ protected:
     // EdfScheduler for weighted LB. The edf_ is only created when the original
     // host weights of 2 or more hosts differ. When not present, the
     // implementation of chooseHostOnce falls back to unweightedHostPick.
-    std::unique_ptr<EdfScheduler<const Host>> edf_;
+    std::unique_ptr<EdfScheduler<Host>> edf_;
   };
 
   void initialize();
@@ -711,8 +711,7 @@ public:
                 ? absl::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
                 : absl::nullopt),
-        enable_full_scan_(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, enable_full_scan, false)) {
+        selection_method_(least_request_config.selection_method()) {
     initialize();
   }
 
@@ -739,6 +738,8 @@ private:
                                         const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
+  HostSharedPtr unweightedHostPickFullScan(const HostVector& hosts_to_use);
+  HostSharedPtr unweightedHostPickNChoices(const HostVector& hosts_to_use);
 
   const uint32_t choice_count_;
 
@@ -748,7 +749,8 @@ private:
   double active_request_bias_{};
 
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
-  const bool enable_full_scan_{};
+  const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
+      selection_method_{};
 };
 
 /**

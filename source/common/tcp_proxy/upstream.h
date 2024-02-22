@@ -8,6 +8,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/router/header_parser.h"
@@ -129,9 +130,11 @@ class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
   using TunnelingConfig =
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
-
+  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info,
+               Http::CodecType type);
   ~HttpUpstream() override;
-  virtual bool isValidResponse(const Http::ResponseHeaderMap&) PURE;
+  bool isValidResponse(const Http::ResponseHeaderMap&);
 
   void doneReading();
   void doneWriting();
@@ -152,15 +155,13 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
-  virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
+  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
   }
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
 
 protected:
-  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   // The encoder offered by the upstream http client.
@@ -196,6 +197,12 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers")) {
+        Buffer::OwnedImpl data;
+        parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      }
+
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
@@ -208,31 +215,13 @@ private:
   };
   DecoderShim response_decoder_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
+  const Http::CodecType type_;
   bool read_half_closed_{};
   bool write_half_closed_{};
 
   // Used to defer onGenericPoolReady and onGenericPoolFailure to the reception
   // of the CONNECT response or the resetEncoder.
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
-};
-
-class Http1Upstream : public HttpUpstream {
-public:
-  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
-
-  void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
-  bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
-};
-
-class Http2Upstream : public HttpUpstream {
-public:
-  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
-
-  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
-  bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
 };
 
 } // namespace TcpProxy

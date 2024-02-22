@@ -82,14 +82,11 @@ message RouteConfiguration {
     (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
   ];
 
-  // By default, headers that should be added/removed are evaluated from most to least specific:
-  //
-  // * route level
-  // * virtual host level
-  // * connection manager level
-  //
-  // To allow setting overrides at the route or virtual host level, this order can be reversed
-  // by setting this option to true. Defaults to false.
+  // Headers mutations at all levels are evaluated, if specified. By default, the order is from most
+  // specific (i.e. route entry level) to least specific (i.e. route configuration level). Later header
+  // mutations may override earlier mutations.
+  // This order can be reversed by setting this field to true. In other words, most specific level mutation
+  // is evaluated last.
   //
   bool most_specific_header_mutations_wins = 10;
 

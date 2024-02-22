@@ -36,6 +36,12 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
     return;
   }
 
+  if (!io_handle_) {
+    // This can happen iff system socket creation fails.
+    ENVOY_LOG_MISC(warn, "Created socket with null io handle");
+    return;
+  }
+
   // Should not happen but some tests inject -1 fds
   if (!io_handle_->isOpen()) {
     return;
@@ -68,9 +74,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.return_value_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.return_value_ != 0) {
-        throwEnvoyExceptionOrPanic(fmt::format("Failed to create socket with mode {}: {}",
-                                               std::to_string(pipe->mode()),
-                                               errorDetails(set_permissions.errno_)));
+        return set_permissions;
       }
     }
     return bind_result;

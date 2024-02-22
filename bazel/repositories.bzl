@@ -1,8 +1,8 @@
-load(":dev_binding.bzl", "envoy_dev_binding")
+load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
+load(":dev_binding.bzl", "envoy_dev_binding")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -14,6 +14,24 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
+    # Extensions that require CEL.
+    "envoy.access_loggers.extension_filters.cel",
+    "envoy.rate_limit_descriptors.expr",
+    "envoy.filters.http.rate_limit_quota",
+    "envoy.filters.http.ext_proc",
+    "envoy.formatter.cel",
+    "envoy.matching.inputs.cel_data_input",
+    "envoy.matching.matchers.cel_matcher",
+    # Wasm and RBAC extensions have a link dependency on CEL.
+    "envoy.access_loggers.wasm",
+    "envoy.bootstrap.wasm",
+    "envoy.filters.http.wasm",
+    "envoy.filters.network.wasm",
+    "envoy.stat_sinks.wasm",
+    # RBAC extensions have a link dependency on CEL.
+    "envoy.filters.http.rbac",
+    "envoy.filters.network.rbac",
+    "envoy.rbac.matchers.upstream_ip_port",
 ]
 
 NO_HTTP3_SKIP_TARGETS = [
@@ -206,7 +224,11 @@ def envoy_repo():
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
-    external_http_archive("com_google_protoconverter")
+    external_http_archive(
+        name = "com_google_protoconverter",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:com_google_protoconverter.patch"],
+    )
     external_http_archive("com_google_protofieldextraction")
     external_http_archive("ocp")
     native.bind(
@@ -290,10 +312,13 @@ def envoy_dependencies(skip_targets = []):
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
+    _com_github_intel_qatzip()
+    _com_github_lz4_lz4()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_nghttp2_nghttp2()
+    _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_alibaba_hessian2_codec()
@@ -311,7 +336,9 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _io_hyperscan()
+    _io_vectorscan()
     _io_opentracing_cpp()
+    _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -337,11 +364,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("envoy_build_tools")
     _com_github_maxmind_libmaxminddb()
 
-    # TODO(keith): Remove patch when we update rules_pkg
-    external_http_archive(
-        "rules_pkg",
-        patches = ["@envoy//bazel:rules_pkg.patch"],
-    )
+    external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive(
         "aspect_bazel_lib",
@@ -556,6 +579,18 @@ def _com_github_intel_qatlib():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
+def _com_github_intel_qatzip():
+    external_http_archive(
+        name = "com_github_intel_qatzip",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_lz4_lz4():
+    external_http_archive(
+        name = "com_github_lz4_lz4",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
@@ -702,12 +737,31 @@ def _com_github_nghttp2_nghttp2():
         actual = "@envoy//bazel/foreign_cc:nghttp2",
     )
 
+def _com_github_msgpack_cpp():
+    external_http_archive(
+        name = "com_github_msgpack_cpp",
+        build_file = "@envoy//bazel/external:msgpack.BUILD",
+    )
+    native.bind(
+        name = "msgpack",
+        actual = "@com_github_msgpack_cpp//:msgpack",
+    )
+
 def _io_hyperscan():
     external_http_archive(
         name = "io_hyperscan",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:hyperscan.patch"],
+    )
+
+def _io_vectorscan():
+    external_http_archive(
+        name = "io_vectorscan",
+        build_file_content = BUILD_ALL_CONTENT,
+        type = "tar.gz",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:vectorscan.patch"],
     )
 
 def _io_opentracing_cpp():
@@ -720,6 +774,13 @@ def _io_opentracing_cpp():
     native.bind(
         name = "opentracing",
         actual = "@io_opentracing_cpp//:opentracing",
+    )
+
+def _io_opentelemetry_api_cpp():
+    external_http_archive("io_opentelemetry_cpp")
+    native.bind(
+        name = "opentelemetry_api",
+        actual = "@io_opentelemetry_cpp//api:api",
     )
 
 def _com_github_datadog_dd_trace_cpp():
@@ -1389,7 +1450,7 @@ filegroup(
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
     external_http_archive(
-        name = "edenhill_librdkafka",
+        name = "confluentinc_librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
@@ -1438,5 +1499,5 @@ def _com_github_maxmind_libmaxminddb():
     )
     native.bind(
         name = "maxmind",
-        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux_darwin",
     )

@@ -35,11 +35,13 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
   auto& factory_context = context.serverFactoryContext();
   tls_slot_ptr_->set([proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
-    TracerPtr tracer = std::make_unique<Tracer>(std::make_unique<TraceSegmentReporter>(
+    auto factory_or_error =
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            proto_config.grpc_service(), factory_context.scope(), true),
-        dispatcher, factory_context.api().randomGenerator(), tracing_stats_,
-        config_.delayed_buffer_size(), config_.token()));
+            proto_config.grpc_service(), factory_context.scope(), true);
+    THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+    TracerPtr tracer = std::make_unique<Tracer>(std::make_unique<TraceSegmentReporter>(
+        std::move(factory_or_error.value()), dispatcher, factory_context.api().randomGenerator(),
+        tracing_stats_, config_.delayed_buffer_size(), config_.token()));
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }
@@ -50,7 +52,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.
-  auto propagation_header = trace_context.getByKey(skywalkingPropagationHeaderKey());
+  auto propagation_header = skywalkingPropagationHeaderKey().get(trace_context);
   if (!propagation_header.has_value()) {
     // Although a sampling flag can be added to the propagation header, it will be ignored by most
     // of SkyWalking agent. The agent will enable tracing anyway if it see the propagation header.

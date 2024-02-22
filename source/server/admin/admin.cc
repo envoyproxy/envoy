@@ -28,12 +28,12 @@
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/listener_manager/listener_impl.h"
 #include "source/common/memory/utils.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
-#include "source/extensions/listener_managers/listener_manager/listener_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/server/admin/utils.h"
 
@@ -108,7 +108,8 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
-    : server_(server), factory_context_(server),
+    : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>()),
+      factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
       profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
@@ -272,7 +273,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions()),
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value(),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
       overload_manager);
 }

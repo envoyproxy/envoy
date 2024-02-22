@@ -7,6 +7,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
+#include "source/common/tracing/trace_context_impl.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -16,13 +17,19 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-constexpr absl::string_view kTraceParent = "traceparent";
-constexpr absl::string_view kTraceState = "tracestate";
 constexpr absl::string_view kDefaultVersion = "00";
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
 namespace {
+
+const Tracing::TraceContextHandler& traceParentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "traceparent");
+}
+
+const Tracing::TraceContextHandler& traceStateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "tracestate");
+}
 
 void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> span_context,
                  Span& new_span, const std::string& operation_name,
@@ -84,9 +91,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   std::string traceparent_header_value =
       absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
   // Set the traceparent in the trace_context.
-  trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
+  traceParentHeader().setRefKey(trace_context, traceparent_header_value);
   // Also set the tracestate.
-  trace_context.setByReferenceKey(kTraceState, span_.trace_state());
+  traceStateHeader().setRefKey(trace_context, span_.trace_state());
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {

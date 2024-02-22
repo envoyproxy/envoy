@@ -97,10 +97,10 @@ struct OptionsLimits {
  * Validates settings/options already set in |options| and initializes any remaining fields with
  * defaults.
  */
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options);
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const ProtobufWkt::BoolValue& hcm_stream_error);
@@ -624,6 +624,33 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
   });
 
   return merged;
+}
+
+/**
+ * Return all the available per route filter configs.
+ *
+ * @param callbacks The stream filter callbacks to check for route configs.
+ *
+ * @return The all available per route config. The returned pointers are guaranteed to be non-null
+ * and their lifetime is the same as the matched route.
+ */
+template <class ConfigType>
+absl::InlinedVector<const ConfigType*, 3>
+getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
+  ASSERT(callbacks != nullptr);
+
+  absl::InlinedVector<const ConfigType*, 3> all_configs;
+  callbacks->traversePerFilterConfig([&all_configs](const Router::RouteSpecificFilterConfig& cfg) {
+    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+
+    all_configs.push_back(typed_cfg);
+  });
+
+  return all_configs;
 }
 
 struct AuthorityAttributes {

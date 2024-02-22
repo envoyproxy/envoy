@@ -8,6 +8,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
+#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
@@ -111,8 +112,10 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  Configuration::InitialImpl initial_config(bootstrap_);
-  AdminFactoryContext factory_context(*this);
+  absl::Status creation_status = absl::OkStatus();
+  Configuration::InitialImpl initial_config(bootstrap_, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
+  AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
@@ -133,7 +136,7 @@ void ValidationInstance::initialize(const Options& options,
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
       sslContextManager(), *secret_manager_, quic_stat_names_, *this);
-  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }

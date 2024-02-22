@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/singleton/const_singleton.h"
+#include "source/common/tracing/trace_context_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,14 +45,14 @@ constexpr bool DEFAULT_SHARED_SPAN_CONTEXT = true;
 class ZipkinCoreConstantValues {
 public:
   // Zipkin B3 headers
-  const Http::LowerCaseString X_B3_TRACE_ID{"x-b3-traceid"};
-  const Http::LowerCaseString X_B3_SPAN_ID{"x-b3-spanid"};
-  const Http::LowerCaseString X_B3_PARENT_SPAN_ID{"x-b3-parentspanid"};
-  const Http::LowerCaseString X_B3_SAMPLED{"x-b3-sampled"};
-  const Http::LowerCaseString X_B3_FLAGS{"x-b3-flags"};
+  const Tracing::TraceContextHandler X_B3_TRACE_ID{"x-b3-traceid"};
+  const Tracing::TraceContextHandler X_B3_SPAN_ID{"x-b3-spanid"};
+  const Tracing::TraceContextHandler X_B3_PARENT_SPAN_ID{"x-b3-parentspanid"};
+  const Tracing::TraceContextHandler X_B3_SAMPLED{"x-b3-sampled"};
+  const Tracing::TraceContextHandler X_B3_FLAGS{"x-b3-flags"};
 
   // Zipkin b3 single header
-  const Http::LowerCaseString B3{"b3"};
+  const Tracing::TraceContextHandler B3{"b3"};
 };
 
 using ZipkinCoreConstants = ConstSingleton<ZipkinCoreConstantValues>;

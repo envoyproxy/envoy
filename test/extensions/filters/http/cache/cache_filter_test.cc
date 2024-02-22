@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/http/cache/simple_http_cache/simple_http_cache.h"
 
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
@@ -31,15 +30,15 @@ protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
   CacheFilterSharedPtr makeFilter(std::shared_ptr<HttpCache> cache, bool auto_destroy = true) {
-    std::shared_ptr<CacheFilter> filter(new CacheFilter(config_, /*stats_prefix=*/"",
-                                                        context_.scope(), context_.timeSource(),
-                                                        cache),
-                                        [auto_destroy](CacheFilter* f) {
-                                          if (auto_destroy) {
-                                            f->onDestroy();
-                                          }
-                                          delete f;
-                                        });
+    std::shared_ptr<CacheFilter> filter(
+        new CacheFilter(config_, /*stats_prefix=*/"", context_.scope(),
+                        context_.server_factory_context_.timeSource(), cache),
+        [auto_destroy](CacheFilter* f) {
+          if (auto_destroy) {
+            f->onDestroy();
+          }
+          delete f;
+        });
     filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
         StreamInfo::FilterState::LifeSpan::FilterChain);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -489,6 +488,69 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
     // Run events on the dispatcher so that the callback is invoked.
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
+}
+
+MATCHER_P2(RangeMatcher, begin, end, "") {
+  return testing::ExplainMatchResult(begin, arg.begin(), result_listener) &&
+         testing::ExplainMatchResult(end, arg.end(), result_listener);
+}
+
+TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
+  request_headers_.setHost("CacheHitWithBody");
+  // Set the buffer limit to 5 bytes, and we will have the file be of size
+  // 8 bytes.
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(5));
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    std::unique_ptr<Http::ResponseHeaderMap> response_headers =
+        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt});
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
+      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>("abcde"));
+      });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(5, 8), _))
+      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>("fgh"));
+      });
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+
+  CacheFilterSharedPtr filter = makeFilter(mock_http_cache, false);
+
+  // The filter should encode cached headers.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+
+  // The filter should encode cached data in two pieces.
+  EXPECT_CALL(
+      decoder_callbacks_,
+      encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq("abcde")), false));
+  EXPECT_CALL(decoder_callbacks_,
+              encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq("fgh")), true));
+
+  // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is
+  // in progress.
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  // The filter should not continue decoding when the cache lookup result is ready, as the
+  // expected result is a hit.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+
+  // The cache lookup callback should be posted to the dispatcher.
+  // Run events on the dispatcher so that the callback is invoked.
+  // The posted lookup callback will cause another callback to be posted (when getBody() is
+  // called) which should also be invoked.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  filter->onDestroy();
+  filter.reset();
 }
 
 TEST_F(CacheFilterTest, CacheInsertAbortedByCache) {

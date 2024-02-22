@@ -1,6 +1,10 @@
+#include <sys/socket.h>
+
 #include <string>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 
 #include "test/test_common/utility.h"
@@ -24,10 +28,13 @@ namespace {
 using namespace Platform;
 
 using envoy::config::bootstrap::v3::Bootstrap;
+using envoy::config::cluster::v3::Cluster;
+using envoy::config::core::v3::SocketOption;
 using DfpClusterConfig = ::envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig;
 using testing::HasSubstr;
 using testing::IsEmpty;
 using testing::Not;
+using testing::NotNull;
 using testing::SizeIs;
 
 DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
@@ -51,6 +58,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
       .addQuicCanonicalSuffix(".xyz.com")
+      .enablePortMigration(true)
 #endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
@@ -78,10 +86,6 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
-#ifdef ENVOY_MOBILE_STATS_REPORTING
-      "asdf.fake.website",
-      "stats_flush_interval { seconds: 654 }",
-#endif
 #ifdef ENVOY_ENABLE_QUIC
       "connection_options: \"5RTO\"",
       "client_connection_options: \"MPQC\"",
@@ -89,10 +93,13 @@ TEST(TestConfig, ConfigIsApplied) {
       "hostname: \"www.def.com\"",
       "canonical_suffixes: \".opq.com\"",
       "canonical_suffixes: \".xyz.com\"",
+      "num_timeouts_to_trigger_port_migration { value: 4 }",
+      "idle_network_timeout { seconds: 30 }",
 #endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
+      "key: \"allow_client_socket_creation_failure\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
@@ -295,6 +302,38 @@ TEST(TestConfig, DisableHttp3) {
 #endif
 }
 
+#ifdef ENVOY_ENABLE_QUIC
+TEST(TestConfig, SocketReceiveBufferSize) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* rcv_buf_option = nullptr;
+  for (const SocketOption& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == SO_RCVBUF) {
+      rcv_buf_option = &sock_opt;
+      break;
+    }
+  }
+
+  // When using an H3 cluster, the UDP receive buffer size option should always be set.
+  ASSERT_THAT(rcv_buf_option, NotNull());
+  EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
+  EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
+}
+#endif
+
 #ifdef ENVOY_MOBILE_XDS
 TEST(TestConfig, XdsConfig) {
   EngineBuilder engine_builder;
@@ -446,7 +485,7 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   std::string data_string = "envoy string";
   auto accessor = std::make_shared<TestStringAccessor>(data_string);
   engine_builder.addStringAccessor(name, accessor);
-  EngineSharedPtr engine = engine_builder.build();
+  Platform::EngineSharedPtr engine = engine_builder.build();
   auto c_accessor = static_cast<envoy_string_accessor*>(Envoy::Api::External::retrieveApi(name));
   ASSERT_TRUE(c_accessor != nullptr);
   EXPECT_EQ(0, accessor->count());

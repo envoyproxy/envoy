@@ -23,6 +23,16 @@ namespace {
 inline bool isResponseNotModified(const Http::ResponseHeaderMap& response_headers) {
   return Http::Utility::getResponseStatus(response_headers) == enumToInt(Http::Code::NotModified);
 }
+
+// This value is only used if there is no encoderBufferLimit on the stream;
+// without *some* constraint here, a very large chunk can be requested and
+// attempt to load into a memory buffer.
+//
+// This default is quite large to minimize the chance of being a surprise
+// behavioral change when a constraint is added.
+//
+// And everyone knows 64MB should be enough for anyone.
+static const size_t MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST = 64 * 1024 * 1024;
 } // namespace
 
 struct CacheResponseCodeDetailValues {
@@ -326,10 +336,21 @@ void CacheFilter::getBody() {
   // posted callback.
   CacheFilterWeakPtr self = weak_from_this();
 
+  // We don't want to request more than a buffer-size at a time from the cache.
+  uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
+  // If there is no buffer size limit, we still want *some* constraint.
+  if (fetch_size_limit == 0) {
+    fetch_size_limit = MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST;
+  }
+  AdjustedByteRange fetch_range = {remaining_ranges_[0].begin(),
+                                   (remaining_ranges_[0].length() > fetch_size_limit)
+                                       ? (remaining_ranges_[0].begin() + fetch_size_limit)
+                                       : remaining_ranges_[0].end()};
+
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(remaining_ranges_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
-                                             Buffer::InstancePtr&& body) {
+  lookup_->getBody(fetch_range, [self, &dispatcher = decoder_callbacks_->dispatcher()](
+                                    Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     dispatcher.post([self, body = std::move(body)]() mutable {
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
@@ -540,9 +561,12 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
 
   filter_state_ = FilterState::EncodeServingFromCache;
 
-  // Update the 304 response status code and content-length
+  // Replace the 304 response status code with the cached status code.
   response_headers.setStatus(lookup_result_->headers_->getStatusValue());
-  response_headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
+
+  // Remove content length header if the 304 had one; if the cache entry had a
+  // content length header it will be added by the header adding block below.
+  response_headers.removeContentLength();
 
   // A response that has been validated should not contain an Age header as it is equivalent to a
   // freshly served response from the origin, unless the 304 response has an Age header, which
@@ -553,7 +577,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
     // TODO(yosrym93): Try to avoid copying the header key twice.
-    Http::LowerCaseString key(std::string(cached_header.key().getStringView()));
+    Http::LowerCaseString key(cached_header.key().getStringView());
     absl::string_view value = cached_header.value().getStringView();
     if (response_headers.get(key).empty()) {
       response_headers.setCopy(key, value);
@@ -638,7 +662,7 @@ void CacheFilter::encodeCachedResponse() {
           ? static_cast<Http::StreamFilterCallbacks*>(decoder_callbacks_)
           : static_cast<Http::StreamFilterCallbacks*>(encoder_callbacks_);
 
-  callbacks->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter);
+  callbacks->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
   callbacks->streamInfo().setResponseCodeDetails(
       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
 

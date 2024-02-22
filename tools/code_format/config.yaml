@@ -96,21 +96,19 @@ paths:
     - envoy/common/exception.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
+    - source/common/listener_manager/listener_impl.cc
+    - source/common/listener_manager/listener_manager_impl.cc
+    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/upstream/thread_aware_lb_impl.cc
     - source/common/upstream/subset_lb_config.cc
-    - source/common/upstream/load_balancer_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
-    - source/common/upstream/outlier_detection_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/upstream/default_local_address_selector_factory.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
-    - source/common/network/cidr_range.cc
     - source/common/network/utility.cc
     - source/common/network/dns_resolver/dns_factory_util.cc
-    - source/common/network/resolver_impl.cc
-    - source/common/network/socket_impl.cc
     - source/common/ssl/tls_certificate_config_impl.cc
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.h
@@ -129,25 +127,20 @@ paths:
     - source/common/protobuf/visitor.cc
     - source/common/protobuf/utility.cc
     - source/common/protobuf/message_validator_impl.cc
-    - source/common/access_log/access_log_manager_impl.cc
+    - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/secret/secret_manager_impl.cc
-    - source/common/grpc/async_client_manager_impl.cc
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/config/subscription_factory_impl.cc
     - source/common/config/xds_resource.cc
     - source/common/config/datasource.cc
-    - source/common/config/utility.cc
     - source/common/runtime/runtime_impl.cc
-    - source/common/quic/quic_transport_socket_factory.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/router/router_ratelimit.cc
-    - source/common/router/vhds.cc
-    - source/common/router/config_utility.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
@@ -166,7 +159,18 @@ paths:
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
     - source/server/ssl_context_manager.cc
-    - source/server/configuration_impl.cc
+    - source/server/config_validation/cluster_manager.cc
+    - source/common/upstream/health_discovery_service.cc
+    - source/common/secret/sds_api.h
+    - source/common/secret/sds_api.cc
+    - source/common/router/router.cc
+    - source/common/config/config_provider_impl.h
+    - source/common/common/logger_delegates.cc
+    - source/common/upstream/health_checker_event_logger.h
+    - source/common/upstream/outlier_detection_impl.h
+    - source/common/ssl/certificate_validation_context_config_impl.cc
+    - source/common/grpc/google_grpc_creds_impl.cc
+    - source/common/local_reply/local_reply.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:

@@ -12,7 +12,6 @@
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/exe/process_wide.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
 #include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -54,7 +53,7 @@ public:
                    std::unique_ptr<Server::Platform> platform_impl,
                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
                    std::unique_ptr<ProcessContext> process_context,
-                   CreateInstanceFunction createInstance);
+                   CreateInstanceFunction create_instance);
 
   void runServer() {
     ASSERT(options_.mode() == Server::Mode::Serve);

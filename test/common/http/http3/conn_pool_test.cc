@@ -2,7 +2,7 @@
 #include <memory>
 
 #include "source/common/http/http3/conn_pool.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"

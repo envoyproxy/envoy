@@ -29,6 +29,13 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
                                                    .localAddress()
                                                    ->asString());
   }
+  if (expected_peer_address_.has_value()) {
+    ASSERT(validation_context.callbacks != nullptr);
+    EXPECT_EQ(expected_peer_address_.value(), validation_context.callbacks->connection()
+                                                  .connectionInfoProvider()
+                                                  .remoteAddress()
+                                                  ->asString());
+  }
   // Store cert chain for the delayed validation.
   for (size_t i = 0; i < sk_X509_num(&cert_chain); i++) {
     X509* cert = sk_X509_value(&cert_chain, i);

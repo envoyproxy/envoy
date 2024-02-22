@@ -241,7 +241,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
       }));
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -311,7 +311,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
       }));
 
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
@@ -351,7 +351,7 @@ TEST_F(HealthCheckFilterCachingTest, All) {
   // Verify that the next request uses the cached value without setting the degraded header.
   prepareFilter(true);
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
@@ -385,7 +385,7 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
   // Verify that the next request uses the cached value and that the x-envoy-degraded header is set.
   prepareFilter(true);
   EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {

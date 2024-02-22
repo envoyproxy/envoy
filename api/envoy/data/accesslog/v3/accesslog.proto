@@ -44,6 +44,9 @@ enum AccessLogType {
   UpstreamPeriodic = 8;
   UpstreamEnd = 9;
   DownstreamTunnelSuccessfullyEstablished = 10;
+  UdpTunnelUpstreamConnected = 11;
+  UdpPeriodic = 12;
+  UdpSessionEnd = 13;
 }
 
 message TCPAccessLogEntry {
@@ -406,6 +409,9 @@ message TLSProperties {
 
     // The subject field of the certificate.
     string subject = 2;
+
+    // The issuer field of the certificate.
+    string issuer = 3;
   }
 
   // Version of TLS that was negotiated.

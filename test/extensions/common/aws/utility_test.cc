@@ -1,16 +1,17 @@
+#include <filesystem>
+
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::ElementsAre;
-using testing::InSequence;
 using testing::NiceMock;
 using testing::Pair;
-using testing::Ref;
 using testing::Return;
 using testing::Throw;
 
@@ -24,6 +25,55 @@ MATCHER_P(WithName, expectedName, "") {
   *result_listener << "\nexpected { name: \"" << expectedName << "\"} but got {name: \""
                    << arg.name() << "\"}\n";
   return ExplainMatchResult(expectedName, arg.name(), result_listener);
+}
+
+const char CREDENTIALS_FILE_CONTENTS[] =
+    R"(
+[default]
+aws_access_key_id=default_access_key
+aws_secret_access_key=default_secret
+aws_session_token=default_token
+
+# This profile has leading spaces that should get trimmed.
+  [profile1]
+# The "=" in the value should not interfere with how this line is parsed.
+aws_access_key_id=profile1_acc=ess_key
+aws_secret_access_key=profile1_secret
+foo=bar
+aws_session_token=profile1_token
+
+[profile2]
+aws_access_key_id=profile2_access_key
+
+[profile3]
+aws_access_key_id=profile3_access_key
+aws_secret_access_key=
+
+[profile4]
+aws_access_key_id = profile4_access_key
+aws_secret_access_key = profile4_secret
+aws_session_token = profile4_token
+)";
+
+TEST(UtilityTest, TestProfileResolver) {
+
+  absl::flat_hash_map<std::string, std::string> elements = {{"AWS_ACCESS_KEY_ID", "testoverwrite"},
+                                                            {"AWS_SECRET_ACCESS_KEY", ""}};
+  absl::flat_hash_map<std::string, std::string>::iterator it;
+
+  auto temp = TestEnvironment::temporaryDirectory();
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credential_file(temp + "/.aws/credentials");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
+
+  Utility::resolveProfileElements(file_path, "default", elements);
+  it = elements.find("AWS_ACCESS_KEY_ID");
+  EXPECT_EQ(it->second, "default_access_key");
+  Utility::resolveProfileElements(file_path, "profile4", elements);
+  it = elements.find("AWS_ACCESS_KEY_ID");
+  EXPECT_EQ(it->second, "profile4_access_key");
 }
 
 // Headers must be in alphabetical order by virtue of std::map
@@ -396,6 +446,41 @@ TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
   EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
   EXPECT_TRUE(Utility::addInternalClusterStatic(
       cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something"));
+}
+
+// The region is simply interpolated into sts.{}.amazonaws.com for most regions
+// https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetNormalAndFipsSTSEndpoints) {
+  EXPECT_EQ("sts.ap-south-1.amazonaws.com", Utility::getSTSEndpoint("ap-south-1"));
+  EXPECT_EQ("sts.some-new-region.amazonaws.com", Utility::getSTSEndpoint("some-new-region"));
+#ifdef ENVOY_SSL_FIPS
+  // Under FIPS mode the Envoy should fetch the credentials from FIPS the dedicated endpoints.
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+  EXPECT_EQ("sts-fips.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+  EXPECT_EQ("sts-fips.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+  EXPECT_EQ("sts-fips.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+  // Even if FIPS mode is enabled ca-central-1 doesn't have a dedicated fips endpoint yet.
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+#else
+  EXPECT_EQ("sts.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+  EXPECT_EQ("sts.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+  EXPECT_EQ("sts.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+  EXPECT_EQ("sts.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+#endif
+}
+
+// China regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetChinaSTSEndpoints) {
+  EXPECT_EQ("sts.cn-north-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-north-1"));
+  EXPECT_EQ("sts.cn-northwest-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-northwest-1"));
+}
+
+// GovCloud regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
+TEST(UtilityTest, GetGovCloudSTSEndpoints) {
+  // No difference between fips vs non-fips endpoints in GovCloud.
+  EXPECT_EQ("sts.us-gov-east-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-east-1"));
+  EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
 } // namespace

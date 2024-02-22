@@ -8,7 +8,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 #include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 
@@ -34,10 +34,10 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 
 } // namespace
 
-Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.getServerFactoryContext();
+    const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& server_context) {
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
@@ -47,22 +47,22 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context),
+          server_context.api(), makeOptRef(server_context), region,
           Extensions::Common::Aws::Utility::fetchMetadata);
 
-  auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
+  auto signer = std::make_shared<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider),
       server_context.mainThreadDispatcher().timeSource(),
       // TODO: extend API to allow specifying header exclusion. ref:
       // https://github.com/envoyproxy/envoy/pull/18998
-      Extensions::Common::Aws::AwsSigV4HeaderExclusionVector{});
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
   FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
-                                 proto_config.payload_passthrough()};
+                                 proto_config.payload_passthrough(), proto_config.host_rewrite()};
 
-  FilterStats stats = generateStats(stat_prefix, context.scope());
-  return [stats, signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
-    auto filter = std::make_shared<Filter>(filter_settings, stats, signer);
+  FilterStats stats = generateStats(stats_prefix, dual_info.scope);
+  return [stats, signer, filter_settings, dual_info](Http::FilterChainFactoryCallbacks& cb) {
+    auto filter = std::make_shared<Filter>(filter_settings, stats, signer, dual_info.is_upstream);
     cb.addStreamFilter(filter);
   };
 }
@@ -79,13 +79,16 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
   }
   return std::make_shared<const FilterSettings>(
       FilterSettings{*arn, getInvocationMode(proto_config.invoke_config()),
-                     proto_config.invoke_config().payload_passthrough()});
+                     proto_config.invoke_config().payload_passthrough(),
+                     proto_config.invoke_config().host_rewrite()});
 }
 
 /*
  * Static registration for the AWS Lambda filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(AwsLambdaFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAwsLambdaFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters

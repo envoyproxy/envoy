@@ -17,6 +17,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -30,6 +31,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche_platform_impl/quiche_flags_impl.h"
+#include "quiche/common/platform/api/quiche_flags.h"
 #endif
 
 namespace Envoy {
@@ -44,21 +46,29 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 }
 
 void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
-  absl::flat_hash_map<std::string, bool> quiche_flags_override;
   for (const auto& it : flag_map) {
-#ifdef ENVOY_ENABLE_QUIC
-    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
-        it.second.bool_value_.has_value()) {
-      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
-          it.second.bool_value_.value();
-    }
-#endif
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
     }
   }
 #ifdef ENVOY_ENABLE_QUIC
+  absl::flat_hash_map<std::string, bool> quiche_flags_override;
+  for (const auto& it : flag_map) {
+    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
+        it.second.bool_value_.has_value()) {
+      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
+          it.second.bool_value_.value();
+    }
+  }
+
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
+
+  // Because this is a QUICHE protocol flag, this behavior can't be flipped with the above
+  // code, so it needs its own runtime flag and code to set it.
+  SetQuicheFlag(quic_always_support_server_preferred_address,
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients"));
+
 #endif
   // Make sure ints are parsed after the flag allowing deprecated ints is parsed.
   for (const auto& it : flag_map) {
@@ -425,7 +435,11 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
   }
 
   Filesystem::Directory directory(path);
-  for (const Filesystem::DirectoryEntry& entry : directory) {
+  Filesystem::DirectoryIteratorImpl it = directory.begin();
+  THROW_IF_NOT_OK_REF(it.status());
+  for (; it != directory.end(); ++it) {
+    THROW_IF_NOT_OK_REF(it.status());
+    Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
     if (prefix.empty()) {
@@ -474,6 +488,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 #endif
     }
   }
+  THROW_IF_NOT_OK_REF(it.status());
 }
 
 ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
@@ -649,8 +664,8 @@ absl::Status RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
   if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
     return absl::InvalidArgumentError(
-        fmt::format("Unexpected RTDS resource length, number of added recources "
-                    "{}, number of removed recources {}",
+        fmt::format("Unexpected RTDS resource length, number of added resources "
+                    "{}, number of removed resources {}",
                     added_resources_num, removed_resources_num));
   }
   return absl::OkStatus();

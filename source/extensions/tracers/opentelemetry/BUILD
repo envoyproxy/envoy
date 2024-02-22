@@ -35,6 +35,12 @@ envoy_cc_library(
         "span_context_extractor.h",
         "tracer.h",
     ],
+    copts = [
+        # Make sure that headers included from opentelemetry-api use Abseil from Envoy
+        # https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.14.0/api/BUILD#L32
+        "-DHAVE_ABSEIL",
+    ],
+    external_deps = ["opentelemetry_api"],
     deps = [
         ":trace_exporter",
         "//envoy/thread_local:thread_local_interface",
@@ -68,6 +74,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "//source/common/tracing:trace_context_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@opentelemetry_proto//:trace_cc_proto",
     ],

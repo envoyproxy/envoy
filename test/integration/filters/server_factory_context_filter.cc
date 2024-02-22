@@ -29,8 +29,10 @@ class TestGrpcClient : public Grpc::AsyncStreamCallbacks<helloworld::HelloReply>
 public:
   TestGrpcClient(Server::Configuration::ServerFactoryContext& context,
                  const envoy::config::core::v3::GrpcService& grpc_service)
-      : client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-            grpc_service, context.scope(), true)),
+      : client_(context.clusterManager()
+                    .grpcAsyncClientManager()
+                    .getOrCreateRawAsyncClient(grpc_service, context.scope(), true)
+                    .value()),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
 
   // AsyncStreamCallbacks

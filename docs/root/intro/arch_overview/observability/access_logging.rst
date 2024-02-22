@@ -17,15 +17,22 @@ logs<envoy_v3_api_field_config.listener.v3.Listener.access_log>`. The listener a
 HTTP request access logging and can be enabled separately and independently from
 filter access logs.
 
-If access log is enabled, then by default it will be reported to the configured sinks at the end of a TCP
-connection, or HTTP stream. It is possible to extend this behavior and report access logs periodically or at the
-start of a TCP connection or HTTP stream. Reporting access logs right after upstream connection establishment
-or new incoming HTTP request does not depend on periodic reporting, and the other way around.
+If access log is enabled, then by default it will be reported to the configured sinks at the end of a UDP
+session, TCP connection, or HTTP stream. It is possible to extend this behavior and report access logs
+periodically or at the start of a UDP session, TCP connection, or HTTP stream. Reporting access logs right
+upstream connection establishment or new incoming HTTP request does not depend on periodic reporting, and
+the other way around.
 
 .. _arch_overview_access_log_start:
 
 Start of session access logs
 ----------------------------
+
+UDP Proxy
+*********
+
+For UDP Proxy, when UDP tunneling over HTTP is configured, it is possible to enable an access log record once after a successful upstream tunnel connected by using
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.flush_access_log_on_tunnel_connected>`
 
 TCP Proxy
 *********
@@ -52,6 +59,12 @@ Note: In case that the HTTP request involves retries, a start of request upstrea
 
 Periodic access logs
 --------------------
+
+UDP Proxy
+*********
+
+For UDP Proxy, it is possible to enable a prediodic access log by using
+:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.access_log_flush_interval>`
 
 TCP Proxy
 *********
@@ -125,6 +138,15 @@ Stderr
   response headers.
 * Writes to the standard error of the process. It works in all platforms.
 
+Fluentd
+********
+
+* Flush access logs over a TCP connection to an upstream that is accepting the Fluentd Forward Protocol as described in:
+  `Fluentd Forward Protocol Specification <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
+* The data sent over the wire is a stream of
+  `Fluentd Forward Mode events <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode>`_
+  which may contain one or more access log entries (depending on the flushing interval and other configuration parameters).
+
 Further reading
 ---------------
 
@@ -135,3 +157,4 @@ Further reading
 * OpenTelemetry (gRPC) :ref:`LogsService <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig>`
 * Stdout :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>`
 * Stderr :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`
+* Fluentd :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`

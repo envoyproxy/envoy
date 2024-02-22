@@ -95,7 +95,9 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
     // This is not very efficient; it is possible to canonicalize etc. much faster with raw string
     // operations, but this implementation provides a reference for later optimization while we
     // adopt xdstp://.
-    xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
+    auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
+    THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+    xdstp_resource = resource_or_error.value();
   }
   auto watches_interested = watch_interest_.find(
       is_xdstp ? XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options) : resource_name);
