@@ -44,9 +44,9 @@ message MaxMindConfig {
   // Optional full file path to the config for country mapping overrides, e.g. ``/etc/country-mapping.conf``.
   // The file is expected to have a ``.conf`` extension, and should be JSON with the following format:
   //
-  // .. code-block::json
+  // .. code-block:: json
   //   {
-  //     "country_code": "country_code" # comment
+  //     "country_code": "country_code" // comment
   //   }
   //
   // The country mapping file is JSON containing the ISO code to be mapped from:to so it is possible to override the result
