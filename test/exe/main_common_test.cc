@@ -752,11 +752,29 @@ TEST_P(AdminStreamingTest, CancelAfterAskingForHeader1) {
 
 TEST_P(AdminStreamingTest, CancelAfterAskingForHeader2) {
   int header_calls = 0;
-  // blockMainThreadUntilResume("/ready", "GET");
   MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
   get_headers_hook_ = [&response]() { response->cancel(); };
   response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
-  // resume_.Notify();
+  quitAndWait();
+  EXPECT_EQ(0, header_calls);
+}
+
+TEST_P(AdminStreamingTest, DeleteAfterAskingForHeader1) {
+  int header_calls = 0;
+  blockMainThreadUntilResume("/ready", "GET");
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+  response.reset();
+  resume_.Notify();
+  quitAndWait();
+  EXPECT_EQ(0, header_calls);
+}
+
+TEST_P(AdminStreamingTest, DeleteAfterAskingForHeader2) {
+  int header_calls = 0;
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  get_headers_hook_ = [&response]() { response.reset(); };
+  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
   quitAndWait();
   EXPECT_EQ(0, header_calls);
 }

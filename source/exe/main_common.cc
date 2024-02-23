@@ -57,14 +57,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                                std::unique_ptr<ProcessContext> process_context)
     : StrippedMainBase(options, time_system, listener_hooks, component_factory,
                        std::move(platform_impl), std::move(random_generator),
-                       std::move(process_context), createFunction())
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-      ,
-      terminate_notifier_(std::make_shared<TerminateNotifier>())
-#endif
-{
-}
-
+                       std::move(process_context), createFunction()) {}
 bool MainCommonBase::run() {
   // Avoid returning from inside switch cases to minimize uncovered lines
   // while avoiding gcc warnings by hitting the final return.
@@ -119,12 +112,11 @@ MainCommonBase::AdminResponse::AdminResponse(Server::Instance& server, absl::str
   request_headers_->setPath(path);
 }
 
-MainCommonBase::AdminResponse::~AdminResponse() {
-  terminate();
-  terminate_notifier_->detachResponse(this);
-}
+MainCommonBase::AdminResponse::~AdminResponse() { terminate_notifier_->detachResponse(this); }
 
 void MainCommonBase::AdminResponse::getHeaders(HeadersFn fn) {
+  auto request_headers = [response = shared_from_this()]() { response->requestHeaders(); };
+
   // First check for cancelling or termination.
   {
     absl::MutexLock lock(&mutex_);
@@ -138,10 +130,12 @@ void MainCommonBase::AdminResponse::getHeaders(HeadersFn fn) {
       return;
     }
   }
-  server_.dispatcher().post([this, response = shared_from_this()]() { requestHeaders(); });
+  server_.dispatcher().post(request_headers);
 }
 
 void MainCommonBase::AdminResponse::nextChunk(BodyFn fn) {
+  auto request_next_chunk = [response = shared_from_this()]() { response->requestNextChunk(); };
+
   // Note the caller may race a call to nextChunk with the server being
   // terminated.
   {
@@ -165,7 +159,7 @@ void MainCommonBase::AdminResponse::nextChunk(BodyFn fn) {
   // in which case the callbacks, held in a shared_ptr, will be cancelled
   // from the destructor. If that happens *before* we post to the main thread,
   // we will just skip and never call fn.
-  server_.dispatcher().post([this, response = shared_from_this()]() { requestNextChunk(); });
+  server_.dispatcher().post(request_next_chunk);
 }
 
 // Called by the user if it is not longer interested in the result of the
