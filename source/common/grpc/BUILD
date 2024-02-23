@@ -207,6 +207,7 @@ envoy_cc_library(
         "//envoy/grpc:google_grpc_creds_interface",
         "//envoy/registry",
         "//source/common/config:datasource_lib",
+        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
