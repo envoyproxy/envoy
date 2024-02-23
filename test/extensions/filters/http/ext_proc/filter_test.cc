@@ -496,7 +496,7 @@ protected:
 
     Buffer::OwnedImpl want_response_body;
     Buffer::OwnedImpl got_response_body;
-    EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .WillRepeatedly(Invoke([&got_response_body](Buffer::Instance& data, Unused) {
           got_response_body.move(data);
         }));
@@ -1760,7 +1760,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
 
   Buffer::OwnedImpl want_request_body;
   Buffer::OwnedImpl got_request_body;
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
       .WillRepeatedly(Invoke(
           [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
 
@@ -1787,7 +1787,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
@@ -1856,7 +1857,7 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
 
   Buffer::OwnedImpl want_request_body;
   Buffer::OwnedImpl got_request_body;
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
       .WillRepeatedly(Invoke(
           [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
 
@@ -1879,9 +1880,6 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
-      .WillRepeatedly(Invoke(
-          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
   Buffer::OwnedImpl response_buffer;
   setUpEncodingBuffering(response_buffer, true);
 
@@ -1897,6 +1895,10 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
   EXPECT_EQ(0, response_buffer.length());
   EXPECT_FALSE(encoding_watermarked);
   got_response_body.move(response_buffer);
+
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
   for (int i = 0; i < 5; i++) {
     Buffer::OwnedImpl resp_chunk;
@@ -1966,7 +1968,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
@@ -2000,7 +2002,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
     processResponseBody(absl::nullopt, false);
   }
 
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
@@ -2058,7 +2060,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
@@ -2084,7 +2086,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
   TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
   want_response_body.add(resp_chunk.toString());
 
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 

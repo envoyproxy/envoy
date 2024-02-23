@@ -273,7 +273,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       should_continue = chunk->end_stream;
       if (chunk_data.length() > 0) {
         ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
-        injectDataToFilterChain(chunk_data, chunk->end_stream);
+        addBufferedData(chunk_data);
       }
 
       if (queueBelowLowLimit()) {
