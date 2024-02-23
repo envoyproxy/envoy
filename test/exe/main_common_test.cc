@@ -837,4 +837,11 @@ TEST_P(AdminStreamingTest, QuitBeforeCreatingResponse) {
   response.reset();
 }
 
+TEST_P(AdminStreamingTest, QuitTerminateRace) {
+  MainCommonBase::AdminResponseSharedPtr response = streamingResponse();
+  adminRequest("/quitquitquit", "POST");
+  response.reset();
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
 } // namespace Envoy

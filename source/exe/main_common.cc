@@ -57,7 +57,8 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                                std::unique_ptr<ProcessContext> process_context)
     : StrippedMainBase(options, time_system, listener_hooks, component_factory,
                        std::move(platform_impl), std::move(random_generator),
-                       std::move(process_context), createFunction()) {}
+                       std::move(process_context), createFunction()),
+      terminate_notifier_(std::make_shared<TerminateNotifier>()) {}
 
 bool MainCommonBase::run() {
   // Avoid returning from inside switch cases to minimize uncovered lines
@@ -68,7 +69,7 @@ bool MainCommonBase::run() {
   case Server::Mode::Serve:
     runServer();
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-    terminateAdminRequests();
+    terminate_notifier_->terminateAdminRequests();
 #endif
     ret = true;
     break;
@@ -106,32 +107,16 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 }
 
 MainCommonBase::AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
-                                             absl::string_view method, CleanupFn cleanup)
-    : server_(server), opt_admin_(server.admin()), cleanup_(cleanup) {
+                                             absl::string_view method,
+                                             TerminateNotifierSharedPtr terminate_notifier)
+    : server_(server), opt_admin_(server.admin()), terminate_notifier_(terminate_notifier) {
   request_headers_->setMethod(method);
   request_headers_->setPath(path);
 }
 
 MainCommonBase::AdminResponse::~AdminResponse() {
-  // MainCommonBase::response_set_ holds a raw pointer to all outstanding
-  // responses (not a shared_ptr). So when destructing the response
-  // we must call cleanup on MainCommonBase if this has not already
-  // occurred.
-  //
-  // Note it's also possible for MainCommonBase to be deleted before
-  // AdminResponse, in which case it will use its response_set_
-  // to call terminate, so we'll track that here and skip calling
-  // cleanup_ in that case.
-  absl::MutexLock lock(&mutex_);
-  if (!terminated_) {
-    // If there is a terminate/destruct race, calling cleanup_ below
-    // will lock MainCommonBase::mutex_, which is being held by
-    // terminateAdminRequests, so will block here until all the
-    // terminate calls are made. Once terminateAdminRequests
-    // release its lock, cleanup_ will return and the object
-    // can be safely destructed.
-    cleanup_(this); // lock in MainCommonBase
-  }
+  terminate();
+  terminate_notifier_->detachResponse(this);
 }
 
 void MainCommonBase::AdminResponse::getHeaders(HeadersFn fn) {
@@ -200,9 +185,11 @@ bool MainCommonBase::AdminResponse::cancelled() const {
 void MainCommonBase::AdminResponse::terminate() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   absl::MutexLock lock(&mutex_);
-  terminated_ = true;
-  sendErrorLockHeld();
-  sendAbortChunkLockHeld();
+  if (!terminated_) {
+    terminated_ = true;
+    sendErrorLockHeld();
+    sendAbortChunkLockHeld();
+  }
 }
 
 void MainCommonBase::AdminResponse::requestHeaders() {
@@ -269,7 +256,7 @@ void MainCommonBase::AdminResponse::sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQ
   }
 }
 
-void MainCommonBase::terminateAdminRequests() {
+void MainCommonBase::TerminateNotifier::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   absl::MutexLock lock(&mutex_);
@@ -284,29 +271,25 @@ void MainCommonBase::terminateAdminRequests() {
   response_set_.clear();
 }
 
-void MainCommonBase::detachResponse(AdminResponse* response) {
+void MainCommonBase::TerminateNotifier::attachResponse(AdminResponse* response) {
   absl::MutexLock lock(&mutex_);
-  int erased = response_set_.erase(response);
-  ASSERT(erased == 1);
+  if (accepting_admin_requests_) {
+    response_set_.insert(response);
+  } else {
+    response->terminate();
+  }
+}
 
-  // We cannot be detaching a response after we've stopped
-  // admitting new requests. Once we have terminated the
-  // active requests, they won't call back to detachResponse.
-  // See the terminated_ check in the destructor.
-  ASSERT(accepting_admin_requests_);
+void MainCommonBase::TerminateNotifier::detachResponse(AdminResponse* response) {
+  absl::MutexLock lock(&mutex_);
+  response_set_.erase(response);
 }
 
 MainCommonBase::AdminResponseSharedPtr
 MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method) {
-  auto response = std::make_shared<AdminResponse>(
-      *server(), path_and_query, method,
-      [this](AdminResponse* response) { detachResponse(response); });
-  absl::MutexLock lock(&mutex_);
-  if (accepting_admin_requests_) {
-    response_set_.insert(response.get());
-  } else {
-    response->terminate();
-  }
+  auto response =
+      std::make_shared<AdminResponse>(*server(), path_and_query, method, terminate_notifier_);
+  terminate_notifier_->attachResponse(response.get());
   return response;
 }
 #endif

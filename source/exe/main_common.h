@@ -34,6 +34,35 @@ public:
   bool run();
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
+  class AdminResponse;
+
+  // AdminResponse can outlive MainCommonBase. But AdminResponse needs a
+  // reliable way of knowing whether MainCommonBase is alive, so we do this with
+  // TerminateNotifier, which is held by MainCommonBase and all the active
+  // AdminResponses via shared_ptr. This gives MainCommonBase a reliable way of
+  // notifying all active responses that it is being shut down, and thus all
+  // responses need to be terminated. And it gives a reliable way for
+  // AdminResponse to detach itself, even if MainCommonBase is already deleted.
+  class TerminateNotifier {
+  public:
+    bool alive() const {
+      absl::MutexLock lock(&mutex_);
+      return accepting_admin_requests_;
+    }
+
+    void detachResponse(AdminResponse*);
+    void attachResponse(AdminResponse*);
+
+    // Called after the server run-loop finishes; any outstanding streaming admin requests
+    // will otherwise hang as the main-thread dispatcher loop will no longer run.
+    void terminateAdminRequests();
+
+    mutable absl::Mutex mutex_;
+    absl::flat_hash_set<AdminResponse*> response_set_ ABSL_GUARDED_BY(mutex_);
+    bool accepting_admin_requests_ ABSL_GUARDED_BY(mutex_) = true;
+  };
+  using TerminateNotifierSharedPtr = std::shared_ptr<TerminateNotifier>;
+
   // Holds context for a streaming response from the admin system, enabling
   // flow-control into another system. This is particularly important when the
   // generated response is very large, such that holding it in memory may cause
@@ -53,10 +82,8 @@ public:
   // cancel() is called, no further callbacks will be called by the response.
   class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
   public:
-    using CleanupFn = std::function<void(AdminResponse*)>;
-
     AdminResponse(Server::Instance& server, absl::string_view path, absl::string_view method,
-                  CleanupFn cleanup);
+                  TerminateNotifierSharedPtr terminate_notifier);
     ~AdminResponse();
 
     /**
@@ -132,7 +159,7 @@ public:
     Buffer::OwnedImpl response_;
     Http::Code code_;
     Server::Admin::RequestPtr request_;
-    CleanupFn cleanup_;
+    // CleanupFn cleanup_;
     Http::RequestHeaderMapPtr request_headers_{Http::RequestHeaderMapImpl::create()};
     Http::ResponseHeaderMapPtr response_headers_{Http::ResponseHeaderMapImpl::create()};
     bool more_data_ = true;
@@ -157,6 +184,8 @@ public:
     HeadersFn headers_fn_ ABSL_GUARDED_BY(mutex_);
     BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
     mutable absl::Mutex mutex_;
+
+    TerminateNotifierSharedPtr terminate_notifier_;
   };
   using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 
@@ -185,13 +214,7 @@ public:
   void detachResponse(AdminResponse*);
 
 private:
-  // Called after the server run-loop finishes; any outstanding streaming admin requests
-  // will otherwise hang as the main-thread dispatcher loop will no longer run.
-  void terminateAdminRequests();
-
-  absl::Mutex mutex_;
-  absl::flat_hash_set<AdminResponse*> response_set_ ABSL_GUARDED_BY(mutex_);
-  bool accepting_admin_requests_ ABSL_GUARDED_BY(mutex_) = true;
+  TerminateNotifierSharedPtr terminate_notifier_;
 #endif
 };
 
