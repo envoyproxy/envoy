@@ -60,14 +60,8 @@ protected:
                                                                                 context_);
   }
 
-  static constexpr uint32_t default_compression_level_{6};
-  static constexpr uint32_t default_enable_checksum_{0};
-  static constexpr uint32_t default_strategy_{0};
   uint32_t default_input_size_{796};
-  uint32_t default_input_round_{10};
   Zstd::Decompressor::ZstdDDictManagerPtr default_ddict_manager_{nullptr};
-  bool enable_qat_zstd{true};
-  uint32_t qat_zstd_fallback_threshold{0};
   QatzstdCompressorLibraryFactory qatzstd_compressor_library_factory_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
