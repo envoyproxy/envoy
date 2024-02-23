@@ -180,7 +180,7 @@ public:
     BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
     mutable absl::Mutex mutex_;
 
-    TerminateNotifierSharedPtr terminate_notifier_{std::make_shared<TerminateNotifier>()};
+    TerminateNotifierSharedPtr terminate_notifier_;
   };
   using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 

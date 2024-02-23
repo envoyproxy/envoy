@@ -767,7 +767,7 @@ TEST_P(AdminStreamingTest, DeleteAfterAskingForHeader1) {
   response.reset();
   resume_.Notify();
   quitAndWait();
-  EXPECT_EQ(0, header_calls);
+  EXPECT_EQ(1, header_calls);
 }
 
 TEST_P(AdminStreamingTest, DeleteAfterAskingForHeader2) {
@@ -776,7 +776,7 @@ TEST_P(AdminStreamingTest, DeleteAfterAskingForHeader2) {
   get_headers_hook_ = [&response]() { response.reset(); };
   response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
   quitAndWait();
-  EXPECT_EQ(0, header_calls);
+  EXPECT_EQ(1, header_calls);
 }
 
 TEST_P(AdminStreamingTest, CancelBeforeAskingForChunk1) {

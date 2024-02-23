@@ -57,7 +57,14 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                                std::unique_ptr<ProcessContext> process_context)
     : StrippedMainBase(options, time_system, listener_hooks, component_factory,
                        std::move(platform_impl), std::move(random_generator),
-                       std::move(process_context), createFunction()) {}
+                       std::move(process_context), createFunction())
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+      ,
+      terminate_notifier_(std::make_shared<TerminateNotifier>())
+#endif
+{
+}
+
 bool MainCommonBase::run() {
   // Avoid returning from inside switch cases to minimize uncovered lines
   // while avoiding gcc warnings by hitting the final return.
@@ -112,7 +119,10 @@ MainCommonBase::AdminResponse::AdminResponse(Server::Instance& server, absl::str
   request_headers_->setPath(path);
 }
 
-MainCommonBase::AdminResponse::~AdminResponse() { terminate_notifier_->detachResponse(this); }
+MainCommonBase::AdminResponse::~AdminResponse() {
+  cancel();
+  terminate_notifier_->detachResponse(this);
+}
 
 void MainCommonBase::AdminResponse::getHeaders(HeadersFn fn) {
   auto request_headers = [response = shared_from_this()]() { response->requestHeaders(); };
