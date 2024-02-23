@@ -75,12 +75,12 @@ message ZipkinConfig {
   //
   // * The Envoy Proxy is used as gateway or ingress.
   // * The Envoy Proxy is used as sidecar but inbound traffic capturing or outbound traffic capturing is disabled.
-  // * Any case that the :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` is set to true.
+  // * Any case that :ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>` is set to true.
   //
   // .. attention::
   //
-  //   If this is set to true, then the
-  //   :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+  //   If this is set to true, then
+  //   :ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`
   //   SHOULD be set to true also to ensure the correctness of trace chain.
   bool split_spans_for_request = 7;
 }
