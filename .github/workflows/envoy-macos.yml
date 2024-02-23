@@ -58,11 +58,8 @@ jobs:
         include:
         - target: ci/mac_ci_steps.sh
           name: macOS
-          steps-pre: |
-            - run: ./ci/mac_ci_setup.sh
-              shell: bash
-              name: Setup macos
           source: |
+            source ./ci/mac_ci_setup.sh
             _BAZEL_BUILD_EXTRA_OPTIONS=(
               --remote_download_toplevel
               --flaky_test_attempts=2
