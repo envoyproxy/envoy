@@ -167,7 +167,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
       continue;
     }
 
-    if ((!value.empty() || entry.add_if_empty_)) {
+    if (!value.empty() || entry.add_if_empty_) {
       switch (entry.append_action_) {
         PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
@@ -214,21 +214,21 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
         continue;
       }
 
-      if (!value.empty() || entry.add_if_empty_)) {
-          switch (entry.append_action_) {
-          case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-            transforms.headers_to_append_or_add.push_back({key, value});
-            break;
-          case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-            transforms.headers_to_overwrite_or_add.push_back({key, value});
-            break;
-          case HeaderValueOption::ADD_IF_ABSENT:
-            transforms.headers_to_add_if_absent.push_back({key, value});
-            break;
-          default:
-            break;
-          }
+      if (!value.empty() || entry.add_if_empty_) {
+        switch (entry.append_action_) {
+        case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+          transforms.headers_to_append_or_add.push_back({key, value});
+          break;
+        case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+          transforms.headers_to_overwrite_or_add.push_back({key, value});
+          break;
+        case HeaderValueOption::ADD_IF_ABSENT:
+          transforms.headers_to_add_if_absent.push_back({key, value});
+          break;
+        default:
+          break;
         }
+      }
     } else {
       switch (entry.append_action_) {
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
