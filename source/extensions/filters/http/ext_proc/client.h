@@ -42,8 +42,7 @@ public:
   virtual ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-        const StreamInfo::StreamInfo& stream_info,
-        const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy) PURE;
+        const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

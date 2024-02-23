@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
@@ -27,11 +26,9 @@ class ExternalProcessorClientImpl : public ExternalProcessorClient {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
-  ExternalProcessorStreamPtr
-  start(ExternalProcessorCallbacks& callbacks,
-        const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-        const StreamInfo::StreamInfo& stream_info,
-        const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy) override;
+  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
+                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                                   const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   Grpc::AsyncClientManager& client_manager_;
@@ -45,8 +42,7 @@ public:
   // Factory method: create and return `ExternalProcessorStreamPtr`; return nullptr on failure.
   static ExternalProcessorStreamPtr
   create(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-         ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info,
-         const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy);
+         ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info);
 
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we
@@ -70,8 +66,7 @@ private:
   // Start the gRPC async stream: It returns true if the start succeeded. Otherwise it returns false
   // if it failed to start.
   bool startStream(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-                   const StreamInfo::StreamInfo& stream_info,
-                   const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy);
+                   const StreamInfo::StreamInfo& stream_info);
   ExternalProcessorCallbacks& callbacks_;
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> client_;
   Grpc::AsyncStream<ProcessingRequest> stream_;

@@ -11,27 +11,24 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
                                                          Stats::Scope& scope)
     : client_manager_(client_manager), scope_(scope) {}
 
-ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
-    ExternalProcessorCallbacks& callbacks,
-    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-    const StreamInfo::StreamInfo& stream_info,
-    const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy) {
+ExternalProcessorStreamPtr
+ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
+                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                                   const StreamInfo::StreamInfo& stream_info) {
   auto client_or_error =
       client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
   THROW_IF_STATUS_NOT_OK(client_or_error, throw);
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(client_or_error.value());
-  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info,
-                                             retry_policy);
+  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info);
 }
 
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info,
-    const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy) {
+    ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info) {
   auto stream =
       std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
 
-  if (stream->startStream(std::move(client), stream_info, retry_policy)) {
+  if (stream->startStream(std::move(client), stream_info)) {
     return stream;
   }
   // Return nullptr on the start failure.
@@ -40,17 +37,13 @@ ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
 
 bool ExternalProcessorStreamImpl::startStream(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    const StreamInfo::StreamInfo& stream_info,
-    const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy) {
+    const StreamInfo::StreamInfo& stream_info) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(kExternalMethod);
   grpc_context_.stream_info = &stream_info;
   Http::AsyncClient::StreamOptions options;
   options.setParentContext(grpc_context_);
-  if (retry_policy.has_value()) {
-    options.setBufferBodyForRetry(true); // Need to buffer message in body.
-    options.setRetryPolicy(*retry_policy);
-  }
+  options.setBufferBodyForRetry(true);
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
   return stream_ != nullptr;

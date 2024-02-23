@@ -7,7 +7,6 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -49,9 +48,8 @@ protected:
   }
 
   Grpc::RawAsyncStream* doStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
-                                   const Http::AsyncClient::StreamOptions& options) {
+                                   const Http::AsyncClient::StreamOptions&) {
     stream_callbacks_ = &callbacks;
-    options_ = options;
     return &stream_;
   }
 
@@ -78,18 +76,17 @@ protected:
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   testing::NiceMock<Stats::MockStore> stats_store_;
-  Http::AsyncClient::StreamOptions options_;
 };
 
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
-  auto stream = client_->start(*this, config_with_hash_key_, stream_info_, absl::nullopt);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, SendToStream) {
-  auto stream = client_->start(*this, config_with_hash_key_, stream_info_, absl::nullopt);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   // Send something and ensure that we get it. Doesn't really matter what.
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
@@ -100,14 +97,14 @@ TEST_F(ExtProcStreamTest, SendToStream) {
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
-  auto stream = client_->start(*this, config_with_hash_key_, stream_info_, absl::nullopt);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
   stream->send(std::move(req), true);
 }
 
 TEST_F(ExtProcStreamTest, ReceiveFromStream) {
-  auto stream = client_->start(*this, config_with_hash_key_, stream_info_, absl::nullopt);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   // Send something and ensure that we get it. Doesn't really matter what.
   ProcessingResponse resp;
@@ -137,7 +134,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
 }
 
 TEST_F(ExtProcStreamTest, StreamClosed) {
-  auto stream = client_->start(*this, config_with_hash_key_, stream_info_, absl::nullopt);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
@@ -150,28 +147,10 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
 }
 
 TEST_F(ExtProcStreamTest, StreamError) {
-  auto stream = client_->start(*this, config_with_hash_key_, stream_info_, absl::nullopt);
+  auto stream = client_->start(*this, config_with_hash_key_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
-  EXPECT_EQ(grpc_status_, 0);
-  stream_callbacks_->onRemoteClose(123, "Some sort of gRPC error");
-  EXPECT_FALSE(last_response_);
-  EXPECT_FALSE(grpc_closed_);
-  EXPECT_EQ(grpc_status_, 123);
-  stream->close();
-}
-
-TEST_F(ExtProcStreamTest, RetryPolicyPropagatedDownToClientImpl) {
-  envoy::config::route::v3::RetryPolicy retry_policy;
-  retry_policy.set_retry_on("5xx");
-  retry_policy.mutable_num_retries()->set_value(2);
-
-  auto stream = client_->start(*this, config_with_hash_key_, stream_info_, retry_policy);
-  ASSERT_NE(stream_callbacks_, nullptr);
-  EXPECT_FALSE(last_response_);
-  EXPECT_FALSE(grpc_closed_);
-  EXPECT_THAT(*(options_.retry_policy), ProtoEq(retry_policy));
   EXPECT_EQ(grpc_status_, 0);
   stream_callbacks_->onRemoteClose(123, "Some sort of gRPC error");
   EXPECT_FALSE(last_response_);

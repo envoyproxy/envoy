@@ -91,7 +91,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -164,7 +163,6 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -222,7 +220,6 @@ envoy_extension_cc_test_library(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_proc:client_interface",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 

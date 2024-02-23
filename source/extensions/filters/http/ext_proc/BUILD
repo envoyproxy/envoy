@@ -37,7 +37,6 @@ envoy_cc_library(
         "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -52,7 +51,6 @@ envoy_cc_extension(
         ":client_lib",
         ":ext_proc",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -124,7 +122,6 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

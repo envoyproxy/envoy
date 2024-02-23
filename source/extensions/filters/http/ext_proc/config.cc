@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/ext_proc/config.h"
 
-#include "envoy/config/route/v3/route_components.pb.h"
-
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"

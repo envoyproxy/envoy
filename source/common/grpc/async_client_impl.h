@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -37,6 +38,10 @@ public:
                            const Http::AsyncClient::StreamOptions& options) override;
   absl::string_view destination() override { return remote_cluster_name_; }
 
+  const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() {
+    return retry_policy_;
+  }
+
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
@@ -45,6 +50,8 @@ private:
   std::list<AsyncStreamImplPtr> active_streams_;
   TimeSource& time_source_;
   Router::HeaderParserPtr metadata_parser_;
+  // Default per service retry policy.
+  absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
 
   friend class AsyncRequestImpl;
   friend class AsyncStreamImpl;

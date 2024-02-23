@@ -4,7 +4,6 @@ package envoy.extensions.filters.http.ext_proc.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/matcher/v3/string.proto";
 
@@ -97,7 +96,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 18]
+// [#next-free-field: 17]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -206,9 +205,6 @@ message ExternalProcessor {
 
   // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 16;
-
-  // Optional retry policy for the external grpc stream.
-  config.route.v3.RetryPolicy retry_policy = 17;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of

@@ -237,8 +237,7 @@ Filter::StreamOpenState Filter::openStream() {
   }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, config_with_hash_key_, decoder_callbacks_->streamInfo(),
-                             config_->retryPolicy());
+    stream_ = client_->start(*this, config_with_hash_key_, decoder_callbacks_->streamInfo());
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       // Asserts that `stream_` is nullptr since it is not valid to be used any further
