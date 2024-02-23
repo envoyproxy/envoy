@@ -68,8 +68,10 @@ void Fetch::sendRequest(const absl::string_view url_string) {
           }
         }
       });
-  stream_prototype->setOnData([](envoy_data c_data, bool fin) {
+  stream_prototype->setOnData([&](envoy_data c_data, bool fin) {
+    std::cout << "==> AAB DATA\n";
     std::cout << Data::Utility::copyToString(c_data);
+    current_stream_->readData(1024);
     if (fin) {
       std::cout << "Received final data\n";
     }
@@ -81,11 +83,12 @@ void Fetch::sendRequest(const absl::string_view url_string) {
                   << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
         request_finished.Notify();
       });
-  stream_prototype->setOnError([&request_finished](Platform::EnvoyErrorSharedPtr,
+  stream_prototype->setOnError([&request_finished](Platform::EnvoyErrorSharedPtr error,
                                                    envoy_stream_intel,
                                                    envoy_final_stream_intel final_intel) {
     std::cerr << "Request failed after " << final_intel.stream_end_ms - final_intel.stream_start_ms
-              << "ms\n";
+              << "ms with error code " << error->error_code << " and error message "
+              << error->message << ".\n";
     request_finished.Notify();
   });
   stream_prototype->setOnCancel(
@@ -95,13 +98,14 @@ void Fetch::sendRequest(const absl::string_view url_string) {
         request_finished.Notify();
       });
 
-  Platform::StreamSharedPtr stream = stream_prototype->start(/*explicit_flow_control=*/false);
+  current_stream_ = stream_prototype->start(/*explicit_flow_control=*/true);
+  current_stream_->readData(1024);
 
   Platform::RequestHeadersBuilder builder(Platform::RequestMethod::GET, std::string(url.scheme()),
                                           std::string(url.hostAndPort()),
                                           std::string(url.pathAndQueryParams()));
 
-  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(builder.build()), true);
+  current_stream_->sendHeaders(std::make_shared<Platform::RequestHeaders>(builder.build()), true);
   request_finished.WaitForNotification();
 }
 
