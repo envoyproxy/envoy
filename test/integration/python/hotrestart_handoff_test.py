@@ -304,7 +304,7 @@ async def _wait_for_envoy_epoch(i: int):
             pass
         await asyncio.sleep(0.2)
     # Envoy instance with expected restart_epoch should have started up
-    assert expected_substring in response, f"server_info={response}"
+    assert expected_substring in response, f"expected_substring={expected_substring}, server_info={response}"
 
 
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):

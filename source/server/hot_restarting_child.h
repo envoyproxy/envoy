@@ -77,7 +77,9 @@ private:
   sockaddr_un parent_address_udp_forwarding_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
   Stats::StatName hot_restart_generation_stat_name_;
-  absl::flat_hash_map<std::string, absl::AnyInvocable<void()>> on_drained_actions_;
+  // There are multiple listener instances per address that must all be reactivated
+  // when the parent is drained, so a multimap is used to contain them.
+  std::unordered_multimap<std::string, absl::AnyInvocable<void()>> on_drained_actions_;
   Event::FileEventPtr socket_event_udp_forwarding_;
   UdpForwardingContext udp_forwarding_context_;
 };

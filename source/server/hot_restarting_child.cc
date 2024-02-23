@@ -162,10 +162,7 @@ void HotRestartingChild::registerParentDrainedCallback(
   if (parent_drained_) {
     callback();
   } else {
-    auto result = on_drained_actions_.try_emplace(address->asString(), std::move(callback));
-    RELEASE_ASSERT(result.second,
-                   fmt::format("two udp listeners with the same address ({}) is unexpected",
-                               address->asString()));
+    on_drained_actions_.emplace(address->asString(), std::move(callback));
   }
 }
 
