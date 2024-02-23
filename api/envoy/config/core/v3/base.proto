@@ -430,6 +430,7 @@ message DataSource {
 }
 
 // The message specifies the retry policy of remote data source when fetching fails.
+// [#next-free-field: 7]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RetryPolicy";
 
@@ -449,18 +450,21 @@ message RetryPolicy {
   string retry_on = 3;
 
   message RetryPriority {
-      string name = 1 [(validate.rules).string = {min_len: 1}];
-      oneof config_type {
-        google.protobuf.Any typed_config = 2;
-      }
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    oneof config_type {
+      google.protobuf.Any typed_config = 2;
+    }
   }
+
   // Specifies an implementation of a RetryPriority which is used to determine the
   // distribution of load across priorities used for retries. Refer to
   // :ref:`retry plugin configuration <arch_overview_http_retry_plugins>` for more details.
   RetryPriority retry_priority = 4;
-
+ 
   message RetryHostPredicate {
     string name = 1 [(validate.rules).string = {min_len: 1}];
+    
     oneof config_type {
       google.protobuf.Any typed_config = 2;
     }
