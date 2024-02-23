@@ -20,5 +20,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: google_grpc
+  change: |
+    Added an off-by-default runtime flag
+    ``envoy.reloadable_features.google_grpc_disable_tls_13`` to disable TLSv1.3
+    usage by gRPC SDK for ``google_grpc`` services.
 
 deprecated:
