@@ -721,11 +721,13 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 
 } // namespace
 
-absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string& json) {
+absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string& json,
+                                                               bool ignore_comments) {
   ObjectHandler handler;
   auto json_container = JsonContainer(json.c_str(), &handler);
 
-  nlohmann::json::sax_parse(json_container, &handler);
+  nlohmann::json::sax_parse(json_container, &handler, nlohmann::detail::input_format_t::json, true,
+                            ignore_comments);
 
   if (handler.hasParseError()) {
     return absl::InternalError(fmt::format("JSON supplied is not valid. Error({}): {}\n",
@@ -734,8 +736,8 @@ absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string
   return handler.getRoot();
 }
 
-ObjectSharedPtr Factory::loadFromString(const std::string& json) {
-  auto result = loadFromStringNoThrow(json);
+ObjectSharedPtr Factory::loadFromString(const std::string& json, bool ignore_comments) {
+  auto result = loadFromStringNoThrow(json, ignore_comments);
   if (!result.ok()) {
     throwExceptionOrPanic(Exception, std::string(result.status().message()));
   }

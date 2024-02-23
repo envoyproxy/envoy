@@ -13,15 +13,23 @@ namespace Json {
 class Factory {
 public:
   /**
-   * Constructs a Json Object from a string.
+   * @brief Constructs a Json Object from a string.
+   * @param json The JSON string to load.
+   * @param ignore_comments Whether to ignore comments in the JSON string. Default is false.
    * Throws Json::Exception if unable to parse the string.
    */
-  static ObjectSharedPtr loadFromString(const std::string& json);
+  static ObjectSharedPtr loadFromString(const std::string& json, bool ignore_comments = false);
 
   /**
-   * Constructs a Json Object from a string.
+   * @brief Loads a JSON object from a string without throwing an exception.
+   *
+   * @param json The JSON string to load.
+   * @param ignore_comments Whether to ignore comments in the JSON string. Default is false.
+   * @return An absl::StatusOr<ObjectSharedPtr> representing the loaded JSON object or an error
+   * status.
    */
-  static absl::StatusOr<ObjectSharedPtr> loadFromStringNoThrow(const std::string& json);
+  static absl::StatusOr<ObjectSharedPtr> loadFromStringNoThrow(const std::string& json,
+                                                               bool ignore_comments = false);
 
   /**
    * Constructs a Json Object from a Protobuf struct.

@@ -41,6 +41,11 @@ protected:
     return getValid(Factory::loadFromStringNoThrow(json));
   }
 
+  ObjectSharedPtr loadValidJsonWithComments(const std::string& json) {
+    bool ignore_comments = true;
+    return getValid(Factory::loadFromStringNoThrow(json, ignore_comments));
+  }
+
   void loadInvalidJson(const std::string& json, absl::StatusCode status_code,
                        const std::string& message) {
     expectError(Factory::loadFromStringNoThrow(json), status_code, message);
@@ -431,6 +436,38 @@ TEST_F(JsonLoaderTest, AsString) {
     }
     return true;
   });
+}
+
+TEST_F(JsonLoaderTest, JsonLoaderIgnoreComments) {
+
+  ObjectSharedPtr json_with_comments = loadValidJsonWithComments("{\"hello\": {} // comment\n}");
+  EXPECT_EQ(getValidObject(*json_with_comments, "hello")->asJsonString(), "null");
+
+  ObjectSharedPtr json_with_multi_line_comments =
+      loadValidJsonWithComments("{\"hello\": {} \n/* comment\n other line of comment */\n}");
+  EXPECT_EQ(getValidObject(*json_with_comments, "hello")->asJsonString(), "null");
+}
+
+TEST_F(JsonLoaderTest, JsonLoaderIgnoreCommentsDontThrowException) {
+  ObjectSharedPtr json_with_comments =
+      Factory::loadFromString("{\"hello\": {} // comment\n}", true);
+  EXPECT_EQ(getValidObject(*json_with_comments, "hello")->asJsonString(), "null");
+
+  ObjectSharedPtr json_with_multi_line_comments =
+      Factory::loadFromString("{\"hello\": {} \n/* comment\n other line of comment */\n}", true);
+  EXPECT_EQ(getValidObject(*json_with_comments, "hello")->asJsonString(), "null");
+}
+
+TEST_F(JsonLoaderTest, JsonLoaderShowErrorOnComments) {
+  loadInvalidJson(
+      "{\"hello\": {} // comment\n}", absl::StatusCode::kInternal,
+      "JSON supplied is not valid. Error(line 1, column 14, token \"hello\": {} /): syntax error "
+      "while parsing object - invalid literal; last read: '\"hello\": {} /'; expected '}'\n");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      Factory::loadFromString("{\"hello\": {} // comment\n}", false), Exception,
+      "JSON supplied is not valid. Error(line 1, column 14, token \"hello\": {} /): syntax error "
+      "while parsing object - invalid literal; last read: '\"hello\": {} /'; expected '}'\n");
 }
 
 TEST_F(JsonLoaderTest, LoadFromStruct) {
