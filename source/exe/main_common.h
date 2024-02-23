@@ -45,11 +45,6 @@ public:
   // AdminResponse to detach itself, even if MainCommonBase is already deleted.
   class TerminateNotifier {
   public:
-    bool alive() const {
-      absl::MutexLock lock(&mutex_);
-      return accepting_admin_requests_;
-    }
-
     void detachResponse(AdminResponse*);
     void attachResponse(AdminResponse*);
 

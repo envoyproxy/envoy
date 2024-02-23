@@ -57,8 +57,13 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                                std::unique_ptr<ProcessContext> process_context)
     : StrippedMainBase(options, time_system, listener_hooks, component_factory,
                        std::move(platform_impl), std::move(random_generator),
-                       std::move(process_context), createFunction()),
-      terminate_notifier_(std::make_shared<TerminateNotifier>()) {}
+                       std::move(process_context), createFunction())
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+      ,
+      terminate_notifier_(std::make_shared<TerminateNotifier>())
+#endif
+{
+}
 
 bool MainCommonBase::run() {
   // Avoid returning from inside switch cases to minimize uncovered lines
