@@ -56,6 +56,10 @@ sudo xcode-select --switch /Applications/Xcode_14.1.app
 
 retry ./bazelw version
 
+echo "ANDROID_HOME: ${ANDROID_HOME}"
+echo "ANDROID_NDK_HOME: ${ANDROID_NDK_HOME}"
+exit 1
+
 if [[ "${1:-}" == "--android" ]]; then
   # Download and set up ndk 21 after GitHub update
   # https://github.com/actions/virtual-environments/issues/5595
