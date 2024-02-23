@@ -7,7 +7,6 @@ envoy_mobile_package()
 
 envoy_mobile_swift_test(
     name = "test",
-    size = "large",
     srcs = [
         "EngineBuilderTests.swift",
         "GRPCRequestHeadersBuilderTests.swift",

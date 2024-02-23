@@ -53,7 +53,7 @@ def envoy_mobile_swift_test(name, srcs, size = None, data = [], deps = [], tags 
         data = data,
         deps = [test_lib_name],
         minimum_os_version = MINIMUM_IOS_VERSION,
-        size = size,
+        size = size or "large",
         tags = tags,
         visibility = visibility,
         flaky = flaky,
