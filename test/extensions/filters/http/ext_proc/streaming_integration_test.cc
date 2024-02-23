@@ -249,8 +249,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBody) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
-// Send a body that's larger than the buffer limit in streamed mode, and ensure
-// that the processor gets the right number of bytes.
+// Send a downstream client request body that's larger than the buffer limit in streamed mode, it
+// triggers high watermark and 413 will be returned with local reply.
 TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBody) {
   const uint32_t num_chunks = 152;
   const uint32_t chunk_size = 1000;
@@ -297,6 +297,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBody) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("413"));
 }
 
+// Send a body that's smaller than the buffer limit in streamed mode, and ensure
+// that the processor gets the right number of bytes.
 TEST_P(StreamingIntegrationTest, UnderWaterMarkStreamedRequestBody) {
   const uint32_t num_chunks = 152;
   const uint32_t chunk_size = 10;
@@ -347,10 +349,9 @@ TEST_P(StreamingIntegrationTest, UnderWaterMarkStreamedRequestBody) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
-// Send a body that's larger than the buffer limit in streamed mode, and change
-// the processing mode after receiving some of the body. We might continue to
-// receive streamed messages after this point, but the whole message should
-// make it upstream regardless.
+// Send a body that's larger than the buffer limit in streamed mode, and change the processing mode
+// after receiving some of the body. It triggers high watermark and 413 will be returned with local
+// reply.
 TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
   const uint32_t num_chunks = 19;
   const uint32_t chunk_size = 10000;
@@ -406,9 +407,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("413"));
 }
 
-// Send a body that's larger than the buffer limit in streamed mode, and close
-// the stream before we've received all the chunks. The whole message should
-// be received by the upstream regardless.
+// Send a downstream client request body that's larger than the buffer limit in streamed mode, and
+// close the stream. It triggers high watermark and 413 will be returned with local reply.
 TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyAndClose) {
   const uint32_t num_chunks = 25;
   const uint32_t chunk_size = 10000;

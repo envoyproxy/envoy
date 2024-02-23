@@ -3446,7 +3446,7 @@ TEST_P(ExtProcIntegrationTest, ResponseFromSidestreamTooLarge) {
   processRequestBodyMessage(
       *grpc_upstreams_[0], true, [&body_str](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_TRUE(body.end_of_stream());
-        // Sned huge body muation back to ext_proc.
+        // Send huge body mutation back to ext_proc.
         auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
         body_mut->set_body(body_str);
         return true;
@@ -3454,7 +3454,7 @@ TEST_P(ExtProcIntegrationTest, ResponseFromSidestreamTooLarge) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  // The response from sidestream is too large and triggers local reply with code 413
+  // The response from side stream is too large and triggers local reply with code 413
   // (PayloadTooLarge).
   EXPECT_EQ(response->headers().getStatusValue(), std::to_string(413));
 }
