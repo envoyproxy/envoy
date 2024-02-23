@@ -26,11 +26,11 @@ namespace DataSource {
  * @param api reference to the Api object
  * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
  * would exceed the limit, it will throw a EnvoyException.
- * @return std::string with DataSource contents.
- * @throw EnvoyException if no DataSource case is specified and !allow_empty.
+ * @return std::string with DataSource contents. or an error status if no DataSource case is
+ * specified and !allow_empty.
  */
-std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty, Api::Api& api,
-                 uint64_t max_size = 0);
+absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& source,
+                                 bool allow_empty, Api::Api& api, uint64_t max_size = 0);
 
 /**
  * @param source data source.
@@ -42,25 +42,6 @@ absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& s
  * Callback for async data source.
  */
 using AsyncDataSourceCb = std::function<void(const std::string&)>;
-
-class LocalAsyncDataProvider {
-public:
-  LocalAsyncDataProvider(Init::Manager& manager, const envoy::config::core::v3::DataSource& source,
-                         bool allow_empty, Api::Api& api, AsyncDataSourceCb&& callback)
-      : init_target_("LocalAsyncDataProvider", [this, &source, allow_empty, &api, callback]() {
-          callback(DataSource::read(source, allow_empty, api));
-          init_target_.ready();
-        }) {
-    manager.add(init_target_);
-  }
-
-  ~LocalAsyncDataProvider() { init_target_.ready(); }
-
-private:
-  Init::TargetImpl init_target_;
-};
-
-using LocalAsyncDataProviderPtr = std::unique_ptr<LocalAsyncDataProvider>;
 
 class RemoteAsyncDataProvider : public Event::DeferredDeletable,
                                 public Config::DataFetcher::RemoteDataFetcherCallback,

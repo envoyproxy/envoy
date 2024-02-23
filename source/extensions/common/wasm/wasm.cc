@@ -374,7 +374,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       stats_handler.onEvent(WasmEvent::RemoteLoadCacheMiss);
     }
   } else if (vm_config.code().has_local()) {
-    code = Config::DataSource::read(vm_config.code().local(), true, api);
+    code = THROW_OR_RETURN_VALUE(Config::DataSource::read(vm_config.code().local(), true, api),
+                                 std::string);
     source = Config::DataSource::getPath(vm_config.code().local())
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }

@@ -39,7 +39,7 @@ public:
   ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
 
   absl::optional<std::string> serializeAsString() const override {
-    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
+    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct())->asJsonString();
   }
 
   void setFilterAction(const std::string& filter, const std::string& action) {

@@ -101,7 +101,7 @@ public:
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     absl::Status creation_status;
     Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     Server::Configuration::MainImpl main_config;
 
     // Emulate main implementation of initializing bootstrap extensions.

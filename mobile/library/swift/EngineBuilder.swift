@@ -154,9 +154,9 @@ open class EngineBuilder: NSObject {
   private var quicHints: [String: Int] = [:]
   private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
-  private var respectSystemProxySettings: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
+  private var respectSystemProxySettings: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
@@ -717,8 +717,7 @@ open class EngineBuilder: NSObject {
                                         }
                                       },
                                       eventTracker: self.eventTracker,
-                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue),
-                                      respectSystemProxySettings: self.respectSystemProxySettings)
+                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue))
     let config = self.makeConfig()
 #if canImport(EnvoyCxxSwiftInterop)
     if self.enableSwiftBootstrap {
@@ -794,6 +793,7 @@ open class EngineBuilder: NSObject {
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      respectSystemProxySettings: self.respectSystemProxySettings,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
@@ -865,6 +865,7 @@ private extension EngineBuilder {
     cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
     cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
     cxxBuilder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation)
+    cxxBuilder.respectSystemProxySettings(self.respectSystemProxySettings)
     cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
     )

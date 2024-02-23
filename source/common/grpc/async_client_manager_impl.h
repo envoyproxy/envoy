@@ -19,7 +19,8 @@ class AsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                          const envoy::config::core::v3::GrpcService& config,
-                         bool skip_cluster_check, TimeSource& time_source);
+                         bool skip_cluster_check, TimeSource& time_source,
+                         absl::Status& creation_status);
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
 
 private:
@@ -33,7 +34,7 @@ public:
   GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot,
                                Stats::Scope& scope,
                                const envoy::config::core::v3::GrpcService& config, Api::Api& api,
-                               const StatNames& stat_names);
+                               const StatNames& stat_names, absl::Status& creation_status);
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
 
 private:
@@ -51,17 +52,17 @@ public:
       Upstream::ClusterManager& cm, ThreadLocal::Instance& tls, TimeSource& time_source,
       Api::Api& api, const StatNames& stat_names,
       const envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig& config);
-  RawAsyncClientSharedPtr
+  absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
                             bool skip_cluster_check) override;
 
-  RawAsyncClientSharedPtr
+  absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClientWithHashKey(const GrpcServiceConfigWithHashKey& config_with_hash_key,
                                        Stats::Scope& scope, bool skip_cluster_check) override;
 
-  AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
-                                              Stats::Scope& scope,
-                                              bool skip_cluster_check) override;
+  absl::StatusOr<AsyncClientFactoryPtr>
+  factoryForGrpcService(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
+                        bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher,

@@ -37,7 +37,6 @@ protected:
   Event::TimerCb retry_timer_cb_;
   NiceMock<Http::MockAsyncClientRequest> request_{&cm_.thread_local_cluster_.async_client_};
 
-  Config::DataSource::LocalAsyncDataProviderPtr local_data_provider_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 
   using AsyncClientSendFunc = std::function<Http::AsyncClient::Request*(
@@ -75,67 +74,6 @@ protected:
     }
   }
 };
-
-TEST_F(AsyncDataSourceTest, LoadLocalDataSource) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    local:
-      inline_string:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_local());
-
-  std::string async_data;
-
-  EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-    init_target_handle_ = target.createHandle("test");
-  }));
-
-  local_data_provider_ = std::make_unique<Config::DataSource::LocalAsyncDataProvider>(
-      init_manager_, config.local(), true, *api_, [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, "xxxxxx");
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-
-  init_target_handle_->initialize(init_watcher_);
-  EXPECT_EQ(async_data, "xxxxxx");
-}
-
-TEST_F(AsyncDataSourceTest, LoadLocalEmptyDataSource) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    local:
-      inline_string: ""
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_local());
-
-  std::string async_data;
-
-  EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-    init_target_handle_ = target.createHandle("test");
-  }));
-
-  local_data_provider_ = std::make_unique<Config::DataSource::LocalAsyncDataProvider>(
-      init_manager_, config.local(), true, *api_, [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, "");
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-
-  init_target_handle_->initialize(init_watcher_);
-  EXPECT_EQ(async_data, "");
-}
 
 TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
   AsyncDataSourcePb config;
@@ -601,7 +539,7 @@ TEST(DataSourceTest, WellKnownEnvironmentVariableTest) {
             config.specifier_case());
   EXPECT_EQ(config.environment_variable(), "PATH");
   Api::ApiPtr api = Api::createApiForTest();
-  const auto path_data = DataSource::read(config, false, *api);
+  const auto path_data = DataSource::read(config, false, *api).value();
   EXPECT_FALSE(path_data.empty());
 }
 
@@ -618,10 +556,10 @@ TEST(DataSourceTest, MissingEnvironmentVariableTest) {
             config.specifier_case());
   EXPECT_EQ(config.environment_variable(), "ThisVariableDoesntExist");
   Api::ApiPtr api = Api::createApiForTest();
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableDoesntExist");
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableDoesntExist");
+  EXPECT_EQ(DataSource::read(config, false, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableDoesntExist");
+  EXPECT_EQ(DataSource::read(config, true, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableDoesntExist");
 }
 
 TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
@@ -641,14 +579,13 @@ TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
   Api::ApiPtr api = Api::createApiForTest();
 #ifdef WIN32
   // Windows doesn't support empty environment variables.
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableIsEmpty");
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableIsEmpty");
+  EXPECT_EQ(DataSource::read(config, false, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableIsEmpty");
+  EXPECT_EQ(DataSource::read(config, true, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableIsEmpty");
 #else
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
-                            "DataSource cannot be empty");
-  const auto environment_variable = DataSource::read(config, true, *api);
+  EXPECT_EQ(DataSource::read(config, false, *api).status().message(), "DataSource cannot be empty");
+  const auto environment_variable = DataSource::read(config, true, *api).value();
   EXPECT_TRUE(environment_variable.empty());
 #endif
 }
