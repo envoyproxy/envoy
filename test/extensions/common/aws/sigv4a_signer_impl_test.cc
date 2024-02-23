@@ -99,10 +99,12 @@ public:
     std::vector<uint8_t> signature;
 
     if (query_string) {
-      auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
-          message->headers().Path()->value().getStringView());
-      auto signature_hex = query_parameters.getFirstValue("X-Amz-Signature")->data();
-      signature = Hex::decode(signature_hex);
+      auto query_parameters =
+          Http::Utility::QueryParamsMulti::parseQueryString(message->headers().getPathValue());
+
+      auto signature_hex = query_parameters.getFirstValue("X-Amz-Signature");
+      ASSERT(signature_hex.has_value());
+      signature = Hex::decode(signature_hex.value());
     } else {
 
       // Extract the signature that is generated

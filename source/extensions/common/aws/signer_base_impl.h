@@ -58,6 +58,9 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 /**
  * Implementation of the Signature V4 signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
+ *
+ * Query parameter support is implemented as per:
+ * https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
  */
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <regex>
 
 #include "envoy/common/exception.h"
 
@@ -124,13 +125,24 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
     // Append signature to existing query string
     query_params.add(SignatureQueryParameters::get().AmzSignature, signature);
     headers.setPath(query_params.replaceQueryString(headers.Path()->value()));
-    ENVOY_LOG(debug, "Query string appended to path");
+    // Sanitize logged query string
+    query_params.overwrite(SignatureQueryParameters::get().AmzSignature, "*****");
+    query_params.overwrite(SignatureQueryParameters::get().AmzSecurityToken, "*****");
+    auto sanitised_query_string = query_params.replaceQueryString(headers.Path()->value());
+    ENVOY_LOG(debug, "Query string signing - New path (sanitised): {}", sanitised_query_string);
+
   } else {
     const auto authorization_header = createAuthorizationHeader(
         credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
 
-    ENVOY_LOG(debug, "Signing request with: {}", authorization_header);
     headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
+    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+    // Sanitize logged authorization header
+    std::vector<std::string> sanitised_header =
+        absl::StrSplit(authorization_header, absl::ByString("Signature="));
+    ENVOY_LOG(debug, "Header signing - Authorization header (sanitised): {}Signature=*****",
+              sanitised_header[0]);
   }
 }
 
@@ -148,8 +160,8 @@ std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, boo
 std::string
 SignerBaseImpl::createAuthorizationCredential(absl::string_view access_key_id,
                                               absl::string_view credential_scope) const {
-  return fmt::format(SignatureConstants::get().AuthorizationCredentialFormat, access_key_id,
-                     credential_scope);
+  return fmt::format(fmt::runtime(SignatureConstants::get().AuthorizationCredentialFormat),
+                     access_key_id, credential_scope);
 }
 
 void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
@@ -168,8 +180,13 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   // These three parameters can contain characters that require URL encoding
   if (session_token.has_value()) {
     // X-Amz-Security-Token
-    query_params.add(SignatureQueryParameters::get().AmzSecurityToken,
-                     Utility::encodeQueryParam(session_token.value()));
+
+    // TODO (@nbaws) : This should be using Utility::encodeQueryParam, but that function appears to
+    // be incorrectly double encoding = signs Will address this in a later patch and add test cases
+    // to ensure we haven't broken anything
+    query_params.add(
+        SignatureQueryParameters::get().AmzSecurityToken,
+        Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(session_token.value()));
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameters::get().AmzCredential,
