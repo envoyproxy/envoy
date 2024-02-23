@@ -249,57 +249,9 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBody) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
-// Send a downstream client request body that's larger than the buffer limit in streamed mode, it
-// triggers high watermark and 413 will be returned with local reply.
-TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBody) {
-  const uint32_t num_chunks = 152;
-  const uint32_t chunk_size = 1000;
-  uint32_t total_size = num_chunks * chunk_size;
-
-  test_processor_.start(
-      ipVersion(),
-      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
-        // Expect a request_headers message as the first message on the stream,
-        // and send back an empty response.
-        ProcessingRequest header_req;
-        ASSERT_TRUE(stream->Read(&header_req));
-        ASSERT_TRUE(header_req.has_request_headers());
-        ProcessingResponse header_resp;
-        header_resp.mutable_request_headers();
-        stream->Write(header_resp);
-
-        // Now, expect a bunch of request_body messages and respond to each.
-        // Count up the number of bytes we receive and make sure that we get
-        // them all.
-        uint32_t received_size = 0;
-        ProcessingRequest body_req;
-        while (stream->Read(&body_req)) {
-          received_size += body_req.request_body().body().size();
-          ProcessingResponse body_resp;
-          body_resp.mutable_request_body();
-          stream->Write(body_resp);
-        }
-
-        EXPECT_EQ(received_size, total_size);
-      });
-
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
-    // This header tells the "autonomous upstream" that will respond to our
-    // request to throw an error if it doesn't get the right number of bytes.
-    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
-  });
-
-  ASSERT_TRUE(client_response_->waitForEndStream());
-  EXPECT_TRUE(client_response_->complete());
-  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("413"));
-}
-
 // Send a body that's smaller than the buffer limit in streamed mode, and ensure
 // that the processor gets the right number of bytes.
-TEST_P(StreamingIntegrationTest, UnderWaterMarkStreamedRequestBody) {
+TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyUnderWatermark) {
   const uint32_t num_chunks = 152;
   const uint32_t chunk_size = 10;
 
@@ -349,13 +301,48 @@ TEST_P(StreamingIntegrationTest, UnderWaterMarkStreamedRequestBody) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
+// Send a downstream client request body that's larger than the buffer limit in streamed mode, it
+// triggers high watermark and 413 will be returned with local reply.
+TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyOverWatermark) {
+  const uint32_t num_chunks = 152;
+  const uint32_t chunk_size = 1000;
+
+  test_processor_.start(
+      ipVersion(), [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        // Expect a request_headers message as the first message on the stream,
+        // and send back an empty response.
+        ProcessingRequest header_req;
+        ASSERT_TRUE(stream->Read(&header_req));
+        ASSERT_TRUE(header_req.has_request_headers());
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        stream->Write(header_resp);
+
+        ProcessingRequest body_req;
+        while (stream->Read(&body_req)) {
+          ProcessingResponse body_resp;
+          body_resp.mutable_request_body();
+          stream->Write(body_resp);
+        }
+      });
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  sendPostRequest(num_chunks, chunk_size, absl::nullopt);
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("413"));
+}
+
 // Send a body that's larger than the buffer limit in streamed mode, and change the processing mode
 // after receiving some of the body. It triggers high watermark and 413 will be returned with local
 // reply.
 TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
   const uint32_t num_chunks = 19;
   const uint32_t chunk_size = 10000;
-  uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
       ipVersion(), [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
@@ -398,9 +385,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   initializeConfig();
   HttpIntegrationTest::initialize();
-  sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
-    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
-  });
+  sendPostRequest(num_chunks, chunk_size, absl::nullopt);
 
   ASSERT_TRUE(client_response_->waitForEndStream());
   EXPECT_TRUE(client_response_->complete());
@@ -441,9 +426,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyAndClose) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   initializeConfig();
   HttpIntegrationTest::initialize();
-  sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
-    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
-  });
+  sendPostRequest(num_chunks, chunk_size, absl::nullopt);
 
   ASSERT_TRUE(client_response_->waitForEndStream());
   EXPECT_TRUE(client_response_->complete());
