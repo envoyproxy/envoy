@@ -469,18 +469,16 @@ UNSIGNED-PAYLOAD)EOF";
 // Verify query string signing defaults to 5s
 TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
 
-  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
   Http::TestRequestHeaderMapImpl headers{};
 
-  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
 
   headers.setMethod("GET");
   // Simple path, 1 extra header
   headers.setPath("/example/path");
   headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
   headers.addCopy("testheader", "value1");
-  SigV4ASignerImpl querysigner("service", "region",
-                               CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+  SigV4ASignerImpl querysigner("service", "region", getTestCredentialsProvider(), time_system_,
                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
 
   querysigner.signUnsignedPayload(headers);
