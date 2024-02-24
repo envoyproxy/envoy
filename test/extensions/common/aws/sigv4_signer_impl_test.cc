@@ -266,7 +266,6 @@ TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
   SigV4SignerImpl querysigner("service", "region",
                               CredentialsProviderSharedPtr{credentials_provider_}, time_system_,
                               Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   querysigner.signUnsignedPayload(headers);
   auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());

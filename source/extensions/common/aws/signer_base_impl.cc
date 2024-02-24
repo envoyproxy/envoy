@@ -124,13 +124,14 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
   if (query_string_) {
     // Append signature to existing query string
     query_params.add(SignatureQueryParameters::get().AmzSignature, signature);
-    headers.setPath(query_params.replaceQueryString(headers.Path()->value()));
+    headers.setPath(query_params.replaceQueryString(Http::HeaderString(headers.getPathValue())));
     // Sanitize logged query string
     query_params.overwrite(SignatureQueryParameters::get().AmzSignature, "*****");
     if (query_params.getFirstValue(SignatureQueryParameters::get().AmzSecurityToken)) {
       query_params.overwrite(SignatureQueryParameters::get().AmzSecurityToken, "*****");
     }
-    auto sanitised_query_string = query_params.replaceQueryString(headers.Path()->value());
+    auto sanitised_query_string =
+        query_params.replaceQueryString(Http::HeaderString(headers.getPathValue()));
     ENVOY_LOG(debug, "Query string signing - New path (sanitised): {}", sanitised_query_string);
 
   } else {
