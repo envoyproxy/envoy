@@ -1149,7 +1149,7 @@ response_headers_to_add:
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   auto transforms = resp_header_parser->getHeaderTransforms(stream_info);
-  // Header with invalid value is not added to trransform.
+  // Header with invalid value is not added to transform.
   EXPECT_TRUE(transforms.headers_to_append_or_add.empty());
 }
 
