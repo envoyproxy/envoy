@@ -1097,6 +1097,62 @@ response_headers_to_remove: ["x-baz-header"]
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
 }
 
+TEST(HeaderParserTest, InvalidHeader) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "foo"
+      value: "\n"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "bar"
+      value: "\r"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+)EOF";
+  envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
+  Router::HeaderParserPtr parser = Router::HeaderParser::configure(route.request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  parser->evaluateHeaders(header_map, stream_info);
+  // Invalid headers are not added to header map.
+  EXPECT_FALSE(header_map.has("foo"));
+  EXPECT_FALSE(header_map.has("bar"));
+}
+
+TEST(HeaderParserTest, GetHeaderTransformsWithInvalidHeaderValue) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "\0"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+)EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+  HeaderParserPtr resp_header_parser = HeaderParser::configure(route.response_headers_to_add());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
+
+  auto transforms = resp_header_parser->getHeaderTransforms(stream_info);
+  // Header with invalid value is not added to trransform.
+  EXPECT_TRUE(transforms.headers_to_append_or_add.empty());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
