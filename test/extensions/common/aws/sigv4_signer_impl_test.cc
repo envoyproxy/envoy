@@ -272,8 +272,7 @@ TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
                               Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
 
   querysigner.signUnsignedPayload(headers);
-  auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
-  EXPECT_EQ(query_parameters.getFirstValue("X-Amz-Expires").value(), "5");
+  EXPECT_TRUE(absl::StrContains(headers.getPathValue(), "X-Amz-Expires=5&"));
 }
 
 // Verify sigv4 and query parameters
