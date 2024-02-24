@@ -35,14 +35,18 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 
 /**
  * Implementation of the Signature V4 signing process.
- * See https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html
+ * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
+ *
+ * Query parameter support is implemented as per:
+ * https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
  */
 class SigV4SignerImpl : public SignerBaseImpl {
 public:
-  SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
-                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-                  const AwsSigningHeaderExclusionVector& matcher_config,
-                  const bool query_string = false, const uint16_t expiration_time = 0)
+  SigV4SignerImpl(
+      absl::string_view service_name, absl::string_view region,
+      const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
+      const AwsSigningHeaderExclusionVector& matcher_config, const bool query_string = false,
+      const uint16_t expiration_time = SignatureQueryParameters::get().DefaultExpiration)
       : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config,
                        query_string, expiration_time) {}
 

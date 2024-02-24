@@ -127,7 +127,9 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
     headers.setPath(query_params.replaceQueryString(headers.Path()->value()));
     // Sanitize logged query string
     query_params.overwrite(SignatureQueryParameters::get().AmzSignature, "*****");
-    query_params.overwrite(SignatureQueryParameters::get().AmzSecurityToken, "*****");
+    if (query_params.getFirstValue(SignatureQueryParameters::get().AmzSecurityToken)) {
+      query_params.overwrite(SignatureQueryParameters::get().AmzSecurityToken, "*****");
+    }
     auto sanitised_query_string = query_params.replaceQueryString(headers.Path()->value());
     ENVOY_LOG(debug, "Query string signing - New path (sanitised): {}", sanitised_query_string);
 
@@ -136,7 +138,6 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
         credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
 
     headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
     // Sanitize logged authorization header
     std::vector<std::string> sanitised_header =
@@ -169,7 +170,7 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
                                        const absl::string_view long_date,
                                        const absl::optional<std::string> session_token,
                                        const std::map<std::string, std::string>& signed_headers,
-                                       const uint8_t expiration_time) const {
+                                       const uint16_t expiration_time) const {
   // X-Amz-Algorithm
   query_params.add(SignatureQueryParameters::get().AmzAlgorithm, getAlgorithmString());
   // X-Amz-Date

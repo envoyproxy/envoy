@@ -466,6 +466,24 @@ UNSIGNED-PAYLOAD)EOF";
                               "ap-southeast-2,us-east-*", 200);
 }
 
+// Verify query string signing defaults to 5s
+TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  Http::TestRequestHeaderMapImpl headers{};
+  headers.setMethod("GET");
+  // Simple path, 1 extra header
+  headers.setPath("/example/path");
+  headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
+  headers.addCopy("testheader", "value1");
+  SigV4ASignerImpl querysigner("service", "region",
+                               CredentialsProviderSharedPtr{credentials_provider_}, time_system_,
+                               Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
+
+  querysigner.signUnsignedPayload(headers);
+  auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
+
+  EXPECT_EQ(query_parameters.getFirstValue("X-Amz-Expires").value(), "5");
+}
 } // namespace
 } // namespace Aws
 } // namespace Common

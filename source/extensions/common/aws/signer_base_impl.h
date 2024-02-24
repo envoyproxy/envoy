@@ -35,6 +35,7 @@ public:
   const std::string AmzSignature{"X-Amz-Signature"};
   const std::string AmzSignedHeaders{"X-Amz-SignedHeaders"};
   const std::string AmzExpires{"X-Amz-Expires"};
+  const uint16_t DefaultExpiration = 5;
 };
 
 using SignatureQueryParameters = ConstSingleton<SignatureQueryParameterValues>;
@@ -67,7 +68,8 @@ public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
                  const AwsSigningHeaderExclusionVector& matcher_config,
-                 const bool query_string = false, const uint16_t expiration_time = 0)
+                 const bool query_string = false,
+                 const uint16_t expiration_time = SignatureQueryParameters::get().DefaultExpiration)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
         query_string_(query_string), expiration_time_(expiration_time), time_source_(time_source),
         long_date_formatter_(SignatureConstants::get().LongDateFormat),
@@ -76,6 +78,9 @@ public:
       excluded_header_matchers_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               matcher));
+      Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+      ENVOY_LOG_MISC(debug, "create with expiration {}", expiration_time_);
     }
   }
 
@@ -127,7 +132,7 @@ protected:
                          const absl::string_view long_date,
                          const absl::optional<std::string> session_token,
                          const std::map<std::string, std::string>& signed_headers,
-                         const uint8_t expiration_time) const;
+                         const uint16_t expiration_time) const;
 
   std::vector<Matchers::StringMatcherPtr> defaultMatchers() const {
     std::vector<Matchers::StringMatcherPtr> matcher_ptrs{};
