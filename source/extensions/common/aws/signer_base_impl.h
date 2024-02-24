@@ -78,9 +78,6 @@ public:
       excluded_header_matchers_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
               matcher));
-      Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
-
-      ENVOY_LOG_MISC(debug, "create with expiration {}", expiration_time_);
     }
   }
 
