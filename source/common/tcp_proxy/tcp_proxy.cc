@@ -294,9 +294,11 @@ void Filter::onInitFailure(UpstreamFailureReason reason) {
   // not have started attempting to connect to an upstream and there is no
   // connection pool callback latency to record.
   if (initial_upstream_connection_start_time_.has_value()) {
-    getStreamInfo().upstreamInfo()->upstreamTiming().recordConnectionPoolCallbackLatency(
-        initial_upstream_connection_start_time_.value(),
-        read_callbacks_->connection().dispatcher().timeSource());
+    if (!getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency()) {
+      getStreamInfo().upstreamInfo()->upstreamTiming().recordConnectionPoolCallbackLatency(
+          initial_upstream_connection_start_time_.value(),
+          read_callbacks_->connection().dispatcher().timeSource());
+    }
   }
   read_callbacks_->connection().close(
       Network::ConnectionCloseType::NoFlush,
@@ -557,7 +559,9 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   if (!factory) {
     return false;
   }
-
+  upstream_decoder_filter_callbacks_.route_ = std::make_shared<Http::NullRouteImpl>(
+      cluster.info()->name(),
+      *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()});
   generic_conn_pool_ = factory->createGenericConnPool(
       cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
       upstream_decoder_filter_callbacks_, getStreamInfo());
@@ -607,9 +611,11 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
                                 const Network::ConnectionInfoProvider& address_provider,
                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
   StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
-  upstream_info.upstreamTiming().recordConnectionPoolCallbackLatency(
-      initial_upstream_connection_start_time_.value(),
-      read_callbacks_->connection().dispatcher().timeSource());
+  if (!upstream_info.upstreamTiming().connectionPoolCallbackLatency()) {
+    upstream_info.upstreamTiming().recordConnectionPoolCallbackLatency(
+        initial_upstream_connection_start_time_.value(),
+        read_callbacks_->connection().dispatcher().timeSource());
+  }
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);

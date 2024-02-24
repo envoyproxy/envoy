@@ -402,6 +402,13 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
                                       const Network::ConnectionInfoProvider& address_provider,
                                       Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+
+    callbacks_->onGenericPoolReady(nullptr, std::move(combined_upstream_), host, address_provider,
+                                   ssl_info);
+    return;
+  }
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, address_provider, ssl_info);
 }
 

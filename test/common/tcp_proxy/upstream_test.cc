@@ -6,8 +6,11 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
+#include "test/mocks/router/router_filter_interface.h"
+#include "test/mocks/router/upstream_request.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/tcp/mocks.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_runtime.h"
@@ -486,6 +489,84 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderHostnameWithDownstreamInfoD
       .WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+class CombinedUpstreamTest : public testing::Test {
+public:
+  CombinedUpstreamTest() {
+    EXPECT_CALL(encoder_, getStream()).Times(AnyNumber());
+    EXPECT_CALL(encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+    EXPECT_CALL(encoder_, enableTcpTunneling()).Times(AnyNumber());
+    EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
+    tcp_proxy_.mutable_tunneling_config()->set_hostname("default.host.com:443");
+  }
+
+  void setup() {
+    route_ = std::make_unique<Http::NullRouteImpl>(
+        cluster_.info()->name(),
+        *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()});
+    tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
+    conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
+                                                decoder_callbacks_, Http::CodecType::HTTP2,
+                                                downstream_stream_info_);
+    upstream_ =
+        std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
+                                           *tunnel_config_, downstream_stream_info_);
+    auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
+    std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
+    config_ = std::make_shared<Config>(tcp_proxy_, factory_context_);
+    filter_ =
+        std::make_unique<Filter>(config_, factory_context_.serverFactoryContext().clusterManager());
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
+        router_filter_interface_, std::move(generic_conn_pool));
+    mock_router_upstream_request_ = mock_upst.get();
+    upstream_->setRouterUpstreamRequest(std::move(mock_upst));
+    EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
+    upstream_->newStream(*filter_);
+  }
+
+  Router::MockUpstreamRequest* mock_router_upstream_request_{};
+  NiceMock<Router::MockRouterFilterInterface> router_filter_interface_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  ConfigSharedPtr config_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  std::unique_ptr<Filter> filter_;
+
+  NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
+  Http::MockRequestEncoder encoder_;
+  Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
+  NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
+  TcpProxy tcp_proxy_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
+  NiceMock<Upstream::MockLoadBalancerContext> lb_context_;
+  std::unique_ptr<HttpConnPool> conn_pool_;
+  NiceMock<Stats::MockStore> store_;
+  Stats::MockScope& scope_{store_.mockScope()};
+  std::unique_ptr<TunnelingConfigHelper> tunnel_config_;
+  std::unique_ptr<Http::NullRouteImpl> route_;
+  std::unique_ptr<CombinedUpstream> upstream_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+};
+
+TEST_F(CombinedUpstreamTest, WriteUpstream) {
+  this->setup();
+  EXPECT_CALL(*this->mock_router_upstream_request_,
+              acceptDataFromRouter(BufferStringEqual("foo"), false /*end_stream*/));
+  Buffer::OwnedImpl buffer1("foo");
+  this->upstream_->encodeData(buffer1, false);
+
+  EXPECT_CALL(*this->mock_router_upstream_request_,
+              acceptDataFromRouter(BufferStringEqual("bar"), true /*end_stream*/));
+  Buffer::OwnedImpl buffer2("bar");
+  this->upstream_->encodeData(buffer2, true);
+
+  // New upstream with no encoder.
+  this->upstream_ =
+      std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
+                                         *tunnel_config_, downstream_stream_info_);
+  this->upstream_->encodeData(buffer2, true);
 }
 } // namespace
 } // namespace TcpProxy
