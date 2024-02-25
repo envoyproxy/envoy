@@ -269,7 +269,7 @@ additional addresses from XFF:
 
  If the trusted client address should be determined from a list of known CIDRs, use the
  :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` original IP
- detection extension instead.
+ detection option instead.
 
  * If the remote address is contained by an entry in ``xff_trusted_cidrs`` and ``recurse`` is
    ``false`` (the default), the trusted client address is the *last* (rightmost) IP address in XFF.
