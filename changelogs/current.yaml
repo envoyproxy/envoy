@@ -200,7 +200,8 @@ new_features:
     please see https://github.com/envoyproxy/envoy/issues/32012.
 - area: quic
   change: |
-    Added private key provider :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
+    Added private key provider
+    :ref:`private_key_provider<envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
     support for the quic over TLS 1.3 protocol.
 - area: rbac
   change: |
