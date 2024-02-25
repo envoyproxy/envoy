@@ -194,6 +194,10 @@ new_features:
   change: |
     Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
     during signature.
+- area: http3
+  change: |
+    Added support for sending and receiving HTTP/3 METADATA frames when
+    :ref:`allow_metata <envoy_api_field_core.Http3ProtocolOptions.allow_metata>` is set.
 - area: ext_proc
   change: |
     added

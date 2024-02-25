@@ -42,6 +42,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
 
   stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
+  RegisterMetadataVisitor(this);
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -447,6 +448,15 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
     return Http::HeaderUtility::HeaderValidationResult::REJECT;
   }
   return result;
+}
+
+void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
+                                               const quic::QuicHeaderList& header_list) {
+  auto metadata = std::make_unique<Http::MetadataMap>();
+  for (const auto& [key, value] : header_list) {
+    (*metadata)[key] = value;
+  }
+  request_decoder_->decodeMetadata(std::move(metadata));
 }
 
 void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection,

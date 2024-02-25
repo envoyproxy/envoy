@@ -31,6 +31,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           stats, http3_options) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
+  RegisterMetadataVisitor(this);
 }
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
@@ -409,6 +410,15 @@ Network::Connection* EnvoyQuicClientStream::connection() { return filterManagerC
 
 QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection() {
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
+}
+
+void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
+                                               const quic::QuicHeaderList& header_list) {
+  auto metadata = std::make_unique<Http::MetadataMap>();
+  for (const auto& [key, value] : header_list) {
+    (*metadata)[key] = value;
+  }
+  response_decoder_->decodeMetadata(std::move(metadata));
 }
 
 void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,
