@@ -75,6 +75,7 @@ void c_on_error(envoy_error raw_error, envoy_stream_intel intel,
     on_error(error, intel, final_intel);
   }
   release_envoy_error(raw_error);
+  // Callbacks can't be invoked after onError is called, so delete the callbacks wrapper context.
   delete stream_callbacks_wrapper;
 }
 
@@ -85,6 +86,7 @@ void c_on_complete(envoy_stream_intel intel, envoy_final_stream_intel final_inte
     auto on_complete = stream_callbacks.on_complete.value();
     on_complete(intel, final_intel);
   }
+  // Callbacks can't be invoked after onComplete is called, so delete the callbacks wrapper context.
   delete stream_callbacks_wrapper;
 }
 
@@ -95,12 +97,13 @@ void c_on_cancel(envoy_stream_intel intel, envoy_final_stream_intel final_intel,
     auto on_cancel = stream_callbacks.on_cancel.value();
     on_cancel(intel, final_intel);
   }
+  // Callbacks can't be invoked after onCancel is called, so delete the callbacks wrapper context.
   delete stream_callbacks_wrapper;
 }
 
 void c_on_send_window_available(envoy_stream_intel intel, void* context) {
-  StreamCallbacksWrapper* stream_callbacks_wrapper = static_cast<StreamCallbacksWrapper*>(context);
-  StreamCallbacks& stream_callbacks = *stream_callbacks_wrapper->stream_callbacks;
+  StreamCallbacks& stream_callbacks =
+      *static_cast<StreamCallbacksWrapper*>(context)->stream_callbacks;
   if (stream_callbacks.on_send_window_available.has_value()) {
     auto on_send_window_available = stream_callbacks.on_send_window_available.value();
     on_send_window_available(intel);
