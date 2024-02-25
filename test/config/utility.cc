@@ -1519,16 +1519,16 @@ void ConfigHelper::initializeTls(
       ProtobufWkt::Struct message;
       std::string sync_mode = test_private_key_provider_sync_mode ? "true" : "false";
 #ifdef ENVOY_ENABLE_YAML
-          TestUtility::loadFromJson(
-            "{\"private_key_file\":\"" +
-                TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem") +
-                "\", \"expected_operation\":\"sign\", \"mode\":\"rsa\", \"sync_mode\":" + sync_mode +
-                "}",
-            message);
+      TestUtility::loadFromJson(
+          "{\"private_key_file\":\"" +
+              TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem") +
+              "\", \"expected_operation\":\"sign\", \"mode\":\"rsa\", \"sync_mode\":" + sync_mode +
+              "}",
+          message);
 #else
-          UNREFERENCED_PARAMETER(message);
-          UNREFERENCED_PARAMETER(sync_mode);
-          PANIC("YAML support compiled out");
+      UNREFERENCED_PARAMETER(message);
+      UNREFERENCED_PARAMETER(sync_mode);
+      PANIC("YAML support compiled out");
 #endif
       tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(message);
     }
