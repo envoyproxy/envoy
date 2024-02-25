@@ -1518,12 +1518,18 @@ void ConfigHelper::initializeTls(
       tls_certificate->mutable_private_key_provider()->set_provider_name("test");
       ProtobufWkt::Struct message;
       std::string sync_mode = test_private_key_provider_sync_mode ? "true" : "false";
-      TestUtility::loadFromJson(
-          "{\"private_key_file\":\"" +
-              TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem") +
-              "\", \"expected_operation\":\"sign\", \"mode\":\"rsa\", \"sync_mode\":" + sync_mode +
-              "}",
-          message);
+#ifdef ENVOY_ENABLE_YAML
+          TestUtility::loadFromJson(
+            "{\"private_key_file\":\"" +
+                TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem") +
+                "\", \"expected_operation\":\"sign\", \"mode\":\"rsa\", \"sync_mode\":" + sync_mode +
+                "}",
+            message);
+#else
+          UNREFERENCED_PARAMETER(config);
+          UNREFERENCED_PARAMETER(filter_list_back);
+          PANIC("YAML support compiled out");
+#endif
       tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(message);
     }
     if (options.rsa_cert_ocsp_staple_) {
