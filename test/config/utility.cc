@@ -1526,8 +1526,8 @@ void ConfigHelper::initializeTls(
                 "}",
             message);
 #else
-          UNREFERENCED_PARAMETER(config);
-          UNREFERENCED_PARAMETER(filter_list_back);
+          UNREFERENCED_PARAMETER(message);
+          UNREFERENCED_PARAMETER(sync_mode);
           PANIC("YAML support compiled out");
 #endif
       tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(message);
