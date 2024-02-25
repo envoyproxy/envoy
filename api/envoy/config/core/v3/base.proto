@@ -245,7 +245,8 @@ message Metadata {
   // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
   // fields are present in the metadata with same keys,
   // only ``typed_filter_metadata`` field will be parsed.
-  map<string, google.protobuf.Struct> filter_metadata = 1;
+  map<string, google.protobuf.Struct> filter_metadata = 1
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The ``envoy.*``
   // namespace is reserved for Envoy's built-in filters.
@@ -253,7 +254,8 @@ message Metadata {
   // If both :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
   // and ``typed_filter_metadata`` fields are present in the metadata with same keys,
   // only ``typed_filter_metadata`` field will be parsed.
-  map<string, google.protobuf.Any> typed_filter_metadata = 2;
+  map<string, google.protobuf.Any> typed_filter_metadata = 2
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
 }
 
 // Runtime derived uint32 with a default when not specified.
