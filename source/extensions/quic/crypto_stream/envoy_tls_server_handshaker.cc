@@ -23,7 +23,7 @@ ssl_private_key_result_t EnvoyTlsServerHandshaker::PrivateKeySign(uint8_t* out, 
                                                                   size_t max_out, uint16_t sig_alg,
                                                                   absl::string_view in) {
   if (transport_socket_factory_->getTlsCertificates().size() > 0) {
-    // TODO(soulxu): Currently the QUIC transport socket only support one certficate. After
+    // TODO(soulxu): Currently the QUIC transport socket only support one certificate. After
     // QUIC transport socket with multiple certificates, we will figure out how to support
     // multiple certificates for private key provider also.
     auto private_key_method =
