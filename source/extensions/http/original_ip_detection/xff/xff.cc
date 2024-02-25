@@ -24,8 +24,13 @@ XffIPDetection::XffIPDetection(
   }
 }
 
-XffIPDetection::XffIPDetection(uint32_t xff_num_trusted_hops)
-    : xff_num_trusted_hops_(xff_num_trusted_hops), append_xff_(false), recurse_(false) {}
+XffIPDetection::XffIPDetection(uint32_t xff_num_trusted_hops, bool append_xff)
+    : xff_num_trusted_hops_(xff_num_trusted_hops), append_xff_(append_xff), recurse_(false) {}
+
+XffIPDetection::XffIPDetection(const std::vector<Network::Address::CidrRange> trusted_cidrs,
+                               bool append_xff, bool recurse)
+    : xff_num_trusted_hops_(0), xff_trusted_cidrs_(trusted_cidrs), append_xff_(append_xff),
+      recurse_(recurse) {}
 
 Envoy::Http::OriginalIPDetectionResult
 XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {

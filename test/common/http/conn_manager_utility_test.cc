@@ -11,6 +11,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/http/original_ip_detection/xff/xff.h"
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/common/http/custom_header_extension.h"
@@ -117,7 +118,7 @@ public:
         .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
                                   HttpConnectionManager::KEEP_UNCHANGED));
 
-    detection_extensions_.push_back(getXFFExtension(0));
+    detection_extensions_.push_back(getXFFExtension(0, false));
     ON_CALL(config_, originalIpDetectionExtensions())
         .WillByDefault(ReturnRef(detection_extensions_));
   }
@@ -563,7 +564,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   // Reconfigure XFF detection.
   detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(1));
+  detection_extensions_.push_back(getXFFExtension(1, false));
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -574,6 +575,89 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+}
+
+// Verify that xff_num_trusted_hops appends XFF with the remote address.
+TEST_F(ConnectionManagerUtilityTest, XFFTrustedHopsAppendsXFF) {
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(1, true));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+  Network::Address::Ipv4Instance local_address("203.0.113.128");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+  EXPECT_EQ(headers.ForwardedFor()->value().getStringView(),
+            "198.51.100.2, 198.51.100.1,203.0.113.128");
+}
+
+// Verify that we use the last address from XFF when the remote address is in `xff_trusted_cidrs`
+// and that XFF is appended to.
+TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithoutRecurse) {
+  std::vector<Network::Address::CidrRange> cidrs = {
+      Network::Address::CidrRange::create("198.51.100.0", 24),
+  };
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(cidrs, true, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("198.51.100.10"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+  EXPECT_EQ(headers.ForwardedFor()->value().getStringView(),
+            "198.51.100.2, 198.51.100.1,198.51.100.10");
+}
+
+// Verify that we use the last address from XFF when the remote address is in `xff_trusted_cidrs`
+// and that XFF is not appended.
+TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithoutRecurseDontAppendXFF) {
+  std::vector<Network::Address::CidrRange> cidrs = {
+      Network::Address::CidrRange::create("198.51.100.0", 24),
+  };
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(cidrs, false, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("198.51.100.10"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+  EXPECT_EQ(headers.ForwardedFor()->value().getStringView(), "198.51.100.2, 198.51.100.1");
+}
+
+// Verify that we use the first address in XFF and XFF is appended to.
+TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithRecurse) {
+  std::vector<Network::Address::CidrRange> cidrs = {
+      Network::Address::CidrRange::create("198.51.100.0", 24),
+  };
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(cidrs, true, true));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("198.51.100.10"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+  // TODO: Add the correct value
+  EXPECT_EQ(headers.ForwardedFor()->value().getStringView(),
+            "198.51.100.2, 198.51.100.1,198.51.100.10");
 }
 
 // Verify we preserve hop by hop headers if configured to do so.

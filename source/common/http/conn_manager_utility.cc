@@ -172,11 +172,13 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
       if (result.reject_options.has_value()) {
         return {nullptr, result.reject_options};
       }
-      if (Network::Utility::isLoopbackAddress(
-              *connection.connectionInfoProvider().remoteAddress())) {
-        Utility::appendXff(request_headers, config.localAddress());
-      } else {
-        Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
+      if (result.append_xff) {
+        if (Network::Utility::isLoopbackAddress(
+                *connection.connectionInfoProvider().remoteAddress())) {
+          Utility::appendXff(request_headers, config.localAddress());
+        } else {
+          Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
+        }
       }
 
       if (result.detected_remote_address) {
