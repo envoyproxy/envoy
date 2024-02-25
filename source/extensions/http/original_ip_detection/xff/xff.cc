@@ -11,9 +11,8 @@ namespace Xff {
 
 XffIPDetection::XffIPDetection(
     const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig& config)
-    : xff_num_trusted_hops_(config.xff_num_trusted_hops()),
-      append_xff_(config.append_xff().value()),
-      recurse_(config.xff_trusted_cidrs().recurse().value()) {
+    : xff_num_trusted_hops_(config.xff_num_trusted_hops()), append_xff_(config.append_xff()),
+      recurse_(config.xff_trusted_cidrs().recurse()) {
   if (config.has_xff_trusted_cidrs() && config.xff_num_trusted_hops() > 0) {
     throw EnvoyException("Cannot set both xff_num_trusted_hops and xff_trusted_cidrs");
   }
