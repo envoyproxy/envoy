@@ -1321,8 +1321,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 
 void ConfigHelper::addQuicDownstreamTransportSocketConfig(
     bool enable_early_data, std::vector<absl::string_view> custom_alpns,
-    bool with_test_private_key_provider,
-    bool test_private_key_provider_sync_mode) {
+    bool with_test_private_key_provider, bool test_private_key_provider_sync_mode) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1333,8 +1332,8 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(
   configDownstreamTransportSocketWithTls(
       bootstrap_,
       [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
-                      true, with_test_private_key_provider, test_private_key_provider_sync_mode);
+        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context, true,
+                      with_test_private_key_provider, test_private_key_provider_sync_mode);
         for (absl::string_view alpn : custom_alpns) {
           common_tls_context.add_alpn_protocols(alpn);
         }
@@ -1454,8 +1453,8 @@ void ConfigHelper::initializeTlsKeyLog(
 
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
-    bool http3, bool with_test_private_key_provider, bool test_private_key_provider_sync_mode) {
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context, bool http3,
+    bool with_test_private_key_provider, bool test_private_key_provider_sync_mode) {
   if (!http3) {
     // If it's HTTP/3, leave it empty as QUIC will derive the supported ALPNs from QUIC version by
     // default.
