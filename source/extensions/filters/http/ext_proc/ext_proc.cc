@@ -397,10 +397,12 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // may request a watermark if the queue is higher than the buffer limit to prevent running
     // out of memory.
     // 2) As a result, filters farther down the chain see empty buffers in some data callbacks.
-    // 3) When a response comes back from the external processor, it injects the processor's result
-    // into the filter chain using "inject**codedData". (The processor may respond indicating that
-    // there is no change, which means that the original buffer stored in the queue is what gets
-    // injected.)
+    // 3) When a response comes back from the external processor, it is buffered in HCM's buffered
+    // data and will be propagated to further filters in the chain altogether later (The processor
+    // may respond indicating that there is no change, which means that the original buffer stored
+    // in the queue is what gets propagated.)
+    // 4) If the response from the external processor is too large, watermark and then local reply
+    // will be triggered.
     //
     // This way, we pipeline data from the proxy to the external processor, and give the processor
     // the ability to modify each chunk, in order. Doing this any other way would have required

@@ -3428,35 +3428,76 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, ResponseFromSidestreamTooLarge) {
+TEST_P(ExtProcIntegrationTest, ExtProcServerResponseTooLarge) {
+  // Build 64kb mutation body string.
+  std::string mutation_body_str = std::string(64 * 1024, 'a');
+
   config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+
+  processRequestBodyMessage(*grpc_upstreams_[0], true,
+                            [&mutation_body_str](const HttpBody& body, BodyResponse& body_resp) {
+                              EXPECT_TRUE(body.end_of_stream());
+                              // Send huge body mutation back to ext_proc.
+                              auto* body_mut =
+                                  body_resp.mutable_response()->mutable_body_mutation();
+                              body_mut->set_body(mutation_body_str);
+                              return true;
+                            });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // The response from ext_proc server is too large and triggers local reply with code 413
+  // (PayloadTooLarge).
+  EXPECT_EQ(response->headers().getStatusValue(), std::to_string(413));
+}
+
+TEST_P(ExtProcIntegrationTest, MultipleSmallExtProcServerResponse) {
+  int mutation_body_size = 256;
+  std::string mutation_body_str = std::string(mutation_body_size, 'a');
+  std::string request_body_str = std::string(32 * 1024, 'a');
 
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
-
-  // Build 64kb body string.
-  std::string body_str = std::string(64 * 1024, 'a');
-
   HttpIntegrationTest::initialize();
 
-  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  auto response = sendDownstreamRequestWithBody(request_body_str, absl::nullopt);
 
-  processRequestBodyMessage(
-      *grpc_upstreams_[0], true, [&body_str](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
-        // Send huge body mutation back to ext_proc.
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body(body_str);
-        return true;
-      });
+  bool end_stream = false;
+  int response_num = 0;
+  // ext_proc server returns response until it receives the last request body chunk (i.e., has
+  // end_of_stream).
+  while (end_stream == false) {
+    processRequestBodyMessage(
+        *grpc_upstreams_[0], response_num == 0 ? true : false,
+        [&mutation_body_str, &end_stream](const HttpBody& req_body, BodyResponse& body_resp) {
+          end_stream = req_body.end_of_stream();
+          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(mutation_body_str);
+          return true;
+        });
+    response_num++;
+  }
 
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  // The response from side stream is too large and triggers local reply with code 413
-  // (PayloadTooLarge).
-  EXPECT_EQ(response->headers().getStatusValue(), std::to_string(413));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  // Verify that request body with all the mutations arrives at upstream.
+  std::string expected_body_str = std::string(response_num * mutation_body_size, 'a');
+  EXPECT_EQ(upstream_request_->body().toString(), expected_body_str);
+
+  // Send the response from upstream.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+  verifyDownstreamResponse(*response, 200);
 }
 
 #if defined(USE_CEL_PARSER)
