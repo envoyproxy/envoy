@@ -42,6 +42,8 @@ public:
    * Connect to a remote host. Errors or connection events are reported via the
    * event callback registered via setAsyncTcpClientCallbacks(). We need to set the
    * callbacks again to call connect() after the connection is disconnected.
+   * @returns true if a new client has created and the connection is in progress.
+   * @returns false if an underlying client exists and is connected or connecting.
    */
   virtual bool connect() PURE;
 

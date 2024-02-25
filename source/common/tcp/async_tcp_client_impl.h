@@ -29,8 +29,6 @@ public:
                      Upstream::ThreadLocalCluster& thread_local_cluster,
                      Upstream::LoadBalancerContext* context, bool enable_half_close);
 
-  ~AsyncTcpClientImpl() override;
-
   void close(Network::ConnectionCloseType type) override;
 
   Network::DetectedCloseType detectedCloseType() const override { return detected_close_; }
@@ -56,7 +54,7 @@ public:
   /**
    * @return if the client connects to a peer host.
    */
-  bool connected() override { return !disconnected_; }
+  bool connected() override { return connected_; }
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -108,7 +106,7 @@ private:
   Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
   Network::DetectedCloseType detected_close_{Network::DetectedCloseType::Normal};
-  bool disconnected_{true};
+  bool connected_{false};
   bool enable_half_close_{false};
 };
 
