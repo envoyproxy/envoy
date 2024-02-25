@@ -198,6 +198,10 @@ new_features:
     Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is
     disabled by default, it can be enabled by runtime feature flag ``envoy.restart_features.enable_execution_context``. For more details,
     please see https://github.com/envoyproxy/envoy/issues/32012.
+- area: quic
+  change: |
+    Added private key provider :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
+    support for the quic over TLS 1.3 protocol.
 - area: rbac
   change: |
     Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
