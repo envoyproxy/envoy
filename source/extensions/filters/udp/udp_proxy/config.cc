@@ -33,7 +33,7 @@ const std::string& TunnelResponseTrailers::key() {
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
     : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
-      proxy_port_(), target_port_(config.default_target_port()), use_post_(config.use_post()),
+      target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()
                                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_options(),
@@ -59,7 +59,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
 
   if (post_path_.empty()) {
     post_path_ = "/";
-  } else if (post_path_.rfind("/", 0) != 0) {
+  } else if (!absl::StartsWith(post_path_, "/")) {
     throw EnvoyException("Path must start with '/'");
   }
 

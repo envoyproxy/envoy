@@ -33,7 +33,7 @@ envoy_objc_library(
         "EnvoyNativeFilterConfig.h",
         "EnvoyNativeFilterConfig.m",
         "EnvoyNetworkMonitor.h",
-        "EnvoyNetworkMonitor.m",
+        "EnvoyNetworkMonitor.mm",
         "EnvoyStringAccessor.h",
         "EnvoyStringAccessor.m",
     ],
@@ -57,9 +57,10 @@ envoy_objc_library(
         ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
         "//library/cc:engine_builder_lib",
-        "//library/common:envoy_main_interface_lib",
+        "//library/common:internal_engine_lib",
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
+        "//library/common/network:apple_proxy_resolution_lib",
     ],
 )
 

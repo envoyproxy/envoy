@@ -583,7 +583,9 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  absl::Status creation_status;
+  Configuration::InitialImpl initial_config(bootstrap_, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -738,7 +740,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
-  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+  THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -820,6 +822,15 @@ void InstanceBase::onRuntimeReady() {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
     });
+  }
+
+  // TODO (nezdolik): Fully deprecate this runtime key in the next release.
+  if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
+    ENVOY_LOG(warn,
+              "Usage of the deprecated runtime key {}, consider switching to "
+              "`envoy.resource_monitors.downstream_connections` instead."
+              "This runtime key will be removed in future.",
+              Runtime::Keys::GlobalMaxCxRuntimeKey);
   }
 }
 
@@ -906,8 +917,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
-          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
-      !instance.runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
     ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
                     "connections. Configure a "
                     "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");

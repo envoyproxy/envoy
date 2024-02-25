@@ -81,10 +81,9 @@ public:
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
    * configured.
    * @param cache_option always use cache or use cache when runtime is enabled.
-   * @return RawAsyncClientPtr a grpc async client.
-   * @throws EnvoyException when grpc_service validation fails.
+   * @return RawAsyncClientPtr a grpc async client or an invalid status.
    */
-  virtual RawAsyncClientSharedPtr
+  virtual absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
                             Stats::Scope& scope, bool skip_cluster_check) PURE;
 
@@ -100,7 +99,7 @@ public:
    * @return RawAsyncClientPtr a grpc async client.
    * @throws EnvoyException when grpc_service validation fails.
    */
-  virtual RawAsyncClientSharedPtr
+  virtual absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClientWithHashKey(const GrpcServiceConfigWithHashKey& grpc_service,
                                        Stats::Scope& scope, bool skip_cluster_check) PURE;
 
@@ -111,10 +110,9 @@ public:
    * @param scope stats scope.
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
    * configured.
-   * @return AsyncClientFactoryPtr factory for grpc_service.
-   * @throws EnvoyException when grpc_service validation fails.
+   * @return AsyncClientFactoryPtr factory for grpc_service or an error status.
    */
-  virtual AsyncClientFactoryPtr
+  virtual absl::StatusOr<AsyncClientFactoryPtr>
   factoryForGrpcService(const envoy::config::core::v3::GrpcService& grpc_service,
                         Stats::Scope& scope, bool skip_cluster_check) PURE;
 };

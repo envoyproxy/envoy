@@ -56,15 +56,6 @@ sudo xcode-select --switch /Applications/Xcode_14.1.app
 
 retry ./bazelw version
 
-if [[ "${1:-}" == "--android" ]]; then
-  # Download and set up ndk 21 after GitHub update
-  # https://github.com/actions/virtual-environments/issues/5595
-  ANDROID_HOME=$ANDROID_SDK_ROOT
-  SDKMANAGER="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
-  "${SDKMANAGER}" --install "platform-tools" "platforms;android-30"
-  "${SDKMANAGER}" --uninstall "ndk-bundle"
-  "${SDKMANAGER}" --install "ndk;21.4.7075529"
-  "${SDKMANAGER}" --install "build-tools;30.0.2"
-  ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/21.4.7075529"
-  export ANDROID_NDK_HOME
-fi
+# Unset default variables so we don't have to install Android SDK/NDK.
+unset ANDROID_HOME
+unset ANDROID_NDK_HOME
