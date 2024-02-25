@@ -1518,7 +1518,7 @@ void ConfigHelper::initializeTls(
       tls_certificate->mutable_private_key_provider()->set_provider_name("test");
       ProtobufWkt::Struct message;
       std::string sync_mode = test_private_key_provider_sync_mode ? "true" : "false";
-      MessageUtil::loadFromJson(
+      TestUtility::loadFromJson(
           "{\"private_key_file\":\"" +
               TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem") +
               "\", \"expected_operation\":\"sign\", \"mode\":\"rsa\", \"sync_mode\":" + sync_mode +
