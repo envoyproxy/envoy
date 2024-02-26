@@ -28,12 +28,12 @@ namespace Envoy {
 namespace {
 
 // Validates that the max value of nanoseconds and seconds doesn't cause an
-// overflow in the protobuf timeutil computations.
+// overflow in the protobuf time-util computations.
 // TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
 // is removed this function should be renamed to validateDurationNoThrow.
 absl::Status validateDurationUnifiedNoThrow(const ProtobufWkt::Duration& duration) {
   // Apply a strict max boundary to the `seconds` value to avoid overflow when
-  // both seconds and nanoseconds are at their heighest values..
+  // both seconds and nanoseconds are at their highest values.
   // Note that protobuf internally converts to the input's seconds and
   // nanoseconds to nanoseconds (with a max nanoseconds value of 999999999).
   // The kMaxSecondsValue = 9223372035, which is about 292 years.
