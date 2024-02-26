@@ -110,17 +110,15 @@ envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
       &c_on_complete,
       &c_on_cancel,
       &c_on_send_window_available,
-      // We have to create a shared_ptr instance from shared_from_this() using the `new` operator,
-      // because the `envoy_http_callbacks` context is a void* (so that it can called from JNI as
-      // well), so we need a raw pointer. If we just call shared_from_this(), then call get() on
-      // that shared_ptr, it will go out of scope when the function exits, and if the
-      // StreamPrototype goes out of scope before the Stream does (which is entirely plausible),
-      // then the underlying memory will get reclaimed before the raw pointer is used in the
-      // StreamCallbacks callback functions, causing a UAF access. For that reason, we create a
-      // raw pointer with `new`, so that it can be stored in the envoy_http_callbacks.context,
-      // and when the StreamCallbacks no longer need the context (c_on_complete, c_on_cancel,
-      // c_on_error), we delete the pointer, which will cause the shared_ptr's destructor to get
-      // invoked as well.
+      // Each of the function pointers in the returned `envoy_http_callbacks` struct have a
+      // `void* context` parameter. The value of the `context` field of this struct is passed in as
+      // the value of that parameter. Because this context passes through JNI, the context field
+      // can not be a smart pointer and must instead be a standard C-pointer. However, the
+      // `StreamCallbacks` object is reference counted and so will be destroyed when the final
+      // shared_ptr is destroyed. So in order to make sure that it lives long enough, the `context`
+      // field here stores a pointer to a newly created `shared_ptr` which will not go out of scope
+      // when this method returns. When the `StreamCallbacks` is no longer need (c_on_complete,
+      // c_on_cancel, c_on_error), this new `shared_ptr` will need to be deleted.
       new StreamCallbacksSharedPtr(shared_from_this()),
   };
 }
