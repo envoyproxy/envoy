@@ -23,11 +23,11 @@ class SpanContext;
 enum class Decision {
   // IsRecording will be false, the Span will not be recorded and all events and attributes will be
   // dropped.
-  DROP,
+  Drop,
   // IsRecording will be true, but the Sampled flag MUST NOT be set.
-  RECORD_ONLY,
+  RecordOnly,
   // IsRecording will be true and the Sampled flag MUST be set.
-  RECORD_AND_SAMPLE
+  RecordAndSample
 };
 
 /**
@@ -48,10 +48,10 @@ struct SamplingResult {
   std::string tracestate;
 
   inline bool isRecording() const {
-    return decision == Decision::RECORD_ONLY || decision == Decision::RECORD_AND_SAMPLE;
+    return decision == Decision::RecordOnly || decision == Decision::RecordAndSample;
   }
 
-  inline bool isSampled() const { return decision == Decision::RECORD_AND_SAMPLE; }
+  inline bool isSampled() const { return decision == Decision::RecordAndSample; }
 };
 
 /**

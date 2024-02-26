@@ -21,6 +21,7 @@
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -813,6 +814,65 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UO");
+}
+
+TEST_F(TcpProxyTest, IdleTimeoutObjectFactory) {
+  const std::string name = "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string duration_in_milliseconds = std::to_string(1234);
+  auto object = factory->createFromBytes(duration_in_milliseconds);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(duration_in_milliseconds, object->serializeAsString());
+}
+
+TEST_F(TcpProxyTest, InvalidIdleTimeoutObjectFactory) {
+  const std::string name = "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  ASSERT_EQ(nullptr, factory->createFromBytes("not_a_number"));
+}
+
+TEST_F(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  uint64_t idle_timeout_override = 5000;
+
+  // Although the configured idle timeout is 1 second, overriding the value through filter state
+  // so the expected idle timeout is 5 seconds instead.
+  filter_callbacks_.connection_.streamInfo().filterState()->setData(
+      TcpProxy::PerConnectionIdleTimeoutMs,
+      std::make_unique<StreamInfo::UInt64AccessorImpl>(idle_timeout_override),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
+  filter_->onData(buffer, false);
+
+  buffer.add("hello2");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
+  filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  idle_timer->invokeCallback();
 }
 
 // Tests that the idle timer closes both connections, and gets updated when either

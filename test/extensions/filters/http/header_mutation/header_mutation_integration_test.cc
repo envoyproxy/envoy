@@ -429,7 +429,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HeaderMutationIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-void TestResponseHeaderMutation(IntegrationStreamDecoder* response, RouteLevelFlag route_level) {
+void testResponseHeaderMutation(IntegrationStreamDecoder* response, RouteLevelFlag route_level) {
   if (route_level.test(RouteLevel::PerRoute)) {
     EXPECT_EQ("downstream-per-route-flag-header-value",
               response->headers()
@@ -545,7 +545,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationAllLevelsApplied) {
                 ->value()
                 .getStringView());
 
-  TestResponseHeaderMutation(response.get(), AllRoutesLevel);
+  testResponseHeaderMutation(response.get(), AllRoutesLevel);
 
   EXPECT_EQ("GET", response->headers()
                        .get(Http::LowerCaseString("request-method-in-upstream-filter"))[0]
@@ -653,7 +653,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRoute) {
                 ->value()
                 .getStringView());
 
-  TestResponseHeaderMutation(response.get(), PerRouteLevel);
+  testResponseHeaderMutation(response.get(), PerRouteLevel);
 
   EXPECT_EQ("GET", response->headers()
                        .get(Http::LowerCaseString("request-method-in-upstream-filter"))[0]
@@ -696,7 +696,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerVirtualHost) {
                 .get(Http::LowerCaseString("upstream-global-flag-header"))[0]
                 ->value()
                 .getStringView());
-  TestResponseHeaderMutation(response.get(), VirtualHostLevel);
+  testResponseHeaderMutation(response.get(), VirtualHostLevel);
 
   EXPECT_EQ("GET", response->headers()
                        .get(Http::LowerCaseString("request-method-in-upstream-filter"))[0]
@@ -740,7 +740,7 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRouteTable) {
                 ->value()
                 .getStringView());
 
-  TestResponseHeaderMutation(response.get(), RouteTableLevel);
+  testResponseHeaderMutation(response.get(), RouteTableLevel);
 
   EXPECT_EQ("GET", response->headers()
                        .get(Http::LowerCaseString("request-method-in-upstream-filter"))[0]

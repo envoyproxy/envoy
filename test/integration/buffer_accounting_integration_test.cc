@@ -37,8 +37,6 @@ namespace {
 #define ASANITIZED /* Sanitized by GCC */
 #endif
 
-using testing::HasSubstr;
-
 std::string protocolTestParamsAndBoolToString(
     const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
   return fmt::format("{}_{}",

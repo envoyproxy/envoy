@@ -443,7 +443,7 @@ typed_config:
 
   const std::string expectedCapsules(std::vector<std::string> raw_datagrams) {
     std::string expected_capsules = "";
-    for (std::string datagram : raw_datagrams) {
+    for (std::string& datagram : raw_datagrams) {
       expected_capsules += encapsulate(datagram);
     }
 

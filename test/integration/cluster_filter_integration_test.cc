@@ -96,28 +96,10 @@ private:
   TestParent& test_parent_;
 };
 
-std::string ipInitializeUpstreamFiltersTestParamsToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
-  return fmt::format(
-      "{}_{}",
-      TestUtility::ipTestParamsToString(
-          testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-      std::get<1>(params.param) ? "do_initialize_upstream_filters"
-                                : "dont_initialize_upstream_filters");
-}
-
-class ClusterFilterIntegrationTestBase
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
-      public TestParent {
+class ClusterFilterIntegrationTestBase : public testing::TestWithParam<Network::Address::IpVersion>,
+                                         public TestParent {
 public:
-  ClusterFilterIntegrationTestBase() : factory_(*this), registration_(factory_) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.initialize_upstream_filters",
-                                  std::get<1>(GetParam()));
-  }
-
-  // Get the test parameter whether upstream network filters are initialized right after the
-  // upstream connection has been established
-  bool upstreamFiltersInitializedWhenConnected() const { return std::get<1>(GetParam()); }
+  ClusterFilterIntegrationTestBase() : factory_(*this), registration_(factory_) {}
 
   void initialize() { on_new_connection_called_after_on_write_.store(absl::optional<bool>{}); }
 
@@ -149,7 +131,7 @@ class ClusterFilterTcpIntegrationTest : public ClusterFilterIntegrationTestBase,
                                         public BaseIntegrationTest {
 public:
   ClusterFilterTcpIntegrationTest()
-      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::tcpProxyConfig()) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   void initialize() override {
     enableHalfClose(true);
@@ -166,10 +148,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsInitializeUpstreamFilters, ClusterFilterTcpIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipInitializeUpstreamFiltersTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsInitializeUpstreamFilters, ClusterFilterTcpIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ClusterFilterTcpIntegrationTest, TestClusterFilter) {
   initialize();
@@ -183,19 +163,12 @@ TEST_P(ClusterFilterTcpIntegrationTest, TestClusterFilter) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(11, &observed_data));
   EXPECT_EQ("please test", observed_data);
 
-  // Upstream read filters are expected to be initialized at this point after connection has been
-  // established but nothing has been read from the connection yet, but only if runtime feature
-  // flag 'initialize_upstream_filters' is true.
-  if (upstreamFiltersInitializedWhenConnected()) {
-    // Note that we need to have written on the connection and waited for the written data to be
-    // received so that we know the upstream connection has had chance to schedule the
-    // onNewConnection() callbacks. This test will be flaky if we expect onNewConnection() having
-    // been called before the waitForData() above.
-    ASSERT_TRUE(wasOnNewConnectionCalled());
-    ASSERT_TRUE(wasOnNewConnectionCalledFirst());
-  } else {
-    ASSERT_FALSE(wasOnNewConnectionCalled());
-  }
+  // Note that we need to have written on the connection and waited for the written data to be
+  // received so that we know the upstream connection has had chance to schedule the
+  // onNewConnection() callbacks. This test will be flaky if we expect onNewConnection() having
+  // been called before the waitForData() above.
+  ASSERT_TRUE(wasOnNewConnectionCalled());
+  ASSERT_TRUE(wasOnNewConnectionCalledFirst());
 
   observed_data.clear();
   ASSERT_TRUE(tcp_client->write(" everything"));
@@ -206,12 +179,8 @@ TEST_P(ClusterFilterTcpIntegrationTest, TestClusterFilter) {
   tcp_client->waitForData("surely yes");
 
   // Finally after reading from the upstream connection onNewConnection() has been called in all
-  // cases, but onWrite was called before it if runtime feature flag 'initialize_upstream_filters'
-  // is false.
+  // cases, but onWrite was called before it
   ASSERT_TRUE(wasOnNewConnectionCalled());
-  if (!upstreamFiltersInitializedWhenConnected()) {
-    ASSERT_FALSE(wasOnNewConnectionCalledFirst());
-  }
 
   ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
@@ -223,8 +192,7 @@ TEST_P(ClusterFilterTcpIntegrationTest, TestClusterFilter) {
 class ClusterFilterHttpIntegrationTest : public ClusterFilterIntegrationTestBase,
                                          public HttpIntegrationTest {
 public:
-  ClusterFilterHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+  ClusterFilterHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -240,10 +208,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsInitializeUpstreamFilters, ClusterFilterHttpIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipInitializeUpstreamFiltersTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsInitializeUpstreamFilters, ClusterFilterHttpIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ClusterFilterHttpIntegrationTest, TestClusterFilter) {
   initialize();
@@ -257,13 +223,9 @@ TEST_P(ClusterFilterHttpIntegrationTest, TestClusterFilter) {
   waitForNextUpstreamRequest();
 
   // Upstream read filters are expected to be initialized at this point after only the request has
-  // been sent, but only if runtime feature flag 'initialize_upstream_filters' is true.
-  if (upstreamFiltersInitializedWhenConnected()) {
-    ASSERT_TRUE(wasOnNewConnectionCalled());
-    ASSERT_TRUE(wasOnNewConnectionCalledFirst());
-  } else {
-    ASSERT_FALSE(wasOnNewConnectionCalled());
-  }
+  // been sent
+  ASSERT_TRUE(wasOnNewConnectionCalled());
+  ASSERT_TRUE(wasOnNewConnectionCalledFirst());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("hello!", upstream_request_->body().toString());
@@ -276,13 +238,9 @@ TEST_P(ClusterFilterHttpIntegrationTest, TestClusterFilter) {
   ASSERT_TRUE(response->complete());
 
   // Finally after receiving the response onNewConnection() has been called in all cases, but
-  // onWrite was called before it if runtime feature flag 'initialize_upstream_filters' is false.
+  // onWrite was called before it
   ASSERT_TRUE(wasOnNewConnectionCalled());
-  if (upstreamFiltersInitializedWhenConnected()) {
-    ASSERT_TRUE(wasOnNewConnectionCalledFirst());
-  } else {
-    ASSERT_FALSE(wasOnNewConnectionCalledFirst());
-  }
+  ASSERT_TRUE(wasOnNewConnectionCalledFirst());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("greetings", response->body());
