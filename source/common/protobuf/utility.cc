@@ -393,40 +393,21 @@ namespace {
 // as defined by Envoy's duration constraints.
 class DurationFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
-  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
+  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+
+  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
+                 bool) override {
     const Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
-    const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
-
-    // If this field is not in use, continue.
-    if ((field.is_repeated() && reflection->FieldSize(*reflectable_message, &field) == 0) ||
-        (!field.is_repeated() && !reflection->HasField(*reflectable_message, &field))) {
-      return;
-    }
-
-    // If this field is a repeated field or not of a duration type, continue.
-    if (field.is_repeated() || field.type() != google::protobuf::FieldDescriptor::TYPE_MESSAGE ||
-        field.message_type()->full_name() != "google.protobuf.Duration") {
-      return;
-    }
-
-    // If the field is populated in the message, validate its correctness.
-    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
-    const Protobuf::FieldDescriptor* duration_field = descriptor->FindFieldByName(field.name());
-    if (duration_field != nullptr && reflection->HasField(message, duration_field)) {
-      ASSERT(duration_field != nullptr);
+    if (reflectable_message->GetDescriptor()->full_name() == "google.protobuf.Duration") {
       ProtobufWkt::Duration duration_message;
-      duration_message.MergeFrom(reflection->GetMessage(message, duration_field));
+      duration_message.MergeFrom(message);
       // Validate the value of the duration.
       absl::Status status = validateDurationUnifiedNoThrow(duration_message);
       if (!status.ok()) {
-        throwEnvoyExceptionOrPanic(
-            fmt::format("Invalid duration in field '{}': {}", field.name(), status.message()));
+        throwEnvoyExceptionOrPanic(fmt::format("Invalid duration: {}", status.message()));
       }
     }
   }
-
-  void onMessage(const Protobuf::Message&, absl::Span<const Protobuf::Message* const>,
-                 bool) override {}
 };
 
 } // namespace

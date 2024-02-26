@@ -1888,17 +1888,15 @@ TEST_F(ProtobufUtilityTest, MessageDurationValidation) {
   {
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     bootstrap.mutable_stats_flush_interval()->set_seconds(-1);
-    EXPECT_THROW_WITH_REGEX(
-        MessageUtil::validateDurationFields(bootstrap), EnvoyException,
-        "Invalid duration in field 'stats_flush_interval': Expected positive duration");
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validateDurationFields(bootstrap), EnvoyException,
+                            "Invalid duration: Expected positive duration");
   }
   {
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     bootstrap.mutable_stats_flush_interval()->set_seconds(1);
     bootstrap.mutable_stats_flush_interval()->set_nanos(-100);
-    EXPECT_THROW_WITH_REGEX(
-        MessageUtil::validateDurationFields(bootstrap), EnvoyException,
-        "Invalid duration in field 'stats_flush_interval': Expected positive duration");
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validateDurationFields(bootstrap), EnvoyException,
+                            "Invalid duration: Expected positive duration");
   }
 }
 

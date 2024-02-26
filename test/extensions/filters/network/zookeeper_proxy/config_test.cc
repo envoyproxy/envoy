@@ -103,7 +103,7 @@ latency_threshold_overrides:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
-                          "Invalid duration in field 'threshold': Expected positive duration");
+                          "Invalid duration: Expected positive duration");
 }
 
 TEST_F(ZookeeperFilterConfigTest, TooSmallLatencyThreshold) {
