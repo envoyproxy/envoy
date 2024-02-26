@@ -118,10 +118,10 @@ message ExternalProcessor {
   // If true, send each part of the HTTP request or response specified by ProcessingMode
   // asynchronously -- in other words, send the message on the gRPC stream and then continue
   // filter processing. In this mode:
-  // 1) only STREAMED body processing mode is supported for async processing and any other body
-  // processing mode will be treated as invalid mode and will be ignored.
-  // 2) ext_proc server is not expected to send back processing response. Any response will be
-  // simply ignored.
+  // 1) only STREAMED body processing mode is supported and any other body processing modes
+  // will be treated as invalid and will be ignored for async processing.
+  // 2) ext_proc server is not expected to send back processing response. Any response from
+  // ext_proc server will be simply ignored.
   //
   // If false, which is the default, suspend filter execution after
   // each message is sent to the remote service and wait up to "message_timeout"
@@ -131,8 +131,8 @@ message ExternalProcessor {
   //
   //    Flow control is necessary mechanism to prevent the fast sender (either downstream client or upstream server)
   //    from overwhelming the ext_proc server when its processing speed is slower.
-  //    This protective measure is being developed but has not been implemented yet so please use your own discretion
-  //    when enabling this feature.
+  //    This protective measure is being explored and developed but has not been ready yet, so please use your own
+  //    discretion when enabling this feature.
   //
   bool async_mode = 4;
 
