@@ -145,7 +145,6 @@ public:
   QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
 
 protected:
-  //virtual void useCapsuleProtocol() PURE;
   virtual void switchStreamBlockState() PURE;
 
   // Needed for ENVOY_STREAM_LOG.
@@ -207,7 +206,7 @@ private:
   // QUIC stream that this EnvoyQuicStream wraps.
   quic::QuicSpdyStream& quic_stream_;
 
-    // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
+  // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
   // upon crossing high and low watermarks.
   // Its high watermark is also the buffer limit of stream read/write filters in
   // HCM.
