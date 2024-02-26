@@ -430,9 +430,9 @@ wYsML58R3P8=
   std::stringstream pem_stream(cert_v1);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("localhost", 54321,
-                                       chain, ocsp_response, cert_sct, &verify_context_,
-                                       &error_details, &verify_details, nullptr, nullptr))
+            verifier_->VerifyCertChain("localhost", 54321, chain, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr))
       << error_details;
   EXPECT_EQ("unable to parse certificate", error_details);
   EXPECT_EQ(verify_details, nullptr);
