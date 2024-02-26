@@ -34,6 +34,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
     *usage->mutable_bucket_id() = bucket->bucket_id;
     usage->set_num_requests_allowed(bucket->quota_usage.num_requests_allowed);
     usage->set_num_requests_denied(bucket->quota_usage.num_requests_denied);
+
     auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
         time_source_.monotonicTime().time_since_epoch());
     // For the newly created bucket (i.e., `bucket_id` input is not null), its time
@@ -48,6 +49,10 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 
     // Update the last_report time point.
     bucket->quota_usage.last_report = now;
+    // Reset the number of request allowed/denied. The RLQS server expects the client to report
+    // those two usage numbers since the last report.
+    bucket->quota_usage.num_requests_allowed = 0;
+    bucket->quota_usage.num_requests_denied = 0;
   }
 
   // Set the domain name.
