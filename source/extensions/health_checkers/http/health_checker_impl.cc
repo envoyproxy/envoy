@@ -81,6 +81,12 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 
+  if (!Http::HeaderUtility::headerValueIsValid(path_) ||
+      !Http::HeaderUtility::headerValueIsValid(host_value_)) {
+    throw EnvoyException(fmt::format("the path {} or host name {} is not a valid header value.",
+                                     path_, host_value_));
+  }
+
   if (response_buffer_size_ != 0 && !receive_bytes_.empty()) {
     uint64_t total = 0;
     for (auto const& bytes : receive_bytes_) {
