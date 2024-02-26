@@ -10,7 +10,9 @@
 #include "source/common/http/codec_helper.h"
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "source/common/quic/http_datagram_handler.h"
+#endif
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stats_gatherer.h"
 #include "source/common/quic/send_buffer_monitor.h"
