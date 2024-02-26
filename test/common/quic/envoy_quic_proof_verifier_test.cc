@@ -399,7 +399,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyMissingSubjectAltName) {
+TEST_F(EnvoyQuicProofVerifierTest, VerifyX509v1Cert) {
   std::string cert_v1 = R"text(
 -----BEGIN CERTIFICATE-----
 MIICpDCCAYwCCQClUY4hwG3eCTANBgkqhkiG9w0BAQsFADAUMRIwEAYDVQQDDAlx
