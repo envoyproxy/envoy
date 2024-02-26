@@ -84,7 +84,7 @@ HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
     : config_(config), downstream_info_(downstream_info), response_decoder_(*this),
       upstream_callbacks_(callbacks), type_(type) {}
 
-HttpUpstream::~HttpUpstream() = default;
+HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
 bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (type_ == Http::CodecType::HTTP1) {
