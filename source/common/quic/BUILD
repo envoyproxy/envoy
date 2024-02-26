@@ -651,7 +651,9 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//envoy/access_log:access_log_interface",
+        "//envoy/formatter:http_formatter_context_interface",
         "//envoy/http:codec_interface",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
     ],

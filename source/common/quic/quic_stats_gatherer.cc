@@ -1,5 +1,7 @@
 #include "source/common/quic/quic_stats_gatherer.h"
 
+#include "envoy/formatter/http_formatter_context.h"
+
 #include <cstdint>
 
 namespace Envoy {
