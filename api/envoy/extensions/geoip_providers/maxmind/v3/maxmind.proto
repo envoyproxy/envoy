@@ -46,10 +46,12 @@ message MaxMindConfig {
   //
   // .. code-block:: json
   //   {
-  //     "country_code": "country_code" // comment
+  //     "country_code": "country_code"
   //   }
+  // Comments can be used in the config file by starting a line with a ``//`` or enclosing with ``/* */`` and they are ignored when parsed.
   //
   // The country mapping file is JSON containing the ISO code to be mapped from:to so it is possible to override the result
   // read from the Maxmind database.
+  //
   string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
 }
