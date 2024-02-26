@@ -82,8 +82,9 @@ bug_fixes:
     ext_authz checks when ``failure_mode_allow`` is set to ``true``.
 - area: config
   change: |
-    Stricter validation of a ``google.protobuf.Duration`` field in a config, rejecting negative values. This can be
-    temporarily reverted by setting runtime guard ``envoy.reloadable_features.validate_duration_in_configs`` to false.
+    Stricter validation of a ``google.protobuf.Duration`` field in a config, rejecting invalid values (where the number
+    of years is over 292). This can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.strict_duration_validation`` to false.
 - area: tls
   change: |
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
