@@ -39,7 +39,7 @@ index e957c0fad3..a6de50e6ab 100644
              "@v8//bazel/config:is_clang": [
                  "-Wno-invalid-offsetof",
 +                "-Wno-unneeded-internal-declaration",
-                 "-std=c++17",
+                 "-std=c++20",
              ],
              "@v8//bazel/config:is_gcc": [
 @@ -131,6 +132,7 @@ def _default_args():

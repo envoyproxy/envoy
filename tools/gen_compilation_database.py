@@ -100,8 +100,8 @@ def modify_compile_command(target, args):
         # depend on Envoy targets.
         if not target["file"].startswith("external/") or target["file"].startswith(
                 "external/envoy"):
-            # *.h file is treated as C header by default while our headers files are all C++17.
-            options = "-x c++ -std=c++17 -fexceptions " + options
+            # *.h file is treated as C header by default while our headers files are all C++20.
+            options = "-x c++ -std=c++20 -fexceptions " + options
 
     target["command"] = " ".join([cc, options])
     return target
