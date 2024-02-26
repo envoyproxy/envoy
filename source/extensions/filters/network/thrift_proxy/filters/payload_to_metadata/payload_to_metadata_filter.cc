@@ -314,7 +314,7 @@ FilterStatus PayloadToMetadataFilter::messageBegin(MessageMetadataSharedPtr meta
   return FilterStatus::Continue;
 }
 
-static std::string get_hex_representation(Buffer::Instance& data) {
+static std::string getHexRepresentation(Buffer::Instance& data) {
   void* buf = data.linearize(static_cast<uint32_t>(data.length()));
   const unsigned char* linearized_data = static_cast<const unsigned char*>(buf);
   std::stringstream hex_stream;
@@ -348,7 +348,7 @@ FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
     END_TRY
     CATCH(const EnvoyException& e, {
       IS_ENVOY_BUG(fmt::format("decoding error, error_message: {}, payload: {}", e.what(),
-                               get_hex_representation(data)));
+                               getHexRepresentation(data)));
       if (!handler.isComplete()) {
         handleOnMissing();
       }

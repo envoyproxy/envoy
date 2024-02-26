@@ -72,7 +72,8 @@ FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
   // TODO(#14320): avoid using an exception here or find some way of doing this
   // in the main thread.
   TRY_NEEDS_AUDIT {
-    std::string header_value = Envoy::Config::DataSource::read(config_.secret_data(), true, api_);
+    std::string header_value = THROW_OR_RETURN_VALUE(
+        Envoy::Config::DataSource::read(config_.secret_data(), true, api_), std::string);
     metadata->insert(std::make_pair(header_key, header_prefix + header_value));
   }
   END_TRY

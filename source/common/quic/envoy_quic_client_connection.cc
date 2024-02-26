@@ -87,7 +87,7 @@ uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
 void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket& connection_socket,
                                                       OptRef<PacketsToReadDelegate> delegate) {
   delegate_ = delegate;
-  if (connection_socket.ioHandle().isOpen()) {
+  if (connection_socket.isOpen()) {
     connection_socket.ioHandle().initializeFileEvent(
         dispatcher_,
         [this, &connection_socket](uint32_t events) -> void {
@@ -102,7 +102,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
       connection_socket.close();
     }
   }
-  if (!connection_socket.ioHandle().isOpen()) {
+  if (!connection_socket.isOpen()) {
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }

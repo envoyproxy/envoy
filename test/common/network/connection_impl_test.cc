@@ -136,11 +136,11 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>();
   StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
-  EXPECT_DEATH(
+  EXPECT_ENVOY_BUG(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), stream_info, false),
-      ".*assert failure: SOCKET_VALID\\(fd\\)");
+      "Client socket failure");
 }
 
 class TestClientConnectionImpl : public Network::ClientConnectionImpl {

@@ -43,22 +43,38 @@ minor_behavior_changes:
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
     grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
     xDS region will take preference. aws_request_signer documentation now reflects the region chain.
+- area: http
+  change: |
+    Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
+    previously used HTTP/1 parser).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
+- area: stateful_session
+  change: |
+    Support 0 TTL for proto-encoded cookies, which disables cookie expiration by Envoy.
 - area: load balancing
   change: |
     Added randomization in locality load-balancing initialization. This helps desynchronizing Envoys across
     a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.edf_lb_locality_scheduler_init_fix`` to false.
+- area: load balancing
+  change: |
+    Added randomization in host load-balancing initialization. This helps desynchronizing Envoys across
+    a fleet by randomizing the scheduler starting point. This can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.edf_lb_host_scheduler_init_fix`` to false.
 - area: UDP and TCP tunneling
   change: |
     fixed a bug where second HTTP response headers received would cause Envoy to crash in cases where
     ``propagate_response_headers`` and retry configurations are enabled at the same time, and an upstream
     request is retried multiple times.
+- area: xds
+  change: |
+    Reject xDS configurations where the rate-limit's :ref:`fill_rate <envoy_v3_api_field_config.core.v3.RateLimitSettings.fill_rate>`
+    is set to Infinity or NaN.
 - area: tracing
   change: |
     Prevent Envoy from crashing at start up when the OpenTelemetry environment resource detector cannot detect any attributes.
@@ -90,6 +106,12 @@ bug_fixes:
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
     received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
     ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: tcp_proxy
+  change: |
+    When tunneling TCP over HTTP, closed the downstream connection (for writing only) when upstream trailers are read
+    to support half close semantics during TCP tunneling.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` to false.
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
@@ -97,6 +119,12 @@ bug_fixes:
   change: |
     Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
     controlled by ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
+- area: deps
+  change: |
+    Updated QUICHE dependencies to incorporate fixes for https://github.com/envoyproxy/envoy/issues/32401.
+- area: tracing
+  change: |
+    Dynatrace resource detector: Only log warning message when no enrichment attributes are found.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -121,6 +149,9 @@ removed_config_or_runtime:
 - area: aws
   change: |
     Removed ``envoy.reloadable_features.enable_aws_credentials_file`` runtime flag and legacy code paths.
+- area: upstream
+  change: |
+    removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
 - area: aws_request_signing
@@ -184,8 +215,21 @@ new_features:
     Envoy will select the host with the fewest active requests from the entire host set rather than
     :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     random choices.
+- area: access_loggers
+  change: |
+    Added :ref:`Fluentd access logger <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`
+    to support flushing access logs in `Fluentd format <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
+- area: tcp_proxy
+  change: |
+    added an option to dynamically set a per downstream connection idle timeout period object under the key
+    ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
+    specified in the filter configuration and the default idle timeout.
 
 deprecated:
+- area: listener
+  change: |
+    deprecated runtime key ``overload.global_downstream_max_connections`` in favor of :ref:`downstream connections monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.
