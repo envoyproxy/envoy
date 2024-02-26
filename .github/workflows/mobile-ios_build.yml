@@ -91,6 +91,9 @@ jobs:
             app: ${{ matrix.app }}
             args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
             expected: received headers with status ${{ matrix.expected-status }}
+          env:
+            ANDROID_NDK_HOME:
+            ANDROID_HOME:
       target: ${{ matrix.target }}
       timeout-minutes: ${{ matrix.timeout-minutes }}
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
@@ -134,6 +137,9 @@ jobs:
             expected: >-
               ${{ matrix.expected
                   || format('received headers with status {0}', matrix.expected-status) }}
+          env:
+            ANDROID_NDK_HOME:
+            ANDROID_HOME:
       target: ${{ matrix.target }}
       timeout-minutes: 50
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
