@@ -24,6 +24,22 @@ namespace Envoy {
 
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
+struct GrpcInitializeConfigOpts {
+  bool disable_with_metadata = false;
+  bool failure_mode_allow = false;
+  uint64_t timeout_seconds = 300;
+};
+
+struct WaitForSuccessfulUpstreamResponseOpts {
+  // Fields of type Headers must be set at initialization.
+  const Headers headers_to_add;
+  const Headers headers_to_append;
+  const Headers headers_to_remove;
+  const Http::TestRequestHeaderMapImpl new_headers_from_upstream;
+  const Http::TestRequestHeaderMapImpl headers_to_append_multiple;
+  bool failure_mode_allowed_header = false;
+};
+
 class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
@@ -35,14 +51,9 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  struct GrpcInitializeConfigOpts {
-    bool disable_with_metadata = false;
-    bool failure_mode_allow = false;
-    uint64_t timeout_seconds = 300;
-  };
-  void initializeConfig(GrpcInitializeConfigOpts opts) {
-    config_helper_.addConfigModifier([this, opts](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  void initializeConfig(GrpcInitializeConfigOpts opts = {}) {
+    config_helper_.addConfigModifier([this,
+                                      opts](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ext_authz_cluster->set_name("ext_authz_cluster");
@@ -206,17 +217,8 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  struct WaitForSuccessfulUpstreamResponseOpts {
-    // Fields of type Headers must be set at initialization.
-    Headers headers_to_add;
-    Headers headers_to_append;
-    Headers headers_to_remove;
-    Http::TestRequestHeaderMapImpl new_headers_from_upstream;
-    Http::TestRequestHeaderMapImpl headers_to_append_multiple;
-    bool failure_mode_allowed_header = false;
-  };
-  void waitForSuccessfulUpstreamResponse(
-      const std::string& expected_response_code, WaitForSuccessfulUpstreamResponseOpts opts) {
+  void waitForSuccessfulUpstreamResponse(const std::string& expected_response_code,
+                                         WaitForSuccessfulUpstreamResponseOpts opts = {}) {
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
     RELEASE_ASSERT(result, result.message());
@@ -430,7 +432,7 @@ attributes:
       const Headers& headers_to_append, const Headers& headers_to_remove,
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple) {
-    initializeConfig({});
+    initializeConfig();
     setDownstreamProtocol(downstream_protocol);
     HttpIntegrationTest::initialize();
     initiateClientConnection(request_size, headers_to_add, headers_to_append, headers_to_remove);
@@ -449,9 +451,9 @@ attributes:
     sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append, headers_to_remove,
                          new_headers_from_upstream, headers_to_append_multiple, Headers{});
 
-    WaitForSuccessfulUpstreamResponseOpts opts {
-      updated_headers_to_add, updated_headers_to_append, headers_to_remove,
-      new_headers_from_upstream, headers_to_append_multiple,
+    WaitForSuccessfulUpstreamResponseOpts opts{
+        updated_headers_to_add,    updated_headers_to_append,  headers_to_remove,
+        new_headers_from_upstream, headers_to_append_multiple,
     };
     waitForSuccessfulUpstreamResponse("200", opts);
 
@@ -468,7 +470,7 @@ attributes:
     HttpIntegrationTest::initialize();
     initiateClientConnection(4);
     if (!deny_at_disable) {
-      waitForSuccessfulUpstreamResponse(expected_status, {});
+      waitForSuccessfulUpstreamResponse(expected_status);
     }
     cleanup();
   }
@@ -808,7 +810,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   // Set up ext_authz filter.
-  initializeConfig({});
+  initializeConfig();
 
   // Use h1, set up the test.
   setDownstreamProtocol(Http::CodecType::HTTP1);
@@ -847,7 +849,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   codec_client_->sendData(encoder_decoder.first, final_body, true);
 
   // Expect a 200 OK response
-  waitForSuccessfulUpstreamResponse("200", {});
+  waitForSuccessfulUpstreamResponse("200");
 
   const std::string expected_body(response_size_, 'a');
   verifyResponse(std::move(response_), "200",
@@ -861,7 +863,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   // Set up ext_authz filter.
-  initializeConfig({});
+  initializeConfig();
 
   // Use h1, set up the test.
   setDownstreamProtocol(Http::CodecType::HTTP1);
@@ -881,7 +883,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
       Headers{{"replaceable", "by-ext-authz"}});
 
   // Wait for the upstream response.
-  waitForSuccessfulUpstreamResponse("200", {});
+  waitForSuccessfulUpstreamResponse("200");
 
   EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_->headers(),
                                                         Http::LowerCaseString("set-cookie"))
@@ -941,7 +943,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
 
   // Do not sendExtAuthzResponse(). Envoy should eventually proxy the request upstream as if the
   // authz service approved the request.
-  WaitForSuccessfulUpstreamResponseOpts upstream_opts;
+  WaitForSuccessfulUpstreamResponseOpts upstream_opts{};
   upstream_opts.failure_mode_allowed_header = true;
   waitForSuccessfulUpstreamResponse("200", upstream_opts);
 
@@ -989,7 +991,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
       Headers{{"replaceable", "by-ext-authz"}});
 
   // Wait for the upstream response.
-  waitForSuccessfulUpstreamResponse("200", {});
+  waitForSuccessfulUpstreamResponse("200");
 
   EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_->headers(),
                                                         Http::LowerCaseString("set-cookie"))
@@ -1308,7 +1310,7 @@ body_format:
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
-  initializeConfig({});
+  initializeConfig();
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
@@ -1328,7 +1330,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
         test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value();
   }
 
-  waitForSuccessfulUpstreamResponse("200", {});
+  waitForSuccessfulUpstreamResponse("200");
 
   Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
