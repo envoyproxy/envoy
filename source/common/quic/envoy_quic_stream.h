@@ -12,9 +12,9 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/http_datagram_handler.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_stats_gatherer.h"
 #include "source/common/quic/send_buffer_monitor.h"
 
-#include "source/common/quic/quic_stats_gatherer.h"
 #include "quiche/http2/adapter/header_validator.h"
 #include "quiche/quic/core/http/quic_spdy_stream.h"
 
@@ -30,7 +30,8 @@ class EnvoyQuicStream : public virtual Http::StreamEncoder,
 public:
   // |buffer_limit| is the high watermark of the stream send buffer, and the low
   // watermark will be half of it.
-  EnvoyQuicStream(quic::QuicSpdyStream& quic_stream, uint32_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
+  EnvoyQuicStream(quic::QuicSpdyStream& quic_stream, uint32_t buffer_limit,
+                  QuicFilterManagerConnectionImpl& filter_manager_connection,
                   std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark, Http::Http3::CodecStats& stats,
                   const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
