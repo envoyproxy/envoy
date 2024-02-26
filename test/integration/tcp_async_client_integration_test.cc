@@ -125,9 +125,8 @@ TEST_P(TcpAsyncClientIntegrationTest, Reconnect) {
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForData([&](const std::string& data) -> bool {
-    return data == "hello1";
-  }));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      [&](const std::string& data) -> bool { return data == "hello1"; }));
   ASSERT_TRUE(fake_upstream_connection->close());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
 
@@ -137,9 +136,8 @@ TEST_P(TcpAsyncClientIntegrationTest, Reconnect) {
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
   FakeRawConnectionPtr fake_upstream_connection2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
-  ASSERT_TRUE(fake_upstream_connection2->waitForData([&](const std::string& data) -> bool {
-    return data == "hello2";
-  }));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(
+      [&](const std::string& data) -> bool { return data == "hello2"; }));
 
   tcp_client->close();
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);

@@ -273,7 +273,7 @@ TEST_F(AsyncTcpClientImplTest, ReconnectAfterClientDisconnected) {
   expectCreateConnection();
 
   EXPECT_EQ(2UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
-                    ->upstream_cx_total_.value());
+                     ->upstream_cx_total_.value());
 }
 
 } // namespace Tcp

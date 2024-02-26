@@ -129,8 +129,8 @@ private:
       ENVOY_LOG_MISC(debug, "tcp client test filter upstream callback onEvent: {}",
                      static_cast<int>(event));
 
-      if (event == Network::ConnectionEvent::RemoteClose
-          || event == Network::ConnectionEvent::LocalClose) {
+      if (event == Network::ConnectionEvent::RemoteClose ||
+          event == Network::ConnectionEvent::LocalClose) {
         parent_.require_reconnect_ = true;
       }
 
