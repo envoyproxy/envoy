@@ -3,11 +3,11 @@
 
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/quic/test_utils.h"
-#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
+#include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"

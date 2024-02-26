@@ -16,7 +16,6 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.getaddrinfo": "//source/extensions/network/dns_resolver/getaddrinfo:config",
     "envoy.transport_sockets.http_11_proxy": "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
     "envoy.transport_sockets.raw_buffer": "//source/extensions/transport_sockets/raw_buffer:config",
-    "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
     "envoy.http.stateful_header_formatters.preserve_case": "//source/extensions/http/header_formatters/preserve_case:config",
     "envoy.load_balancing_policies.round_robin": "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.cluster_provided": "//source/extensions/load_balancing_policies/cluster_provided:config",

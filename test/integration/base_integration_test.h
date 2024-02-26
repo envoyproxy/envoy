@@ -9,7 +9,7 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
