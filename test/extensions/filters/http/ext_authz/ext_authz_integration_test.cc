@@ -32,11 +32,11 @@ struct GrpcInitializeConfigOpts {
 
 struct WaitForSuccessfulUpstreamResponseOpts {
   // Fields of type Headers must be set at initialization.
-  const Headers headers_to_add;
-  const Headers headers_to_append;
-  const Headers headers_to_remove;
-  const Http::TestRequestHeaderMapImpl new_headers_from_upstream;
-  const Http::TestRequestHeaderMapImpl headers_to_append_multiple;
+  const Headers headers_to_add = {};
+  const Headers headers_to_append = {};
+  const Headers headers_to_remove = {};
+  const Http::TestRequestHeaderMapImpl new_headers_from_upstream = {};
+  const Http::TestRequestHeaderMapImpl headers_to_append_multiple = {};
   bool failure_mode_allowed_header = false;
 };
 
@@ -943,7 +943,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
 
   // Do not sendExtAuthzResponse(). Envoy should eventually proxy the request upstream as if the
   // authz service approved the request.
-  WaitForSuccessfulUpstreamResponseOpts upstream_opts{};
+  WaitForSuccessfulUpstreamResponseOpts upstream_opts;
   upstream_opts.failure_mode_allowed_header = true;
   waitForSuccessfulUpstreamResponse("200", upstream_opts);
 
