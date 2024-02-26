@@ -195,6 +195,9 @@ public:
   static std::string defaultBufferFilter();
   // A string for a small buffer filter, which can be used with prependFilter()
   static std::string smallBufferFilter();
+  // A string for a small buffer filter with set_limit_only enabled, which can be used with
+  // prependFilter()
+  static std::string smallSetLimitOnlyBufferFilter();
   // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
   // A string for a squash filter which can be used with prependFilter()

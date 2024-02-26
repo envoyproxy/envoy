@@ -329,6 +329,16 @@ typed_config:
 )EOF";
 }
 
+std::string ConfigHelper::smallSetLimitOnlyBufferFilter() {
+  return R"EOF(
+name: set_limit_only_buffer
+typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+    max_request_bytes : 1024
+    set_limit_only : true
+)EOF";
+}
+
 std::string ConfigHelper::defaultHealthCheckFilter() {
   return R"EOF(
 name: health_check

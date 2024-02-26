@@ -21,10 +21,12 @@ public:
   BufferFilterSettings(const envoy::extensions::filters::http::buffer::v3::BufferPerRoute&);
 
   bool disabled() const { return disabled_; }
+  bool setLimitOnly() const { return set_limit_only_; }
   uint64_t maxRequestBytes() const { return max_request_bytes_; }
 
 private:
   bool disabled_;
+  bool set_limit_only_;
   uint64_t max_request_bytes_;
 };
 

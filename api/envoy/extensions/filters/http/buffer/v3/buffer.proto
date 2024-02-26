@@ -28,6 +28,11 @@ message Buffer {
   // manager will stop buffering and return a 413 response.
   google.protobuf.UInt32Value max_request_bytes = 1
       [(validate.rules).uint32 = {gt: 0}, (validate.rules).message = {required: true}];
+
+  // Set the maximum request size but doesn't buffer the data immediately.
+  // It's useful when the following filters may do the buffer themselves conditionally, so
+  // we won't buffer the data too early.
+  bool set_limit_only = 3;
 }
 
 message BufferPerRoute {

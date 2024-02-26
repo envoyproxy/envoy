@@ -19,12 +19,13 @@ namespace BufferFilter {
 
 BufferFilterSettings::BufferFilterSettings(
     const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config)
-    : disabled_(false),
+    : disabled_(false), set_limit_only_(proto_config.set_limit_only()),
       max_request_bytes_(static_cast<uint64_t>(proto_config.max_request_bytes().value())) {}
 
 BufferFilterSettings::BufferFilterSettings(
     const envoy::extensions::filters::http::buffer::v3::BufferPerRoute& proto_config)
     : disabled_(proto_config.disabled()),
+      set_limit_only_(proto_config.has_buffer() ? proto_config.buffer().set_limit_only() : false),
       max_request_bytes_(
           proto_config.has_buffer()
               ? static_cast<uint64_t>(proto_config.buffer().max_request_bytes().value())
@@ -63,6 +64,10 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::RequestHeaderMap& he
   callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
   request_headers_ = &headers;
 
+  if (settings_->setLimitOnly()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -71,6 +76,10 @@ Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end
   if (end_stream || settings_->disabled()) {
     maybeAddContentLength();
 
+    return Http::FilterDataStatus::Continue;
+  }
+
+  if (settings_->setLimitOnly()) {
     return Http::FilterDataStatus::Continue;
   }
 

@@ -149,6 +149,22 @@ TEST_F(BufferFilterTest, PerFilterConfigDisabledConfigOverride) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data1, true));
 }
 
+TEST_F(BufferFilterTest, SetLimitOnly) {
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute per_route_cfg;
+  auto* buf = per_route_cfg.mutable_buffer();
+  buf->mutable_max_request_bytes()->set_value(123);
+  buf->set_set_limit_only(true);
+  BufferFilterSettings route_settings(per_route_cfg);
+
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_)).WillOnce(Return(&route_settings));
+  EXPECT_CALL(callbacks_, setDecoderBufferLimit(123ULL));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+
+  filter_.onDestroy();
+}
+
 } // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions

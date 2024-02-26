@@ -209,5 +209,79 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceededWithSetLimitOnly) {
+  // Make sure the connection isn't closed during request upload.
+  // Without a large drain-close it's possible that the local reply will be sent
+  // during request upload, and continued upload will result in TCP reset before
+  // the response is read.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
+  config_helper_.prependFilter(ConfigHelper::smallSetLimitOnlyBufferFilter(),
+                               testing_downstream_filter_);
+  // Use a filter to buffer the whole request after the buffer filter.
+  // FIXME: this test failed with error "Unable to parse JSON as proto (INVALID_ARGUMENT: could not
+  // find @type 'type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua')"
+  config_helper_.prependFilter(R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(handle)
+        local always_wrap_body = true
+        local body = handle:body(always_wrap_body)
+        local size = body:length()
+        local data = body:getBytes(0, size)
+      end
+)EOF",
+                               testing_downstream_filter_);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 65);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(BufferIntegrationTest, RouterRequestBufferLimitNotExceededWithSetLimitOnly) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
+  config_helper_.prependFilter(ConfigHelper::smallSetLimitOnlyBufferFilter(),
+                               testing_downstream_filter_);
+  // Without a filter to buffer the whole request, the limit will not be triggered.
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 65);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy
