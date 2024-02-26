@@ -741,7 +741,7 @@ message CustomInlineHeader {
 message MemoryAllocatorManager {
   // Configures tcmalloc to perform background release of free memory in amount of bytes per ``memory_release_interval`` interval.
   // If equals to ``0``, no memory release will occur. Defaults to ``0``.
-  // Currently memory releasing for gperf tcmalloc is not supported. 
+  // Currently memory releasing for gperf tcmalloc is not supported.
   uint64 bytes_to_release = 1 [(validate.rules).uint64 = {gte: 1}];
 
   // Interval in milliseconds for memory releasing. If specified, during every
