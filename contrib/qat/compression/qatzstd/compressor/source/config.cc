@@ -55,15 +55,9 @@ void* QatzstdCompressorFactory::QatzstdThreadLocal::GetQATSession() {
 }
 
 Envoy::Compression::Compressor::CompressorPtr QatzstdCompressorFactory::createCompressor() {
-  if (enable_qat_zstd_) {
-    return std::make_unique<QatzstdCompressorImpl>(
-        compression_level_, enable_checksum_, strategy_, chunk_size_, enable_qat_zstd_,
-        qat_zstd_fallback_threshold_, tls_slot_->get()->GetQATSession());
-  } else {
-    return std::make_unique<QatzstdCompressorImpl>(compression_level_, enable_checksum_, strategy_,
-                                                   chunk_size_, enable_qat_zstd_,
-                                                   qat_zstd_fallback_threshold_, nullptr);
-  }
+  return std::make_unique<QatzstdCompressorImpl>(
+      compression_level_, enable_checksum_, strategy_, chunk_size_, enable_qat_zstd_,
+      qat_zstd_fallback_threshold_, enable_qat_zstd_ ? tls_slot_->get()->GetQATSession() : nullptr);
 }
 
 Envoy::Compression::Compressor::CompressorFactoryPtr
