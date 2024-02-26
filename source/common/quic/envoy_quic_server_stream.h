@@ -118,11 +118,6 @@ private:
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 
-  quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  // Setting |http_datagram_handler_| enables HTTP Datagram support.
-  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
-#endif
   // True if a :path header has been seen before.
   bool saw_path_{false};
 };
