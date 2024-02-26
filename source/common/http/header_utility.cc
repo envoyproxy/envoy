@@ -233,6 +233,10 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   }
 }
 
+bool HeaderUtility::pathIsValid(const absl::string_view path_value) {
+  return http2::adapter::HeaderValidator::IsValidPath(path_value, true);
+}
+
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
   return response_headers.Status()->value() == "100" ||
          response_headers.Status()->value() == "102" || response_headers.Status()->value() == "103";

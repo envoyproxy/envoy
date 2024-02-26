@@ -81,10 +81,14 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 
-  if (!Http::HeaderUtility::headerValueIsValid(path_) ||
-      !Http::HeaderUtility::headerValueIsValid(host_value_)) {
-    throw EnvoyException(fmt::format("the path {} or host name {} is not a valid header value.",
-                                     path_, host_value_));
+  if (!Http::HeaderUtility::authorityIsValid(host_value_)) {
+    THROW_IF_NOT_OK(absl::InvalidArgumentError(
+        fmt::format("host: {} in http health check is not valid.", host_value_)));
+  }
+
+  if (!Http::HeaderUtility::pathIsValid(path_)) {
+    THROW_IF_NOT_OK(absl::InvalidArgumentError(
+        fmt::format("path: {} in http health check is not valid.", path_)));
   }
 
   if (response_buffer_size_ != 0 && !receive_bytes_.empty()) {
@@ -93,9 +97,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       total += bytes.size();
     }
     if (total > response_buffer_size_) {
-      throw EnvoyException(fmt::format(
+      THROW_IF_NOT_OK(absl::InvalidArgumentError(fmt::format(
           "The expected response length '{}' is over than http health response buffer size '{}'",
-          total, response_buffer_size_));
+          total, response_buffer_size_)));
     }
   }
 }

@@ -155,6 +155,12 @@ public:
   static bool authorityIsValid(const absl::string_view authority_value);
 
   /**
+   * Validates that the characters in the path are valid.
+   * @return bool true if the header values are valid, false otherwise.
+   */
+  static bool pathIsValid(const absl::string_view path_value);
+
+  /**
    * @brief return if the 1xx should be handled by the [encode|decode]1xx calls.
    */
   static bool isSpecial1xx(const ResponseHeaderMap& response_headers);

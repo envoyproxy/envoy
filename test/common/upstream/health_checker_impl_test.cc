@@ -3712,7 +3712,7 @@ TEST_F(HttpHealthCheckerImplTest, MethodConnectDisallowedValidation) {
                           "Proto constraint validation failed.*")
 }
 
-TEST_F(HttpHealthCheckerImplTest, InvalidHostAndPath) {
+TEST_F(HttpHealthCheckerImplTest, InvalidHost) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -3722,11 +3722,28 @@ TEST_F(HttpHealthCheckerImplTest, InvalidHostAndPath) {
     healthy_threshold: 1
     http_health_check:
       host: "\x07"
+      path: "/aaa"
+    )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
+                            "host: \a in http health check is not valid.")
+}
+
+TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      host: "aaa"
       path: "\x08"
     )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
-                            "the path \b or host name \a is not a valid header value.")
+                            "path: \b in http health check is not valid.")
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
