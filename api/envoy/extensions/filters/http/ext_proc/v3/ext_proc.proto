@@ -118,8 +118,8 @@ message ExternalProcessor {
   // If true, send each part of the HTTP request or response specified by ProcessingMode
   // asynchronously -- in other words, send the message on the gRPC stream and then continue
   // filter processing. In this mode:
-  // 1) only STREAMED body processing mode is supported and any other body processing modes
-  // will be treated as invalid and will be ignored for async processing.
+  // 1) Only STREAMED body processing mode is supported and any other body processing modes
+  // will be ignored for asynchronous processing.
   // 2) ext_proc server is not expected to send back processing response. Any response from
   // ext_proc server will be simply ignored.
   //
