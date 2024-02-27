@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
@@ -208,6 +209,7 @@ public:
   static Network::UpstreamTransportSocketFactoryPtr
   createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                            Ssl::ContextManager& context_manager,
+                                           ThreadLocal::Instance& threadlocal,
                                            const std::string& san_to_match);
 
   static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(
