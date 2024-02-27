@@ -87,3 +87,33 @@ like `ENVOY_LOG` except that they prepend the log message with `[C123]` or
 `[C123][S456` based on the connection/stream ID of the specified argument.
 Note that the IDs here are the Envoy IDs *NOT* the on-the-wire IDs from HTTP/2
 or HTTP/3.
+
+#### ENVOY_TAGGED_LOG
+
+The following logging API allows the call site to pass a key-value object (``std::map``) with additional
+context information that would be printed in the final log line. Unless JSON application logging is enabled,
+the output log line will prepend the log tags in the following format: '[Tags: "key1":"value1","key2":"value2"]'.
+When JSON application logging is enabled, the output JSON log will also include the key-values as additional properties
+in the JSON struct.
+Example:
+
+```
+std::map<std::string, std::string> log_tags{{"key1","value1"},{"key2","value2"}};
+ENVOY_TAGGED_LOG(debug, log_tags, "failed to perform the operation");
+// output: [debug] [Tags: "key1":"value1","key2":"value2"] failed to perform the operation
+```
+
+#### ENVOY_TAGGED_CONN_LOG / ENVOY_TAGGED_STREAM_LOG
+
+These logging APIs support all the properties as described for ENVOY_TAGGED_LOG, but allow the call site to pass
+additional objects to add a connection ID or stream ID (with respect to the relevant macro).
+When using these macros, an additional log tag will be added with the key "ConnectionId" or "StreamId" (or both).
+
+Example:
+
+```
+std::map<std::string, std::string> log_tags{{"key1","value1"},{"key2","value2"}};
+ENVOY_TAGGED_LOG(debug, log_tags, conn_, "failed to perform the operation");
+ENVOY_TAGGED_LOG(debug, log_tags, stream_, "failed to perform the operation");
+// output: [debug] [Tags: "ConnectionId":"10","StreamId":"11","key1":"value1","key2":"value2"] failed to perform the operation
+```
