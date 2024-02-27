@@ -35,6 +35,7 @@ bool AsyncTcpClientImpl::connect() {
   }
 
   cluster_info_->trafficStats()->upstream_cx_total_.inc();
+  cluster_info_->trafficStats()->upstream_cx_active_.inc();
   connection_->enableHalfClose(enable_half_close_);
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(std::make_shared<NetworkReadFilter>(*this));
@@ -132,8 +133,6 @@ void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
       callbacks_->onEvent(event);
     }
   } else {
-    cluster_info_->trafficStats()->upstream_cx_active_.inc();
-
     connected_ = true;
     conn_connect_ms_->complete();
     conn_connect_ms_.reset();
