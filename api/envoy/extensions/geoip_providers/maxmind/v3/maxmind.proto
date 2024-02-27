@@ -45,9 +45,11 @@ message MaxMindConfig {
   // The file is expected to have a ``.conf`` extension, and should be JSON with the following format:
   //
   // .. code-block:: json
-  //   {
-  //     "country_code": "country_code"
-  //   }
+  //
+  //  {
+  //    "country_code": "country_code"
+  //  }
+  //
   // Comments can be used in the config file by starting a line with a ``//`` or enclosing with ``/* */`` and they are ignored when parsed.
   //
   // The country mapping file is JSON containing the ISO code to be mapped from:to so it is possible to override the result
