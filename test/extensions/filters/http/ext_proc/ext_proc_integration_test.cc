@@ -41,6 +41,7 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
+using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
 using Http::LowerCaseString;
@@ -2578,6 +2579,43 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
       });
   verifyDownstreamResponse(*response, 201);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+}
+
+// Set up per-route configuration that extends original metadata.
+TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadata) {
+  initializeConfig();
+
+  // Override metadata from route config.
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    // Set up "/foo" so that it will use a different GrpcService
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("b", "c");
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("c", "c");
+    setPerRouteConfig(route, per_route);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  // Request that matches route directed to ext_proc_server_0
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  EXPECT_EQ(
+      "c",
+      processor_stream_->headers().get(Http::LowerCaseString("b"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "c",
+      processor_stream_->headers().get(Http::LowerCaseString("c"))[0]->value().getStringView());
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
 }
 
 // Sending new timeout API in both downstream request and upstream response

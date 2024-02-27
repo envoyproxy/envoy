@@ -149,6 +149,15 @@ removed_config_or_runtime:
     removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
+- area: ext_proc
+  change: |
+    Added
+    :ref:`grpc_initial_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_initial_metadata>`
+    config API to allow extending inherited metadata from
+    :ref:`ExternalProcessor.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`
+    and
+    :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
+    with the new or updated values.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
