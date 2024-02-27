@@ -44,10 +44,10 @@ message DynatraceSamplerConfig {
 
   // Default number of root spans per minute, used when the value can't be obtained from the Dynatrace API.
   //
-  // A default value of 1000 is used when:
+  // A default value of ``1000`` is used when:
   //
-  // - root_spans_per_minute is unset
-  // - root_spans_per_minute is set to 0
+  // - ``root_spans_per_minute`` is unset
+  // - ``root_spans_per_minute`` is set to 0
   //
   uint32 root_spans_per_minute = 5;
 }
