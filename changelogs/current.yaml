@@ -219,7 +219,7 @@ new_features:
 - area: load shed point
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
-    the system is under pressure.
+    Envoy is under pressure, typically memory.
 
 deprecated:
 - area: listener
