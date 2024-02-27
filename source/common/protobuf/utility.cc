@@ -400,7 +400,7 @@ public:
     const Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()->full_name() == "google.protobuf.Duration") {
       ProtobufWkt::Duration duration_message;
-      duration_message.MergeFrom(message);
+      duration_message.CheckTypeAndMergeFrom(message);
       // Validate the value of the duration.
       absl::Status status = validateDurationUnifiedNoThrow(duration_message);
       if (!status.ok()) {
