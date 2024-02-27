@@ -46,9 +46,6 @@ message XffConfig {
   // `CDN <https://en.wikipedia.org/wiki/Content_delivery_network>`_.
   //
   // Only one of ``xff_num_trusted_hops`` and ``xff_trusted_cidrs`` can be set.
-  //
-  // Note: Use of this option is an ``n*m`` operation on every request, where ``n`` is
-  // the number of trusted CIDRs and ``m`` is the number of entries in the XFF header.
   XffTrustedCidrs xff_trusted_cidrs = 2;
 
   // Whether to append the detected trusted client IP address to ``x-forwarded-for``.
@@ -68,5 +65,8 @@ message XffTrustedCidrs {
   // Whether or not to recurse depends on whether you trust the downstream proxy to have
   // validated all addresses in the list.
   // If you do not fully trust the downstream proxy you may not wish to recurse.
+  //
+  // Note: Use of this option is an ``N*M`` operation on every request, where ``N`` is
+  // the number of trusted CIDRs and ``M`` is the number of entries in the XFF header.
   bool recurse = 2;
 }
