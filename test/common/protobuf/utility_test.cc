@@ -1707,33 +1707,28 @@ TEST(DurationUtilTest, OutOfRange) {
     scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.strict_duration_validation", strict_duration}});
     {
-      ENVOY_LOG_MISC(trace, "ADIP: here1");
       ProtobufWkt::Duration duration;
       duration.set_seconds(-1);
       EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
     }
     {
-      ENVOY_LOG_MISC(trace, "ADIP: here2");
       ProtobufWkt::Duration duration;
       duration.set_nanos(-1);
       EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
     }
     // Invalid number of nanoseconds.
     {
-      ENVOY_LOG_MISC(trace, "ADIP: here3");
       ProtobufWkt::Duration duration;
       duration.set_nanos(1000000000);
       EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
     }
     {
-      ENVOY_LOG_MISC(trace, "ADIP: here4");
       ProtobufWkt::Duration duration;
       duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
       EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
     }
     // Invalid number of seconds.
     {
-      ENVOY_LOG_MISC(trace, "ADIP: here5");
       ProtobufWkt::Duration duration;
       constexpr int64_t kMaxInt64Nanoseconds =
           (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
@@ -1748,7 +1743,6 @@ TEST(DurationUtilTest, OutOfRange) {
     }
     // Max valid seconds and nanoseconds.
     {
-      ENVOY_LOG_MISC(trace, "ADIP: here6");
       ProtobufWkt::Duration duration;
       constexpr int64_t kMaxInt64Nanoseconds =
           (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
@@ -1758,7 +1752,6 @@ TEST(DurationUtilTest, OutOfRange) {
     }
     // Invalid combined seconds and nanoseconds.
     {
-      ENVOY_LOG_MISC(trace, "ADIP: here7");
       ProtobufWkt::Duration duration;
       constexpr int64_t kMaxInt64Nanoseconds =
           std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
