@@ -2,9 +2,14 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/filter_state_proxy_info.h"
 
+#include "library/common/api/external.h"
+#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
+#include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -55,6 +60,17 @@ bool NetworkConfigurationFilter::onAddressResolved(
   return false;
 }
 
+void NetworkConfigurationFilter::onProxyResolutionComplete(
+    Network::ProxySettingsConstSharedPtr proxy_settings) {
+  if (continueWithProxySettings(proxy_settings) == Http::FilterHeadersStatus::Continue) {
+    // PAC URL resolution happens via Apple APIs on a separate thread (Apple's run loop thread), so
+    // we schedule the continuation callback on the engine's dispatcher.
+    continue_decoding_callback_ = decoder_callbacks_->dispatcher().createSchedulableCallback(
+        [this]() { decoder_callbacks_->continueDecoding(); });
+    continue_decoding_callback_->scheduleCallbackNextIteration();
+  }
+}
+
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
@@ -64,19 +80,76 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // If there is no proxy configured, continue.
+  // For iOS, we use the `envoy_proxy_resolver` API, which reads proxy settings asynchronously,
+  // and callbacks are invoked in the filter when proxy settings are updated.
+  auto* proxy_resolver = static_cast<Network::ProxyResolverApi*>(
+      Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
+  if (proxy_resolver != nullptr) {
+    return resolveProxy(request_headers, proxy_resolver);
+  }
+
+  // For Android, proxy settings are pushed to the ConnectivityManager and synchronously handled
+  // here.
   const auto proxy_settings = connectivity_manager_->getProxySettings();
+  return continueWithProxySettings(proxy_settings);
+}
+
+Http::FilterHeadersStatus
+NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
+                                         Network::ProxyResolverApi* proxy_resolver) {
+  ASSERT(proxy_resolver != nullptr, "proxy_resolver must not be null.");
+
+  const std::string target_url = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
+
+  std::weak_ptr<NetworkConfigurationFilter> weak_self = weak_from_this();
+  Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
+      target_url, proxy_settings_,
+      [&weak_self](const std::vector<Network::ProxySettings>& proxies) {
+        // This is the callback invoked from the Apple APIs resolving the PAC file URL, which
+        // happens on a separate Apple run loop thread. We keep a weak_ptr to this filter instance
+        // so that, if the stream is canceled and the filter chain is torn down in the meantime,
+        // we will fail to aquire the weak_ptr lock and won't execute any callbacks on the resolved
+        // proxies.
+        if (auto caller_ptr = weak_self.lock()) {
+          Network::ProxySettingsConstSharedPtr proxy_settings =
+              Network::ProxySettings::create(proxies);
+          // We are currently in the main thread, so post the proxy resolution callback to the
+          // worker thread's (i.e. the Engine thread) dispatcher.
+          caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, proxy_settings]() {
+            // Again, the stream may have been canceled in the interim, so try aquiring the
+            // filter through its weak_ptr before proceding with the proxy resolution callback.
+            if (auto filter_ptr = weak_self.lock()) {
+              filter_ptr->onProxyResolutionComplete(proxy_settings);
+            }
+          });
+        }
+      });
+
+  switch (proxy_resolution_result) {
+  case Network::ProxyResolutionResult::NO_PROXY_CONFIGURED:
+    return Http::FilterHeadersStatus::Continue;
+  case Network::ProxyResolutionResult::RESULT_COMPLETED:
+    return continueWithProxySettings(Network::ProxySettings::create(proxy_settings_));
+  case Network::ProxyResolutionResult::RESULT_IN_PROGRESS:
+    // `onProxyResolutionComplete` method will be called once the proxy resolution completes
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
+}
+
+Http::FilterHeadersStatus NetworkConfigurationFilter::continueWithProxySettings(
+    Network::ProxySettingsConstSharedPtr proxy_settings) {
+  // If there is no proxy configured, continue.
   if (proxy_settings == nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request", proxy_settings->asString());
+  ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request proxy_settings={}",
+            proxy_settings->asString());
   // If there is a proxy with a raw address, set the information, and continue.
   const auto proxy_address = proxy_settings->address();
   if (proxy_address != nullptr) {
-    const auto authorityHeader = request_headers.get(AuthorityHeaderName);
-
-    setInfo(request_headers.getHostValue(), proxy_address);
+    const auto host_value = decoder_callbacks_->streamInfo().getRequestHeaders()->getHostValue();
+    setInfo(host_value, proxy_address);
     return Http::FilterHeadersStatus::Continue;
   }
 

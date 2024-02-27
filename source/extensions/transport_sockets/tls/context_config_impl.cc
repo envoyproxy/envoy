@@ -460,7 +460,8 @@ ServerContextConfigImpl::getSessionTicketKeys(
     const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys) {
   std::vector<Ssl::ServerContextConfig::SessionTicketKey> result;
   for (const auto& datasource : keys.keys()) {
-    result.emplace_back(getSessionTicketKey(Config::DataSource::read(datasource, false, api_)));
+    result.emplace_back(getSessionTicketKey(
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(datasource, false, api_), std::string)));
   }
   return result;
 }

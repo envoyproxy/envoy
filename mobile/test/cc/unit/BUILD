@@ -11,6 +11,14 @@ envoy_cc_test(
         ["envoy_config_test.cc"],
         "@envoy",
     ),
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            # For the TestProxyResolutionApi test.
+            "-Wl,-framework,CoreFoundation",
+            "-Wl,-framework,CFNetwork",
+        ],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",

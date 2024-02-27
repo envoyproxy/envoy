@@ -470,7 +470,7 @@ protected:
     }
   }
 
-  void StreamingSmallChunksWithBodyMutation(bool empty_last_chunk, bool mutate_last_chunk) {
+  void streamingSmallChunksWithBodyMutation(bool empty_last_chunk, bool mutate_last_chunk) {
     initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -1502,19 +1502,19 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
 }
 
 TEST_F(HttpFilterTest, StreamingBodyMutateLastEmptyChunk) {
-  StreamingSmallChunksWithBodyMutation(true, true);
+  streamingSmallChunksWithBodyMutation(true, true);
 }
 
 TEST_F(HttpFilterTest, StreamingBodyNotMutateLastEmptyChunk) {
-  StreamingSmallChunksWithBodyMutation(true, false);
+  streamingSmallChunksWithBodyMutation(true, false);
 }
 
 TEST_F(HttpFilterTest, StreamingBodyMutateLastChunk) {
-  StreamingSmallChunksWithBodyMutation(false, true);
+  streamingSmallChunksWithBodyMutation(false, true);
 }
 
 TEST_F(HttpFilterTest, StreamingBodyNotMutateLastChunk) {
-  StreamingSmallChunksWithBodyMutation(false, false);
+  streamingSmallChunksWithBodyMutation(false, false);
 }
 
 // gRPC call fails when streaming sends small chunk request data.

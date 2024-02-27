@@ -156,6 +156,7 @@ open class EngineBuilder: NSObject {
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
+  private var respectSystemProxySettings: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
@@ -363,6 +364,25 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableInterfaceBinding(_ enableInterfaceBinding: Bool) -> Self {
     self.enableInterfaceBinding = enableInterfaceBinding
+    return self
+  }
+
+  ///
+  /// Specify whether system proxy settings should be respected. If yes, Envoy Mobile will
+  /// use iOS APIs to query iOS Proxy settings configured on a device and will
+  /// respect these settings when establishing connections with remote services.
+  ///
+  /// The method is introduced for experimentation purposes and as a safety guard against
+  /// critical issues in the implementation of the proxying feature. It's intended to be removed
+  /// after it's confirmed that proxies on iOS work as expected.
+  ///
+  /// - parameter respectSystemProxySettings: whether to use the system's proxy settings for
+  ///                                         outbound connections.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func respectSystemProxySettings(_ respectSystemProxySettings: Bool) -> Self {
+    self.respectSystemProxySettings = respectSystemProxySettings
     return self
   }
 
@@ -773,6 +793,7 @@ open class EngineBuilder: NSObject {
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      respectSystemProxySettings: self.respectSystemProxySettings,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
@@ -844,6 +865,7 @@ private extension EngineBuilder {
     cxxBuilder.enforceTrustChainVerification(self.enforceTrustChainVerification)
     cxxBuilder.setForceAlwaysUsev6(self.forceIPv6)
     cxxBuilder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation)
+    cxxBuilder.respectSystemProxySettings(self.respectSystemProxySettings)
     cxxBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       Int32(self.h2ConnectionKeepaliveIdleIntervalMilliseconds)
     )

@@ -78,6 +78,7 @@ envoy_cc_library(
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_id_provider_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/stream_info:uint64_accessor_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/upstreams/tcp/generic:config",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",

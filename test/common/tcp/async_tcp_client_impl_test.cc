@@ -215,6 +215,19 @@ TEST_F(AsyncTcpClientImplTest, TestFailStats) {
                      ->upstream_cx_connect_fail_.value());
 }
 
+TEST_F(AsyncTcpClientImplTest, TestFailWithReconnect) {
+  setUpClient();
+  expectCreateConnection(false);
+  connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  ASSERT_FALSE(client_->connected());
+  connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_connect_fail_.value());
+  // Reconnect should success without the timer failure.
+  client_->setAsyncTcpClientCallbacks(callbacks_);
+  expectCreateConnection(true);
+}
+
 TEST_F(AsyncTcpClientImplTest, TestCxDestroyRemoteClose) {
   setUpClient();
   expectCreateConnection();

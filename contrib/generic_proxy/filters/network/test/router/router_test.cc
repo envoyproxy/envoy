@@ -175,10 +175,10 @@ public:
     ASSERT(!filter_->upstreamRequestsForTest().empty());
 
     auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+    auto stream_frame = std::make_shared<StreamFramePtr>(std::move(response));
 
     EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
-        .WillOnce(Invoke([this, resp = std::make_shared<StreamFramePtr>(std::move(response))](
-                             Buffer::Instance& buffer, bool) {
+        .WillOnce(Invoke([this, resp = std::move(stream_frame)](Buffer::Instance& buffer, bool) {
           buffer.drain(buffer.length());
 
           const bool end_stream = (*resp)->frameFlags().endStream();
