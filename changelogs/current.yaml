@@ -131,6 +131,7 @@ new_features:
   change: |
     Added support for QUIC listeners to :ref:`choose certificates based on SNI <arch_overview_ssl_cert_select>` and load certificates
     from formats other than PEM, such as :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`.
+    This behavior can be disabled with runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code``.
 - area: ext_proc
   change: |
     implemented

@@ -34,6 +34,15 @@ protected:
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
+  legacyGetCertChain(const quic::QuicSocketAddress& server_address,
+                     const quic::QuicSocketAddress& client_address, const std::string& hostname,
+                     bool* cert_matched_sni);
+  void legacySignPayload(const quic::QuicSocketAddress& server_address,
+                         const quic::QuicSocketAddress& client_address, const std::string& hostname,
+                         uint16_t signature_algorithm, absl::string_view in,
+                         std::unique_ptr<quic::ProofSource::SignatureCallback> callback);
+
   struct CertWithFilterChain {
     quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_;
     std::shared_ptr<quic::CertificatePrivateKey> private_key_;
@@ -44,6 +53,16 @@ private:
                                                      const quic::QuicSocketAddress& client_address,
                                                      const std::string& hostname,
                                                      bool* cert_matched_sni);
+
+  struct LegacyCertConfigWithFilterChain {
+    absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_;
+    absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
+  };
+
+  LegacyCertConfigWithFilterChain
+  legacyGetTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                       const quic::QuicSocketAddress& client_address,
+                                       const std::string& hostname);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};

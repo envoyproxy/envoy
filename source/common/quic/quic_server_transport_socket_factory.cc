@@ -93,12 +93,20 @@ QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
     Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names)
     : QuicTransportSocketFactoryBase(scope, "server"), manager_(manager), stats_scope_(scope),
       config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_,
-                                               initializeQuicCertAndKey)),
+      ssl_ctx_(Runtime::runtimeFeatureEnabled(
+                   "envoy.restart_features.quic_handle_certs_with_shared_tls_code")
+                   ? createSslServerContext()
+                   : nullptr),
       enable_early_data_(enable_early_data) {}
 
 QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
   manager_.removeContext(ssl_ctx_);
+}
+
+Envoy::Ssl::ServerContextSharedPtr
+QuicServerTransportSocketFactory::createSslServerContext() const {
+  return manager_.createSslServerContext(stats_scope_, *config_, server_names_,
+                                         initializeQuicCertAndKey);
 }
 
 ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyConfigProto() {
@@ -146,13 +154,16 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
 
 void QuicServerTransportSocketFactory::onSecretUpdated() {
   ENVOY_LOG(debug, "Secret is updated.");
-  auto ctx = manager_.createSslServerContext(stats_scope_, *config_, server_names_,
-                                             initializeQuicCertAndKey);
-  {
-    absl::WriterMutexLock l(&ssl_ctx_mu_);
-    std::swap(ctx, ssl_ctx_);
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.restart_features.quic_handle_certs_with_shared_tls_code")) {
+    auto ctx = createSslServerContext();
+    {
+      absl::WriterMutexLock l(&ssl_ctx_mu_);
+      std::swap(ctx, ssl_ctx_);
+    }
+    manager_.removeContext(ctx);
   }
-  manager_.removeContext(ctx);
 
   stats_.context_config_update_by_sds_.inc();
 }

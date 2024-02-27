@@ -693,6 +693,12 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   codec_client_->close();
 }
 
+TEST_P(QuicHttpIntegrationTest, LegacyCertLoadingAndSelection) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.quic_handle_certs_with_shared_tls_code",
+                                    "false");
+  testMultipleQuicConnections();
+}
+
 // Ensure multiple quic connections work, regardless of platform BPF support
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
   testMultipleQuicConnections();

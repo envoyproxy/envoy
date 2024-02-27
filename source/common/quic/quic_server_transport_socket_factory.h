@@ -36,12 +36,25 @@ public:
             std::shared_ptr<quic::CertificatePrivateKey>>
   getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const;
 
+  // Return TLS certificates if the context config is ready.
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
+  legacyGetTlsCertificates() const {
+    if (!config_->isReady()) {
+      ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
+      stats_.downstream_context_secrets_not_ready_.inc();
+      return {};
+    }
+    return config_->tlsCertificates();
+  }
+
   bool earlyDataEnabled() const { return enable_early_data_; }
 
 protected:
   void onSecretUpdated() override;
 
 private:
+  Envoy::Ssl::ServerContextSharedPtr createSslServerContext() const;
+
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   Ssl::ServerContextConfigPtr config_;
