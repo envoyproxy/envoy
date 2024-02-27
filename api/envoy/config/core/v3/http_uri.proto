@@ -28,7 +28,7 @@ message HttpUri {
   //
   //    uri: https://www.googleapis.com/oauth2/v1/certs
   //
-  string uri = 1 [(validate.rules).string = {min_len: 1}];
+  string uri = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Specify how ``uri`` is to be fetched. Today, this requires an explicit
   // cluster, but in the future we may support dynamic cluster creation or
