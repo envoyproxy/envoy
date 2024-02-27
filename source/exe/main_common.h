@@ -60,7 +60,7 @@ public:
   void detachResponse(AdminResponse*);
 
 private:
-  TerminateNotifierSharedPtr terminate_notifier_;
+  AdminResponse::SharedPtrSet shared_response_set_;
 #endif
 };
 

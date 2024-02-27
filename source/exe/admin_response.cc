@@ -8,16 +8,15 @@
 namespace Envoy {
 
 AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
-                             absl::string_view method,
-                             TerminateNotifierSharedPtr terminate_notifier)
-    : server_(server), opt_admin_(server.admin()), terminate_notifier_(terminate_notifier) {
+                             absl::string_view method, SharedPtrSet response_set)
+    : server_(server), opt_admin_(server.admin()), shared_response_set_(response_set) {
   request_headers_->setMethod(method);
   request_headers_->setPath(path);
 }
 
 AdminResponse::~AdminResponse() {
   cancel();
-  terminate_notifier_->detachResponse(this);
+  shared_response_set_->detachResponse(this);
 }
 
 void AdminResponse::getHeaders(HeadersFn fn) {
@@ -161,7 +160,7 @@ void AdminResponse::sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
   }
 }
 
-void TerminateNotifier::terminateAdminRequests() {
+void AdminResponse::PtrSet::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   absl::MutexLock lock(&mutex_);
@@ -176,7 +175,7 @@ void TerminateNotifier::terminateAdminRequests() {
   response_set_.clear();
 }
 
-void TerminateNotifier::attachResponse(AdminResponse* response) {
+void AdminResponse::PtrSet::attachResponse(AdminResponse* response) {
   absl::MutexLock lock(&mutex_);
   if (accepting_admin_requests_) {
     response_set_.insert(response);
@@ -185,7 +184,7 @@ void TerminateNotifier::attachResponse(AdminResponse* response) {
   }
 }
 
-void TerminateNotifier::detachResponse(AdminResponse* response) {
+void AdminResponse::PtrSet::detachResponse(AdminResponse* response) {
   absl::MutexLock lock(&mutex_);
   response_set_.erase(response);
 }

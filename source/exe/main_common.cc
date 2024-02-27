@@ -60,7 +60,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                        std::move(process_context), createFunction())
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
       ,
-      terminate_notifier_(std::make_shared<TerminateNotifier>())
+      shared_response_set_(std::make_shared<AdminResponse::PtrSet>())
 #endif
 {
 }
@@ -74,7 +74,7 @@ bool MainCommonBase::run() {
   case Server::Mode::Serve:
     runServer();
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-    terminate_notifier_->terminateAdminRequests();
+    shared_response_set_->terminateAdminRequests();
 #endif
     ret = true;
     break;
@@ -114,8 +114,8 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 AdminResponseSharedPtr MainCommonBase::adminRequest(absl::string_view path_and_query,
                                                     absl::string_view method) {
   auto response =
-      std::make_shared<AdminResponse>(*server(), path_and_query, method, terminate_notifier_);
-  terminate_notifier_->attachResponse(response.get());
+      std::make_shared<AdminResponse>(*server(), path_and_query, method, shared_response_set_);
+  shared_response_set_->attachResponse(response.get());
   return response;
 }
 #endif

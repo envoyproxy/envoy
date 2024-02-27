@@ -14,28 +14,6 @@ namespace Envoy {
 
 class AdminResponse;
 
-// AdminResponse can outlive MainCommonBase. But AdminResponse needs a
-// reliable way of knowing whether MainCommonBase is alive, so we do this with
-// TerminateNotifier, which is held by MainCommonBase and all the active
-// AdminResponses via shared_ptr. This gives MainCommonBase a reliable way of
-// notifying all active responses that it is being shut down, and thus all
-// responses need to be terminated. And it gives a reliable way for
-// AdminResponse to detach itself, even if MainCommonBase is already deleted.
-class TerminateNotifier {
-public:
-  void detachResponse(AdminResponse*);
-  void attachResponse(AdminResponse*);
-
-  // Called after the server run-loop finishes; any outstanding streaming admin requests
-  // will otherwise hang as the main-thread dispatcher loop will no longer run.
-  void terminateAdminRequests();
-
-  mutable absl::Mutex mutex_;
-  absl::flat_hash_set<AdminResponse*> response_set_ ABSL_GUARDED_BY(mutex_);
-  bool accepting_admin_requests_ ABSL_GUARDED_BY(mutex_) = true;
-};
-using TerminateNotifierSharedPtr = std::shared_ptr<TerminateNotifier>;
-
 // Holds context for a streaming response from the admin system, enabling
 // flow-control into another system. This is particularly important when the
 // generated response is very large, such that holding it in memory may cause
@@ -55,8 +33,31 @@ using TerminateNotifierSharedPtr = std::shared_ptr<TerminateNotifier>;
 // cancel() is called, no further callbacks will be called by the response.
 class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
 public:
+  // AdminResponse can outlive MainCommonBase. But AdminResponse needs a
+  // reliable way of knowing whether MainCommonBase is alive, so we do this with
+  // PtrSet, which is held by MainCommonBase and all the active AdminResponse,
+  // which is held by MainCommonBase and by AdminResponse via shared_ptr. This
+  // gives MainCommonBase a reliable way of notifying all active responses that
+  // it is being shut down, and thus all responses need to be terminated. And it
+  // gives a reliable way for AdminResponse to detach itself, even if
+  // MainCommonBase is already deleted.
+  class PtrSet {
+  public:
+    void detachResponse(AdminResponse*);
+    void attachResponse(AdminResponse*);
+
+    // Called after the server run-loop finishes; any outstanding streaming admin requests
+    // will otherwise hang as the main-thread dispatcher loop will no longer run.
+    void terminateAdminRequests();
+
+    mutable absl::Mutex mutex_;
+    absl::flat_hash_set<AdminResponse*> response_set_ ABSL_GUARDED_BY(mutex_);
+    bool accepting_admin_requests_ ABSL_GUARDED_BY(mutex_) = true;
+  };
+  using SharedPtrSet = std::shared_ptr<PtrSet>;
+
   AdminResponse(Server::Instance& server, absl::string_view path, absl::string_view method,
-                TerminateNotifierSharedPtr terminate_notifier);
+                SharedPtrSet response_set);
   ~AdminResponse();
 
   /**
@@ -112,9 +113,6 @@ public:
   bool cancelled() const;
 
 private:
-  friend class MainCommonBase;
-  friend class TerminateNotifier;
-
   /**
    * Called when the server is terminated. This calls any outstanding
    * callbacks to be called. If nextChunk is called after termination,
@@ -159,7 +157,7 @@ private:
   BodyFn body_fn_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
 
-  TerminateNotifierSharedPtr terminate_notifier_;
+  SharedPtrSet shared_response_set_;
 };
 using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 
