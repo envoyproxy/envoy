@@ -167,7 +167,7 @@ The following core load shed points are supported:
 
   * - envoy.load_shed_points.hcm_ondata_creating_codec
     - Envoy will close the connections before creating codec if Envoy is under
-      pressure, typically memory. This happends once geting data from the
+      pressure, typically memory. This happens once geting data from the
       connection.
 
 .. _config_overload_manager_reducing_timeouts:
