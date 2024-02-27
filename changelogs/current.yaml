@@ -174,7 +174,7 @@ new_features:
     identifier.
 - area: compression
   change: |
-    Added qatzstd :ref:`compressor <envoy_v3_api_msg_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd>`.
+    Added Qatzstd :ref:`compressor <envoy_v3_api_msg_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd>`.
 - area: aws_lambda
   change: |
     Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
