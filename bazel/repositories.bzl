@@ -338,6 +338,7 @@ def envoy_dependencies(skip_targets = []):
     _io_hyperscan()
     _io_vectorscan()
     _io_opentracing_cpp()
+    _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -773,6 +774,13 @@ def _io_opentracing_cpp():
     native.bind(
         name = "opentracing",
         actual = "@io_opentracing_cpp//:opentracing",
+    )
+
+def _io_opentelemetry_api_cpp():
+    external_http_archive("io_opentelemetry_cpp")
+    native.bind(
+        name = "opentelemetry_api",
+        actual = "@io_opentelemetry_cpp//api:api",
     )
 
 def _com_github_datadog_dd_trace_cpp():
