@@ -138,12 +138,6 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
   onLocalEndStream();
 }
 
-void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-  // Metadata Frame is not supported in QUICHE.
-  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
-  stats_.metadata_not_supported_error_.inc();
-}
-
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   if (http_datagram_handler_) {

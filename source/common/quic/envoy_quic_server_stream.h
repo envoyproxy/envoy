@@ -32,7 +32,6 @@ public:
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
   void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
-  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }

@@ -25,7 +25,6 @@ public:
   void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
   // Http::StreamEncoder
-  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }

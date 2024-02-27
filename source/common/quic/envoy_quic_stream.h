@@ -52,6 +52,7 @@ public:
   // Http::StreamEncoder
   Stream& getStream() override { return *this; }
   void encodeData(Buffer::Instance& data, bool end_stream) override;
+  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
 
   // Http::Stream
   void readDisable(bool disable) override {
