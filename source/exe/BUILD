@@ -7,6 +7,7 @@ load(
     "envoy_cc_posix_without_linux_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
     "envoy_select_signal_trace",
 )
@@ -102,8 +103,7 @@ envoy_cc_library(
     hdrs = [
         "main_common.h",
     ],
-    deps = [
-        ":admin_response_lib",
+    deps = envoy_select_admin_functionality([":admin_response_lib"]) + [
         ":platform_impl_lib",
         ":process_wide_lib",
         ":stripped_main_base_lib",

@@ -10,7 +10,10 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
+
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/exe/admin_response.h"
+#endif
 #include "source/exe/process_wide.h"
 #include "source/exe/stripped_main_base.h"
 #include "source/server/listener_hooks.h"

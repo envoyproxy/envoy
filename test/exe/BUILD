@@ -87,8 +87,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
-    deps = [
-        ":main_common_test_base_lib",
+    deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -105,8 +104,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
-    deps = [
-        ":main_common_test_base_lib",
+    deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
