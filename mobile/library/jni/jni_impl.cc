@@ -277,11 +277,10 @@ jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& head
   return noopResult;
 }
 
-static void* jvm_on_response_headers(envoy_headers headers, bool end_stream,
-                                     envoy_stream_intel stream_intel, void* context) {
+static void jvm_on_response_headers(envoy_headers headers, bool end_stream,
+                                    envoy_stream_intel stream_intel, void* context) {
   const auto managed_headers = Envoy::Types::ManagedEnvoyHeaders(headers);
-  return jvm_on_headers("onResponseHeaders", managed_headers, end_stream, stream_intel, context)
-      .release();
+  jvm_on_headers("onResponseHeaders", managed_headers, end_stream, stream_intel, context);
 }
 
 static envoy_filter_headers_status
@@ -360,9 +359,9 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_data(const char* metho
   return result;
 }
 
-static void* jvm_on_response_data(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
-                                  void* context) {
-  return jvm_on_data("onResponseData", data, end_stream, stream_intel, context).release();
+static void jvm_on_response_data(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
+                                 void* context) {
+  jvm_on_data("onResponseData", data, end_stream, stream_intel, context);
 }
 
 static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data, bool end_stream,
@@ -433,11 +432,10 @@ static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data
                                     /*pending_headers*/ pending_headers};
 }
 
-static void* jvm_on_metadata(envoy_headers metadata, envoy_stream_intel /*stream_intel*/,
-                             void* /*context*/) {
+static void jvm_on_metadata(envoy_headers metadata, envoy_stream_intel /*stream_intel*/,
+                            void* /*context*/) {
   jni_log("[Envoy]", "jvm_on_metadata");
   jni_log("[Envoy]", std::to_string(metadata.length).c_str());
-  return nullptr;
 }
 
 static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_trailers(const char* method,
@@ -465,9 +463,9 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_trailers(const char* m
   return result;
 }
 
-static void* jvm_on_response_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
-                                      void* context) {
-  return jvm_on_trailers("onResponseTrailers", trailers, stream_intel, context).release();
+static void jvm_on_response_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
+                                     void* context) {
+  jvm_on_trailers("onResponseTrailers", trailers, stream_intel, context);
 }
 
 static envoy_filter_trailers_status
@@ -666,8 +664,8 @@ jvm_http_filter_on_resume_response(envoy_headers* headers, envoy_data* data,
                                    stream_intel, context);
 }
 
-static void* call_jvm_on_complete(envoy_stream_intel stream_intel,
-                                  envoy_final_stream_intel final_stream_intel, void* context) {
+static void call_jvm_on_complete(envoy_stream_intel stream_intel,
+                                 envoy_final_stream_intel final_stream_intel, void* context) {
   jni_log("[Envoy]", "jvm_on_complete");
 
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
@@ -682,16 +680,12 @@ static void* call_jvm_on_complete(envoy_stream_intel stream_intel,
       Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
   Envoy::JNI::LocalRefUniquePtr<jlongArray> j_final_stream_intel =
       Envoy::JNI::envoyFinalStreamIntelToJavaLongArray(jni_helper, final_stream_intel);
-  jobject result = jni_helper
-                       .callObjectMethod(j_context, jmid_onComplete, j_stream_intel.get(),
-                                         j_final_stream_intel.get())
-                       .release();
-
-  return result;
+  Envoy::JNI::LocalRefUniquePtr<jobject> unused = jni_helper.callObjectMethod(
+      j_context, jmid_onComplete, j_stream_intel.get(), j_final_stream_intel.get());
 }
 
-static void* call_jvm_on_error(envoy_error error, envoy_stream_intel stream_intel,
-                               envoy_final_stream_intel final_stream_intel, void* context) {
+static void call_jvm_on_error(envoy_error error, envoy_stream_intel stream_intel,
+                              envoy_final_stream_intel final_stream_intel, void* context) {
   jni_log("[Envoy]", "jvm_on_error");
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
   jobject j_context = static_cast<jobject>(context);
@@ -708,25 +702,21 @@ static void* call_jvm_on_error(envoy_error error, envoy_stream_intel stream_inte
   Envoy::JNI::LocalRefUniquePtr<jlongArray> j_final_stream_intel =
       Envoy::JNI::envoyFinalStreamIntelToJavaLongArray(jni_helper, final_stream_intel);
 
-  jobject result =
-      jni_helper
-          .callObjectMethod(j_context, jmid_onError, error.error_code, j_error_message.get(),
-                            error.attempt_count, j_stream_intel.get(), j_final_stream_intel.get())
-          .release();
+  Envoy::JNI::LocalRefUniquePtr<jobject> unused = jni_helper.callObjectMethod(
+      j_context, jmid_onError, error.error_code, j_error_message.get(), error.attempt_count,
+      j_stream_intel.get(), j_final_stream_intel.get());
 
   release_envoy_error(error);
-  return result;
 }
 
-static void* jvm_on_error(envoy_error error, envoy_stream_intel stream_intel,
-                          envoy_final_stream_intel final_stream_intel, void* context) {
-  void* result = call_jvm_on_error(error, stream_intel, final_stream_intel, context);
+static void jvm_on_error(envoy_error error, envoy_stream_intel stream_intel,
+                         envoy_final_stream_intel final_stream_intel, void* context) {
+  call_jvm_on_error(error, stream_intel, final_stream_intel, context);
   Envoy::JNI::jniDeleteGlobalRef(context);
-  return result;
 }
 
-static void* call_jvm_on_cancel(envoy_stream_intel stream_intel,
-                                envoy_final_stream_intel final_stream_intel, void* context) {
+static void call_jvm_on_cancel(envoy_stream_intel stream_intel,
+                               envoy_final_stream_intel final_stream_intel, void* context) {
   jni_log("[Envoy]", "jvm_on_cancel");
 
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
@@ -742,26 +732,20 @@ static void* call_jvm_on_cancel(envoy_stream_intel stream_intel,
   Envoy::JNI::LocalRefUniquePtr<jlongArray> j_final_stream_intel =
       Envoy::JNI::envoyFinalStreamIntelToJavaLongArray(jni_helper, final_stream_intel);
 
-  jobject result = jni_helper
-                       .callObjectMethod(j_context, jmid_onCancel, j_stream_intel.get(),
-                                         j_final_stream_intel.get())
-                       .release();
-
-  return result;
+  Envoy::JNI::LocalRefUniquePtr<jobject> unused = jni_helper.callObjectMethod(
+      j_context, jmid_onCancel, j_stream_intel.get(), j_final_stream_intel.get());
 }
 
-static void* jvm_on_complete(envoy_stream_intel stream_intel,
-                             envoy_final_stream_intel final_stream_intel, void* context) {
-  void* result = call_jvm_on_complete(stream_intel, final_stream_intel, context);
+static void jvm_on_complete(envoy_stream_intel stream_intel,
+                            envoy_final_stream_intel final_stream_intel, void* context) {
+  call_jvm_on_complete(stream_intel, final_stream_intel, context);
   Envoy::JNI::jniDeleteGlobalRef(context);
-  return result;
 }
 
-static void* jvm_on_cancel(envoy_stream_intel stream_intel,
-                           envoy_final_stream_intel final_stream_intel, void* context) {
-  void* result = call_jvm_on_cancel(stream_intel, final_stream_intel, context);
+static void jvm_on_cancel(envoy_stream_intel stream_intel,
+                          envoy_final_stream_intel final_stream_intel, void* context) {
+  call_jvm_on_cancel(stream_intel, final_stream_intel, context);
   Envoy::JNI::jniDeleteGlobalRef(context);
-  return result;
 }
 
 static void jvm_http_filter_on_error(envoy_error error, envoy_stream_intel stream_intel,
@@ -776,7 +760,7 @@ static void jvm_http_filter_on_cancel(envoy_stream_intel stream_intel,
   call_jvm_on_cancel(stream_intel, final_stream_intel, const_cast<void*>(context));
 }
 
-static void* jvm_on_send_window_available(envoy_stream_intel stream_intel, void* context) {
+static void jvm_on_send_window_available(envoy_stream_intel stream_intel, void* context) {
   jni_log("[Envoy]", "jvm_on_send_window_available");
 
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
@@ -790,11 +774,8 @@ static void* jvm_on_send_window_available(envoy_stream_intel stream_intel, void*
   Envoy::JNI::LocalRefUniquePtr<jlongArray> j_stream_intel =
       Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
 
-  jobject result =
-      jni_helper.callObjectMethod(j_context, jmid_onSendWindowAvailable, j_stream_intel.get())
-          .release();
-
-  return result;
+  Envoy::JNI::LocalRefUniquePtr<jobject> unused =
+      jni_helper.callObjectMethod(j_context, jmid_onSendWindowAvailable, j_stream_intel.get());
 }
 
 // JvmKeyValueStoreContext

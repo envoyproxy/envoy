@@ -19,12 +19,19 @@ using testing::HasSubstr;
 class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                 public HttpProtocolIntegrationTest {
 protected:
-  void
-  initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action) {
+  void initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
+                                 absl::optional<bool> appendLocalOverloadHeader = absl::nullopt) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
     });
+
+    if (appendLocalOverloadHeader.has_value() && appendLocalOverloadHeader.value()) {
+      config_helper_.addConfigModifier(
+          [=](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& cm) -> void { cm.set_append_local_overload(true); });
+    }
+
     initialize();
     updateResource(0);
   }
@@ -62,6 +69,8 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  // Verify that no local overload header is added by default
+  EXPECT_EQ(true, response->headers().get(Http::Headers::get().EnvoyLocalOverloaded).empty());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -71,6 +80,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(true, response->headers().get(Http::Headers::get().EnvoyLocalOverloaded).empty());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -86,6 +96,56 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0U, response->body().size());
+}
+
+TEST_P(OverloadIntegrationTest, AppendLocalOverloadHeader) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"),
+      true);
+
+  // Put envoy in overloaded state and check that it drops new requests and the local overload is
+  // correctly added. Test both header-only and header+body requests since the code paths are
+  // slightly different.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(Http::Headers::get().EnvoyOverloadedValues.True,
+            response->headers()
+                .get(Http::Headers::get().EnvoyLocalOverloaded)[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ("envoy overloaded", response->body());
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(Http::Headers::get().EnvoyOverloadedValues.True,
+            response->headers()
+                .get(Http::Headers::get().EnvoyLocalOverloaded)[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ("envoy overloaded", response->body());
+  codec_client_->close();
 }
 
 TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
