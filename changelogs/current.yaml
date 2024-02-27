@@ -215,7 +215,8 @@ new_features:
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
-    by specifying the ``query_parameters`` configuration section.
+    by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
+    configuration section.
 
 deprecated:
 - area: listener

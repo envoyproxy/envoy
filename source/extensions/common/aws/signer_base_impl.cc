@@ -184,8 +184,8 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
     // X-Amz-Security-Token
 
     // TODO (@nbaws) : This should be using Utility::encodeQueryParam, but that function appears to
-    // be incorrectly double encoding = signs Will address this in a later patch and add test cases
-    // to ensure we haven't broken anything
+    // be incorrectly double encoding = signs. Will address this in a later patch and add test cases
+    // to ensure we haven't broken anything.
     query_params.add(
         SignatureQueryParameters::get().AmzSecurityToken,
         Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(session_token.value()));

@@ -27,14 +27,15 @@ using SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 class SignatureQueryParameterValues {
 public:
   // Query string parameters require camel case
-  const std::string AmzAlgorithm{"X-Amz-Algorithm"};
-  const std::string AmzCredential{"X-Amz-Credential"};
-  const std::string AmzDate{"X-Amz-Date"};
-  const std::string AmzRegionSet{"X-Amz-Region-Set"};
-  const std::string AmzSecurityToken{"X-Amz-Security-Token"};
-  const std::string AmzSignature{"X-Amz-Signature"};
-  const std::string AmzSignedHeaders{"X-Amz-SignedHeaders"};
-  const std::string AmzExpires{"X-Amz-Expires"};
+  static constexpr char AmzAlgorithm[] = "X-Amz-Algorithm";
+  static constexpr char AmzCredential[] = "X-Amz-Credential";
+  static constexpr char AmzDate[] = "X-Amz-Date";
+  static constexpr char AmzRegionSet[] = "X-Amz-Region-Set";
+  static constexpr char AmzSecurityToken[] = "X-Amz-Security-Token";
+  static constexpr char AmzSignature[] = "X-Amz-Signature";
+  static constexpr char AmzSignedHeaders[] = "X-Amz-SignedHeaders";
+  static constexpr char AmzExpires[] = "X-Amz-Expires";
+  // Expiration time of query parameter request, in seconds
   const uint16_t DefaultExpiration = 5;
 };
 

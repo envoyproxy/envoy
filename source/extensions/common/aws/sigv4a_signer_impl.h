@@ -25,12 +25,12 @@ using SigV4ASignatureHeaders = ConstSingleton<SigV4ASignatureHeaderValues>;
 
 class SigV4ASignatureConstantValues : public SignatureConstantValues {
 public:
-  const std::string SigV4AAuthorizationHeaderFormat{
-      "AWS4-ECDSA-P256-SHA256 Credential={}, SignedHeaders={}, Signature={}"};
-  const std::string SigV4ACredentialScopeFormat{"{}/{}/aws4_request"};
-  const std::string SigV4ASignatureVersion{"AWS4A"};
-  const std::string SigV4AStringToSignFormat{"{}\n{}\n{}\n{}"};
-  const std::string SigV4AAlgorithm = "AWS4-ECDSA-P256-SHA256";
+  static constexpr char SigV4AAuthorizationHeaderFormat[] =
+      "AWS4-ECDSA-P256-SHA256 Credential={}, SignedHeaders={}, Signature={}";
+  static constexpr char SigV4ACredentialScopeFormat[] = "{}/{}/aws4_request";
+  static constexpr char SigV4ASignatureVersion[] = "AWS4A";
+  static constexpr char SigV4AStringToSignFormat[] = "{}\n{}\n{}\n{}";
+  static constexpr char SigV4AAlgorithm[] = "AWS4-ECDSA-P256-SHA256";
 };
 
 using SigV4ASignatureConstants = ConstSingleton<SigV4ASignatureConstantValues>;

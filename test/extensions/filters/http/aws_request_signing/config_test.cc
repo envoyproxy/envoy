@@ -517,6 +517,44 @@ match_excluded_headers:
       EnvoyException);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, InvalidLowExpirationTime) {
+  const std::string yaml = R"EOF(
+service_name: s3
+signing_algorithm: AWS_SIGV4
+query_string:
+  expiration_time: 0s
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+
+  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
+                          EnvoyException, "Proto constraint validation failed");
+}
+
+TEST(AwsRequestSigningFilterConfigTest, InvalidHighExpirationTime) {
+  const std::string yaml = R"EOF(
+service_name: s3
+signing_algorithm: AWS_SIGV4
+query_string:
+  expiration_time: 9999s
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+
+  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
+                          EnvoyException, "Proto constraint validation failed");
+}
+
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
 } // namespace Extensions
