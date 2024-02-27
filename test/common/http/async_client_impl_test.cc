@@ -369,6 +369,50 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
 
+TEST_F(AsyncClientImplTest, OngoingRequestWithResetAfterCompletion) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  TestRequestHeaderMapImpl headers_copy = *headers;
+
+  Buffer::OwnedImpl data("test data");
+  const Buffer::OwnedImpl data_copy(data.toString());
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  headers_copy.addCopy("x-envoy-internal", "true");
+  headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers_copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), true));
+
+  AsyncClient::OngoingRequest* request =
+      client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  request->sendData(data, true);
+
+  expectSuccess(request, 200);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
+
+  request->reset();
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("internal.upstream_rq_200")
+                     .value());
+}
+
 TEST_F(AsyncClientImplTracingTest, Basic) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   message_->body().add("test body");
@@ -1441,6 +1485,50 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
               setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
 
+  request->cancel();
+}
+
+TEST_F(AsyncClientImplTracingTest, CancelRequestAfterComplete) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            return nullptr;
+          }));
+
+  EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
+      .WillOnce(Return(child_span));
+
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, injectContext(_, _));
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _))
+      .WillOnce(Invoke([](Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
+        span.setTag("onBeforeFinalizeUpstreamSpan", "called");
+        // Since this is  a failure, we expect no response headers.
+        ASSERT_EQ(nullptr, response_headers);
+      }));
+  AsyncClient::Request* request = client_.send(std::move(message_), callbacks_, options);
+
+  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.1:443")));
+
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span, finishSpan());
   request->cancel();
 }
 

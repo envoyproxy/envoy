@@ -708,7 +708,7 @@ private:
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   Status onPing(uint64_t opaque_data, bool is_ack);
-  Status onBeginData(int32_t stream_id, size_t length, uint8_t type, uint8_t flags, size_t padding);
+  Status onBeginData(int32_t stream_id, size_t length, uint8_t flags, size_t padding);
   Status onGoAway(uint32_t error_code);
   Status onHeaders(int32_t stream_id, size_t length, uint8_t flags);
   Status onRstStream(int32_t stream_id, uint32_t error_code);

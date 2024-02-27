@@ -701,6 +701,17 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
   if (upstreamProtocol() != Http::CodecType::HTTP1) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
+
+  // Close the HTTP3 connection and verify stats are dumped properly.
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    ASSERT_TRUE(upstream_connection_->close());
+    ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+    upstream_connection_.reset();
+    ASSERT_TRUE(
+        waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", 1));
+    ASSERT_TRUE(waitForCounterGe(
+        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED", 1));
+  }
 }
 
 TEST_P(ClientIntegrationTest, BasicCancelWithCompleteStream) {
@@ -1019,6 +1030,14 @@ TEST_P(ClientIntegrationTest, TestStats) {
     EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
   }
 }
+
+#if defined(__APPLE__)
+TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
+  builder_.respectSystemProxySettings(true);
+  initialize();
+  ASSERT_TRUE(Envoy::Api::External::retrieveApi("envoy_proxy_resolver") != nullptr);
+}
+#endif
 
 } // namespace
 } // namespace Envoy

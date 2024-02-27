@@ -190,6 +190,14 @@ public:
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
 
+#if defined(__APPLE__)
+  // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
+  // use in reading and using the system proxy settings.
+  // If/when we move Android system proxy registration to the C++ Engine Builder, we will make this
+  // API available on all platforms.
+  EngineBuilder& respectSystemProxySettings(bool value);
+#endif
+
   // This is separated from build() for the sake of testability
   virtual std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
 
@@ -242,6 +250,10 @@ private:
   std::vector<std::string> quic_suffixes_;
   bool enable_port_migration_ = false;
   bool always_use_v6_ = false;
+#if defined(__APPLE__)
+  // TODO(abeyad): once stable, consider setting the default to true.
+  bool respect_system_proxy_settings_ = false;
+#endif
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
 

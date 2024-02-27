@@ -15,10 +15,8 @@
 
 #include "gtest/gtest.h"
 
-using testing::AllOf;
 using testing::DoAll;
 using testing::Eq;
-using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
