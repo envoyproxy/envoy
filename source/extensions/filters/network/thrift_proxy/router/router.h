@@ -129,9 +129,10 @@ class RouterStats {
 public:
   RouterStats(const std::string& stat_prefix, Stats::Scope& scope,
               const LocalInfo::LocalInfo& local_info)
-      : named_(RouterNamedStats::generateStats(stat_prefix, scope)),
-        stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
-        symbol_table_(scope.symbolTable()),
+      : stats_scope_(scope.createScope("")),
+        named_(RouterNamedStats::generateStats(stat_prefix, *stats_scope_)),
+        stat_name_set_(stats_scope_->symbolTable().makeSet("thrift_proxy")),
+        symbol_table_(stats_scope_->symbolTable()),
         upstream_rq_call_(stat_name_set_->add("thrift.upstream_rq_call")),
         upstream_rq_oneway_(stat_name_set_->add("thrift.upstream_rq_oneway")),
         upstream_rq_invalid_type_(stat_name_set_->add("thrift.upstream_rq_invalid_type")),
@@ -340,8 +341,6 @@ public:
                                 Stats::Histogram::Unit::Milliseconds, value);
   }
 
-  const RouterNamedStats named_;
-
 private:
   void incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
                               Upstream::HostDescriptionConstSharedPtr upstream_host,
@@ -385,6 +384,12 @@ private:
     return symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
   }
 
+  Stats::ScopeSharedPtr stats_scope_;
+
+public:
+  const RouterNamedStats named_;
+
+private:
   Stats::StatNameSetPtr stat_name_set_;
   Stats::SymbolTable& symbol_table_;
   const Stats::StatName upstream_rq_call_;
