@@ -519,7 +519,7 @@ public:
         std::make_unique<Filter>(config_, factory_context_.serverFactoryContext().clusterManager());
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
-        router_filter_interface_, std::move(generic_conn_pool));
+        *upstream_, std::move(generic_conn_pool));
     mock_router_upstream_request_ = mock_upst.get();
     upstream_->setRouterUpstreamRequest(std::move(mock_upst));
     EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
@@ -567,6 +567,46 @@ TEST_F(CombinedUpstreamTest, WriteUpstream) {
       std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
                                          *tunnel_config_, downstream_stream_info_);
   this->upstream_->encodeData(buffer2, true);
+}
+
+TEST_F(CombinedUpstreamTest, WriteDownstream) {
+  this->setup();
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("foo"), false));
+  Buffer::OwnedImpl buffer1("foo");
+  this->upstream_->responseDecoder().decodeData(buffer1, false);
+
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("bar"), true));
+  Buffer::OwnedImpl buffer2("bar");
+  this->upstream_->responseDecoder().decodeData(buffer2, true);
+}
+
+TEST_F(CombinedUpstreamTest, InvalidUpgradeWithEarlyFin) {
+  this->setup();
+  EXPECT_CALL(this->callbacks_, onEvent(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), true);
+}
+
+TEST_F(CombinedUpstreamTest, InvalidUpgradeWithNon200) {
+  this->setup();
+  EXPECT_CALL(this->callbacks_, onEvent(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "301"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TEST_F(CombinedUpstreamTest, ReadDisable) {
+  this->setup();
+  EXPECT_CALL(*this->mock_router_upstream_request_, onAboveWriteBufferHighWatermark());
+  EXPECT_TRUE(this->upstream_->readDisable(true));
+
+  EXPECT_CALL(*this->mock_router_upstream_request_, onAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_TRUE(this->upstream_->readDisable(false));
+
+  // New upstream with no encoder.
+  this->upstream_ =
+      std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
+                                         *tunnel_config_, downstream_stream_info_);
+  EXPECT_FALSE(this->upstream_->readDisable(true));
 }
 } // namespace
 } // namespace TcpProxy

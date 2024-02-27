@@ -419,14 +419,7 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    StreamInfo::StreamInfo& downstream_info)
     : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
       decoder_filter_callbacks_(decoder_callbacks), route_(&route), response_decoder_(*this),
-      upstream_callbacks_(callbacks) {}
-
-void CombinedUpstream::setRouterUpstreamRequest(
-    Router::UpstreamRequestPtr router_upstream_request) {
-  LinkedList::moveIntoList(std::move(router_upstream_request), upstream_requests_);
-}
-
-void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
+      upstream_callbacks_(callbacks) {
   auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
@@ -442,6 +435,14 @@ void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
 
   config_.headerEvaluator().evaluateHeaders(
       *downstream_headers_, {downstream_info_.getRequestHeaders()}, downstream_info_);
+}
+
+void CombinedUpstream::setRouterUpstreamRequest(
+    Router::UpstreamRequestPtr router_upstream_request) {
+  LinkedList::moveIntoList(std::move(router_upstream_request), upstream_requests_);
+}
+
+void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
   upstream_requests_.front()->acceptHeadersFromRouter(false);
 }
 
