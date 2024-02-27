@@ -55,7 +55,7 @@ const std::string& outOfMemoryPattern() {
  */
 class MainCommonTest : public MainCommonTestBase,
                        public testing::TestWithParam<Network::Address::IpVersion> {
- protected:
+protected:
   MainCommonTest() : MainCommonTestBase(GetParam()) {}
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
@@ -257,7 +257,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
 
 class AdminRequestTest : public AdminRequestTestBase,
                          public testing::TestWithParam<Network::Address::IpVersion> {
- protected:
+protected:
   AdminRequestTest() : AdminRequestTestBase(GetParam()) {}
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
