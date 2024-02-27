@@ -114,8 +114,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       cluster_manager_(cluster_manager), listener_stats_(config_.listenerStats()),
       overload_manager_(overload_manager),
       overload_state_(overload_manager.getThreadLocalOverloadState()),
-      accept_new_http_stream_(overload_manager.getLoadShedPoint(
-          "envoy.load_shed_points.http_connection_manager_decode_headers")),
+      accept_new_http_stream_(
+          overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders)),
       overload_stop_accepting_requests_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
@@ -1257,8 +1257,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     filter_manager_.skipFilterChainCreation();
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
-    sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().Overload);
+    sendLocalReply(
+        Http::Code::ServiceUnavailable, "envoy overloaded",
+        [this](Http::ResponseHeaderMap& headers) {
+          if (connection_manager_.config_.appendLocalOverload()) {
+            headers.addReference(Http::Headers::get().EnvoyLocalOverloaded,
+                                 Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+        },
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
 
