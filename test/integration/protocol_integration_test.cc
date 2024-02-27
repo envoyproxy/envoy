@@ -4451,6 +4451,52 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   cleanupUpstreamAndDownstream();
 }
 
+// TODO(alyssawilk) fix windows build before flipping flag.
+#ifndef WIN32
+// A singleton which will fail creation of the Nth socket
+class AllowForceFail : public Api::OsSysCallsImpl {
+public:
+  void startFailing() {
+    absl::MutexLock m(&mutex_);
+    fail_ = true;
+  }
+  Api::SysCallSocketResult socket(int domain, int type, int protocol) override {
+    absl::MutexLock m(&mutex_);
+    if (fail_) {
+      return {-1, 1};
+    }
+    return Api::OsSysCallsImpl::socket(domain, type, protocol);
+  }
+
+private:
+  absl::Mutex mutex_;
+  bool fail_ = false;
+};
+
+TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.allow_client_socket_creation_failure",
+                                    "true");
+  AllowForceFail fail_socket_n_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  EXPECT_ENVOY_BUG(
+      {
+        fail_socket_n_.startFailing();
+        auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_EQ("503", response->headers().getStatusValue());
+      },
+      "");
+
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
+  fake_upstreams_.clear();
+}
+#endif
+
 TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter

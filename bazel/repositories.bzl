@@ -318,6 +318,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_nghttp2_nghttp2()
+    _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_alibaba_hessian2_codec()
@@ -337,6 +338,7 @@ def envoy_dependencies(skip_targets = []):
     _io_hyperscan()
     _io_vectorscan()
     _io_opentracing_cpp()
+    _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -735,6 +737,16 @@ def _com_github_nghttp2_nghttp2():
         actual = "@envoy//bazel/foreign_cc:nghttp2",
     )
 
+def _com_github_msgpack_cpp():
+    external_http_archive(
+        name = "com_github_msgpack_cpp",
+        build_file = "@envoy//bazel/external:msgpack.BUILD",
+    )
+    native.bind(
+        name = "msgpack",
+        actual = "@com_github_msgpack_cpp//:msgpack",
+    )
+
 def _io_hyperscan():
     external_http_archive(
         name = "io_hyperscan",
@@ -762,6 +774,13 @@ def _io_opentracing_cpp():
     native.bind(
         name = "opentracing",
         actual = "@io_opentracing_cpp//:opentracing",
+    )
+
+def _io_opentelemetry_api_cpp():
+    external_http_archive("io_opentelemetry_cpp")
+    native.bind(
+        name = "opentelemetry_api",
+        actual = "@io_opentelemetry_cpp//api:api",
     )
 
 def _com_github_datadog_dd_trace_cpp():
