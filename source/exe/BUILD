@@ -103,6 +103,7 @@ envoy_cc_library(
         "main_common.h",
     ],
     deps = [
+        ":admin_response_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
         ":stripped_main_base_lib",
@@ -115,6 +116,19 @@ envoy_cc_library(
         "//source/server:options_lib",
         "//source/server/config_validation:server_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "admin_response_lib",
+    srcs = ["admin_response.cc"],
+    hdrs = ["admin_response.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/server:server_lib",
+        "//source/server/admin:admin_lib",
+        "//source/server/admin:utils_lib",
     ],
 )
 
