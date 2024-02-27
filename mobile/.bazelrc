@@ -190,7 +190,8 @@ build:mobile-remote-ci-linux --config=mobile-remote-ci-common
 #############################################################################
 # mobile-remote-ci-linux-clang: These options are linux-only using Clang by default
 #############################################################################
-build:mobile-remote-ci-linux-clang --config=clang
+build:mobile-remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
+build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
 
 #############################################################################
