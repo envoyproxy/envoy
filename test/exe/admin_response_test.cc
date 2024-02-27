@@ -276,7 +276,7 @@ TEST_F(AdminStreamingTest, CancelAfterAskingForChunk) {
   int chunk_calls = 0;
 
   // Cause the /streaming handler to pause while yielding the next chunk, to hit
-  // an early exit in MainCommonBase::requestNextChunk.
+  // an early exit in requestNextChunk.
   next_chunk_hook_ = [response]() { response->cancel(); };
   response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
   resume_.Notify();

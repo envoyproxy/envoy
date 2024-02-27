@@ -3,7 +3,7 @@ State				Action		  		Next State				Side Effects
 Ground				adminRequest(u,m)	ResponseInitial
 ResponseInitial		getHeaders			HeadersWait				post to main thread to get headers
 HeadersWait			postComplete		HeadersSent				call HeadersFn
-HeadersSent						
+HeadersSent
 
 
 ResponseInitial		cancel				ResponseCancelled

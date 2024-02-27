@@ -43,11 +43,29 @@ public:
   // MainCommonBase is already deleted.
   class PtrSet {
   public:
-    void detachResponse(AdminResponse*);
-    void attachResponse(AdminResponse*);
+    /**
+     * Called when an AdminResponse is created. When terminateAdminRequests is
+     * called, all outstanding response objects have their terminate() methods
+     * called.
+     *
+     * @param response the response pointer to be added to the set.
+     */
+    void attachResponse(AdminResponse* response);
 
-    // Called after the server run-loop finishes; any outstanding streaming admin requests
-    // will otherwise hang as the main-thread dispatcher loop will no longer run.
+    /**
+     * Called when an AdminResponse is terminated, either by completing normally
+     * or having the caller call cancel on it. Either way it needs to be removed
+     * from the set that will be used by terminateAdminRequests below.
+     *
+     * @param response the response pointer to be removed from the set.
+     */
+    void detachResponse(AdminResponse* response);
+
+    /**
+     * Called after the server run-loop finishes; any outstanding streaming
+     * admin requests will otherwise hang as the main-thread dispatcher loop
+     * will no longer run.
+     */
     void terminateAdminRequests();
 
     mutable absl::Mutex mutex_;
@@ -131,7 +149,6 @@ private:
   Buffer::OwnedImpl response_;
   Http::Code code_;
   Server::Admin::RequestPtr request_;
-  // CleanupFn cleanup_;
   Http::RequestHeaderMapPtr request_headers_{Http::RequestHeaderMapImpl::create()};
   Http::ResponseHeaderMapPtr response_headers_{Http::ResponseHeaderMapImpl::create()};
   bool more_data_ = true;

@@ -1,6 +1,5 @@
 #include "envoy/common/platform.h"
 
-#include "source/common/common/lock_guard.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/common/thread.h"

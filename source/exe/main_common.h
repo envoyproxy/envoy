@@ -38,26 +38,42 @@ public:
   using AdminRequestFn =
       std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
 
-  // Makes an admin-console request by path, calling handler() when complete.
-  // The caller can initiate this from any thread, but it posts the request
-  // onto the main thread, so the handler is called asynchronously.
-  //
-  // This is designed to be called from downstream consoles, so they can access
-  // the admin console information stream without opening up a network port.
-  //
-  // This should only be called while run() is active; ensuring this is the
-  // responsibility of the caller.
-  //
-  // TODO(jmarantz): consider std::future for encapsulating this delayed request
-  // semantics, rather than a handler callback.
+  /**
+   * Makes an admin-console request by path, calling handler() when complete.
+   * The caller can initiate this from any thread, but it posts the request
+   * onto the main thread, so the handler is called asynchronously.
+   *
+   * This is designed to be called from downstream consoles, so they can access
+   * the admin console information stream without opening up a network port.
+   *
+   * This should only be called while run() is active; ensuring this is the
+   * responsibility of the caller.
+   *
+   * TODO(jmarantz): consider std::future for encapsulating this delayed request
+   * semantics, rather than a handler callback.
+   *
+   * Consider using the 2-arg version of adminRequest, below, which enables
+   * streaming of large responses one chunk at a time, without holding
+   * potentially huge response text in memory.
+   *
+   * @param path_and_query the URL to send to admin, including any query params.
+   * @param method the HTTP method: "GET" or "POST"
+   * @param handler an async callback that will be sent the serialized headers
+   *        and response.
+   */
   void adminRequest(absl::string_view path_and_query, absl::string_view method,
                     const AdminRequestFn& handler);
-  AdminResponseSharedPtr adminRequest(absl::string_view path_and_query, absl::string_view method);
 
-  // Called when a streaming response is terminated, either by completing normally
-  // or having the caller call cancel on it. Either way it needs to be removed from
-  // the set that will be used by terminateAdminRequests below.
-  void detachResponse(AdminResponse*);
+  /**
+   * Initiates a streaming response to an admin request. The caller interacts
+   * with the returned AdminResponse object, and can thus control the pace of
+   * handling chunks of response text.
+   *
+   * @param path_and_query the URL to send to admin, including any query params.
+   * @param method the HTTP method: "GET" or "POST"
+   * @return AdminResponseSharedPtr the response object
+   */
+  AdminResponseSharedPtr adminRequest(absl::string_view path_and_query, absl::string_view method);
 
 private:
   AdminResponse::SharedPtrSet shared_response_set_;
