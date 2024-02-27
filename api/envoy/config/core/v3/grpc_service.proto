@@ -301,5 +301,7 @@ message GrpcService {
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated HeaderValue initial_metadata = 5;
 
+  // Optional default retry policy for streams toward the service.
+  // If an async stream doesn't have retry policy configured in its stream options, this retry policy is used.
   RetryPolicy retry_policy = 6;
 }
