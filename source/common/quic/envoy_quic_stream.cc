@@ -79,6 +79,29 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
+void EnvoyQuicStream::encodeTrailersImpl(spdy::Http2HeaderBlock&& trailers) {
+  if (quic_stream_.write_side_closed()) {
+    IS_ENVOY_BUG("encodeTrailers is called on write-closed stream.");
+    return;
+  }
+  ASSERT(!local_end_stream_);
+  local_end_stream_ = true;
+
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(&quic_stream_, this);
+  {
+    IncrementalBytesSentTracker tracker(quic_stream_, *mutableBytesMeter(), true);
+    size_t bytes_sent = quic_stream_.WriteTrailers(std::move(trailers), nullptr);
+    ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
+    if (stats_gatherer_ != nullptr) {
+      stats_gatherer_->addBytesSent(bytes_sent, true);
+    }
+  }
+  if (codec_callbacks_) {
+    codec_callbacks_->onCodecEncodeComplete();
+  }
+  onLocalEndStream();
+}
+
 void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUICHE.
   ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
