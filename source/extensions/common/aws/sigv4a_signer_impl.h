@@ -44,7 +44,7 @@ enum SigV4AKeyDerivationResult {
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
- * Implementation of the Signature V4 signing process.
+ * Implementation of the Signature V4A signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
  *
  * Query parameter support is implemented as per:
