@@ -24,6 +24,7 @@ public:
 
   void process(Buffer::Instance& output_buffer, ZSTD_EndDirective mode);
 
+protected:
   virtual void compressPreprocess(Buffer::Instance& buffer,
                                   Envoy::Compression::Compressor::State state) PURE;
 
