@@ -197,7 +197,7 @@ class StringMatcherExtensionFactory : public Config::TypedFactory {
 public:
   virtual StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& config) PURE;
 
-  std::string category() const override { return "envoy.matching.string"; }
+  std::string category() const override { return "envoy.string_matcher"; }
 };
 
 class ListMatcher : public ValueMatcher {

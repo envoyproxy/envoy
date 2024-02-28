@@ -64,7 +64,7 @@ message StringMatcher {
     string contains = 7 [(validate.rules).string = {min_len: 1}];
 
     // Use an extension as the matcher type.
-    // [#extension-category: envoy.matching.string]
+    // [#extension-category: envoy.string_matcher]
     xds.core.v3.TypedExtensionConfig custom = 8;
   }
 

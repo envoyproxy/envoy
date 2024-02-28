@@ -1,11 +1,11 @@
-#include "source/extensions/matching/string/lua/match.h"
+#include "source/extensions/string_matcher/lua/match.h"
 
-#include "envoy/extensions/matching/string/lua/v3/lua.pb.h"
+#include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 
-namespace Envoy::Extensions::Matching::String::Lua {
+namespace Envoy::Extensions::StringMatcher::Lua {
 
 LuaStringMatcher::LuaStringMatcher(const std::string& code) : state_(luaL_newstate()) {
   RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
@@ -92,7 +92,7 @@ private:
 
 Matchers::StringMatcherPtr
 LuaStringMatcherFactory::createStringMatcher(const ProtobufWkt::Any& message) {
-  ::envoy::extensions::matching::string::lua::v3::Lua config;
+  ::envoy::extensions::string_matcher::lua::v3::Lua config;
   Config::Utility::translateOpaqueConfig(message, ProtobufMessage::getStrictValidationVisitor(),
                                          config);
   Api::Api* api = InjectableSingleton<Api::Api>::getExisting();
@@ -106,9 +106,9 @@ LuaStringMatcherFactory::createStringMatcher(const ProtobufWkt::Any& message) {
 }
 
 ProtobufTypes::MessagePtr LuaStringMatcherFactory::createEmptyConfigProto() {
-  return std::make_unique<::envoy::extensions::matching::string::lua::v3::Lua>();
+  return std::make_unique<::envoy::extensions::string_matcher::lua::v3::Lua>();
 }
 
 REGISTER_FACTORY(LuaStringMatcherFactory, Matchers::StringMatcherExtensionFactory);
 
-} // namespace Envoy::Extensions::Matching::String::Lua
+} // namespace Envoy::Extensions::StringMatcher::Lua

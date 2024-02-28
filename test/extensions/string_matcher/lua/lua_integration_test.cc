@@ -1,6 +1,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "envoy/extensions/matching/string/lua/v3/lua.pb.h"
+#include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -20,7 +20,7 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
-          ::envoy::extensions::matching::string::lua::v3::Lua config;
+          ::envoy::extensions::string_matcher::lua::v3::Lua config;
           config.mutable_source_code()->set_inline_string(
               R"(
               function match(str)

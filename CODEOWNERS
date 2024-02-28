@@ -325,7 +325,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
 # String matching extensions
-/*/extensions/matching/string/ @ggreenway @UNOWNED
+/*/extensions/string_matcher/ @ggreenway @UNOWNED
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 # Health checkers

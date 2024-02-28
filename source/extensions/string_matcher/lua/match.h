@@ -4,7 +4,7 @@
 #include "source/common/common/matchers.h"
 #include "source/extensions/filters/common/lua/lua.h"
 
-namespace Envoy::Extensions::Matching::String::Lua {
+namespace Envoy::Extensions::StringMatcher::Lua {
 
 class LuaStringMatcher : public Matchers::StringMatcher, public ThreadLocal::ThreadLocalObject {
 public:
@@ -23,8 +23,8 @@ private:
 class LuaStringMatcherFactory : public Matchers::StringMatcherExtensionFactory {
 public:
   Matchers::StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& message) override;
-  std::string name() const override { return "envoy.matching.string.lua"; }
+  std::string name() const override { return "envoy.string_matcher.lua"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 
-} // namespace Envoy::Extensions::Matching::String::Lua
+} // namespace Envoy::Extensions::StringMatcher::Lua

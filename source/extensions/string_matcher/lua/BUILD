@@ -16,6 +16,6 @@ envoy_cc_extension(
         "//source/common/common:matchers_lib",
         "//source/common/config:datasource_lib",
         "//source/extensions/filters/common/lua:lua_lib",
-        "@envoy_api//envoy/extensions/matching/string/lua/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/string_matcher/lua/v3:pkg_cc_proto",
     ],
 )

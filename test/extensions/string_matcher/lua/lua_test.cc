@@ -1,5 +1,5 @@
-#include "envoy/extensions/matching/string/lua/v3/lua.pb.h"
-#include "source/extensions/matching/string/lua/match.h"
+#include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
+#include "source/extensions/string_matcher/lua/match.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -7,8 +7,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Matching {
-namespace String {
+namespace StringMatcher {
 namespace Lua {
 
 namespace {
@@ -79,7 +78,7 @@ TEST(LuaStringMatcher, LuaStdLib) {
 
 TEST(LuaStringMatcher, NoCode) {
   LuaStringMatcherFactory factory;
-  ::envoy::extensions::matching::string::lua::v3::Lua empty_config;
+  ::envoy::extensions::string_matcher::lua::v3::Lua empty_config;
   ProtobufWkt::Any any;
   any.PackFrom(empty_config);
   EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any), EnvoyException,
@@ -94,7 +93,6 @@ TEST(LuaStringMatcher, NoCode) {
 }
 
 } // namespace Lua
-} // namespace String
-} // namespace Matching
+} // namespace StringMatcher
 } // namespace Extensions
 } // namespace Envoy
