@@ -88,6 +88,9 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: quic
+  change: |
+    Fixed crash bug with QUIC upstream + X.509v1 certificates.
 - area: proxy_protocol
   change: |
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
