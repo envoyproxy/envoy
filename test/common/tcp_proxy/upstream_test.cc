@@ -608,6 +608,87 @@ TEST_F(CombinedUpstreamTest, ReadDisable) {
                                          *tunnel_config_, downstream_stream_info_);
   EXPECT_FALSE(this->upstream_->readDisable(true));
 }
+
+TEST_F(CombinedUpstreamTest, AddBytesSentCallbackForCoverage) {
+  this->setup();
+  this->upstream_->addBytesSentCallback([&](uint64_t) { return true; });
+}
+
+TEST_F(CombinedUpstreamTest, DownstreamDisconnect) {
+  this->setup();
+  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
+  EXPECT_CALL(this->callbacks_, onEvent(_)).Times(0);
+  EXPECT_TRUE(this->upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
+}
+
+TEST_F(CombinedUpstreamTest, UpstreamReset) {
+  this->setup();
+  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
+  EXPECT_CALL(this->callbacks_, onEvent(_));
+  this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+}
+
+TEST_F(CombinedUpstreamTest, UpstreamWatermarks) {
+  this->setup();
+  EXPECT_CALL(this->callbacks_, onAboveWriteBufferHighWatermark());
+  this->upstream_->onAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(this->callbacks_, onBelowWriteBufferLowWatermark());
+  this->upstream_->onBelowWriteBufferLowWatermark();
+}
+
+TEST_F(CombinedUpstreamTest, OnSuccessCalledOnValidResponse) {
+  this->setup();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure()).Times(0);
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TEST_F(CombinedUpstreamTest, OnFailureCalledOnInvalidResponse) {
+  this->setup();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "404"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
+  std::array<char, 256> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  this->setup();
+
+  Stats::TestUtil::MemoryTest memory_test;
+  this->upstream_->responseDecoder().dumpState(ostream, 1);
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
+}
+TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
+  this->setup();
+  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
+  this->upstream_->doneWriting();
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
+TEST_F(CombinedUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatureDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
+        "false"}});
+  this->setup();
+  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
+  upstream_->doneWriting();
+  EXPECT_CALL(callbacks_, onUpstreamData(_, _)).Times(0);
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy
