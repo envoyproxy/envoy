@@ -1,6 +1,7 @@
 #include "source/extensions/matching/string/lua/match.h"
 
 #include "envoy/extensions/matching/string/lua/v3/lua.pb.h"
+#include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 
@@ -89,20 +90,24 @@ private:
   ThreadLocal::TypedSlotPtr<LuaStringMatcher> tls_slot_;
 };
 
-class LuaStringMatcherFactory : public Matchers::StringMatcherExtensionFactory {
-public:
-  Matchers::StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& message) override {
-    ::envoy::extensions::matching::string::lua::v3::Lua config;
-    Config::Utility::translateOpaqueConfig(message, ProtobufMessage::getStrictValidationVisitor(),
-                                           config);
-    return std::make_unique<LuaStringMatcherThreadWrapper>(config.inline_code());
+Matchers::StringMatcherPtr
+LuaStringMatcherFactory::createStringMatcher(const ProtobufWkt::Any& message) {
+  ::envoy::extensions::matching::string::lua::v3::Lua config;
+  Config::Utility::translateOpaqueConfig(message, ProtobufMessage::getStrictValidationVisitor(),
+                                         config);
+  Api::Api* api = InjectableSingleton<Api::Api>::getExisting();
+  absl::StatusOr<std::string> result = Config::DataSource::read(
+      config.source_code(), false /* allow_empty */, *api, 0 /* max_size */);
+  if (!result.ok()) {
+    throw EnvoyException(
+        fmt::format("Failed to get lua string matcher code from source: {}", result.status()));
   }
+  return std::make_unique<LuaStringMatcherThreadWrapper>(*result);
+}
 
-  std::string name() const override { return "envoy.matching.string.lua"; }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<::envoy::extensions::matching::string::lua::v3::Lua>();
-  }
-};
+ProtobufTypes::MessagePtr LuaStringMatcherFactory::createEmptyConfigProto() {
+  return std::make_unique<::envoy::extensions::matching::string::lua::v3::Lua>();
+}
 
 REGISTER_FACTORY(LuaStringMatcherFactory, Matchers::StringMatcherExtensionFactory);
 

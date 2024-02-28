@@ -21,12 +21,13 @@ public:
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
           ::envoy::extensions::matching::string::lua::v3::Lua config;
-          config.set_inline_code(
+          config.mutable_source_code()->set_inline_string(
               R"(
               function match(str)
                 return str == "good" or str == "acceptable"
               end
             )");
+
           auto* header_match = hcm.mutable_route_config()
                                    ->mutable_virtual_hosts(0)
                                    ->mutable_routes(0)

@@ -20,4 +20,11 @@ private:
   CSmartPtr<lua_State, lua_close> state_;
 };
 
+class LuaStringMatcherFactory : public Matchers::StringMatcherExtensionFactory {
+public:
+  Matchers::StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& message) override;
+  std::string name() const override { return "envoy.matching.string.lua"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+};
+
 } // namespace Envoy::Extensions::Matching::String::Lua

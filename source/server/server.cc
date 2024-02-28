@@ -109,11 +109,10 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
 
   InjectableSingleton<ThreadLocal::SlotAllocator>::initialize(&thread_local_);
+  InjectableSingleton<Api::Api>::initialize(api_.get());
 }
 
 InstanceBase::~InstanceBase() {
-  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
-
   terminate();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
@@ -143,6 +142,9 @@ InstanceBase::~InstanceBase() {
     close(tracing_fd_);
   }
 #endif
+
+  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
+  InjectableSingleton<Api::Api>::clear();
 }
 
 Upstream::ClusterManager& InstanceBase::clusterManager() {

@@ -1,3 +1,4 @@
+#include "envoy/extensions/matching/string/lua/v3/lua.pb.h"
 #include "source/extensions/matching/string/lua/match.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -74,6 +75,22 @@ TEST(LuaStringMatcher, LuaStdLib) {
 
   EXPECT_TRUE(test(code, "contains text!"));
   EXPECT_FALSE(test(code, "nope"));
+}
+
+TEST(LuaStringMatcher, NoCode) {
+  LuaStringMatcherFactory factory;
+  ::envoy::extensions::matching::string::lua::v3::Lua empty_config;
+  ProtobufWkt::Any any;
+  any.PackFrom(empty_config);
+  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any), EnvoyException,
+                            "Failed to get lua string matcher code from source: INVALID_ARGUMENT: "
+                            "Unexpected DataSource::specifier_case(): 0");
+
+  empty_config.mutable_source_code()->set_inline_string("");
+  any.PackFrom(empty_config);
+  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any), EnvoyException,
+                            "Failed to get lua string matcher code from source: INVALID_ARGUMENT: "
+                            "DataSource cannot be empty");
 }
 
 } // namespace Lua
