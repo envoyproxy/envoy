@@ -21,19 +21,19 @@ LuaStringMatcher::LuaStringMatcher(const std::string& code) : state_(luaL_newsta
     throw EnvoyException(absl::StrCat("Failed to load lua code in Lua StringMatcher:", error));
   }
 
-  lua_getglobal(state_.get(), "match");
+  lua_getglobal(state_.get(), "envoy_match");
   bool is_function = lua_isfunction(state_.get(), -1);
-  lua_pop(state_.get(), 1);
   if (!is_function) {
-    throw EnvoyException("Lua code did not contain a global function named 'match'");
+    throw EnvoyException("Lua code did not contain a global function named 'envoy_match'");
   }
+  matcher_func_ref_ = luaL_ref(state_.get(), LUA_REGISTRYINDEX);
 }
 
 bool LuaStringMatcher::match(const absl::string_view value) const {
   const int initial_depth = lua_gettop(state_.get());
 
   bool ret = [&]() {
-    lua_getglobal(state_.get(), "match");
+    lua_rawgeti(state_.get(), LUA_REGISTRYINDEX, matcher_func_ref_);
     ASSERT(lua_isfunction(state_.get(), -1)); // Validated in constructor
 
     lua_pushlstring(state_.get(), value.data(), value.size());

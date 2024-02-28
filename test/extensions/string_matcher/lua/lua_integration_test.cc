@@ -23,7 +23,7 @@ public:
           ::envoy::extensions::string_matcher::lua::v3::Lua config;
           config.mutable_source_code()->set_inline_string(
               R"(
-              function match(str)
+              function envoy_match(str)
                 return str == "good" or str == "acceptable"
               end
             )");

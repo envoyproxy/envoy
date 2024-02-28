@@ -18,6 +18,7 @@ public:
 
 private:
   CSmartPtr<lua_State, lua_close> state_;
+  int matcher_func_ref_{LUA_NOREF};
 };
 
 class LuaStringMatcherFactory : public Matchers::StringMatcherExtensionFactory {

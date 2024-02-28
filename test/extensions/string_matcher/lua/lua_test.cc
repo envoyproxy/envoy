@@ -21,7 +21,7 @@ const std::string program = R"(
     local good_val = "match"
     local bad_val = "nomatch"
 
-    function match(str)
+    function envoy_match(str)
       if str == good_val then
         return true
       elseif str == bad_val then
@@ -48,7 +48,7 @@ const std::string invalid_lua_program = R"(
 
 TEST(LuaStringMatcher, LuaBehavior) {
   EXPECT_THROW_WITH_MESSAGE(test(no_match_function_program, ""), EnvoyException,
-                            "Lua code did not contain a global function named 'match'");
+                            "Lua code did not contain a global function named 'envoy_match'");
 
   EXPECT_THROW_WITH_REGEX(
       test(invalid_lua_program, ""), EnvoyException,
@@ -66,7 +66,7 @@ TEST(LuaStringMatcher, LuaBehavior) {
 // Ensure that the code runs in a context that the standard library is loaded into.
 TEST(LuaStringMatcher, LuaStdLib) {
   const std::string code = R"(
-    function match(str)
+    function envoy_match(str)
       -- Requires the string library to be present.
       return string.find(str, "text") ~= nil
     end
