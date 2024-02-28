@@ -55,6 +55,7 @@ protected:
 private:
   Envoy::Ssl::ServerContextSharedPtr createSslServerContext() const;
 
+  const bool handle_certs_with_shared_tls_code_;
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   Ssl::ServerContextConfigPtr config_;

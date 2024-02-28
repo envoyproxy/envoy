@@ -91,12 +91,12 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
 QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
     bool enable_early_data, Stats::Scope& scope, Ssl::ServerContextConfigPtr config,
     Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names)
-    : QuicTransportSocketFactoryBase(scope, "server"), manager_(manager), stats_scope_(scope),
-      config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(Runtime::runtimeFeatureEnabled(
-                   "envoy.restart_features.quic_handle_certs_with_shared_tls_code")
-                   ? createSslServerContext()
-                   : nullptr),
+    : QuicTransportSocketFactoryBase(scope, "server"),
+      handle_certs_with_shared_tls_code_(Runtime::runtimeFeatureEnabled(
+          "envoy.restart_features.quic_handle_certs_with_shared_tls_code")),
+      manager_(manager), stats_scope_(scope), config_(std::move(config)),
+      server_names_(server_names),
+      ssl_ctx_(handle_certs_with_shared_tls_code_ ? createSslServerContext() : nullptr),
       enable_early_data_(enable_early_data) {}
 
 QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
@@ -155,8 +155,7 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
 void QuicServerTransportSocketFactory::onSecretUpdated() {
   ENVOY_LOG(debug, "Secret is updated.");
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.quic_handle_certs_with_shared_tls_code")) {
+  if (handle_certs_with_shared_tls_code_) {
     auto ctx = createSslServerContext();
     {
       absl::WriterMutexLock l(&ssl_ctx_mu_);
