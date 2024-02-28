@@ -92,6 +92,7 @@ void AdminFilter::onComplete() {
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
+  // TODO(#31087): use high/lower watermarks to apply flow-control to the admin http port.
   bool more_data;
   do {
     Buffer::OwnedImpl response;

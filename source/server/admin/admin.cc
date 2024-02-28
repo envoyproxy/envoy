@@ -494,7 +494,6 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  // AdminFilter filter(createRequestFunction());
   AdminFilter filter(*this);
 
   auto request_headers = Http::RequestHeaderMapImpl::create();

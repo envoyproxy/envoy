@@ -91,11 +91,10 @@ protected:
    *
    * To resume the main thread, call resume_.Notify();
    *
-   * @param url the stats endpoint to initiate.
+   * @param url the admin endpoint to initiate.
    */
   void blockMainThreadUntilResume(absl::string_view url, absl::string_view method) {
     AdminResponseSharedPtr blocked_response = main_common_->adminRequest(url, method);
-    absl::Notification block_main_thread;
     blocked_response->getHeaders(
         [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
   }
@@ -292,11 +291,18 @@ TEST_F(AdminStreamingTest, QuitBeforeHeaders) {
   EXPECT_EQ(0, chunks_bytes.second);
 }
 
-TEST_F(AdminStreamingTest, QuitDeleteRace) {
+TEST_F(AdminStreamingTest, QuitDeleteRace1) {
   AdminResponseSharedPtr response = streamingResponse();
   // Initiates a streaming quit on the main thread, but do not wait for it.
   quitAndRequestHeaders();
   response.reset(); // Races with the quitquitquit
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_F(AdminStreamingTest, QuitDeleteRace2) {
+  AdminResponseSharedPtr response = streamingResponse();
+  adminRequest("/quitquitquit", "POST");
+  response.reset();
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
@@ -322,13 +328,6 @@ TEST_F(AdminStreamingTest, QuitBeforeCreatingResponse) {
   resume_.Notify();
   EXPECT_TRUE(waitForEnvoyToExit());
   response.reset();
-}
-
-TEST_F(AdminStreamingTest, QuitTerminateRace) {
-  AdminResponseSharedPtr response = streamingResponse();
-  adminRequest("/quitquitquit", "POST");
-  response.reset();
-  EXPECT_TRUE(waitForEnvoyToExit());
 }
 
 } // namespace Envoy
