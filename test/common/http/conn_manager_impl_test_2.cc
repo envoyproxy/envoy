@@ -1534,7 +1534,9 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   EXPECT_CALL(*log_handler_, log(_, _))
       .WillOnce(Invoke(
           [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_FALSE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(stream_info.hasResponseFlag(
+                StreamInfo::CoreResponseFlag::DownstreamConnectionTermination));
           }));
 
   expectOnDestroy();
