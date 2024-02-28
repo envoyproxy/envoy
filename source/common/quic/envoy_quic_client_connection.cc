@@ -7,6 +7,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -229,7 +230,9 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
-        *this, dispatcher_.timeSource(), /*prefer_gro=*/false, packets_dropped_);
+        *this, dispatcher_.timeSource(),
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_udp_gro"),
+        packets_dropped_);
     if (err == nullptr) {
       // In the case where the path validation fails, the probing socket will be closed and its IO
       // events are no longer interesting.
