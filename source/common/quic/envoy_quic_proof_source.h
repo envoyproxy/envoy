@@ -49,10 +49,9 @@ private:
     absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
   };
 
-  CertWithFilterChain getTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                                     const quic::QuicSocketAddress& client_address,
-                                                     const std::string& hostname,
-                                                     bool* cert_matched_sni);
+  CertWithFilterChain getTlsCertAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                               const quic::QuicSocketAddress& client_address,
+                                               const std::string& hostname, bool* cert_matched_sni);
 
   struct LegacyCertConfigWithFilterChain {
     absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_;

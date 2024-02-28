@@ -28,7 +28,7 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   *cert_matched_sni = false;
 
   CertWithFilterChain res =
-      getTlsCertConfigAndFilterChain(server_address, client_address, hostname, cert_matched_sni);
+      getTlsCertAndFilterChain(server_address, client_address, hostname, cert_matched_sni);
   return res.cert_;
 }
 
@@ -80,8 +80,8 @@ void EnvoyQuicProofSource::signPayload(
                              std::move(callback));
   }
 
-  CertWithFilterChain res = getTlsCertConfigAndFilterChain(server_address, client_address, hostname,
-                                                           nullptr /* cert_matched_sni */);
+  CertWithFilterChain res = getTlsCertAndFilterChain(server_address, client_address, hostname,
+                                                     nullptr /* cert_matched_sni */);
   if (res.private_key_ == nullptr) {
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     callback->Run(false, "", nullptr);
@@ -151,7 +151,7 @@ void EnvoyQuicProofSource::legacySignPayload(
                 std::make_unique<EnvoyQuicProofSourceDetails>(res.filter_chain_.value().get()));
 }
 
-EnvoyQuicProofSource::CertWithFilterChain EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(
+EnvoyQuicProofSource::CertWithFilterChain EnvoyQuicProofSource::getTlsCertAndFilterChain(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const std::string& hostname, bool* cert_matched_sni) {
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
