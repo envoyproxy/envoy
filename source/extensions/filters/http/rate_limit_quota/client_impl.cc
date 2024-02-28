@@ -98,9 +98,13 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
           double fill_rate_per_sec =
               static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
               fill_interval_sec;
-
-          quota_buckets_[bucket_id]->token_bucket_limiter = std::make_unique<TokenBucketImpl>(
-              rate_limit_strategy.token_bucket().max_tokens(), time_source_, fill_rate_per_sec);
+          uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
+          ENVOY_LOG(trace,
+                    "Create the token bucket limiter with max_tokens: {}; "
+                    "fill_interval_sec: {}; fill_rate_per_sec: {}",
+                    max_tokens, fill_interval_sec, fill_rate_per_sec);
+          quota_buckets_[bucket_id]->token_bucket_limiter =
+              std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate_per_sec);
         }
       }
     }

@@ -190,9 +190,11 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
       if (limiter->consume(1, /*allow_partial=*/false)) {
         // Request is allowed.
         quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+        ENVOY_LOG(trace, "Request is allowed by token bucket limiter");
       } else {
         // Request is throttled.
         quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
+        ENVOY_LOG(trace, "Request is throttled by token bucket limiter");
         // TODO(tyxia) Build the customized response based on `DenyResponseSettings` if it is
         // configured.
         callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt,
