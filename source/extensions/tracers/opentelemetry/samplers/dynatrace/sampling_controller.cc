@@ -130,9 +130,6 @@ void SamplingController::calculateSamplingExponents(
   for (auto& counter : top_k) {
     // allowed multiplicity for this entry
     auto wanted_multiplicity = counter.getValue() / allowed_per_entry;
-    if (wanted_multiplicity < 0) {
-      wanted_multiplicity = 1;
-    }
     auto sampling_state = new_sampling_exponents.find(counter.getItem());
     // sampling exponent has to be a power of 2. Find the exponent to have multiplicity near to
     // wanted_multiplicity
