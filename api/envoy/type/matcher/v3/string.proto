@@ -65,7 +65,6 @@ message StringMatcher {
 
     // Use an extension as the matcher type.
     // [#extension-category: envoy.matching.string]
-    // [#comment: This uses the xds type instead of the envoy type to avoid a circular dependency in the build system.]
     xds.core.v3.TypedExtensionConfig extension = 8;
   }
 
