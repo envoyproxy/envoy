@@ -86,7 +86,7 @@ ResponseFlag ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag
 
 const ResponseFlagUtils::ResponseFlagsVecType& ResponseFlagUtils::responseFlagsVec() {
   CONSTRUCT_ON_FIRST_USE(ResponseFlagsVecType, []() {
-    static_assert(CoreResponseFlag::LastFlag == 27,
+    static_assert(CoreResponseFlag::LastFlag == 28,
                   "A flag has been added. Add the new flag to CORE_RESPONSE_FLAGS.");
 
     responseFlagsVecInitialized() = true;
