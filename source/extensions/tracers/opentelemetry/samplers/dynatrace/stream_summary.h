@@ -108,11 +108,9 @@ private:
       }
       auto current_child = current_bucket->children.begin();
       while (current_child != current_bucket->children.end()) {
-        if (current_child->bucket != current_bucket) {
-          return absl::InternalError("entry should point to its bucket.");
-        }
-        if (current_child->value != current_bucket->value) {
-          return absl::InternalError("entry and bucket should have the same value.");
+        if (current_child->bucket != current_bucket ||
+            current_child->value != current_bucket->value) {
+          return absl::InternalError("entry does not point to a bucket with the same value.");
         }
         if (current_child->item) {
           auto old_iter = cache_copy.find(*current_child->item);
@@ -125,14 +123,8 @@ private:
       }
       current_bucket++;
     }
-    if (!cache_copy.empty()) {
-      return absl::InternalError("there should be no dead cached entries.");
-    }
-    if (cache_.size() > capacity_) {
-      return absl::InternalError("cache size must not exceed capacity");
-    }
-    if (value_sum != n_) {
-      return absl::InternalError("sum of all counter->value() must be equal to n");
+    if (!cache_copy.empty() || cache_.size() > capacity_ || value_sum != n_) {
+      return absl::InternalError("unexpected size.");
     }
     return absl::OkStatus();
   }

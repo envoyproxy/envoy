@@ -56,6 +56,12 @@ protected:
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
 };
 
+// Test tracer category()
+TEST_F(SamplerFactoryTest, TestGetName) {
+  TestSamplerFactory factory;
+  EXPECT_STREQ(factory.category().c_str(), "envoy.tracers.opentelemetry.samplers");
+}
+
 // Test OTLP tracer without a sampler
 TEST_F(SamplerFactoryTest, TestWithoutSampler) {
   // using StrictMock, calls to SamplerFactory would cause a test failure

@@ -11,10 +11,11 @@ namespace OpenTelemetry {
 // Test calculation using an empty string
 TEST(TenantIdTest, TestEmpty) { EXPECT_EQ(absl::StrCat(calculateTenantId("")), "0"); }
 
-// Test calculation using strings with whitespace
-TEST(TenantIdTest, TestWhitespace) {
+// Test calculation using strings with unexpected characters
+TEST(TenantIdTest, TestUnexpected) {
   EXPECT_EQ(absl::StrCat(calculateTenantId("abc 1234")), "182ccac");
   EXPECT_EQ(absl::StrCat(calculateTenantId("      ")), "b173ef2e");
+  EXPECT_EQ(absl::StrCat(calculateTenantId("€someth")), "17bd71ec");
 }
 
 // Test calculation using some expected strings

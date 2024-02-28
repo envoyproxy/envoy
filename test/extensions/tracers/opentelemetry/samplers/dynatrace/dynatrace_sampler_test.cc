@@ -123,6 +123,57 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextSampled) {
   EXPECT_TRUE(sampling_result.isSampled());
 }
 
+// Verify sampler being invoked with an invalid Dynatrace trace state
+TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext) {
+  const char* invalidts = "5b3f9fed-980df25c@dt=fw4;4";
+  SpanContext parent_context("00", trace_id, parent_span_id, true, invalidts);
+
+  auto sampling_result =
+      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+                             ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+  EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
+  EXPECT_STREQ(sampling_result.tracestate.c_str(),
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,5b3f9fed-980df25c@dt=fw4;4");
+  EXPECT_TRUE(sampling_result.isRecording());
+  EXPECT_TRUE(sampling_result.isSampled());
+}
+
+// Verify sampler being invoked with an invalid Dynatrace trace state
+TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext1) {
+  // invalid tracestate[6] has to be an int
+  const char* invalidts = "5b3f9fed-980df25c@dt=fw4;4;4af38366;0;0;0;X;123";
+  SpanContext parent_context("00", trace_id, parent_span_id, true, invalidts);
+
+  auto sampling_result =
+      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+                             ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+  EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
+  EXPECT_STREQ(
+      sampling_result.tracestate.c_str(),
+      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,5b3f9fed-980df25c@dt=fw4;4;4af38366;0;0;0;X;123");
+  EXPECT_TRUE(sampling_result.isRecording());
+  EXPECT_TRUE(sampling_result.isSampled());
+}
+
+// Verify sampler being invoked with an old Dynatrace trace state version
+TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextOtherVersion) {
+  const char* oldts =
+      "5b3f9fed-980df25c@dt=fw3;4;4af38366;0;0;0;0;123;8eae;2h01;3h4af38366;4h00;5h01;"
+      "6h67a9a23155e1741b5b35368e08e6ece5;7h9d83def9a4939b7b";
+  SpanContext parent_context("00", trace_id, parent_span_id, true, oldts);
+
+  auto sampling_result =
+      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+                             ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+  EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
+  EXPECT_STREQ(
+      sampling_result.tracestate.c_str(),
+      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,5b3f9fed-980df25c@dt=fw3;4;4af38366;0;0;0;0;123;"
+      "8eae;2h01;3h4af38366;4h00;5h01;6h67a9a23155e1741b5b35368e08e6ece5;7h9d83def9a4939b7b");
+  EXPECT_TRUE(sampling_result.isRecording());
+  EXPECT_TRUE(sampling_result.isSampled());
+}
+
 // Verify sampler being invoked with Dynatrace trace parent where ignored flag is set
 TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextIgnored) {
   SpanContext parent_context("00", trace_id, parent_span_id, true, dt_tracestate_ignored);

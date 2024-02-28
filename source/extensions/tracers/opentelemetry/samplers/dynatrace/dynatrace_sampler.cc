@@ -72,7 +72,6 @@ public:
   bool isValid() const { return valid_; };
   bool isIgnored() const { return ignored_; };
   uint32_t getSamplingExponent() const { return sampling_exponent_; };
-  uint32_t getPathInfo() const { return path_info_; };
 
 private:
   DynatraceTag(bool valid, bool ignored, uint32_t sampling_exponent, uint32_t path_info)
@@ -144,6 +143,7 @@ SamplingResult DynatraceSampler::shouldSample(const absl::optional<SpanContext> 
       parent_context.has_value() ? parent_context->tracestate() : "");
 
   std::string trace_state_value;
+  bool is_root_span = true;
 
   if (trace_state->Get(dt_tracestate_key_, trace_state_value)) {
     // we found a Dynatrace tag in the tracestate header. Respect the sampling decision in the tag.
@@ -152,8 +152,11 @@ SamplingResult DynatraceSampler::shouldSample(const absl::optional<SpanContext> 
       result.decision = dynatrace_tag.isIgnored() ? Decision::Drop : Decision::RecordAndSample;
       addSamplingAttributes(dynatrace_tag.getSamplingExponent(), att);
       result.tracestate = parent_context->tracestate();
+      is_root_span = false;
     }
-  } else {
+  }
+
+  if (is_root_span) {
     // do a decision based on the calculated exponent
     // we use a hash of the trace_id as random number
     const auto hash = MurmurHash::murmurHash2(trace_id);
