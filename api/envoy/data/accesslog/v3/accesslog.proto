@@ -372,6 +372,9 @@ message ResponseFlags {
 
   // Indicates a DNS resolution failed.
   bool dns_resolution_failure = 27;
+
+  // Indicates a downstream remote codec level reset was received on the stream
+  bool downstream_remote_reset = 28;
 }
 
 // Properties of a negotiated TLS connection.
