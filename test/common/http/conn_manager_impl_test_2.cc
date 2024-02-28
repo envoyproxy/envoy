@@ -1576,8 +1576,8 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamConnectionTermination) {
           [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_FALSE(stream_info.responseCode());
             EXPECT_TRUE(stream_info.hasAnyResponseFlag());
-            EXPECT_TRUE(
-                stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination));
+            EXPECT_TRUE(stream_info.hasResponseFlag(
+                StreamInfo::CoreResponseFlag::DownstreamConnectionTermination));
           }));
 
   // Start the request
