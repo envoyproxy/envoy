@@ -137,8 +137,11 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
         status, fmt::format("parseGetDataRequest: {}", status.message()));
     break;
   case OpCodes::Create:
+    ABSL_FALLTHROUGH_INTENDED;
   case OpCodes::Create2:
+    ABSL_FALLTHROUGH_INTENDED;
   case OpCodes::CreateContainer:
+    ABSL_FALLTHROUGH_INTENDED;
   case OpCodes::CreateTtl:
     status = parseCreateRequest(data, offset, len.value(), opcode);
     RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
@@ -645,8 +648,11 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
     const auto op = static_cast<OpCodes>(opcode.value());
     switch (op) {
     case OpCodes::Create:
+      ABSL_FALLTHROUGH_INTENDED;
     case OpCodes::Create2:
+      ABSL_FALLTHROUGH_INTENDED;
     case OpCodes::CreateContainer:
+      ABSL_FALLTHROUGH_INTENDED;
     case OpCodes::CreateTtl:
       status = parseCreateRequest(data, offset, len, op);
       EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
