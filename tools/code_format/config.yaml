@@ -133,7 +133,6 @@ paths:
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/config/subscription_factory_impl.cc
     - source/common/config/xds_resource.cc
-    - source/common/config/datasource.cc
     - source/common/runtime/runtime_impl.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc

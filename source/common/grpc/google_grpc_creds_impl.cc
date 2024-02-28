@@ -4,6 +4,9 @@
 #include "envoy/grpc/google_grpc_creds.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "grpcpp/security/tls_certificate_provider.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -15,15 +18,32 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
     case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelCredentials::
         CredentialSpecifierCase::kSslCredentials: {
       const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
-      const grpc::SslCredentialsOptions ssl_credentials_options = {
-          THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.root_certs(), true, api),
-                                std::string),
-          THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.private_key(), true, api),
-                                std::string),
-          THROW_OR_RETURN_VALUE(Config::DataSource::read(ssl_credentials.cert_chain(), true, api),
-                                std::string),
-      };
-      return grpc::SslCredentials(ssl_credentials_options);
+      const auto root_certs = THROW_OR_RETURN_VALUE(
+          Config::DataSource::read(ssl_credentials.root_certs(), true, api), std::string);
+      const auto private_key = THROW_OR_RETURN_VALUE(
+          Config::DataSource::read(ssl_credentials.private_key(), true, api), std::string);
+      const auto cert_chain = THROW_OR_RETURN_VALUE(
+          Config::DataSource::read(ssl_credentials.cert_chain(), true, api), std::string);
+      grpc::experimental::TlsChannelCredentialsOptions options;
+      if (!private_key.empty() || !cert_chain.empty()) {
+        options.set_certificate_provider(
+            std::make_shared<grpc::experimental::StaticDataCertificateProvider>(
+                root_certs,
+                std::vector<grpc::experimental::IdentityKeyCertPair>{{private_key, cert_chain}}));
+      } else if (!root_certs.empty()) {
+        options.set_certificate_provider(
+            std::make_shared<grpc::experimental::StaticDataCertificateProvider>(root_certs));
+      }
+      if (!root_certs.empty()) {
+        options.watch_root_certs();
+      }
+      if (!private_key.empty() || !cert_chain.empty()) {
+        options.watch_identity_key_cert_pairs();
+      }
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.google_grpc_disable_tls_13")) {
+        options.set_max_tls_version(grpc_tls_version::TLS1_2);
+      }
+      return grpc::experimental::TlsCredentials(options);
     }
     case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelCredentials::
         CredentialSpecifierCase::kLocalCredentials: {
@@ -46,7 +66,11 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultSslChannelCredent
   if (creds != nullptr) {
     return creds;
   }
-  return grpc::SslCredentials({});
+  grpc::experimental::TlsChannelCredentialsOptions options;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.google_grpc_disable_tls_13")) {
+    options.set_max_tls_version(grpc_tls_version::TLS1_2);
+  }
+  return grpc::experimental::TlsCredentials(options);
 }
 
 std::vector<std::shared_ptr<grpc::CallCredentials>>
