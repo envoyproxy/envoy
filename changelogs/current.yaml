@@ -50,6 +50,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http3_upstream
+  change: |
+    Fixing a bug with HTTP/3 upstream using a non-threadsafe cache cross-thread. Bumping HTTP/3 support down
+    to alpha as the severity of this bug indicates it is both not in use and not GA quality code.
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.

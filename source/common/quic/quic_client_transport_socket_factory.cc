@@ -34,11 +34,8 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
       fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
           std::move(config), factory_context.sslContextManager(), factory_context.statsScope())),
-           tls_slot_(factory_context.serverFactoryContext().threadLocal()) {
-    tls_slot_.set([](Event::Dispatcher &) {
-    ENVOY_LOG(warn, "Creating TLS config");
-      return std::make_shared<ThreadLocalQuicConfig>();
-    });
+      tls_slot_(factory_context.serverFactoryContext().threadLocal()) {
+  tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalQuicConfig>(); });
 }
 
 void QuicClientTransportSocketFactory::initialize() {
@@ -62,7 +59,6 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
   }
 
   ASSERT(tls_slot_.currentThreadRegistered());
-    ENVOY_LOG(warn, "Getting TLS config");
   ThreadLocalQuicConfig& tls_config = *tls_slot_;
 
   if (tls_config.client_context_ != context) {

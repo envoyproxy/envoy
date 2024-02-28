@@ -206,11 +206,9 @@ public:
    * Create transport socket factory for Quic upstream transport socket.
    * @return TransportSocketFactoryPtr the client transport socket factory.
    */
-  static Network::UpstreamTransportSocketFactoryPtr
-  createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
-                                           Ssl::ContextManager& context_manager,
-                                           ThreadLocal::Instance& threadlocal,
-                                           const std::string& san_to_match);
+  static Network::UpstreamTransportSocketFactoryPtr createQuicUpstreamTransportSocketFactory(
+      Api::Api& api, Stats::Store& store, Ssl::ContextManager& context_manager,
+      ThreadLocal::Instance& threadlocal, const std::string& san_to_match);
 
   static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(
       const ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&

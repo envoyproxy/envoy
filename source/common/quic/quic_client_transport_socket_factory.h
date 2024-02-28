@@ -46,7 +46,7 @@ protected:
   void onSecretUpdated() override {}
 
   // The cache in the QuicCryptoClientConfig is not thread-safe, so crypto_config_ needs to
-  // be a tls object. client_context lets the TLS object determine if the crypto
+  // be a thread local object. client_context lets the thread local object determine if the crypto
   // config needs to be updated.
   struct ThreadLocalQuicConfig : public ThreadLocal::ThreadLocalObject {
     // Latch the latest client context, to determine if it has updated since last
