@@ -29,9 +29,9 @@ message Buffer {
   google.protobuf.UInt32Value max_request_bytes = 1
       [(validate.rules).uint32 = {gt: 0}, (validate.rules).message = {required: true}];
 
-  // Set the maximum request size but doesn't buffer the data immediately.
-  // It's useful when the following filters may do the buffer themselves conditionally, so
-  // we won't buffer the data too early.
+  // Set the maximum request size but doesn't buffer the data in the Buffer filter.
+  // It's useful when subsequent filters may do the buffering themselves conditionally,
+  // so the Buffer filter doesn't buffer prematurely.
   bool set_limit_only = 3;
 }
 
