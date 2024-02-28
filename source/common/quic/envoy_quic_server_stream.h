@@ -5,7 +5,6 @@
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "source/common/quic/http_datagram_handler.h"
 #endif
-#include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/common/platform/api/quiche_reference_counted.h"
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
@@ -28,14 +27,11 @@ public:
     request_decoder_ = &decoder;
     stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
   }
-  QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
   void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
-  void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
-  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
@@ -121,11 +117,6 @@ private:
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 
-  quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  // Setting |http_datagram_handler_| enables HTTP Datagram support.
-  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
-#endif
   // True if a :path header has been seen before.
   bool saw_path_{false};
 };
