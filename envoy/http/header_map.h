@@ -12,7 +12,9 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/union_string.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_formatter.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
@@ -800,6 +802,25 @@ public:
 };
 
 using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
+
+/**
+ * Base class for both tunnel response headers and trailers.
+ */
+class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
+    value().iterate([&proto_out](const HeaderEntry& e) -> HeaderMap::Iterate {
+      auto* new_header = proto_out->add_headers();
+      new_header->set_key(std::string(e.key().getStringView()));
+      new_header->set_value(std::string(e.value().getStringView()));
+      return HeaderMap::Iterate::Continue;
+    });
+    return proto_out;
+  }
+
+  virtual const HeaderMap& value() const PURE;
+};
 
 } // namespace Http
 } // namespace Envoy
