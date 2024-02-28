@@ -95,7 +95,7 @@ void addSamplingAttributes(uint32_t sampling_exponent,
   attributes["supportability.atm_sampling_ratio"] = std::to_string(multiplicity);
 
   if (multiplicity > 1) {
-    static constexpr uint64_t two_pow_56 = 1lu << 56; // 2^56
+    static constexpr uint64_t two_pow_56 = 1llu << 56; // 2^56
     // The sampling probability can be interpreted as the number of spans
     // that are discarded out of 2^56. The attribute is only available if the sampling.threshold is
     // not 0 and therefore sampling happened.
