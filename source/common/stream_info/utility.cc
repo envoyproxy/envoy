@@ -456,14 +456,14 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
       return ProxyStatusError::ConnectionRefused;
     } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
       return ProxyStatusError::ConnectionTerminated;
-    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamConnectionTermination)) {
-      return ProxyStatusError::ConnectionTerminated;
     } else if (stream_info.hasResponseFlag(CoreResponseFlag::OverloadManager)) {
       return ProxyStatusError::ConnectionLimitReached;
     } else if (stream_info.hasResponseFlag(CoreResponseFlag::DropOverLoad)) {
       return ProxyStatusError::ConnectionLimitReached;
     } else if (stream_info.hasResponseFlag(CoreResponseFlag::FaultInjected)) {
       return ProxyStatusError::HttpRequestError;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamConnectionTermination)) {
+      return ProxyStatusError::ConnectionTerminated;
     }
   } else {
     if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
