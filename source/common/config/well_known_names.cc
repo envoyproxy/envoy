@@ -208,9 +208,6 @@ TagNameValues::TagNameValues() {
   // (<stat_prefix>.).rbac.**
   addTokenized(RBAC_PREFIX, "$.rbac.**");
 
-  // (<stat_prefix>.).rbac.**
-  addTokenized(RBAC_PREFIX, "$.rbac.**");
-
   // http.(<stat_prefix>.).rbac.**
   addTokenized(RBAC_HTTP_PREFIX, "http.$.rbac.**");
 }
