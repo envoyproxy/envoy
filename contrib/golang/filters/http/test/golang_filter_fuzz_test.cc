@@ -79,7 +79,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
   // Prepare filter.
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", context);
-  std::unique_ptr<Filter> filter = std::make_unique<Filter>(config, dso_lib);
+  std::unique_ptr<Filter> filter = std::make_unique<Filter>(config, dso_lib, 0);
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 

@@ -2332,14 +2332,14 @@ TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext&,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_FALSE(stream_info.responseCode());
-        EXPECT_TRUE(stream_info.hasAnyResponseFlag());
-        EXPECT_TRUE(
-            stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination));
-        EXPECT_EQ("downstream_remote_disconnect", stream_info.responseCodeDetails().value());
-      }));
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_FALSE(stream_info.responseCode());
+            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(stream_info.hasResponseFlag(
+                StreamInfo::CoreResponseFlag::DownstreamConnectionTermination));
+            EXPECT_EQ("downstream_remote_disconnect", stream_info.responseCodeDetails().value());
+          }));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -3045,12 +3045,12 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke(
-          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_TRUE(stream_info.responseCode());
-            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
-            EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout));
-          }));
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext&,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+        EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout));
+      }));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
@@ -4362,7 +4362,7 @@ public:
     sendRequestHeadersAndData();
   }
   const ResponseHeaderMap*
-  sendRequestWith(int status, StreamInfo::ResponseFlag response_flag, std::string details,
+  sendRequestWith(int status, StreamInfo::CoreResponseFlag response_flag, std::string details,
                   absl::optional<std::string> proxy_status = absl::nullopt) {
     auto response_headers = new TestResponseHeaderMapImpl{{":status", std::to_string(status)}};
     if (proxy_status.has_value()) {
@@ -4382,7 +4382,7 @@ TEST_F(ProxyStatusTest, NoPopulateProxyStatus) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
+      sendRequestWith(403, StreamInfo::CoreResponseFlag::FailedLocalHealthCheck, "foo");
   ASSERT_TRUE(altered_headers);
   ASSERT_FALSE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getStatusValue(), "403"); // unchanged from request.
@@ -4397,7 +4397,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, /*details=*/"foo");
+      sendRequestWith(403, StreamInfo::CoreResponseFlag::FailedLocalHealthCheck, /*details=*/"foo");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -4419,7 +4419,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
+      sendRequestWith(403, StreamInfo::CoreResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -4443,7 +4443,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
+      sendRequestWith(403, StreamInfo::CoreResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -4466,7 +4466,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz");
+      sendRequestWith(403, StreamInfo::CoreResponseFlag::UpstreamRequestTimeout, /*details=*/"baz");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -4489,7 +4489,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
+      sendRequestWith(403, StreamInfo::CoreResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
                       /*proxy_status=*/"SomeCDN");
 
   ASSERT_TRUE(altered_headers);

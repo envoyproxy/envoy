@@ -47,7 +47,12 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
         "@envoy_mobile//library/common/types:matcher_data_lib",
-    ],
+    ] + select({
+        "@envoy//bazel:apple": [
+            "@envoy_mobile//library/common/network:apple_proxy_resolution_lib",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
@@ -107,7 +112,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        "//library/common:engine_lib_no_stamp",
+        "//library/common:internal_engine_lib_no_stamp",
         "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/key_value/platform:config",

@@ -228,12 +228,13 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAccessLog) {
   setup(false, "");
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext&,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_FALSE(stream_info.responseCode());
-        EXPECT_TRUE(stream_info.hasAnyResponseFlag());
-        EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError));
-      }));
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_FALSE(stream_info.responseCode());
+            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(
+                stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError));
+          }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
@@ -261,12 +262,13 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
       }));
 
   EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext&,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_FALSE(stream_info.responseCode());
-        EXPECT_TRUE(stream_info.hasAnyResponseFlag());
-        EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError));
-      }));
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_FALSE(stream_info.responseCode());
+            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(
+                stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError));
+          }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -314,7 +316,7 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
                           conn_manager_->onData(fake_input, false));
 
   EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
-      StreamInfo::ResponseFlag::DownstreamProtocolError));
+      StreamInfo::CoreResponseFlag::DownstreamProtocolError));
 }
 
 TEST_F(HttpConnectionManagerImplTest, EnvoyOverloadError) {
@@ -347,7 +349,7 @@ TEST_F(HttpConnectionManagerImplTest, EnvoyOverloadError) {
   conn_manager_->onData(fake_input, false);
 
   EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
-      StreamInfo::ResponseFlag::OverloadManager));
+      StreamInfo::CoreResponseFlag::OverloadManager));
   EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
 }
 
@@ -420,13 +422,13 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationResponseFlag) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   filter_callbacks_.connection_.streamInfo().setResponseFlag(
-      StreamInfo::ResponseFlag::DurationTimeout);
+      StreamInfo::CoreResponseFlag::DurationTimeout);
   EXPECT_CALL(*connection_duration_timer, disableTimer());
 
   connection_duration_timer->invokeCallback();
 
   EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
-      StreamInfo::ResponseFlag::DurationTimeout));
+      StreamInfo::CoreResponseFlag::DurationTimeout));
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
 }

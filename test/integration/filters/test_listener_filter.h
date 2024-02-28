@@ -103,6 +103,7 @@ public:
                              std::make_unique<TestStringFilterState>(added_value_),
                              StreamInfo::FilterState::StateType::ReadOnly,
                              StreamInfo::FilterState::LifeSpan::Connection);
+    dispatcher_ = &cb.dispatcher();
     return Network::FilterStatus::Continue;
   }
   bool isCompatibleWithServerPreferredAddress(
@@ -122,6 +123,7 @@ public:
 private:
   const std::string added_value_;
   const bool allow_server_migration_;
+  Event::Dispatcher* dispatcher_{nullptr};
   const bool allow_client_migration_;
 };
 

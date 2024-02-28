@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile.jni;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;

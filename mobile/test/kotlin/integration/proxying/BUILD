@@ -16,10 +16,10 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -42,10 +42,10 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -68,10 +68,10 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -94,10 +94,10 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -120,10 +120,10 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -146,10 +146,10 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/common/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
         ],
         "//conditions:default": [],
     }),

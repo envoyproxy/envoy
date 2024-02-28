@@ -1,0 +1,11 @@
+--- a/src/google/protobuf/util/converter/port_def.inc	2024-01-04 20:39:52.910353189 +0000
++++ b/src/google/protobuf/util/converter/port_def.inc	2024-01-04 20:39:02.134416756 +0000
+@@ -415,7 +415,7 @@
+ 
+ // The minimum library version which works with the current version of the
+ // headers.
+-#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4023000
++#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4024000
+ 
+ #ifdef PROTOBUF_RTTI
+ #error PROTOBUF_RTTI was previously defined

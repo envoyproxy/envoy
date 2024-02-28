@@ -4,6 +4,9 @@ namespace Envoy {
 void H1FuzzIntegrationTest::initialize() { HttpIntegrationTest::initialize(); }
 
 DEFINE_PROTO_FUZZER(const test::integration::CaptureFuzzTestCase& input) {
+  if (input.events_size() == 0) {
+    return;
+  }
   // Pick an IP version to use for loopback, it doesn't matter which.
   RELEASE_ASSERT(!TestEnvironment::getIpVersionsForTest().empty(), "");
   const auto ip_version = TestEnvironment::getIpVersionsForTest()[0];

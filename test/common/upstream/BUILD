@@ -268,6 +268,7 @@ envoy_cc_test(
     srcs = ["load_balancer_impl_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_includes",
@@ -566,6 +567,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",

@@ -62,8 +62,10 @@ public:
       return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
     });
 
-    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true,
-                                                      context.serverFactoryContext().api());
+    const auto inline_jwks =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(jwt_provider_.local_jwks(), true,
+                                                       context.serverFactoryContext().api()),
+                              std::string);
     if (!inline_jwks.empty()) {
       auto jwks =
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);

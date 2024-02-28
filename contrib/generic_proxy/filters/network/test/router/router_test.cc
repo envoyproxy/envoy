@@ -175,10 +175,10 @@ public:
     ASSERT(!filter_->upstreamRequestsForTest().empty());
 
     auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
+    auto stream_frame = std::make_shared<StreamFramePtr>(std::move(response));
 
     EXPECT_CALL(*mock_client_codec_, decode(BufferStringEqual("test_1"), _))
-        .WillOnce(Invoke([this, resp = std::make_shared<StreamFramePtr>(std::move(response))](
-                             Buffer::Instance& buffer, bool) {
+        .WillOnce(Invoke([this, resp = std::move(stream_frame)](Buffer::Instance& buffer, bool) {
           buffer.drain(buffer.length());
 
           const bool end_stream = (*resp)->frameFlags().endStream();
@@ -251,6 +251,7 @@ public:
     if (with_tracing_) {
       EXPECT_CALL(mock_filter_callback_, tracingConfig())
           .WillOnce(Return(OptRef<const Tracing::Config>{tracing_config_}));
+      EXPECT_CALL(tracing_config_, spawnUpstreamSpan()).WillOnce(Return(true));
       EXPECT_CALL(active_span_, spawnChild_(_, "router observability_name egress", _))
           .WillOnce(Invoke([this](const Tracing::Config&, const std::string&, SystemTime) {
             child_span_ = new NiceMock<Tracing::MockSpan>();

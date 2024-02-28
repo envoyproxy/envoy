@@ -5,31 +5,31 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_library(
-    name = "engine_lib",
+    name = "internal_engine_lib",
     repository = "@envoy",
     deps = [
         ":engine_common_lib_stamped",
-        ":engine_lib_no_stamp",
+        ":internal_engine_lib_no_stamp",
     ],
 )
 
 envoy_cc_library(
-    name = "engine_lib_no_stamp",
+    name = "internal_engine_lib_no_stamp",
     srcs = [
-        "engine.cc",
+        "internal_engine.cc",
     ],
     hdrs = [
-        "engine.h",
+        "internal_engine.h",
     ],
     repository = "@envoy",
     deps = [
         ":engine_common_lib",
         "//library/common/bridge:utility_lib",
-        "//library/common/common:lambda_logger_delegate_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
+        "//library/common/logger:logger_delegate_lib",
         "//library/common/network:connectivity_manager_lib",
         "//library/common/stats:utility_lib",
         "//library/common/types:c_types_lib",

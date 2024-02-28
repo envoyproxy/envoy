@@ -1,10 +1,9 @@
 static_resources:
   listeners:
-  - name: main
-    address:
+  - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 8000
+        port_value: 10000
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -13,9 +12,9 @@ static_resources:
           stat_prefix: ingress_http
           codec_type: AUTO
           route_config:
-            name: local_route
+            name: example_route
             virtual_hosts:
-            - name: local_service
+            - name: example_hosts
               domains:
               - "*"
               routes:
@@ -32,23 +31,22 @@ static_resources:
                             function envoy_on_route(route_handle)
                               local header_value = route_handle:headers():get("header_key")
                               if header_value == "fake" then
-                                return "fake_service"
+                                return "fake_cluster"
                               end
-                              return "web_service"
+                              return "example_cluster"
                             end
-                        default_cluster: web_service
-
+                        default_cluster: example_cluster
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
-  - name: web_service
-    type: STRICT_DNS  # static
+  - name: example_cluster
+    type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: web_service
+      cluster_name: example_cluster_service
       endpoints:
       - lb_endpoints:
         - endpoint:

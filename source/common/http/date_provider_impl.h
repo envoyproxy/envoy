@@ -8,8 +8,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/utility.h"
-
-#include "date_provider.h"
+#include "source/common/http/date_provider.h"
 
 namespace Envoy {
 namespace Http {

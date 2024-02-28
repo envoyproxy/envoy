@@ -4,9 +4,9 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/tracing/trace_context_impl.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
 
 #include "absl/strings/escaping.h"
-#include "span_context.h"
 
 namespace Envoy {
 namespace Extensions {

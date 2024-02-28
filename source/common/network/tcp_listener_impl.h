@@ -4,9 +4,9 @@
 #include "envoy/runtime/runtime.h"
 
 #include "source/common/common/interval_value.h"
+#include "source/common/network/base_listener_impl.h"
 
 #include "absl/strings/string_view.h"
-#include "base_listener_impl.h"
 
 namespace Envoy {
 namespace Network {

@@ -9,6 +9,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
+using namespace std::literals::string_literals;
+
 class DecoderCallbacksMock : public DecoderCallbacks {
 public:
   MOCK_METHOD(void, incMessagesBackend, (), (override));
@@ -519,21 +521,28 @@ TEST_P(PostgresProxyErrorTest, ParseErrorMsgs) {
 INSTANTIATE_TEST_SUITE_P(
     PostgresProxyErrorTestSuite, PostgresProxyErrorTest,
     ::testing::Values(
-        std::make_tuple("blah blah", DecoderCallbacks::ErrorType::Unknown),
-        std::make_tuple("SERRORC1234", DecoderCallbacks::ErrorType::Error),
-        std::make_tuple("SERRORVERRORC1234", DecoderCallbacks::ErrorType::Error),
-        std::make_tuple("SFATALVFATALC22012", DecoderCallbacks::ErrorType::Fatal),
-        std::make_tuple("SPANICVPANICC22012", DecoderCallbacks::ErrorType::Panic),
+        // Error is encoded as sequence of 1-byte code, string.
+        // The sequence is terminated by 1-byte code equal to zero.
+        // That is the reason why each string contains 'zero' at the end.
+        // Each string literal is packed in std::string and std::string will add
+        // another 'zero' which will be interpreted as 1-byte terminating code.
+        std::make_tuple("blah blah\0"s, DecoderCallbacks::ErrorType::Unknown),
+        std::make_tuple("SERRORC1234\0"s, DecoderCallbacks::ErrorType::Error),
+        std::make_tuple("SERRORVERRORC1234\0"s, DecoderCallbacks::ErrorType::Error),
+        std::make_tuple("SFATALVFATALC22012\0"s, DecoderCallbacks::ErrorType::Fatal),
+        std::make_tuple("SPANICVPANICC22012\0"s, DecoderCallbacks::ErrorType::Panic),
+        std::make_tuple("SERROR\0VERROR\0C22012\0Mdivision by zero\0Fint.c\0L820\0Rint4div\0"s,
+                        DecoderCallbacks::ErrorType::Error),
         // This is the real German message in Postgres > 9.6. It contains keyword
         // in English with V prefix.
         std::make_tuple("SPANIKVPANICC42501Mkonnte Datei »pg_wal/000000010000000100000096« nicht "
-                        "öffnen: Permission deniedFxlog.cL3229RXLogFileInit",
+                        "öffnen: Permission denAiedFxlog.cL3229RXLogFileInit\0"s,
                         DecoderCallbacks::ErrorType::Panic),
         // This is German message indicating error. The comment field contains word PANIC.
         // Since we do not decode other languages, it should go into Other bucket.
         // This situation can only happen in Postgres < 9.6. Starting with version 9.6
         // messages must have severity in English with prefix V.
-        std::make_tuple("SFEHLERCP0001MMy PANIC ugly messageFpl_exec.cL3216Rexec_stmt_raise",
+        std::make_tuple("SFEHLERCP0001MMy PANIC ugly messageFpl_exec.cL3216Rexec_stmt_raise\0"s,
                         DecoderCallbacks::ErrorType::Unknown)));
 
 // Test parsing N message. It indicate notice

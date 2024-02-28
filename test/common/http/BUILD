@@ -114,6 +114,7 @@ envoy_proto_library(
             "//test/mocks/network:network_mocks",
             "//test/mocks/server:overload_manager_mocks",
             "//test/test_common:test_runtime_lib",
+            "@com_github_google_quiche//:quiche_common_platform_test",
         ],
     )
     for http_protocol in [

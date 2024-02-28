@@ -86,19 +86,23 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {
   envoy::config::core::v3::ApiConfigSource api_config_source;
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(false, rate_limit_settings.enabled_);
-  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(false, rate_limit_settings->enabled_);
+  EXPECT_EQ(100, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings->fill_rate_);
 }
 
 TEST(UtilityTest, ParseEmptyRateLimitSettings) {
   envoy::config::core::v3::ApiConfigSource api_config_source;
   api_config_source.mutable_rate_limit_settings();
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(true, rate_limit_settings.enabled_);
-  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(true, rate_limit_settings->enabled_);
+  EXPECT_EQ(100, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings->fill_rate_);
 }
 
 TEST(UtilityTest, ParseRateLimitSettings) {
@@ -107,10 +111,38 @@ TEST(UtilityTest, ParseRateLimitSettings) {
       api_config_source.mutable_rate_limit_settings();
   rate_limits->mutable_max_tokens()->set_value(500);
   rate_limits->mutable_fill_rate()->set_value(4);
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(true, rate_limit_settings.enabled_);
-  EXPECT_EQ(500, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(4, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(true, rate_limit_settings->enabled_);
+  EXPECT_EQ(500, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(4, rate_limit_settings->fill_rate_);
+}
+
+TEST(UtilityTest, ParseNanFillRateLimitSettings) {
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      api_config_source.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::quiet_NaN());
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_FALSE(rate_limit_settings.ok());
+  EXPECT_EQ(rate_limit_settings.status().message(),
+            "The value of fill_rate in RateLimitSettings (nan) must not be NaN nor Inf");
+}
+
+TEST(UtilityTest, ParseInfiniteFillRateLimitSettings) {
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      api_config_source.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::infinity());
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_FALSE(rate_limit_settings.ok());
+  EXPECT_EQ(rate_limit_settings.status().message(),
+            "The value of fill_rate in RateLimitSettings (inf) must not be NaN nor Inf");
 }
 
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured

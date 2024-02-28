@@ -11,6 +11,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
@@ -236,6 +237,20 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(ProxyProtocolTest, V1UnsupportedIPv4) {
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
+  expectProxyProtoError();
+}
+
 TEST_P(ProxyProtocolTest, V1Basic) {
   connect();
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -388,6 +403,34 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
+  // A well-formed ipv6/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x21, 0x22, 0x00, 0x24, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
+                                0x01, 0x01, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 'm',  'o',  'r',
+                                'e',  ' ',  'd',  'a',  't',  'a'};
+
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
@@ -621,6 +664,34 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
              Envoy::Network::Address::IpVersion::v4) {
     EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
               "127.0.0.1");
+  }
+  EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
+  // A well-formed local proxy protocol v2 header sampled from an AWS NLB healthcheck request,
+  // no address, 1 TLV is present.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x20, 0x00, 0x00, 0x07, 0x00, 0x00, 0x04, 0x0a, 0x0b, 0x0c,
+                                0x0d, 'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  expectData("moredata");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  if (server_connection_->connectionInfoProvider().remoteAddress()->ip()->version() ==
+      Envoy::Network::Address::IpVersion::v6) {
+    EXPECT_EQ(proxy_proto_data.dst_addr_->ip()->addressAsString(), "::1");
+  } else if (server_connection_->connectionInfoProvider().remoteAddress()->ip()->version() ==
+             Envoy::Network::Address::IpVersion::v4) {
+    EXPECT_EQ(proxy_proto_data.dst_addr_->ip()->addressAsString(), "127.0.0.1");
   }
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
@@ -1529,6 +1600,70 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
   ASSERT_THAT(value_vpc_id,
               ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
                           0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // A TLV of type 0x00 with size of 4 (1 byte is value).
+  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
+  // A TLV of type 0x02 with size of 10 bytes (7 bytes are value). Second and last bytes in the
+  // value are non utf8 characters.
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0xfe,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0xc1};
+  // A TLV of type 0x0f with size of 6 bytes (3 bytes are value).
+  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
+  // A TLV of type 0xea with size of 25 bytes (22 bytes are value). 7th and 21st bytes are non utf8
+  // characters.
+  constexpr uint8_t tlv_vpc_id[] = {0xea, 0x00, 0x16, 0x01, 0x76, 0x70, 0x63, 0x2d, 0x30,
+                                    0xc0, 0x35, 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61,
+                                    0x36, 0x63, 0x36, 0x33, 0x68, 0xf9, 0x37};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule_type_authority = proto_config.add_rules();
+  rule_type_authority->set_tlv_type(0x02);
+  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  auto rule_vpc_id = proto_config.add_rules();
+  rule_vpc_id->set_tlv_type(0xea);
+  rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv3, sizeof(tlv3));
+  write(tlv_vpc_id, sizeof(tlv_vpc_id));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
+
+  auto fields = metadata.at(ProxyProtocol).fields();
+  EXPECT_EQ(2, fields.size());
+  EXPECT_EQ(1, fields.count("PP2 type authority"));
+  EXPECT_EQ(1, fields.count("PP2 vpc id"));
+
+  const char replacement = 0x21;
+  auto value_type_authority = fields.at("PP2 type authority").string_value();
+  // Non utf8 characters have been replaced with `0x21` (`!` character).
+  ASSERT_THAT(value_type_authority,
+              ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement));
+
+  auto value_vpc_id = fields.at("PP2 vpc id").string_value();
+  ASSERT_THAT(value_vpc_id,
+              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35, 0x74, 0x65, 0x73,
+                          0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, replacement, 0x37));
   disconnect();
 }
 

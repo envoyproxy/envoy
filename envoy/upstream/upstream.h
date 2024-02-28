@@ -149,7 +149,9 @@ public:
   /* is not meant to be routed to. */                                            \
   m(EXCLUDED_VIA_IMMEDIATE_HC_FAIL, 0x80)                                        \
   /* The host failed active HC due to timeout. */                                \
-  m(ACTIVE_HC_TIMEOUT, 0x100)
+  m(ACTIVE_HC_TIMEOUT, 0x100)                                                    \
+  /* The host is currently marked as draining by EDS */                          \
+  m(EDS_STATUS_DRAINING, 0x200)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -594,6 +596,7 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
+   * @param seed a random number to initialize the locality load-balancing algorithm.
    * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
    * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
    * @param cross_priority_host_map read only cross-priority host map which is created in the main
@@ -602,7 +605,7 @@ public:
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<bool> weighted_priority_health,
+                           uint64_t seed, absl::optional<bool> weighted_priority_health,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -626,7 +629,7 @@ public:
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
-                             absl::optional<bool> weighted_priority_health,
+                             uint64_t seed, absl::optional<bool> weighted_priority_health,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
@@ -1272,6 +1275,14 @@ public:
    * ENVOY_ENABLE_UHV is undefined.
    */
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
+
+  /**
+   * @return absl::optional<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
+   * an optional value of the configuration for happy eyeballs for this cluster.
+   */
+  virtual const absl::optional<
+      envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  happyEyeballsConfig() const PURE;
 
 protected:
   /**

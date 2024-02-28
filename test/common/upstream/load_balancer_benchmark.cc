@@ -51,10 +51,10 @@ public:
     HostVectorConstSharedPtr updated_hosts = std::make_shared<HostVector>(hosts);
     HostsPerLocalityConstSharedPtr hosts_per_locality = makeHostsPerLocality({hosts});
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {},
-                              hosts, {}, absl::nullopt);
+                              hosts, {}, random_.random(), absl::nullopt);
     local_priority_set_.updateHosts(0,
                                     HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality),
-                                    {}, hosts, {}, absl::nullopt);
+                                    {}, hosts, {}, random_.random(), absl::nullopt);
   }
 
   Envoy::Thread::MutexBasicLockable lock_;

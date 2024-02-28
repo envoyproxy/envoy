@@ -18,6 +18,8 @@ namespace PostgresProxy {
 using testing::ReturnRef;
 using ::testing::WithArgs;
 
+using namespace std::literals::string_literals;
+
 // Decoder mock.
 class MockDecoderTest : public Decoder {
 public:
@@ -239,22 +241,22 @@ TEST_F(PostgresFilterTest, ErrorMsgsStats) {
   // Pretend that startup message has been received.
   static_cast<DecoderImpl*>(filter_->getDecoder())->state(DecoderImpl::State::InSyncState);
 
-  createPostgresMsg(data_, "E", "SERRORVERRORC22012");
+  createPostgresMsg(data_, "E", "SERRORVERRORC22012\0"s);
   filter_->onWrite(data_, false);
   ASSERT_THAT(filter_->getStats().errors_.value(), 1);
   ASSERT_THAT(filter_->getStats().errors_error_.value(), 1);
 
-  createPostgresMsg(data_, "E", "SFATALVFATALC22012");
+  createPostgresMsg(data_, "E", "SFATALVFATALC22012\0"s);
   filter_->onWrite(data_, false);
   ASSERT_THAT(filter_->getStats().errors_.value(), 2);
   ASSERT_THAT(filter_->getStats().errors_fatal_.value(), 1);
 
-  createPostgresMsg(data_, "E", "SPANICVPANICC22012");
+  createPostgresMsg(data_, "E", "SPANICVPANICC22012\0Mmessage\0"s);
   filter_->onWrite(data_, false);
   ASSERT_THAT(filter_->getStats().errors_.value(), 3);
   ASSERT_THAT(filter_->getStats().errors_panic_.value(), 1);
 
-  createPostgresMsg(data_, "E", "SBLAHBLAHC22012");
+  createPostgresMsg(data_, "E", "SBLAHBLAHC22012\0"s);
   filter_->onWrite(data_, false);
   ASSERT_THAT(filter_->getStats().errors_.value(), 4);
   ASSERT_THAT(filter_->getStats().errors_unknown_.value(), 1);

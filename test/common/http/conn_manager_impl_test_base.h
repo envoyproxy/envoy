@@ -53,7 +53,7 @@ public:
   void sendRequestHeadersAndData();
   ResponseHeaderMap*
   sendResponseHeaders(ResponseHeaderMapPtr&& response_headers,
-                      absl::optional<StreamInfo::ResponseFlag> response_flag = absl::nullopt,
+                      absl::optional<StreamInfo::CoreResponseFlag> response_flag = absl::nullopt,
                       std::string response_code_details = "details");
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);
@@ -172,6 +172,7 @@ public:
   ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
     return header_validator_factory_.createServerHeaderValidator(protocol, header_validator_stats_);
   }
+  bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;

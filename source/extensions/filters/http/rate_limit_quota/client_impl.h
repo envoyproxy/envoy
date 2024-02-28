@@ -34,15 +34,7 @@ class RateLimitClientImpl : public RateLimitClient,
 public:
   RateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                       Server::Configuration::FactoryContext& context, absl::string_view domain_name,
-                      RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
-      : domain_name_(domain_name),
-        aync_client_(
-            context.serverFactoryContext()
-                .clusterManager()
-                .grpcAsyncClientManager()
-                .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true)),
-        rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
-        time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
+                      RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets);
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 

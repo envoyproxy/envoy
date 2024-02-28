@@ -403,6 +403,7 @@ listener_filters:
   ASSERT_NE(nullptr, listener_filter);
   Network::MockListenerFilterCallbacks callbacks;
   EXPECT_CALL(callbacks, filterState());
+  EXPECT_CALL(callbacks, dispatcher()).WillOnce(ReturnRef(server_.dispatcher_));
   listener_filter->onAccept(callbacks);
   auto* added_filter_state =
       callbacks.filter_state_.getDataReadOnly<TestQuicListenerFilter::TestStringFilterState>(

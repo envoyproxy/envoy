@@ -1,4 +1,3 @@
-#include "codec.h"
 #include "source/extensions/common/dubbo/codec.h"
 
 #include <cstdint>
@@ -8,10 +7,9 @@
 
 #include "source/common/common/assert.h"
 #include "source/extensions/common/dubbo/hessian2_serializer_impl.h"
+#include "source/extensions/common/dubbo/message.h"
 #include "source/extensions/common/dubbo/message_impl.h"
-
-#include "message.h"
-#include "metadata.h"
+#include "source/extensions/common/dubbo/metadata.h"
 
 namespace Envoy {
 namespace Extensions {

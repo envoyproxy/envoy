@@ -1775,14 +1775,13 @@ TEST_P(WasmHttpFilterTest, Property) {
     // TODO(PiotrSikora): test not yet implemented using Rust SDK.
     return;
   }
-  setupTest("", "property");
-  setupFilter();
   envoy::config::core::v3::Node node_data;
   ProtobufWkt::Value node_val;
   node_val.set_string_value("sample_data");
   (*node_data.mutable_metadata()->mutable_fields())["istio.io/metadata"] = node_val;
   EXPECT_CALL(local_info_, node()).WillRepeatedly(ReturnRef(node_data));
-
+  setupTest("", "property");
+  setupFilter();
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
           "envoy.filters.http.wasm",
@@ -2116,6 +2115,24 @@ TEST_P(WasmHttpFilterTest, CloseResponse) {
   // Create in-VM context.
   filter().onCreate();
   EXPECT_EQ(proxy_wasm::FilterHeadersStatus::Continue, filter().onResponseHeaders(0, false));
+}
+
+TEST_P(WasmHttpFilterTest, VerifySignature) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(patricio78): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "verify_signature");
+  setupFilter();
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info, Eq(absl::string_view("signature is valid"))));
+
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::err, Eq(absl::string_view("unknown is not supported."))));
+  EXPECT_CALL(rootContext(), log_(spdlog::level::err,
+                                  Eq(absl::string_view("Failed to initialize digest verify."))))
+      .Times(2);
+  rootContext().onTick(0);
 }
 
 } // namespace Wasm

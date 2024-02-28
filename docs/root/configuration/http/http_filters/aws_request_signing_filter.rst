@@ -16,7 +16,7 @@ existing AWS Credential Provider to get the secrets used for generating the requ
 headers.
 
 This filter can be used to communicate with both AWS API endpoints and customer API endpoints, such as AWS API Gateway
-hosted APIs or AWS VPC Lattice services.
+hosted APIs or Amazon VPC Lattice services.
 
 The :ref:`use_unsigned_payload <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.use_unsigned_payload>`
 option determines whether or not requests are buffered so the request body can be used to compute the payload hash. Some
@@ -92,6 +92,10 @@ filter chain within the cluster configuration.
     :caption: :download:`aws-request-signing-filter-upstream.yaml <_include/aws-request-signing-filter-upstream.yaml>`
 
 .. include:: _include/aws_credentials.rst
+
+.. _config_http_filters_aws_request_signing_region:
+
+.. include:: _include/aws_regions.rst
 
 Statistics
 ----------

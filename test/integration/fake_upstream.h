@@ -639,7 +639,7 @@ struct FakeUpstreamConfig {
   };
 
   FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {
-    http2_options_ = ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options_);
+    http2_options_ = ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options_).value();
     // Legacy options which are always set.
     http2_options_.set_allow_connect(true);
     http2_options_.set_allow_metadata(true);

@@ -75,7 +75,7 @@ class MainActivity : Activity() {
             Log.d("MainActivity", "Event emitted: ${entry.key}, ${entry.value}")
           }
         })
-        .setLogger { Log.d("MainActivity", it) }
+        .setLogger { _, message -> Log.d("MainActivity", message) }
         .build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView

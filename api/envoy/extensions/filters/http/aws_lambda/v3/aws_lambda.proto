@@ -42,6 +42,19 @@ message Config {
 
   // Determines the way to invoke the Lambda function.
   InvocationMode invocation_mode = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Indicates that before signing headers, the host header will be swapped with
+  // this value. If not set or empty, the original host header value
+  // will be used and no rewrite will happen.
+  //
+  // Note: this rewrite affects both signing and host header forwarding. However, this
+  // option shouldn't be used with
+  // :ref:`HCM host rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>` given that the
+  // value set here would be used for signing whereas the value set in the HCM would be used
+  // for host header forwarding which is not the desired outcome.
+  // Changing the value of the host header can result in a different route to be selected
+  // if an HTTP filter after AWS lambda re-evaluates the route (clears route cache).
+  string host_rewrite = 4;
 }
 
 // Per-route configuration for AWS Lambda. This can be useful when invoking a different Lambda function or a different

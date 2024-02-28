@@ -5,7 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 
-#include "library/common/jni/android_jni_utility.h"
+#include "library/jni/android_jni_utility.h"
 
 namespace Envoy {
 namespace Network {

@@ -27,7 +27,7 @@ private:
   /* A mapping of the envoymobile errors we care about for testing
    * From https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
    */
-  StreamInfo::ResponseFlag mapErrorToResponseFlag(uint64_t errorCode);
+  StreamInfo::CoreResponseFlag mapErrorToResponseFlag(uint64_t errorCode);
 };
 
 } // namespace TestRead

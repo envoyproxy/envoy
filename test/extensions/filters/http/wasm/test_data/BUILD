@@ -158,6 +158,7 @@ envoy_wasm_cc_binary(
         ":test_cc_proto",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
+        "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )

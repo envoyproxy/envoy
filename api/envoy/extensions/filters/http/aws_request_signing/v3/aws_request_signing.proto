@@ -39,6 +39,9 @@ message AwsRequestSigning {
   // Example: s3
   string service_name = 1 [(validate.rules).string = {min_len: 1}];
 
+  // Optional region string. If region is not provided, the region will be retrieved from the environment
+  // or AWS configuration files. See :ref:`config_http_filters_aws_request_signing_region` for more details.
+  //
   // When signing_algorithm is set to ``AWS_SIGV4`` the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
   // hosting the HTTP endpoint.
   //
@@ -53,7 +56,7 @@ message AwsRequestSigning {
   //
   // By configuring a region set, a sigv4a signed request can be sent to multiple regions, rather than being
   // valid for only a single region destination.
-  string region = 2 [(validate.rules).string = {min_len: 1}];
+  string region = 2;
 
   // Indicates that before signing headers, the host header will be swapped with
   // this value. If not set or empty, the original host header value

@@ -438,6 +438,12 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
 }
 
+TEST_F(QuicPlatformTest, QuicheLogDFatalNoExit) {
+  quiche::test::QuicheScopedDisableExitOnDFatal scoped_object;
+  QUIC_LOG(DFATAL) << "This shouldn't call abort()";
+  QUICHE_DCHECK(false) << "This shouldn't call abort()";
+}
+
 TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
   auto& flag_registry = quiche::FlagRegistry::getInstance();
 

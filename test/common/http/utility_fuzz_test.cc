@@ -86,10 +86,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
-    try {
-      Http2::Utility::initializeAndValidateOptions(options);
-    } catch (EnvoyException& e) {
-      absl::string_view msg = e.what();
+    auto options_or_error = Http2::Utility::initializeAndValidateOptions(options);
+    if (options_or_error.status().ok()) {
+      absl::string_view msg = options_or_error.status().message();
       // initializeAndValidateOptions throws exceptions for 4 different reasons due to malformed
       // settings, so check for them and allow any other exceptions through
       if (absl::StartsWith(
@@ -103,9 +102,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
           absl::EndsWith(
               msg, "HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
                    "custom parameters")) {
-        ENVOY_LOG_MISC(trace, "Caught exception {} in initializeAndValidateOptions test", e.what());
+        ENVOY_LOG_MISC(trace, "Ignoring error {} in initializeAndValidateOptions", msg);
       } else {
-        throw EnvoyException(e.what());
+        throw EnvoyException(std::string(msg));
       }
     }
     break;

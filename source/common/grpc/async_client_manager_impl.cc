@@ -45,12 +45,14 @@ bool validateGrpcCompatibleAsciiHeaderValue(absl::string_view h_value) {
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                                                const envoy::config::core::v3::GrpcService& config,
-                                               bool skip_cluster_check, TimeSource& time_source)
+                                               bool skip_cluster_check, TimeSource& time_source,
+                                               absl::Status& creation_status)
     : cm_(cm), config_(config), time_source_(time_source) {
   if (skip_cluster_check) {
-    return;
+    creation_status = absl::OkStatus();
+  } else {
+    creation_status = cm_.checkActiveStaticCluster(config.envoy_grpc().cluster_name());
   }
-  THROW_IF_NOT_OK(cm_.checkActiveStaticCluster(config.envoy_grpc().cluster_name()));
 }
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(
@@ -81,11 +83,11 @@ RawAsyncClientPtr AsyncClientFactoryImpl::createUncachedRawAsyncClient() {
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot, Stats::Scope& scope,
-    const envoy::config::core::v3::GrpcService& config, Api::Api& api, const StatNames& stat_names)
+    const envoy::config::core::v3::GrpcService& config, Api::Api& api, const StatNames& stat_names,
+    absl::Status& creation_status)
     : tls_(tls), google_tls_slot_(google_tls_slot),
       scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
       config_(config), api_(api), stat_names_(stat_names) {
-
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(tls_);
   UNREFERENCED_PARAMETER(google_tls_slot_);
@@ -93,26 +95,30 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   UNREFERENCED_PARAMETER(config_);
   UNREFERENCED_PARAMETER(api_);
   UNREFERENCED_PARAMETER(stat_names_);
-  throwEnvoyExceptionOrPanic("Google C++ gRPC client is not linked");
+  creation_status = absl::InvalidArgumentError("Google C++ gRPC client is not linked");
+  return;
 #else
   ASSERT(google_tls_slot_ != nullptr);
 #endif
 
+  creation_status = absl::OkStatus();
   // Check metadata for gRPC API compliance. Uppercase characters are lowered in the HeaderParser.
   // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
   for (const auto& header : config.initial_metadata()) {
     // Validate key
     if (!validateGrpcHeaderChars(header.key())) {
-      throwEnvoyExceptionOrPanic(
+      creation_status = absl::InvalidArgumentError(
           fmt::format("Illegal characters in gRPC initial metadata header key: {}.", header.key()));
+      return;
     }
 
     // Validate value
     // Binary base64 encoded - handled by the GRPC library
     if (!::absl::EndsWith(header.key(), "-bin") &&
         !validateGrpcCompatibleAsciiHeaderValue(header.value())) {
-      throwEnvoyExceptionOrPanic(fmt::format(
+      creation_status = absl::InvalidArgumentError(fmt::format(
           "Illegal ASCII value for gRPC initial metadata header key: {}.", header.key()));
+      return;
     }
   }
 }
@@ -128,22 +134,30 @@ RawAsyncClientPtr GoogleAsyncClientFactoryImpl::createUncachedRawAsyncClient() {
 #endif
 }
 
-AsyncClientFactoryPtr
+absl::StatusOr<AsyncClientFactoryPtr>
 AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope, bool skip_cluster_check) {
+  absl::Status creation_status = absl::OkStatus();
+  AsyncClientFactoryPtr factory;
   switch (config.target_specifier_case()) {
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kEnvoyGrpc:
-    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check, time_source_);
+    factory = std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check,
+                                                       time_source_, creation_status);
+    break;
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
-    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
-                                                          config, api_, stat_names_);
+    factory = std::make_unique<GoogleAsyncClientFactoryImpl>(
+        tls_, google_tls_slot_.get(), scope, config, api_, stat_names_, creation_status);
+    break;
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
-  return nullptr;
+  if (!creation_status.ok()) {
+    return creation_status;
+  }
+  return factory;
 }
 
-RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
+absl::StatusOr<RawAsyncClientSharedPtr> AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
     bool skip_cluster_check) {
   const GrpcServiceConfigWithHashKey config_with_hash_key = GrpcServiceConfigWithHashKey(config);
@@ -151,21 +165,26 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   if (client != nullptr) {
     return client;
   }
-  client = factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check)
-               ->createUncachedRawAsyncClient();
+  auto factory_or_error =
+      factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check);
+  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  client = factory_or_error.value()->createUncachedRawAsyncClient();
   raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;
 }
 
-RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClientWithHashKey(
+absl::StatusOr<RawAsyncClientSharedPtr>
+AsyncClientManagerImpl::getOrCreateRawAsyncClientWithHashKey(
     const GrpcServiceConfigWithHashKey& config_with_hash_key, Stats::Scope& scope,
     bool skip_cluster_check) {
   RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(config_with_hash_key);
   if (client != nullptr) {
     return client;
   }
-  client = factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check)
-               ->createUncachedRawAsyncClient();
+  auto factory_or_error =
+      factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check);
+  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  client = factory_or_error.value()->createUncachedRawAsyncClient();
   raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;
 }

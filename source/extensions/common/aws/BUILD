@@ -163,6 +163,7 @@ envoy_cc_library(
     hdrs = ["region_provider_impl.h"],
     deps = [
         ":region_provider_interface",
+        ":utility_lib",
         "//source/common/common:logger_lib",
     ],
 )

@@ -365,6 +365,13 @@ INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   initialize();
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
+  EXPECT_TRUE(quic_listener_->udpPacketWriter().isBatchMode());
+#else
+  EXPECT_FALSE(quic_listener_->udpPacketWriter().isBatchMode());
+#endif
+  // The listener ignores read error.
+  quic_listener_->onReceiveError(Api::IoError::IoErrorCode::InvalidArgument);
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);

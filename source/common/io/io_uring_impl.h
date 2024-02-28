@@ -54,20 +54,5 @@ private:
   std::list<InjectedCompletion> injected_completions_;
 };
 
-class IoUringFactoryImpl : public IoUringFactory {
-public:
-  IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                     ThreadLocal::SlotAllocator& tls);
-
-  // IoUringFactory
-  IoUring& getOrCreate() const override;
-  void onServerInitialized() override;
-
-private:
-  const uint32_t io_uring_size_{};
-  const bool use_submission_queue_polling_{};
-  ThreadLocal::TypedSlot<IoUringImpl> tls_;
-};
-
 } // namespace Io
 } // namespace Envoy

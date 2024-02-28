@@ -17,6 +17,7 @@ typedef struct { // NOLINT(modernize-use-using)
   Cstring plugin_name;
   uint64_t configId;
   int phase;
+  uint32_t worker_id;
 } httpRequest;
 
 typedef struct { // NOLINT(modernize-use-using)
@@ -25,6 +26,7 @@ typedef struct { // NOLINT(modernize-use-using)
   uint64_t config_ptr;
   uint64_t config_len;
   int is_route_config;
+  uint32_t concurrency;
 } httpConfig;
 
 typedef enum { // NOLINT(modernize-use-using)

@@ -11,10 +11,10 @@
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
-#include "check_request_utils.h"
 
 namespace Envoy {
 namespace Extensions {

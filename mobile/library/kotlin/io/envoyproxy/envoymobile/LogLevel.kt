@@ -13,5 +13,20 @@ enum class LogLevel(internal val level: String, val levelInt: Int) {
   WARN("warn", 3),
   ERROR("error", 4),
   CRITICAL("critical", 5),
-  OFF("off", -1)
+  OFF("off", 6);
+
+  companion object {
+    /** Converts from numeric int to `LogLevel`. */
+    fun from(level: Int): LogLevel {
+      return when (level) {
+        0 -> TRACE
+        1 -> DEBUG
+        2 -> INFO
+        3 -> WARN
+        4 -> ERROR
+        5 -> CRITICAL
+        else -> OFF
+      }
+    }
+  }
 }

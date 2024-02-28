@@ -88,22 +88,13 @@ struct NullPathMatchCriterion : public Router::PathMatchCriterion {
 
 struct RouteEntryImpl : public Router::RouteEntry {
   RouteEntryImpl(
-      const std::string& cluster_name, Singleton::Manager& singleton_manager,
-      const absl::optional<std::chrono::milliseconds>& timeout,
+      const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
           hash_policy,
-      const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
-      : cluster_name_(cluster_name), timeout_(timeout) {
+      const Router::RetryPolicy& retry_policy)
+      : retry_policy_(retry_policy), cluster_name_(cluster_name), timeout_(timeout) {
     if (!hash_policy.empty()) {
       hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
-    }
-    if (retry_policy.has_value()) {
-      // ProtobufMessage::getStrictValidationVisitor() ?  how often do we do this?
-      Upstream::RetryExtensionFactoryContextImpl factory_context(singleton_manager);
-      retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
-          retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), factory_context);
-    } else {
-      retry_policy_ = std::make_unique<Router::RetryPolicyImpl>();
     }
   }
 
@@ -139,7 +130,7 @@ struct RouteEntryImpl : public Router::RouteEntry {
     return Upstream::ResourcePriority::Default;
   }
   const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-  const Router::RetryPolicy& retryPolicy() const override { return *retry_policy_; }
+  const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
   const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
     return internal_redirect_policy_;
   }
@@ -198,7 +189,7 @@ struct RouteEntryImpl : public Router::RouteEntry {
   const Router::EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
-  std::unique_ptr<Router::RetryPolicy> retry_policy_;
+  const Router::RetryPolicy& retry_policy_;
 
   static const NullHedgePolicy hedge_policy_;
   static const NullRateLimitPolicy rate_limit_policy_;
@@ -220,12 +211,11 @@ struct RouteEntryImpl : public Router::RouteEntry {
 };
 
 struct NullRouteImpl : public Router::Route {
-  NullRouteImpl(const std::string cluster_name, Singleton::Manager& singleton_manager,
+  NullRouteImpl(const std::string cluster_name, const Router::RetryPolicy& retry_policy,
                 const absl::optional<std::chrono::milliseconds>& timeout = {},
                 const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-                    hash_policy = {},
-                const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy = {})
-      : route_entry_(cluster_name, singleton_manager, timeout, hash_policy, retry_policy) {}
+                    hash_policy = {})
+      : route_entry_(cluster_name, timeout, hash_policy, retry_policy) {}
 
   // Router::Route
   const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }

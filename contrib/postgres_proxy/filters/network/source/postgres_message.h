@@ -95,6 +95,11 @@ public:
 
   T get() const { return value_; }
 
+  T& operator=(const T& other) {
+    value_ = other;
+    return value_;
+  }
+
 private:
   T value_{};
 };
@@ -287,6 +292,69 @@ private:
   std::vector<std::unique_ptr<T>> value_;
 };
 
+// ZeroTCodes (Zero Terminated Codes) is a structure which represents sequence of:
+// [code][value]
+// [code][value]
+// ...
+// [code][value]
+// zero
+// Where code is 1 Byte.
+template <typename T> class ZeroTCodes {
+public:
+  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+    for (size_t i = 0; i < values_.size(); i++) {
+      if (!values_[i].first.read(data, pos, left)) {
+        return false;
+      }
+      if (!values_[i].second->read(data, pos, left)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  std::string toString() const {
+    std::string out;
+    for (const auto& value : values_) {
+      out += fmt::format("[{}:{}]", value.first.toString(), value.second->toString());
+    }
+    return out;
+  }
+
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t start_offset,
+                                     uint64_t& pos, uint64_t& left) {
+    uint64_t orig_pos = pos;
+    uint64_t orig_left = left;
+    // Check if one byte of code can be read.
+    while (left >= sizeof(Byte1)) {
+      // Read 1 byte code and exit when terminating zero is found.
+      Byte1 code;
+      code = data.peekBEInt<char>(pos);
+      // Advance the position by 1 byte (code).
+      pos += sizeof(Byte1);
+      left -= sizeof(Byte1);
+      if (code.get() == 0) {
+        return Message::ValidationOK;
+      }
+
+      // Validate the value found after the code.
+      auto item = std::make_unique<T>();
+      Message::ValidationResult result = item->validate(data, start_offset, pos, left);
+      if (Message::ValidationOK != result) {
+        pos = orig_pos;
+        left = orig_left;
+        values_.clear();
+        return result;
+      }
+      values_.push_back(std::make_pair(code, std::move(item)));
+    }
+
+    return Message::ValidationFailed;
+  }
+
+  std::vector<std::pair<Byte1, std::unique_ptr<T>>> values_;
+};
+
 // Sequence is tuple like structure, which binds together
 // set of several fields of different types.
 template <typename... Types> class Sequence;
@@ -330,8 +398,8 @@ public:
   std::string toString() const { return ""; }
   bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
   Message::ValidationResult validate(const Buffer::Instance&, const uint64_t, uint64_t&,
-                                     uint64_t& left) {
-    return left == 0 ? Message::ValidationOK : Message::ValidationFailed;
+                                     uint64_t&) {
+    return Message::ValidationOK;
   }
 };
 
@@ -350,6 +418,13 @@ public:
     uint64_t pos = start_pos;
     uint64_t left = length;
     validation_result_ = Sequence<Types...>::validate(data, start_pos, pos, left);
+    if (validation_result_ != Message::ValidationOK) {
+      return validation_result_;
+    }
+    // verify that parser iterated over entire message and nothing is left.
+    if (left != 0) {
+      validation_result_ = Message::ValidationFailed;
+    }
     return validation_result_;
   }
   std::string toString() const override { return Sequence<Types...>::toString(); }

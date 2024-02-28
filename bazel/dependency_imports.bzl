@@ -16,6 +16,7 @@ load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies"
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
+load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
 
 # go version for rules_go
 GO_VERSION = "1.20"
@@ -27,7 +28,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
-    envoy_download_go_sdks(go_version)
+    if go_version != "host":
+        envoy_download_go_sdks(go_version)
     gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()
@@ -155,6 +157,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     )
 
     protoc_gen_jsonschema_go_dependencies()
+    rules_proto_grpc_toolchains()
 
 def envoy_download_go_sdks(go_version):
     go_download_sdk(
