@@ -96,7 +96,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message ExternalProcessor {
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
@@ -115,26 +115,31 @@ message ExternalProcessor {
   // sent. See ProcessingMode for details.
   ProcessingMode processing_mode = 3;
 
+   // [#not-implemented-hide:]
   // If true, send each part of the HTTP request or response specified by ProcessingMode
   // asynchronously -- in other words, send the message on the gRPC stream and then continue
-  // filter processing. In this mode:
-  // 1) Only STREAMED body processing mode is supported and any other body processing modes
-  // will be ignored for asynchronous processing.
-  // 2) ext_proc server is not expected to send back processing response. Any response from
-  // ext_proc server will be simply ignored.
-  //
-  // If false, which is the default, suspend filter execution after
+  // filter processing. If false, which is the default, suspend filter execution after
   // each message is sent to the remote service and wait up to "message_timeout"
   // for a reply.
+  bool async_mode = 4;
+
+  // If true, send each part of the HTTP request or response specified by ProcessingMode
+  // without puasing on filter chain iteration. It is "Send and Go" mode that can be used
+  // by external processor to observe Envoy data and status. In this mode:
+  // 1) Only STREAMED body processing mode is supported and any other body processing modes
+  // will be ignored.
+  // 2) External processor is not expected to send back processing response. Any response
+  // will be simply ignored.
+  //
   //
   // .. warning::
   //
   //    Flow control is necessary mechanism to prevent the fast sender (either downstream client or upstream server)
-  //    from overwhelming the ext_proc server when its processing speed is slower.
+  //    from overwhelming the external processor when its processing speed is slower.
   //    This protective measure is being explored and developed but has not been ready yet, so please use your own
   //    discretion when enabling this feature.
   //
-  bool async_mode = 4;
+  bool observability_mode = 19;
 
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
