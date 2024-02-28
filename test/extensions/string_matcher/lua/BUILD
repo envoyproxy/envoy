@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/extensions/string_matcher/lua:config",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/string_matcher/lua/v3:pkg_cc_proto",
     ],
 )
 
@@ -29,5 +30,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/string_matcher/lua:config",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/extensions/string_matcher/lua/v3:pkg_cc_proto",
     ],
 )

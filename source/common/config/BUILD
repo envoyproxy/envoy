@@ -250,7 +250,7 @@ envoy_cc_library(
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-     ],
+    ],
 )
 
 envoy_cc_library(
