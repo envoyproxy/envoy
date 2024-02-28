@@ -149,6 +149,15 @@ removed_config_or_runtime:
     removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
+- area: ext_proc
+  change: |
+    Added
+    :ref:`grpc_initial_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_initial_metadata>`
+    config API to allow extending inherited metadata from
+    :ref:`ExternalProcessor.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`
+    and
+    :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
+    with the new or updated values.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
@@ -222,6 +231,11 @@ new_features:
     added an option to dynamically set a per downstream connection idle timeout period object under the key
     ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
     specified in the filter configuration and the default idle timeout.
+- area: overload
+  change: |
+    added a :ref:`configuration option
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>` to add
+    ``x-envoy-local-overloaded`` header when Overload Manager is triggered.
 
 deprecated:
 - area: listener

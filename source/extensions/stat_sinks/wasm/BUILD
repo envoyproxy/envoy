@@ -20,6 +20,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/server:instance_interface",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/extensions/stat_sinks/wasm/v3:pkg_cc_proto",
