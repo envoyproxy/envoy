@@ -154,7 +154,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   }
 
   if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamRemoteReset)) {
-    common_access_log.mutable_response_flags()->set_downstream_remote_reset(true); 
+    common_access_log.mutable_response_flags()->set_downstream_remote_reset(true);
   }
 }
 
