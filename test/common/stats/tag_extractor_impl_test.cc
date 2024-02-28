@@ -455,7 +455,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   Tag rbac_http_prefix;
   rbac_http_prefix.name_ = tag_names.RBAC_HTTP_PREFIX;
   rbac_http_prefix.value_ = "my_rbac_http_prefix";
-  regex_tester.testRegex("my_rbac_http_prefix.rbac.allowed", "rbac.allowed", {rbac_http_prefix});
+  regex_tester.testRegex("http.my_rbac_http_prefix.rbac.allowed", "rbac.allowed",
+                         {rbac_http_prefix});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
