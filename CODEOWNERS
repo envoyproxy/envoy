@@ -258,6 +258,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # proxy protocol
 /*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
 # access loggers
+/*/extensions/access_loggers/fluentd @ohadvano @wbpcode
 /*/extensions/access_loggers/grpc @wbpcode @cpakulski @giantcroc @gyohuangxin
 # stats
 /*/extensions/stat_sinks/statsd @mattklein123 @suniltheta

@@ -7,6 +7,9 @@
 
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/network/connectivity_manager.h"
+#include "library/common/network/proxy_api.h"
+#include "library/common/network/proxy_resolver_interface.h"
+#include "library/common/network/proxy_settings.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/types/c_types.h"
 
@@ -21,7 +24,8 @@ namespace NetworkConfiguration {
 class NetworkConfigurationFilter final
     : public Http::PassThroughFilter,
       public Logger::Loggable<Logger::Id::filter>,
-      public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
+      public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
+      public std::enable_shared_from_this<NetworkConfigurationFilter> {
 public:
   NetworkConfigurationFilter(Network::ConnectivityManagerSharedPtr connectivity_manager,
                              bool enable_drain_post_dns_refresh, bool enable_interface_binding)
@@ -43,11 +47,16 @@ public:
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override;
 
   void onDestroy() override;
+  void onProxyResolutionComplete(Network::ProxySettingsConstSharedPtr proxy_settings);
 
 private:
   void setInfo(absl::string_view authority, Network::Address::InstanceConstSharedPtr address);
   bool
   onAddressResolved(const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info);
+  Http::FilterHeadersStatus resolveProxy(Http::RequestHeaderMap& request_headers,
+                                         Network::ProxyResolverApi* resolver);
+  Http::FilterHeadersStatus
+  continueWithProxySettings(Network::ProxySettingsConstSharedPtr proxy_settings);
 
   // This is only present if there is an active proxy DNS lookup in progress.
   std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandle>
@@ -57,6 +66,8 @@ private:
   bool enable_drain_post_dns_refresh_;
   bool enable_interface_binding_;
   Event::SchedulableCallbackPtr continue_decoding_callback_;
+  // The lifetime of proxy settings must be attached to the lifetime of the filter.
+  std::vector<Network::ProxySettings> proxy_settings_;
 };
 
 } // namespace NetworkConfiguration

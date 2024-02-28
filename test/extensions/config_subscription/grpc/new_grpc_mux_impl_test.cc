@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -23,6 +24,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -761,6 +763,24 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
     EXPECT_CALL(*eds_resources_cache_, removeResource("y"));
     expectSendMessage(type_url, {}, {"y"});
   }
+}
+
+TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
+  auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
+      "envoy.config_mux.new_grpc_mux_factory");
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Stats::MockStore> store;
+  Stats::MockScope& scope{store.mockScope()};
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::config::core::v3::ApiConfigSource ads_config;
+  ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
+  ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), dispatcher, random, scope,
+                               ads_config, local_info, nullptr, nullptr, absl::nullopt,
+                               absl::nullopt, false),
+               EnvoyException);
 }
 
 } // namespace

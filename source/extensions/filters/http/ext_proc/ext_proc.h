@@ -373,8 +373,7 @@ private:
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      ProtobufWkt::Struct* proto);
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
@@ -386,6 +385,7 @@ private:
   void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void addDynamicMetadata(const ProcessorState& state,
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;

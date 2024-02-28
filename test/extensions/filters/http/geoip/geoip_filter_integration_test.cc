@@ -7,9 +7,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::DoAll;
-using testing::SaveArg;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

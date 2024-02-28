@@ -560,6 +560,22 @@ TEST_F(ConnectivityGridTest, TestCancel) {
   cancel->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
+// Test tearing down the grid with active connections.
+TEST_F(ConnectivityGridTest, TestTeardown) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->first(), nullptr);
+
+  grid_->newStream(decoder_, callbacks_,
+                   {/*can_send_early_data_=*/false,
+                    /*can_use_http3_=*/true});
+  EXPECT_NE(grid_->first(), nullptr);
+
+  // When the grid is reset, pool failure should be called.
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_.reset();
+}
+
 // Make sure drains get sent to all active pools.
 TEST_F(ConnectivityGridTest, Drain) {
   initialize();
@@ -599,20 +615,18 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
   // The first time a drain is started, both pools should start draining.
   {
     EXPECT_CALL(*grid_->first(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     EXPECT_CALL(*grid_->second(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
-    grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 
-  // The second time, the pools will not see any change.
+  // The second time a drain is started, both pools should still be notified.
   {
     EXPECT_CALL(*grid_->first(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-        .Times(0);
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
     EXPECT_CALL(*grid_->second(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-        .Times(0);
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
     grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
   {
