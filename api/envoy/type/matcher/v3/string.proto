@@ -65,7 +65,7 @@ message StringMatcher {
 
     // Use an extension as the matcher type.
     // [#extension-category: envoy.matching.string]
-    xds.core.v3.TypedExtensionConfig extension = 8;
+    xds.core.v3.TypedExtensionConfig custom = 8;
   }
 
   // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This

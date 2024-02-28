@@ -141,13 +141,13 @@ public:
 private:
   // Type `xds::type::matcher::v3::StringMatcher` doesn't have an extension type, so use function
   // overloading to only handle that case for type `envoy::type::matcher::v3::StringMatcher` to
-  // prevent compilation errors on use of `kExtension`.
+  // prevent compilation errors on use of `kCustom`.
 
   void initialize(const xds::type::matcher::v3::StringMatcher&) {}
 
   void initialize(const envoy::type::matcher::v3::StringMatcher& matcher) {
-    if (matcher.has_extension()) {
-      extension_ = getExtensionStringMatcher(matcher.extension());
+    if (matcher.has_custom()) {
+      custom_ = getExtensionStringMatcher(matcher.custom());
     }
   }
 
@@ -158,8 +158,8 @@ private:
   bool match(const absl::string_view value,
              const envoy::type::matcher::v3::StringMatcher& matcher) const {
     if (matcher.match_pattern_case() ==
-        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExtension) {
-      return extension_->match(value);
+        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kCustom) {
+      return custom_->match(value);
     }
     return matchCommon(value);
   }
@@ -190,7 +190,7 @@ private:
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
-  StringMatcherPtr extension_;
+  StringMatcherPtr custom_;
 };
 
 class StringMatcherExtensionFactory : public Config::TypedFactory {

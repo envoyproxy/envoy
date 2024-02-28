@@ -36,7 +36,7 @@ public:
 
           header_match->set_name("lua-header");
 
-          auto* string_match_extension = header_match->mutable_string_match()->mutable_extension();
+          auto* string_match_extension = header_match->mutable_string_match()->mutable_custom();
           string_match_extension->set_name("unused but must be set");
           string_match_extension->mutable_typed_config()->PackFrom(config);
         });
