@@ -15,6 +15,7 @@ struct HttpProtocolTestParams {
   Http2Impl http2_implementation;
   bool defer_processing_backedup_streams;
   bool use_universal_header_validator;
+  bool tunneling_with_upstream_filters;
 };
 
 absl::string_view http2ImplementationToString(Http2Impl impl);
@@ -83,6 +84,9 @@ public:
                                                                                    : "false");
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       GetParam().use_universal_header_validator ? "true" : "false");
+    config_helper_.addRuntimeOverride(Runtime::upstream_http_filters_with_tcp_proxy,
+                                      GetParam().tunneling_with_upstream_filters ? "true"
+                                                                                 : "false");
   }
 
   void SetUp() override {

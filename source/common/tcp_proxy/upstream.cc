@@ -322,6 +322,9 @@ HttpConnPool::~HttpConnPool() {
     // before going idle, they are closed with Default rather than CloseExcess.
     upstream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
   }
+  if (combined_upstream_ != nullptr) {
+    combined_upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+  }
 }
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
