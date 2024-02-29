@@ -69,6 +69,8 @@ public:
         // cause non UTF-8 body content to be changed when it doesn't need to.
         pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
 
+        headers_as_bytes_(config.headers_as_bytes()),
+
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -148,6 +150,8 @@ public:
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   bool packAsBytes() const { return pack_as_bytes_; }
+
+  bool headersAsBytes() const { return headers_as_bytes_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -229,6 +233,7 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
+  const bool headers_as_bytes_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;

@@ -803,6 +803,46 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   EXPECT_EQ(data_.length(), check_request.attributes().request().http().raw_body().size());
 }
 
+// Checks that the filter buffers the data and initiates the authorization request.
+TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
+  InSequence s;
+
+  // N.B. headers_as_bytes is set to true.
+  initialize(R"EOF(
+  transport_api_version: V3
+  headers_as_bytes: true
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  // Add header with non-UTF-8 value.
+  absl::string_view header_key = "header-with-non-utf-8-value";
+  const uint8_t non_utf_8_bytes[2] = {0xc0, 0xc0};
+  absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
+  request_headers_.addCopy(Http::LowerCaseString(header_key), header_value);
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_request,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        request_callbacks_ = &callbacks;
+        // headers should be empty.
+        EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
+        // headers_bytes should contain the header we added and it should be unchanged.
+        ASSERT_TRUE(
+            check_request.attributes().request().http().headers_bytes().contains(header_key));
+        EXPECT_EQ(header_value,
+                  check_request.attributes().request().http().headers_bytes().at(header_key));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+}
+
 // Checks that filter does not buffer data on header-only request.
 TEST_F(HttpFilterTest, HeaderOnlyRequest) {
   InSequence s;
