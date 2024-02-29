@@ -2,11 +2,11 @@ agent-ubuntu: ubuntu-22.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
-  sha: d736c58f06f36848e7966752cc7e01519cc1b5101a178d5c6634807e8ac3deab
-  mobile-sha: 13674edd989ada8b94257f410e38e5e8e4c6a0a9c2fdf8bda9261047a7f843e4
+  sha: 556d7362de123ddc09b26f407a174122a7df54f9ae7e70007f254fe9d0033197
+  mobile-sha: 8dcd964dda9d452e8469ee7412a9102e526524c8b5f242c16f4142938221214c
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: 0434d2f6a65895a00f8936fba83b7ff14d21e149dc15c9ac25a31a6fa018234f
-  tag: 0ca52447572ee105a4730da5e76fe47c9c5a7c64
+  gcr-sha: 5fb979e9e6851aeb043c4a42064a09ca738d27495761d6c7573755a130bfe2c6
+  tag: a7e14c742e0968a6a55ff80e9f4a3d107d7fd71f
 
 config:
   envoy:
