@@ -47,6 +47,9 @@ namespace Router {
 namespace {
 constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 
+ABSL_ATTRIBUTE_UNUSED
+consteval int sqr(int n) { return n * n; }
+
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
