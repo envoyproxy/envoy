@@ -7,6 +7,8 @@
 
 namespace Envoy::Extensions::StringMatcher::Lua {
 
+// This class should not be used directly. It is exposed here for use in tests.
+// Correct use requires use of a thread local slot.
 class LuaStringMatcher : public Matchers::StringMatcher, public ThreadLocal::ThreadLocalObject {
 public:
   LuaStringMatcher(const std::string& code);
