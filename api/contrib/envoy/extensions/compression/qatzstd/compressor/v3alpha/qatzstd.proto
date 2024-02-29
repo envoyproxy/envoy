@@ -42,13 +42,14 @@ message Qatzstd {
   // to default. Setting this will however eventually dynamically impact the compression
   // parameters which have not been manually set. The manually set
   // ones will 'stick'.
-  google.protobuf.UInt32Value compression_level = 1;
+  google.protobuf.UInt32Value compression_level = 1 [(validate.rules).uint32 = {lte: 22 gte: 1}];
 
   // A 32-bits checksum of content is written at end of frame. If not set, defaults to false.
   bool enable_checksum = 2;
 
   // The higher the value of selected strategy, the more complex it is,
   // resulting in stronger and slower compression.
+  //
   // Special: value 0 means "use default strategy".
   Strategy strategy = 3 [(validate.rules).enum = {defined_only: true}];
 
@@ -56,6 +57,9 @@ message Qatzstd {
   google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
 
   // Enable QAT to accelerate Zstd compression or not. If not set, defaults to false.
+  //
+  // This is useful in the case that users want to enable QAT for a period of time and disable QAT for another period of time, 
+  // they don't have to change the config too much or prepare for another config that has software zstd compressor and just changing the value of this filed.
   bool enable_qat_zstd = 6;
 
   // Fallback to software for Qatzstd when input size is less than this value.
