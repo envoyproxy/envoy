@@ -22,12 +22,15 @@ const std::string program = R"(
     -- Test that these locals are properly captured in the state.
     local good_val = "match"
     local bad_val = "nomatch"
+    local error_val = "error"
 
     function envoy_match(str)
       if str == good_val then
         return true
       elseif str == bad_val then
         return false
+      elseif str == error_val then
+        error("intentional error")
       end
     end
 
@@ -63,6 +66,10 @@ TEST(LuaStringMatcher, LuaBehavior) {
 
   EXPECT_LOG_CONTAINS("error", "function did not return a boolean",
                       { EXPECT_FALSE(test(program, "unknown")); });
+
+  EXPECT_LOG_CONTAINS(
+      "error", "Lua StringMatcher error running script: [string \"...\"]:13: intentional error",
+      { EXPECT_FALSE(test(program, "error")); });
 }
 
 // Ensure that the code runs in a context that the standard library is loaded into.
