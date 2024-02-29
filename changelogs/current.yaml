@@ -17,7 +17,7 @@ minor_behavior_changes:
 - area: sockets
   change: |
     Failure to create an upstream socket should now result in clean connection failure rather than failing a release assert. This behavior
-    can be temporarily reverted by setting runtime feature ``envoy.restart_features_.llow_client_socket_creation_failure`` to false.
+    can be temporarily reverted by setting runtime feature ``envoy.restart_features_.allow_client_socket_creation_failure`` to false.
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
