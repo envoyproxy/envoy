@@ -54,7 +54,7 @@ jobs:
   start:
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
+    - uses: envoyproxy/toolshed/gh-actions/jq@e0f55edab5d5eca4c2e4547d374f32cb7cf7b341  # actions-v0.2.25
       id: check-config
       name: Prepare check data
       with:
@@ -77,13 +77,13 @@ jobs:
           | .skipped.output.summary = "${{ inputs.skipped-summary }}"
           | .skipped.output.text = ""
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
+    - uses: envoyproxy/toolshed/gh-actions/appauth@e0f55edab5d5eca4c2e4547d374f32cb7cf7b341  # actions-v0.2.25
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checks@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
+    - uses: envoyproxy/toolshed/gh-actions/github/checks@e0f55edab5d5eca4c2e4547d374f32cb7cf7b341  # actions-v0.2.25
       name: Start checks
       id: checks
       with:
@@ -94,7 +94,7 @@ jobs:
 
           ${{ fromJSON(inputs.env).summary.summary }}
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/json/table@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
+    - uses: envoyproxy/toolshed/gh-actions/json/table@e0f55edab5d5eca4c2e4547d374f32cb7cf7b341  # actions-v0.2.25
       name: Summary
       with:
         collapse-open: true
@@ -118,7 +118,7 @@ jobs:
         output-path: GITHUB_STEP_SUMMARY
         title: Checks started/skipped
 
-    - uses: envoyproxy/toolshed/gh-actions/github/env/save@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
+    - uses: envoyproxy/toolshed/gh-actions/github/env/save@e0f55edab5d5eca4c2e4547d374f32cb7cf7b341  # actions-v0.2.25
       name: Save env
       id: data
       with:
