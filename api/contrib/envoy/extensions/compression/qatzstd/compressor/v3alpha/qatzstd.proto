@@ -58,7 +58,7 @@ message Qatzstd {
 
   // Enable QAT to accelerate Zstd compression or not. If not set, defaults to false.
   //
-  // This is useful in the case that users want to enable QAT for a period of time and disable QAT for another period of time, 
+  // This is useful in the case that users want to enable QAT for a period of time and disable QAT for another period of time,
   // they don't have to change the config too much or prepare for another config that has software zstd compressor and just changing the value of this filed.
   bool enable_qat_zstd = 6;
 
