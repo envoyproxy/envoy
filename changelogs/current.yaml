@@ -234,11 +234,18 @@ new_features:
     added an option to dynamically set a per downstream connection idle timeout period object under the key
     ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
     specified in the filter configuration and the default idle timeout.
+- area: load shed point
+  change: |
+    Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
+    Envoy is under pressure, typically memory.
 - area: overload
   change: |
     added a :ref:`configuration option
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>` to add
     ``x-envoy-local-overloaded`` header when Overload Manager is triggered.
+- area: tracing
+  change: |
+    Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
 
 deprecated:
 - area: listener
