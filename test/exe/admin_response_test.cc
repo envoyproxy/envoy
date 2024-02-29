@@ -182,7 +182,7 @@ TEST_F(AdminStreamingTest, CancelDuringChunks) {
   EXPECT_TRUE(quitAndWait());
 }
 
-TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader1) {
+TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader) {
   blockMainThreadUntilResume("/ready", "GET");
   AdminResponseSharedPtr response = streamingResponse();
   response->cancel();
@@ -191,17 +191,6 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader1) {
 
   // After 'cancel', the headers function will not be called.
   response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
-  EXPECT_TRUE(quitAndWait());
-  EXPECT_EQ(0, header_calls);
-}
-
-TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader2) {
-  AdminResponseSharedPtr response = streamingResponse();
-  blockMainThreadUntilResume("/ready", "GET");
-  int header_calls = 0;
-  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
-  resume_.Notify();
-  response->cancel();
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, header_calls);
 }
@@ -262,8 +251,8 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk2) {
   blockMainThreadUntilResume("/ready", "GET");
   int chunk_calls = 0;
   response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
-  resume_.Notify();
   response->cancel();
+  resume_.Notify();
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, chunk_calls);
 }
@@ -340,6 +329,7 @@ TEST_F(AdminStreamingTest, TimeoutGettingResponse) {
   absl::Notification got_headers;
   response->getHeaders(
       [&got_headers](Http::Code, Http::ResponseHeaderMap&) { got_headers.Notify(); });
+  ENVOY_LOG_MISC(info, "Blocking for 5 seconds to test timeout functionality...");
   ASSERT_FALSE(got_headers.WaitForNotificationWithTimeout(absl::Seconds(5)));
   resume_.Notify();
   EXPECT_TRUE(quitAndWait());
