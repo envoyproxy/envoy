@@ -419,7 +419,9 @@ void validateMirrorClusterSpecifier(
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config)
-    : cluster_(config.cluster()), cluster_header_(config.cluster_header()) {
+    : cluster_(config.cluster()), cluster_header_(config.cluster_header()),
+      disable_shadow_host_suffix_append_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, disable_shadow_host_suffix_append, false)) {
   validateMirrorClusterSpecifier(config);
 
   if (config.has_runtime_fraction()) {
