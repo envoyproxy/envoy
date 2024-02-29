@@ -123,13 +123,12 @@ void AdminResponse::requestNextChunk() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   {
     absl::MutexLock lock(&mutex_);
-    if (cancelled_ || terminated_) {
+    if (cancelled_ || terminated_ || !more_data_) {
       return;
     }
   }
-  while (response_.length() == 0 && more_data_) {
-    more_data_ = request_->nextChunk(response_);
-  }
+  ASSERT(response_.length() == 0);
+  more_data_ = request_->nextChunk(response_);
   {
     absl::MutexLock lock(&mutex_);
     if (sent_end_stream_ || cancelled_) {

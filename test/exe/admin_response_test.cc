@@ -46,26 +46,35 @@ protected:
         true, false);
   }
 
-  using ChunksBytes = std::pair<uint64_t, uint64_t>;
-  ChunksBytes runStreamingRequest(AdminResponseSharedPtr response,
-                                  std::function<void()> chunk_hook = nullptr) {
+  struct ResponseData {
+    uint64_t num_chunks_{0};
+    uint64_t num_bytes_{0};
+    Http::Code code_;
+    std::string content_type_;
+  };
+
+  ResponseData runStreamingRequest(AdminResponseSharedPtr response,
+                                   std::function<void()> chunk_hook = nullptr) {
     absl::Notification done;
     std::vector<std::string> out;
     absl::Notification headers_notify;
+    ResponseData response_data;
     response->getHeaders(
-        [&headers_notify](Http::Code, Http::ResponseHeaderMap&) { headers_notify.Notify(); });
+        [&headers_notify, &response_data](Http::Code code, Http::ResponseHeaderMap& headers) {
+          response_data.code_ = code;
+          response_data.content_type_ = headers.getContentTypeValue();
+          headers_notify.Notify();
+        });
     headers_notify.WaitForNotification();
     bool cont = true;
-    uint64_t num_chunks = 0;
-    uint64_t num_bytes = 0;
     while (cont && !response->cancelled()) {
       absl::Notification chunk_notify;
       response->nextChunk(
-          [&chunk_notify, &num_chunks, &num_bytes, &cont](Buffer::Instance& chunk, bool more) {
+          [&chunk_notify, &response_data, &cont](Buffer::Instance& chunk, bool more) {
             cont = more;
-            num_bytes += chunk.length();
+            response_data.num_bytes_ += chunk.length();
             chunk.drain(chunk.length());
-            ++num_chunks;
+            ++response_data.num_chunks_;
             chunk_notify.Notify();
           });
       chunk_notify.WaitForNotification();
@@ -74,7 +83,7 @@ protected:
       }
     }
 
-    return ChunksBytes(num_chunks, num_bytes);
+    return response_data;
   }
 
   /**
@@ -99,6 +108,8 @@ protected:
         [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
   }
 
+#define CANCEL_AFTER_RESUME_HELPER 0
+#if CANCEL_AFTER_RESUME_HELPER
   /**
    * To hit an early exit after the second lock in
    * AdminResponseImpl::requestNextChunk and AdminResponseImpl::requestHeaders
@@ -115,6 +126,7 @@ protected:
       response->cancel();
     });
   }
+#endif
 
   /**
    * Requests the headers and waits until the headers have been sent.
@@ -148,10 +160,12 @@ protected:
 
 TEST_F(AdminStreamingTest, RequestGetStatsAndQuit) {
   AdminResponseSharedPtr response = streamingResponse();
-  ChunksBytes chunks_bytes = runStreamingRequest(response);
-  EXPECT_EQ(StreamingAdminRequest::NumChunks, chunks_bytes.first);
+  ResponseData response_data = runStreamingRequest(response);
+  EXPECT_EQ(StreamingAdminRequest::NumChunks, response_data.num_chunks_);
   EXPECT_EQ(StreamingAdminRequest::NumChunks * StreamingAdminRequest::BytesPerChunk,
-            chunks_bytes.second);
+            response_data.num_bytes_);
+  EXPECT_EQ(Http::Code::OK, response_data.code_);
+  EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
   EXPECT_TRUE(quitAndWait());
 }
 
@@ -159,28 +173,32 @@ TEST_F(AdminStreamingTest, QuitDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
   AdminResponseSharedPtr response = streamingResponse();
-  ChunksBytes chunks_bytes = runStreamingRequest(response, [&quit_counter, this]() {
+  ResponseData response_data = runStreamingRequest(response, [&quit_counter, this]() {
     if (++quit_counter == chunks_to_send_before_quitting) {
       EXPECT_TRUE(quitAndWait());
     }
   });
-  EXPECT_EQ(4, chunks_bytes.first);
+  EXPECT_EQ(4, response_data.num_chunks_);
   EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
-            chunks_bytes.second);
+            response_data.num_bytes_);
+  EXPECT_EQ(Http::Code::OK, response_data.code_);
+  EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
 }
 
 TEST_F(AdminStreamingTest, CancelDuringChunks) {
   int quit_counter = 0;
   static constexpr int chunks_to_send_before_quitting = 3;
   AdminResponseSharedPtr response = streamingResponse();
-  ChunksBytes chunks_bytes = runStreamingRequest(response, [response, &quit_counter]() {
+  ResponseData response_data = runStreamingRequest(response, [response, &quit_counter]() {
     if (++quit_counter == chunks_to_send_before_quitting) {
       response->cancel();
     }
   });
-  EXPECT_EQ(3, chunks_bytes.first); // no final call to the chunk handler after cancel.
+  EXPECT_EQ(3, response_data.num_chunks_); // no final call to the chunk handler after cancel.
   EXPECT_EQ(chunks_to_send_before_quitting * StreamingAdminRequest::BytesPerChunk,
-            chunks_bytes.second);
+            response_data.num_bytes_);
+  EXPECT_EQ(Http::Code::OK, response_data.code_);
+  EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
   EXPECT_TRUE(quitAndWait());
 }
 
@@ -199,10 +217,17 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader1) {
 
 TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader2) {
   AdminResponseSharedPtr response = streamingResponse();
+#if CANCEL_AFTER_RESUME_HELPER
   blockMainThreadAndCancelResponseAfterResume(response);
+#else
+  blockMainThreadUntilResume("/ready", "GET");
+#endif
   int header_calls = 0;
   response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
   resume_.Notify();
+#if !CANCEL_AFTER_RESUME_HELPER
+  response->cancel();
+#endif
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, header_calls);
 }
@@ -260,10 +285,17 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk1) {
 TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk2) {
   AdminResponseSharedPtr response = streamingResponse();
   waitForHeaders(response);
+#if CANCEL_AFTER_RESUME_HELPER
   blockMainThreadAndCancelResponseAfterResume(response);
+#else
+  blockMainThreadUntilResume("/ready", "GET");
+#endif
   int chunk_calls = 0;
   response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
   resume_.Notify();
+#if !CANCEL_AFTER_RESUME_HELPER
+  response->cancel();
+#endif
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, chunk_calls);
 }
@@ -286,9 +318,11 @@ TEST_F(AdminStreamingTest, CancelAfterAskingForChunk) {
 TEST_F(AdminStreamingTest, QuitBeforeHeaders) {
   AdminResponseSharedPtr response = streamingResponse();
   EXPECT_TRUE(quitAndWait());
-  ChunksBytes chunks_bytes = runStreamingRequest(response);
-  EXPECT_EQ(1, chunks_bytes.first);
-  EXPECT_EQ(0, chunks_bytes.second);
+  ResponseData response_data = runStreamingRequest(response);
+  EXPECT_EQ(1, response_data.num_chunks_);
+  EXPECT_EQ(0, response_data.num_bytes_);
+  EXPECT_EQ(Http::Code::InternalServerError, response_data.code_);
+  EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
 }
 
 TEST_F(AdminStreamingTest, QuitDeleteRace1) {
@@ -322,12 +356,25 @@ TEST_F(AdminStreamingTest, QuitBeforeCreatingResponse) {
   adminRequest("/quitquitquit", "POST");
   pause_point_.WaitForNotification(); // run() finished, but main_common_ still exists.
   AdminResponseSharedPtr response = streamingResponse();
-  ChunksBytes chunks_bytes = runStreamingRequest(response);
-  EXPECT_EQ(1, chunks_bytes.first);
-  EXPECT_EQ(0, chunks_bytes.second);
+  ResponseData response_data = runStreamingRequest(response);
+  EXPECT_EQ(1, response_data.num_chunks_);
+  EXPECT_EQ(0, response_data.num_bytes_);
+  EXPECT_EQ(Http::Code::InternalServerError, response_data.code_);
+  EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
   resume_.Notify();
   EXPECT_TRUE(waitForEnvoyToExit());
   response.reset();
+}
+
+TEST_F(AdminStreamingTest, TimeoutGettingResponse) {
+  blockMainThreadUntilResume("/ready", "GET");
+  AdminResponseSharedPtr response = streamingResponse();
+  absl::Notification got_headers;
+  response->getHeaders(
+      [&got_headers](Http::Code, Http::ResponseHeaderMap&) { got_headers.Notify(); });
+  ASSERT_FALSE(got_headers.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  resume_.Notify();
+  EXPECT_TRUE(quitAndWait());
 }
 
 } // namespace Envoy

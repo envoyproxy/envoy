@@ -35,12 +35,11 @@ class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
 public:
   // AdminResponse can outlive MainCommonBase. But AdminResponse needs a
   // reliable way of knowing whether MainCommonBase is alive, so we do this with
-  // PtrSet, which is held by MainCommonBase and all the active AdminResponse,
-  // which is held by MainCommonBase and by AdminResponse via shared_ptr. This
-  // gives MainCommonBase a reliable way of notifying all active responses that
-  // it is being shut down, and thus all responses need to be terminated. And it
-  // gives a reliable way for AdminResponse to detach itself, even if
-  // MainCommonBase is already deleted.
+  // PtrSet, which is held by MainCommonBase and all the active AdminResponses.
+  // via shared_ptr. This gives MainCommonBase a reliable way of notifying all
+  // active responses that it is being shut down, and thus all responses need to
+  // be terminated. And it gives a reliable way for AdminResponse to detach
+  // itself, whether or not MainCommonBase is already deleted.
   class PtrSet {
   public:
     /**
