@@ -243,6 +243,9 @@ new_features:
     added a :ref:`configuration option
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>` to add
     ``x-envoy-local-overloaded`` header when Overload Manager is triggered.
+- area: tracing
+  change: |
+    Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
 
 deprecated:
 - area: listener
