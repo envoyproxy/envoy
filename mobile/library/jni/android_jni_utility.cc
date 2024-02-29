@@ -13,7 +13,7 @@ namespace Envoy {
 namespace JNI {
 
 bool isCleartextPermitted(absl::string_view hostname) {
-#if defined(__ANDROID_API__)
+#if defined(__ANDROID__)
   envoy_data host = Envoy::Data::Utility::copyToBridgeData(hostname);
   JniHelper jni_helper(getEnv());
   LocalRefUniquePtr<jstring> java_host = envoyDataToJavaString(jni_helper, host);
@@ -32,7 +32,7 @@ bool isCleartextPermitted(absl::string_view hostname) {
 }
 
 void tagSocket(int ifd, int uid, int tag) {
-#if defined(__ANDROID_API__)
+#if defined(__ANDROID__)
   JniHelper jni_helper(getEnv());
   LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
       findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
