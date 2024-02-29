@@ -18,12 +18,12 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     deps = [
         "//source/common/router:string_accessor_lib",
-        "//source/common/tls:config",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//test/common/upstream:utility_lib",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/protobuf:protobuf_mocks",

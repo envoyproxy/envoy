@@ -112,9 +112,9 @@ envoy_cc_test(
     deps = [
         ":xds_integration_test_lib",
         "@envoy//source/common/config:protobuf_link_hacks",
-        "@envoy//source/common/tls:config",
         "@envoy//source/common/tls:context_config_lib",
         "@envoy//source/common/tls:context_lib",
+        "@envoy//source/extensions/transport_sockets/tls:config",
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

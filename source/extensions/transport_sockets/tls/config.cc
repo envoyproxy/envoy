@@ -1,4 +1,4 @@
-#include "source/common/tls/config.h"
+#include "source/extensions/transport_sockets/tls/config.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"

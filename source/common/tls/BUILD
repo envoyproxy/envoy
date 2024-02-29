@@ -21,7 +21,6 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
     alwayslink = 1,
 )

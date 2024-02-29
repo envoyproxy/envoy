@@ -15,10 +15,10 @@ envoy_cc_test(
     srcs = ["eds_test.cc"],
     deps = [
         "//source/common/config:utility_lib",
-        "//source/common/tls:config",
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/common/upstream:utility_lib",
