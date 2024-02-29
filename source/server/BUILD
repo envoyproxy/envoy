@@ -313,6 +313,7 @@ envoy_cc_library(
         "//source/common/event:scaled_range_timer_manager_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
+        "@com_google_absl//absl/container:node_hash_set",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
@@ -440,6 +441,7 @@ envoy_cc_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:stats_utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/grpc:async_client_manager_lib",
