@@ -145,19 +145,25 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_quic_stream_lib",
+    srcs = ["envoy_quic_stream.cc"],
     hdrs = ["envoy_quic_stream.h"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
+        ":quic_stats_gatherer",
         ":send_buffer_monitor_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
         "@com_github_google_quiche//:http2_adapter",
+        "@com_github_google_quiche//:quic_core_http_client_lib",
+        "@com_github_google_quiche//:quic_core_http_http_encoder_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http_datagrams([
+        ":http_datagram_handler",
+    ]),
 )
 
 envoy_cc_library(
@@ -645,7 +651,9 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//envoy/access_log:access_log_interface",
+        "//envoy/formatter:http_formatter_context_interface",
         "//envoy/http:codec_interface",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
     ],
