@@ -1,6 +1,7 @@
+#include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
+
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
 
 #include "test/integration/http_integration.h"
 

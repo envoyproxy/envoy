@@ -1,5 +1,7 @@
 #include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
+
 #include "source/extensions/string_matcher/lua/match.h"
+
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 

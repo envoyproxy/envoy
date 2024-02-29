@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/thread_local/thread_local.h"
+
 #include "source/common/common/matchers.h"
 #include "source/extensions/filters/common/lua/lua.h"
 

@@ -1,6 +1,7 @@
 #include "source/extensions/string_matcher/lua/match.h"
 
 #include "envoy/extensions/string_matcher/lua/v3/lua.pb.h"
+
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
