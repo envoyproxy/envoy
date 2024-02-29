@@ -75,6 +75,7 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
+build:mobile-android --android_crosstool_top=@androidndk//:toolchain
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -119,6 +120,7 @@ build:mobile-remote-release-clang --remote_download_toplevel
 build:mobile-remote-release-clang --config=ci
 build:mobile-remote-release-clang --config=remote
 
+build:mobile-remote-release-clang-android --config=mobile-android
 build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
 build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
@@ -153,6 +155,7 @@ build:mobile-release-ios --compilation_mode=opt
 
 # Flags for release builds targeting Android or the JVM
 # Release does not use the option --define=logger=android
+build:mobile-release-android --config=mobile-android
 build:mobile-release-android --config=mobile-release-common
 build:mobile-release-android --compilation_mode=opt
 
@@ -254,6 +257,7 @@ build:mobile-remote-ci --config=remote-ci
 
 build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
+test:mobile-remote-ci-android --config=mobile-android
 test:mobile-remote-ci-android --config=mobile-test-android
 test:mobile-remote-ci-android --config=mobile-remote-ci
 
