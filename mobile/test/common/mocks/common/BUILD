@@ -15,5 +15,6 @@ envoy_cc_mock(
     repository = "@envoy",
     deps = [
         "//library/common/system:system_helper_lib",
+        "@envoy//source/common/common:thread_impl_lib_posix",
     ],
 )

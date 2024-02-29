@@ -4,6 +4,9 @@
 #include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/posix/thread_impl.h"
+#include "source/common/common/thread.h"
 
 #include "absl/base/call_once.h"
 #include "extension_registry.h"
@@ -118,10 +121,16 @@ public:
   Stats::Store& getStatsStore();
 
 private:
+  GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
+
+  InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                 envoy_event_tracker event_tracker, Thread::PosixThreadFactoryPtr thread_factory);
+
   envoy_status_t main(std::unique_ptr<Envoy::OptionsImplBase>&& options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
 
+  Thread::PosixThreadFactoryPtr thread_factory_;
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopeSharedPtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
@@ -142,7 +151,7 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
-  std::thread main_thread_{}; // Empty placeholder to be populated later.
+  Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
 };
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "source/common/common/posix/thread_impl.h"
+
 #include "gmock/gmock.h"
 #include "library/common/system/system_helper.h"
 
@@ -51,6 +53,15 @@ public:
   private:
     SystemHelper* previous_;
   };
+};
+
+class MockPosixThreadFactory : public Thread::PosixThreadFactory {
+public:
+  MOCK_METHOD(Thread::ThreadPtr, createThread, (std::function<void()>, Thread::OptionsOptConstRef));
+  MOCK_METHOD(Thread::PosixThreadPtr, createThread,
+              (absl::AnyInvocable<void()>, Thread::OptionsOptConstRef, bool crash_on_failure));
+  MOCK_METHOD(Thread::ThreadId, currentThreadId, ());
+  MOCK_METHOD(Thread::ThreadId, currentPthreadId, ());
 };
 
 } // namespace test
