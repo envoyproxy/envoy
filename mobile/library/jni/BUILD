@@ -149,14 +149,6 @@ envoy_cc_library(
     alwayslink = True,
 )
 
-config_setting(
-    name = "android_armeabi",
-    constraint_values = [
-        "@platforms//cpu:armv7",
-        "@platforms//os:android",
-    ],
-)
-
 # Main dynamic library for the Envoy Mobile aar
 cc_binary(
     name = "libenvoy_jni.so",
