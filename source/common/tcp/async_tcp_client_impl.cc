@@ -109,9 +109,8 @@ void AsyncTcpClientImpl::reportConnectionDestroy(Network::ConnectionEvent event)
 void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    if (connected_) {
-      cluster_info_->trafficStats()->upstream_cx_active_.dec();
-    } else {
+    cluster_info_->trafficStats()->upstream_cx_active_.dec();
+    if (!connected_) {
       cluster_info_->trafficStats()->upstream_cx_connect_fail_.inc();
     }
 

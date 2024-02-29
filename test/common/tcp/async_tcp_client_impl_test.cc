@@ -251,6 +251,17 @@ TEST_F(AsyncTcpClientImplTest, TestActiveCx) {
                      ->upstream_cx_active_.value());
 }
 
+TEST_F(AsyncTcpClientImplTest, TestActiveCxWhileNotConnected) {
+  setUpClient();
+  expectCreateConnection(false);
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_active_.value());
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(0UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_active_.value());
+}
+
 TEST_F(AsyncTcpClientImplTest, ReconnectWhileClientConnected) {
   setUpClient();
   expectCreateConnection();
