@@ -332,7 +332,7 @@ void javaByteArrayToByteVector(JniHelper& jni_helper, jbyteArray array, std::vec
 
 MatcherData::Type StringToType(std::string type_as_string) {
   if (type_as_string.length() != 4) {
-    ASSERT("conversion failure failure");
+    // ASSERT("conversion failure failure");
     return MatcherData::EXACT;
   }
   // grab the lowest bit.
@@ -342,7 +342,7 @@ MatcherData::Type StringToType(std::string type_as_string) {
   case 1:
     return MatcherData::SAFE_REGEX;
   }
-  ASSERT("enum failure");
+  // ASSERT("enum failure");
   return MatcherData::EXACT;
 }
 
