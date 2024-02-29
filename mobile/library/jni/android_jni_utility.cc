@@ -2,7 +2,7 @@
 
 #include "source/common/common/assert.h"
 
-#if defined(__ANDROID_API__)
+#if defined(__ANDROID__)
 #include "library/common/data/utility.h"
 #include "library/jni/import/jni_import.h"
 #include "library/jni/jni_support.h"
