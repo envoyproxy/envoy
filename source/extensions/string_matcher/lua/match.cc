@@ -6,7 +6,10 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 
-namespace Envoy::Extensions::StringMatcher::Lua {
+namespace Envoy {
+namespace Extensions {
+namespace StringMatcher {
+namespace Lua {
 
 LuaStringMatcher::LuaStringMatcher(const std::string& code) : state_(luaL_newstate()) {
   RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
@@ -112,4 +115,7 @@ ProtobufTypes::MessagePtr LuaStringMatcherFactory::createEmptyConfigProto() {
 
 REGISTER_FACTORY(LuaStringMatcherFactory, Matchers::StringMatcherExtensionFactory);
 
-} // namespace Envoy::Extensions::StringMatcher::Lua
+} // namespace Lua
+} // namespace StringMatcher
+} // namespace Extensions
+} // namespace Envoy

@@ -5,7 +5,10 @@
 #include "source/common/common/matchers.h"
 #include "source/extensions/filters/common/lua/lua.h"
 
-namespace Envoy::Extensions::StringMatcher::Lua {
+namespace Envoy {
+namespace Extensions {
+namespace StringMatcher {
+namespace Lua {
 
 // This class should not be used directly. It is exposed here for use in tests.
 // Correct use requires use of a thread local slot.
@@ -31,4 +34,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 
-} // namespace Envoy::Extensions::StringMatcher::Lua
+} // namespace Lua
+} // namespace StringMatcher
+} // namespace Extensions
+} // namespace Envoy
