@@ -392,6 +392,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
     if (parseEntryFractionalPercentValue(entry)) {
       error_message = kFractionError;
     }
+    break;
   default:
     break;
   }
