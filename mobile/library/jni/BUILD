@@ -161,6 +161,8 @@ cc_binary(
         # included in the build, but several parts of Envoy rely on libm, for
         # example, for std::pow, so we link it in here.
         "-lm",
+        # See libpthread below.
+        "-L$(GENDIR)/{}".format(package_name()),
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
@@ -168,6 +170,7 @@ cc_binary(
     linkshared = True,
     deps = [
         ":envoy_jni_lib",
+        ":libpthread",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
@@ -198,4 +201,17 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+# Create a fake pthread library so that -lpthread works on Android.
+# See #6 here https://github.com/bazelbuild/rules_android_ndk/issues/5
+cc_import(
+    name = "libpthread",
+    static_library = ":pthread",
+)
+
+envoy_cc_library(
+    name = "pthread",
+    srcs = ["@bazel_tools//tools/objc:dummy.c"],
+    repository = "@envoy",
 )
