@@ -62,7 +62,7 @@ class SamplingController : public Logger::Loggable<Logger::Id::tracing> {
 public:
   explicit SamplingController(SamplerConfigProviderPtr sampler_config_provider)
       : stream_summary_(std::make_unique<StreamSummaryT>(STREAM_SUMMARY_SIZE)),
-        sampler_config_provider(std::move(sampler_config_provider)) {}
+        sampler_config_provider_(std::move(sampler_config_provider)) {}
 
   /**
    * @brief Trigger calculating the sampling exponents based on the request count since last update
@@ -104,17 +104,17 @@ public:
                                     const absl::string_view method);
 
   static constexpr size_t STREAM_SUMMARY_SIZE{100};
+  static constexpr uint32_t MAX_SAMPLING_EXPONENT = (1 << 4) - 1; // 15
 
 private:
   using SamplingExponentsT = absl::flat_hash_map<std::string, SamplingState>;
   SamplingExponentsT sampling_exponents_;
   mutable absl::Mutex sampling_exponents_mutex_{};
   std::string rest_bucket_key_{};
-  static constexpr uint32_t MAX_SAMPLING_EXPONENT = (1 << 4) - 1; // 15
   std::unique_ptr<StreamSummaryT> stream_summary_;
   uint64_t last_effective_count_{};
   mutable absl::Mutex stream_summary_mutex_{};
-  SamplerConfigProviderPtr sampler_config_provider;
+  SamplerConfigProviderPtr sampler_config_provider_;
 
   void logSamplingInfo(const TopKListT& top_k, const SamplingExponentsT& new_sampling_exponents,
                        uint64_t last_period_count, uint32_t total_wanted) const;

@@ -82,7 +82,9 @@ TEST(SamplingControllerTest, TestWithOneAllowedSpan) {
   auto scf = std::make_unique<TestSamplerConfigProvider>(1);
   SamplingController sc(std::move(scf));
   sc.update();
+  EXPECT_EQ(sc.getSamplingState("1").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
   offerEntry(sc, "1", 1);
+  EXPECT_EQ(sc.getSamplingState("1").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
   sc.update();
   EXPECT_EQ(sc.getSamplingState("1").getMultiplicity(), 1);
 }

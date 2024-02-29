@@ -14,7 +14,7 @@ void SamplingController::update() {
 
   // update sampling exponents
   update(top_k, last_period_count,
-         sampler_config_provider->getSamplerConfig().getRootSpansPerMinute());
+         sampler_config_provider_->getSamplerConfig().getRootSpansPerMinute());
   // Note: getTopK() returns references to values in StreamSummary.
   // Do not destroy it while top_k is used!
   stream_summary_ = std::make_unique<StreamSummaryT>(STREAM_SUMMARY_SIZE);
@@ -69,7 +69,7 @@ SamplingState SamplingController::getSamplingState(const std::string& sampling_k
 
   // If we can't find a sampling exponent, we calculate it based on the total number of requests
   // in this period. This should also handle the "warm up phase" where no top_k is available
-  const auto divisor = sampler_config_provider->getSamplerConfig().getRootSpansPerMinute() / 2;
+  const auto divisor = sampler_config_provider_->getSamplerConfig().getRootSpansPerMinute() / 2;
   if (divisor == 0) {
     return SamplingState{MAX_SAMPLING_EXPONENT};
   }
@@ -105,13 +105,12 @@ uint64_t SamplingController::calculateEffectiveCount(const TopKListT& top_k,
   uint64_t cnt = 0;
   for (auto const& counter : top_k) {
     auto sampling_state = sampling_exponents.find(counter.getItem());
-    if (sampling_state == sampling_exponents.end()) {
-      continue;
+    if (sampling_state != sampling_exponents.end()) {
+      auto counterVal = counter.getValue();
+      auto mul = sampling_state->second.getMultiplicity();
+      auto res = counterVal / mul;
+      cnt += res;
     }
-    auto counterVal = counter.getValue();
-    auto mul = sampling_state->second.getMultiplicity();
-    auto res = counterVal / mul;
-    cnt += res;
   }
   return cnt;
 }
