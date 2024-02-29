@@ -108,7 +108,9 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
       enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
 
+  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
   InjectableSingleton<ThreadLocal::SlotAllocator>::initialize(&thread_local_);
+  InjectableSingleton<Api::Api>::clear();
   InjectableSingleton<Api::Api>::initialize(api_.get());
 }
 
