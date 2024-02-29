@@ -108,26 +108,6 @@ protected:
         [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
   }
 
-#define CANCEL_AFTER_RESUME_HELPER 0
-#if CANCEL_AFTER_RESUME_HELPER
-  /**
-   * To hit an early exit after the second lock in
-   * AdminResponseImpl::requestNextChunk and AdminResponseImpl::requestHeaders
-   * we, need to post a cancel request to the main thread, but block that on the
-   * resume_ notification. This allows a subsequent test call to getHeaders or
-   * nextChunk initiate a post to main thread, but runs the cancel call on the
-   * response before headers_fn_ or body_fn_ runs.
-   *
-   * @param response the response to cancel after resume_.
-   */
-  void blockMainThreadAndCancelResponseAfterResume(AdminResponseSharedPtr response) {
-    main_common_->dispatcherForTest().post([response, this] {
-      resume_.WaitForNotification();
-      response->cancel();
-    });
-  }
-#endif
-
   /**
    * Requests the headers and waits until the headers have been sent.
    *
@@ -217,17 +197,11 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader1) {
 
 TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader2) {
   AdminResponseSharedPtr response = streamingResponse();
-#if CANCEL_AFTER_RESUME_HELPER
-  blockMainThreadAndCancelResponseAfterResume(response);
-#else
   blockMainThreadUntilResume("/ready", "GET");
-#endif
   int header_calls = 0;
   response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
   resume_.Notify();
-#if !CANCEL_AFTER_RESUME_HELPER
   response->cancel();
-#endif
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, header_calls);
 }
@@ -285,17 +259,11 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk1) {
 TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk2) {
   AdminResponseSharedPtr response = streamingResponse();
   waitForHeaders(response);
-#if CANCEL_AFTER_RESUME_HELPER
-  blockMainThreadAndCancelResponseAfterResume(response);
-#else
   blockMainThreadUntilResume("/ready", "GET");
-#endif
   int chunk_calls = 0;
   response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
   resume_.Notify();
-#if !CANCEL_AFTER_RESUME_HELPER
   response->cancel();
-#endif
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, chunk_calls);
 }
