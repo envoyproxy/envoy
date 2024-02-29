@@ -257,7 +257,7 @@ class FormatChecker:
 
     @cached_property
     def namespace_re(self):
-        return re.compile("^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
+        return re.compile(r"^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
 
     # Map a line transformation function across each line of a file,
     # writing the result lines as requested.
