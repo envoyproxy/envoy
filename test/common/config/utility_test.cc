@@ -8,7 +8,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
@@ -58,7 +57,7 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
 
 TEST(UtilityTest, createTagProducer) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {});
+  auto producer = Utility::createTagProducer(bootstrap, {});
   ASSERT_TRUE(producer != nullptr);
   Stats::TagVector tags;
   auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
@@ -68,7 +67,7 @@ TEST(UtilityTest, createTagProducer) {
 
 TEST(UtilityTest, createTagProducerWithDefaultTgs) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {{"foo", "bar"}});
+  auto producer = Utility::createTagProducer(bootstrap, {{"foo", "bar"}});
   ASSERT_TRUE(producer != nullptr);
   Stats::TagVector tags;
   auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);

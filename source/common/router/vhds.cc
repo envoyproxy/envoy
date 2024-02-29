@@ -13,7 +13,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
-#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 

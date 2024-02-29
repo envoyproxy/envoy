@@ -6,7 +6,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/api_version.h"
-#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
