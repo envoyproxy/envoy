@@ -110,6 +110,15 @@ envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
       &c_on_complete,
       &c_on_cancel,
       &c_on_send_window_available,
+      // Each of the function pointers in the returned `envoy_http_callbacks` struct have a
+      // `void* context` parameter. The value of the `context` field of this struct is passed in as
+      // the value of that parameter. Because this context passes through JNI, the context field
+      // can not be a smart pointer and must instead be a standard C-pointer. However, the
+      // `StreamCallbacks` object is reference counted and so will be destroyed when the final
+      // shared_ptr is destroyed. So in order to make sure that it lives long enough, the `context`
+      // field here stores a pointer to a newly created `shared_ptr` which will not go out of scope
+      // when this method returns. When the `StreamCallbacks` is no longer need (c_on_complete,
+      // c_on_cancel, c_on_error), this new `shared_ptr` will need to be deleted.
       new StreamCallbacksSharedPtr(shared_from_this()),
   };
 }
