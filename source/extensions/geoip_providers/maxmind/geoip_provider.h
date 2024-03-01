@@ -57,6 +57,11 @@ public:
         stat_name_set_->getBuiltin(absl::StrCat("country_mapping", ".parse_error"), unknown_hit_));
   }
 
+  void incCountryMappingFileDoesntExists() {
+    incCounter(stat_name_set_->getBuiltin(absl::StrCat("country_mapping", ".file_doesnt_exists"),
+                                          unknown_hit_));
+  }
+
   void registerGeoDbStats(const std::string& db_type);
 
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }

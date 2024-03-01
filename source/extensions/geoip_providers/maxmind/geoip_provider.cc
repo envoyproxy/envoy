@@ -37,7 +37,6 @@ GeoipProviderConfig::GeoipProviderConfig(
                                                  : absl::nullopt),
       anon_db_path_(!config.anon_db_path().empty() ? absl::make_optional(config.anon_db_path())
                                                    : absl::nullopt),
-      // Path is hardcoded since we don't have the field on the OSS version of the proto.
       country_mapping_path_(!config.country_mapping_path().empty()
                                 ? absl::make_optional(config.country_mapping_path())
                                 : absl::nullopt),
@@ -83,6 +82,7 @@ GeoipProviderConfig::GeoipProviderConfig(
     registerGeoDbStats("anon_db");
   }
   stat_name_set_->rememberBuiltin(absl::StrCat("country_mapping", ".parse_error"));
+  stat_name_set_->rememberBuiltin(absl::StrCat("country_mapping", ".file_doesnt_exists"));
 };
 
 void GeoipProviderConfig::registerGeoDbStats(const std::string& db_type) {
@@ -109,6 +109,9 @@ GeoipProvider::~GeoipProvider() {
   }
   if (anon_db_) {
     MMDB_close(anon_db_.get());
+  }
+  if (country_mapping_) {
+    country_mapping_->clear();
   }
 }
 
@@ -140,7 +143,7 @@ GeoipProvider::initCountryMapping(const absl::optional<std::string>& country_map
       }
       parseCountryMapping(file_or_error.value(), country_mapping_path.value(), country_mapping);
     } else {
-      config_->incCountryMappingFileParseError();
+      config_->incCountryMappingFileDoesntExists();
       throwEnvoyExceptionOrPanic(fmt::format(
           "Country Mapping configuration file {} does not exist.", country_mapping_path.value()));
     }

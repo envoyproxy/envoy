@@ -238,10 +238,10 @@ TEST(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto api = Api::createApiForTest();
 
-  Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope{stats_store.createScope("")};
   ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
-  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope));
   EXPECT_CALL(context, messageValidationVisitor());
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
@@ -253,6 +253,50 @@ TEST(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
                     HasRegionHeader("x-geo-region"), HasAsnHeader("x-geo-asn"),
                     HasAnonVpnHeader("x-anon-vpn"), HasAnonTorHeader("x-anon-tor"),
                     HasAnonProxyHeader("x-anon-proxy"), HasAnonHostingHeader("x-anon-hosting")));
+}
+
+TEST(MaxmindProviderConfigTest, ProviderConfigWithCorrectProtoWithoutCountryMapping) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+        anon_vpn: "x-anon-vpn"
+        asn: "x-geo-asn"
+        is_anon: "x-geo-anon"
+        anon_vpn: "x-anon-vpn"
+        anon_tor: "x-anon-tor"
+        anon_proxy: "x-anon-proxy"
+        anon_hosting: "x-anon-hosting"
+    city_db_path: %s
+    isp_db_path: %s
+    anon_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
+  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto processed_provider_config_yaml =
+      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto api = Api::createApiForTest();
+
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope{stats_store.createScope("")};
+  ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope));
+  EXPECT_CALL(context, messageValidationVisitor());
+  MaxmindProviderFactory factory;
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context);
+  EXPECT_THAT(driver, AllOf(HasCityDbPath(city_db_path), HasIspDbPath(asn_db_path),
+                            HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
+                            HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
+                            HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
+                            HasAnonTorHeader("x-anon-tor"), HasAnonProxyHeader("x-anon-proxy"),
+                            HasAnonHostingHeader("x-anon-hosting")));
 }
 
 TEST(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
@@ -330,10 +374,10 @@ TEST(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
 
   auto api = Api::createApiForTest();
 
-  Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope{stats_store.createScope("")};
   ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
-  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope));
   EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
@@ -389,10 +433,10 @@ TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfi
 
   auto api = Api::createApiForTest();
 
-  Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope{stats_store.createScope("")};
   ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
-  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope));
   EXPECT_CALL(context, messageValidationVisitor()).Times(2);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
@@ -402,7 +446,7 @@ TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfi
   EXPECT_NE(driver1.get(), driver2.get());
 }
 
-using MaxmindProviderConfigDeathTest = MaxmindProviderConfigTest;
+class MaxmindProviderConfigDeathTest : public testing::Test {};
 
 TEST_F(MaxmindProviderConfigDeathTest, CountryMappingPathDoesNotExist) {
   const auto provider_config_yaml = R"EOF(
@@ -419,10 +463,10 @@ TEST_F(MaxmindProviderConfigDeathTest, CountryMappingPathDoesNotExist) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto api = Api::createApiForTest();
 
-  Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopeSharedPtr scope_{stats_store_.createScope("")};
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope{stats_store.createScope("")};
   ON_CALL(context.server_factory_context_, api()).WillByDefault(ReturnRef(*api));
-  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope_));
+  EXPECT_CALL(context, scope()).WillRepeatedly(ReturnRef(*scope));
   MaxmindProviderFactory factory;
   EXPECT_THROW_WITH_REGEX(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
                           EnvoyException,
