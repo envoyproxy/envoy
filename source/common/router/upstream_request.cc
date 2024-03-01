@@ -134,7 +134,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   // Set up the upstream HTTP filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
-      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), connection(),
+      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), UpstreamRequest::connection(),
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
       parent_.callbacks()->decoderBufferLimit(), *parent_.cluster(), *this);
   // Attempt to create custom cluster-specified filter chain

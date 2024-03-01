@@ -6,9 +6,7 @@
 #include "contrib/kafka/filters/network/test/broker/mock_filter_config.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Return;
-using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +32,7 @@ public:
 
   uint32_t computeSize() const override { return size_; };
 
-  virtual uint32_t encode(Buffer::Instance& dst) const override {
+  uint32_t encode(Buffer::Instance& dst) const override {
     putBytesIntoBuffer(dst, size_);
     return size_;
   };

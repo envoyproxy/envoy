@@ -88,7 +88,7 @@ public:
     anon_db_ = initMaxMindDb(config_->anonDbPath());
   };
 
-  ~GeoipProvider();
+  ~GeoipProvider() override;
 
   // Envoy::Geolocation::Driver
   void lookup(Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&&) const override;
