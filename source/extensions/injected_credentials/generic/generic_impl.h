@@ -1,6 +1,5 @@
 #pragma once
 
-#include "source/common/config/datasource.h"
 #include "source/extensions/injected_credentials/common/credential.h"
 #include "source/extensions/injected_credentials/common/secret_reader.h"
 

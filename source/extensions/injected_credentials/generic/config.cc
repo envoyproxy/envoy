@@ -34,12 +34,10 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
   auto secret_provider = secretsProvider(credential_secret, secret_manager,
                                          transport_socket_factory, context.initManager());
-  if (secret_provider == nullptr) {
-    throw EnvoyException("invalid credential secret configuration");
-  }
 
-  auto secret_reader =
-      std::make_shared<const Common::SDSSecretReader>(secret_provider, server_context.api());
+  auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
+      std::move(secret_provider), context.serverFactoryContext().threadLocal(),
+      server_context.api());
   std::string header = config.header();
   if (header.empty()) {
     header = "Authorization";
