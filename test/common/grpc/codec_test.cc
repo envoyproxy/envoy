@@ -244,6 +244,42 @@ TEST(GrpcCodecTest, decodeSingleFrameOverLimit) {
   EXPECT_EQ(buffer.length(), size);
 }
 
+TEST(GrpcCodecTest, decodeSingleFrameWithMultiBuffersOverLimit) {
+  Buffer::OwnedImpl buffer;
+  std::array<uint8_t, 5> header;
+  Encoder encoder;
+
+  uint32_t max_length = 32 * 1024;
+  uint32_t single_buffer_length = 18 * 1024;
+  std::string req_str = std::string(single_buffer_length, 'a');
+
+  // First buffer is valid (i.e. within total_frame_length limit).
+  helloworld::HelloRequest request;
+  request.set_name(req_str);
+  buffer.add(header.data(), 5);
+  buffer.add(request.SerializeAsString());
+
+  // Second buffer itself is valid but results in the total frame size exceeding the limit.
+  helloworld::HelloRequest request_2;
+  request_2.set_name(req_str);
+  buffer.add(header.data(), 5);
+  buffer.add(request_2.SerializeAsString());
+
+  // Total frame consists of two buffers, request and request_2.
+  encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize() + request_2.ByteSize(), header);
+
+  size_t size = buffer.length();
+  std::vector<Frame> frames;
+  Decoder decoder;
+  decoder.setMaxFrameLength(max_length);
+
+  // The decoder doesn't successfully decode due to oversized frame.
+  EXPECT_FALSE(decoder.decode(buffer, frames));
+  ASSERT_EQ(frames.size(), 0);
+  // Buffer does not get drained due to it returning false.
+  EXPECT_EQ(buffer.length(), size);
+}
+
 TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
   Buffer::OwnedImpl buffer;
   std::array<uint8_t, 5> header;
