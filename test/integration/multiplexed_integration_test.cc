@@ -1030,6 +1030,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MetadataIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(MetadataIntegrationTest, Metadata) {
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_enable_http3_metadata_decoding));
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1046,7 +1047,7 @@ TEST_P(MetadataIntegrationTest, Metadata) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeMetadata(metadata_map_vector);
-  upstream_request_->encodeData(12, true);
+  upstream_request_->encodeData(22, true);
 
   // Verifies metadata is received by the client.
   ASSERT_TRUE(response->waitForEndStream());

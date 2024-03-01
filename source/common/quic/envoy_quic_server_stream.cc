@@ -452,11 +452,7 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
 
 void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
                                                const quic::QuicHeaderList& header_list) {
-  auto metadata = std::make_unique<Http::MetadataMap>();
-  for (const auto& [key, value] : header_list) {
-    (*metadata)[key] = value;
-  }
-  request_decoder_->decodeMetadata(std::move(metadata));
+  request_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
 }
 
 void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection,

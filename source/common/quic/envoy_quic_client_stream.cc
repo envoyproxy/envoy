@@ -414,11 +414,7 @@ QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection(
 
 void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
                                                const quic::QuicHeaderList& header_list) {
-  auto metadata = std::make_unique<Http::MetadataMap>();
-  for (const auto& [key, value] : header_list) {
-    (*metadata)[key] = value;
-  }
-  response_decoder_->decodeMetadata(std::move(metadata));
+  response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
 }
 
 void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,
