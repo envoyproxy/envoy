@@ -100,13 +100,13 @@ RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
+RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
+RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
-// TODO(alyssawilk) flip true after server side is handled.
-FALSE_RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 // Execution context is optional and must be enabled explicitly.
 // See https://github.com/envoyproxy/envoy/issues/32012.
 FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
@@ -133,8 +133,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quiche_use_mem_slice_releasor_api)
 // remove the feature flag and remove code path that relies on old technique to fetch credentials
 // via libcurl and remove the bazel steps to pull and test the curl dependency.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_http_client_to_fetch_aws_credentials);
-// TODO(adisuissa): enable by default once this is tested in prod.
-FALSE_RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 // TODO(#10646) change to true when UHV is sufficiently tested
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
