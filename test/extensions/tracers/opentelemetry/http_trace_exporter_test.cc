@@ -78,6 +78,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
             callback = &callbacks;
 
             EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
+            EXPECT_EQ("OTel-OTLP-Exporter-Envoy", message->headers().getUserAgentValue());
             EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
                       message->headers().getContentTypeValue());
 

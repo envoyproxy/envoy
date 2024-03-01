@@ -70,6 +70,10 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, CreateExporterAndExportSpan) {
   span.set_name("test");
   *request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_TRUE(exporter.log(request));
+
+  Http::TestRequestHeaderMapImpl metadata;
+  callbacks_->onCreateInitialMetadata(metadata);
+  EXPECT_EQ("OTel-OTLP-Exporter-Envoy", metadata.getUserAgentValue());
 }
 
 TEST_F(OpenTelemetryGrpcTraceExporterTest, NoExportWithHighWatermark) {

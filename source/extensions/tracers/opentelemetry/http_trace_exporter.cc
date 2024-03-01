@@ -50,6 +50,10 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
+  // User-Agent header follows the OTLP specification:
+  // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.30.0/specification/protocol/exporter.md#user-agent
+  message->headers().setReferenceUserAgent("OTel-OTLP-Exporter-Envoy");
+
   // Add all custom headers to the request.
   for (const auto& header_pair : parsed_headers_to_add_) {
     message->headers().setReference(header_pair.first, header_pair.second);

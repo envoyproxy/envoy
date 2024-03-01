@@ -30,7 +30,9 @@ public:
     LocalStream(OpenTelemetryGrpcTraceExporterClient& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
+      metadata.setReferenceUserAgent("OTel-OTLP-Exporter-Envoy");
+    }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
     void onReceiveMessage(
         std::unique_ptr<opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse>&&)
