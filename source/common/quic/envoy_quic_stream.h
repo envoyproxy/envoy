@@ -181,8 +181,8 @@ protected:
   void encodeTrailersImpl(spdy::Http2HeaderBlock&& trailers);
 
   // Converts `header_list` into a new `Http::MetadataMap`.
-  std::unique_ptr<Http::MetadataMap> metadataMapFromHeaderList(
-      const quic::QuicHeaderList& header_list);
+  std::unique_ptr<Http::MetadataMap>
+  metadataMapFromHeaderList(const quic::QuicHeaderList& header_list);
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Setting |http_datagram_handler_| enables HTTP Datagram support.

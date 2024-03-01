@@ -102,8 +102,8 @@ void EnvoyQuicStream::encodeTrailersImpl(spdy::Http2HeaderBlock&& trailers) {
   onLocalEndStream();
 }
 
-std::unique_ptr<Http::MetadataMap> EnvoyQuicStream::metadataMapFromHeaderList(
-    const quic::QuicHeaderList& header_list) {
+std::unique_ptr<Http::MetadataMap>
+EnvoyQuicStream::metadataMapFromHeaderList(const quic::QuicHeaderList& header_list) {
   auto metadata_map = std::make_unique<Http::MetadataMap>();
   for (const auto& [key, value] : header_list) {
     (*metadata_map)[key] = value;
@@ -116,7 +116,7 @@ namespace {
 // Returns a new `unique_ptr<char[]>` containing the characters copied from `str`.
 std::unique_ptr<char[]> dataFromString(const std::string& str) {
   auto data = std::make_unique<char[]>(str.length());
-  memcpy(&data[0], str.data(), str.length());  // NOLINT(safe-memcpy)
+  memcpy(&data[0], str.data(), str.length()); // NOLINT(safe-memcpy)
   return data;
 }
 
