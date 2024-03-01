@@ -205,8 +205,7 @@ new_features:
     during signature.
 - area: http3
   change: |
-    Added support for sending and receiving HTTP/3 METADATA frames when
-    :ref:`allow_metata <envoy_api_field_core.Http3ProtocolOptions.allow_metadata>` is set.
+    Added experimental support for sending and receiving HTTP/3 METADATA frames.
 - area: ext_proc
   change: |
     added
