@@ -187,7 +187,6 @@ envoy_cc_library(
     hdrs = envoy_select_hot_restart(["hot_restarting_child.h"]),
     deps = [
         ":hot_restarting_base",
-        "//envoy/network:parent_drained_callback_registrar_interface",
         "//source/common/stats:stat_merger_lib",
     ],
 )

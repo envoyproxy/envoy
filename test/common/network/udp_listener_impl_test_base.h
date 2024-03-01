@@ -31,24 +31,13 @@ namespace Envoy {
 namespace Network {
 
 class UdpListenerImplTestBase : public ListenerImplTestBase {
-protected:
-  MockIoHandle&
-  useHotRestartSocket(OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar) {
-    auto io_handle = std::make_unique<testing::NiceMock<MockIoHandle>>();
-    MockIoHandle& ret = *io_handle;
-    server_socket_ = createServerSocketFromExistingHandle(std::move(io_handle),
-                                                          parent_drained_callback_registrar);
-    return ret;
-  }
-
-  void setup() {
-    if (server_socket_ == nullptr) {
-      server_socket_ = createServerSocket(true);
-    }
-    send_to_addr_ = Address::InstanceConstSharedPtr(getServerLoopbackAddress());
+public:
+  UdpListenerImplTestBase()
+      : server_socket_(createServerSocket(true)), send_to_addr_(getServerLoopbackAddress()) {
     time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
+protected:
   Address::Instance* getServerLoopbackAddress() {
     if (version_ == Address::IpVersion::v4) {
       return new Address::Ipv4Instance(
@@ -69,14 +58,6 @@ protected:
                                              nullptr,
 #endif
                                              bind);
-  }
-
-  SocketSharedPtr createServerSocketFromExistingHandle(
-      IoHandlePtr&& io_handle,
-      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar) {
-    return std::make_shared<UdpListenSocket>(
-        std::move(io_handle), Network::Test::getCanonicalLoopbackAddress(version_),
-        SocketOptionFactory::buildIpFreebindOptions(), parent_drained_callback_registrar);
   }
 
   Address::InstanceConstSharedPtr getNonDefaultSourceAddress() {

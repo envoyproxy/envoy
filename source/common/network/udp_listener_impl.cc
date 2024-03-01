@@ -9,7 +9,6 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
-#include "envoy/network/parent_drained_callback_registrar.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
@@ -35,34 +34,9 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source),
       // Default prefer_gro to false for downstream server traffic.
       config_(config, false) {
-  parent_drained_callback_registrar_ = socket_->parentDrainedCallbackRegistrar();
   socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::PlatformDefaultTriggerType, paused() ? 0 : events_when_unpaused_);
-  if (paused()) {
-    parent_drained_callback_registrar_->registerParentDrainedCallback(
-        socket_->connectionInfoProvider().localAddress(),
-        [this, &dispatcher, alive = std::weak_ptr<void>(destruction_checker_)]() {
-          dispatcher.post([this, alive = std::move(alive)]() {
-            auto still_alive = alive.lock();
-            if (still_alive != nullptr) {
-              unpause();
-            }
-          });
-        });
-  }
-}
-
-void UdpListenerImpl::unpause() {
-  // Remove the paused state so enable will actually start listening to events.
-  parent_drained_callback_registrar_ = absl::nullopt;
-  if (events_when_unpaused_ != 0) {
-    // Start listening to events.
-    enable();
-    // There may have already been events while this instance was ignoring them,
-    // so try reading immediately.
-    activateRead();
-  }
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
 UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
@@ -70,18 +44,10 @@ UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
 void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
-  events_when_unpaused_ = Event::FileReadyType::Read | Event::FileReadyType::Write;
-  if (!paused()) {
-    socket_->ioHandle().enableFileEvents(events_when_unpaused_);
-  }
+  socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-void UdpListenerImpl::disableEvent() {
-  events_when_unpaused_ = 0;
-  if (!paused()) {
-    socket_->ioHandle().enableFileEvents(0);
-  }
-}
+void UdpListenerImpl::disableEvent() { socket_->ioHandle().enableFileEvents(0); }
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
