@@ -329,6 +329,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "drain_close_integration_test.cc",
     ]),
+    shard_count = 6,
     tags = [
         "cpu:3",
     ],
