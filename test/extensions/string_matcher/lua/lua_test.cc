@@ -2,6 +2,8 @@
 
 #include "source/extensions/string_matcher/lua/match.h"
 
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -86,6 +88,10 @@ TEST(LuaStringMatcher, LuaStdLib) {
 }
 
 TEST(LuaStringMatcher, NoCode) {
+  ScopedInjectableLoader<Api::Api> api_inject(std::make_unique<Api::MockApi>());
+  ScopedInjectableLoader<ThreadLocal::SlotAllocator> tls_inject(
+      std::make_unique<ThreadLocal::MockInstance>());
+
   LuaStringMatcherFactory factory;
   ::envoy::extensions::string_matcher::lua::v3::Lua empty_config;
   ProtobufWkt::Any any;
