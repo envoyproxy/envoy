@@ -502,16 +502,12 @@ public:
   }
 
   void setup() {
-    route_ = std::make_unique<Http::NullRouteImpl>(
-        cluster_.info()->name(),
-        *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()});
     tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
     conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
                                                 decoder_callbacks_, Http::CodecType::HTTP2,
                                                 downstream_stream_info_);
-    upstream_ =
-        std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
-                                           *tunnel_config_, downstream_stream_info_);
+    upstream_ = std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_,
+                                                   *tunnel_config_, downstream_stream_info_);
     auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
     std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
     config_ = std::make_shared<Config>(tcp_proxy_, factory_context_);
@@ -522,7 +518,22 @@ public:
         *upstream_, std::move(generic_conn_pool));
     mock_router_upstream_request_ = mock_upst.get();
     upstream_->setRouterUpstreamRequest(std::move(mock_upst));
+    // EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
+
+    EXPECT_EQ(upstream_->startUpstreamSecureTransport(), false);
+    EXPECT_EQ(upstream_->getUpstreamConnectionSslInfo(), nullptr);
+    EXPECT_NO_THROW(upstream_->onUpstream1xxHeaders(nullptr, *mock_upst.get()));
+    EXPECT_NO_THROW(upstream_->onUpstreamMetadata(nullptr));
+    EXPECT_NO_THROW(upstream_->onPerTryTimeout(*mock_upst.get()));
+    EXPECT_NO_THROW(upstream_->onPerTryIdleTimeout(*mock_upst.get()));
+    EXPECT_NO_THROW(upstream_->onStreamMaxDurationReached(*mock_upst.get()));
+    EXPECT_EQ(upstream_->dynamicMaxStreamDuration(), absl::nullopt);
+    EXPECT_EQ(upstream_->downstreamTrailers(), nullptr);
+    EXPECT_EQ(upstream_->downstreamResponseStarted(), false);
+    EXPECT_EQ(upstream_->downstreamEndStream(), false);
+    EXPECT_EQ(upstream_->attemptCount(), 0);
     EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
+
     upstream_->newStream(*filter_);
   }
 
@@ -545,7 +556,6 @@ public:
   NiceMock<Stats::MockStore> store_;
   Stats::MockScope& scope_{store_.mockScope()};
   std::unique_ptr<TunnelingConfigHelper> tunnel_config_;
-  std::unique_ptr<Http::NullRouteImpl> route_;
   std::unique_ptr<CombinedUpstream> upstream_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
@@ -563,9 +573,8 @@ TEST_F(CombinedUpstreamTest, WriteUpstream) {
   this->upstream_->encodeData(buffer2, true);
 
   // New upstream with no encoder.
-  this->upstream_ =
-      std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
-                                         *tunnel_config_, downstream_stream_info_);
+  this->upstream_ = std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_,
+                                                       *tunnel_config_, downstream_stream_info_);
   this->upstream_->encodeData(buffer2, true);
 }
 
@@ -603,9 +612,8 @@ TEST_F(CombinedUpstreamTest, ReadDisable) {
   EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder.
-  this->upstream_ =
-      std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_, *route_,
-                                         *tunnel_config_, downstream_stream_info_);
+  this->upstream_ = std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_,
+                                                       *tunnel_config_, downstream_stream_info_);
   EXPECT_FALSE(this->upstream_->readDisable(true));
 }
 

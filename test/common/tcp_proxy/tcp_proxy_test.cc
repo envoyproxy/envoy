@@ -522,6 +522,68 @@ TEST_P(TcpProxyTest, NoHost) {
   EXPECT_EQ(access_log_data_, "UH");
 }
 
+// Tests StreamDecoderFilterCallbacks interface implementation
+TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      accessLogConfig("%RESPONSE_FLAGS%");
+  config.mutable_tunneling_config()->set_hostname("www.example.com");
+  configure(config);
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  // EXPECT_CALL(factory_context_.serverFactoryContext().clusterManager(), getThreadLocalCluster(_))
+  //     .WillRepeatedly(Return(&thread_local_cluster_));
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info));
+  filter_ =
+      std::make_unique<Filter>(config_, factory_context_.serverFactoryContext().clusterManager());
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  auto stream_decoder_callbacks = Filter::HttpStreamDecoderFilterCallbacks(filter_.get());
+  EXPECT_NO_THROW(stream_decoder_callbacks.streamId());
+  EXPECT_NO_THROW(stream_decoder_callbacks.connection());
+  EXPECT_NO_THROW(stream_decoder_callbacks.dispatcher());
+  EXPECT_ENVOY_BUG(
+      { stream_decoder_callbacks.resetStream(Http::StreamResetReason::RemoteReset, ""); },
+      "Not implemented");
+  EXPECT_NO_THROW(stream_decoder_callbacks.streamInfo());
+  EXPECT_NO_THROW(stream_decoder_callbacks.scope());
+  EXPECT_NO_THROW(stream_decoder_callbacks.route());
+  EXPECT_NO_THROW(stream_decoder_callbacks.continueDecoding());
+  EXPECT_NO_THROW(stream_decoder_callbacks.responseHeaders());
+  EXPECT_NO_THROW(stream_decoder_callbacks.responseTrailers());
+  EXPECT_NO_THROW(stream_decoder_callbacks.encodeMetadata(nullptr));
+  EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(uint32_t{0}));
+  EXPECT_NO_THROW(stream_decoder_callbacks.decoderBufferLimit());
+  EXPECT_NO_THROW(stream_decoder_callbacks.recreateStream(nullptr));
+  EXPECT_NO_THROW(stream_decoder_callbacks.getUpstreamSocketOptions());
+  EXPECT_NO_THROW(stream_decoder_callbacks.mostSpecificPerFilterConfig());
+  EXPECT_NO_THROW(stream_decoder_callbacks.account());
+  // EXPECT_NO_THROW(stream_decoder_callbacks.setUpstreamOverrideHost("foo"));
+  EXPECT_NO_THROW(stream_decoder_callbacks.http1StreamEncoderOptions());
+  EXPECT_NO_THROW(stream_decoder_callbacks.downstreamCallbacks());
+  EXPECT_NO_THROW(stream_decoder_callbacks.upstreamCallbacks());
+  EXPECT_NO_THROW(stream_decoder_callbacks.upstreamOverrideHost());
+  EXPECT_NO_THROW(stream_decoder_callbacks.resetIdleTimer());
+  EXPECT_NO_THROW(stream_decoder_callbacks.filterConfigName());
+  EXPECT_NO_THROW(stream_decoder_callbacks.activeSpan());
+  EXPECT_NO_THROW(stream_decoder_callbacks.tracingConfig());
+  Buffer::OwnedImpl inject_data;
+  EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
+  EXPECT_NO_THROW(stream_decoder_callbacks.injectDecodedDataToFilterChain(inject_data, false));
+  EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
+  EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedTrailers());
+  EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedMetadata());
+  EXPECT_NO_THROW(stream_decoder_callbacks.decodingBuffer());
+  auto func = [](Buffer::Instance&) {};
+  EXPECT_NO_THROW(stream_decoder_callbacks.modifyDecodingBuffer(func));
+  EXPECT_NO_THROW(stream_decoder_callbacks.encode1xxHeaders(nullptr));
+  EXPECT_NO_THROW(stream_decoder_callbacks.informationalHeaders());
+  EXPECT_NO_THROW(stream_decoder_callbacks.encodeHeaders(nullptr, false, ""));
+  EXPECT_NO_THROW(stream_decoder_callbacks.encodeData(inject_data, false));
+  EXPECT_NO_THROW(stream_decoder_callbacks.encodeTrailers(nullptr));
+  EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(0));
+}
+
 TEST_P(TcpProxyTest, RouteWithMetadataMatch) {
   auto v1 = ProtobufWkt::Value();
   v1.set_string_value("v1");

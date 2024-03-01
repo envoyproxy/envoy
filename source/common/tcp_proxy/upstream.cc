@@ -331,9 +331,8 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
-    combined_upstream_ =
-        std::make_unique<CombinedUpstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-                                           *(route_), config_, downstream_info_);
+    combined_upstream_ = std::make_unique<CombinedUpstream>(
+        *this, upstream_callbacks_, *decoder_filter_callbacks_, config_, downstream_info_);
     RouterUpstreamRequestPtr upstream_request = std::make_unique<RouterUpstreamRequest>(
         *combined_upstream_, std::move(generic_conn_pool_), /*can_send_early_data_=*/false,
         /*can_use_http3_=*/true, true /*enable_tcp_tunneling*/);
@@ -341,15 +340,6 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
     combined_upstream_->newStream(callbacks);
     return;
   }
-  // if (type_ == Http::CodecType::HTTP1) {
-  //   upstream_ =
-  //       std::make_unique<Http1Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-  //                                       *(route_), config_, downstream_info_);
-  // } else {
-  //   upstream_ =
-  //       std::make_unique<Http2Upstream>(*this, upstream_callbacks_, *decoder_filter_callbacks_,
-  //                                       *(route_), config_, downstream_info_);
-  // }
 
   upstream_ = std::make_unique<HttpUpstream>(upstream_callbacks_, config_, downstream_info_, type_);
   Tcp::ConnectionPool::Cancellable* handle =
@@ -394,12 +384,6 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
   upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
       *this, host, info.downstreamAddressProvider().sslConnection()));
-  // } else if (combined_upstream_ != nullptr) {
-  //   combined_upstream_->setRequestEncoder(
-  //       request_encoder, host->transportSocketFactory().implementsSecureTransport());
-  //   combined_upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
-  //       *this, host, info.downstreamAddressProvider().sslConnection()));
-  // }
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
@@ -418,10 +402,10 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                                    Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                                   Router::Route& route, const TunnelingConfigHelper& config,
+                                   const TunnelingConfigHelper& config,
                                    StreamInfo::StreamInfo& downstream_info)
     : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
-      decoder_filter_callbacks_(decoder_callbacks), route_(&route), response_decoder_(*this),
+      decoder_filter_callbacks_(decoder_callbacks), response_decoder_(*this),
       upstream_callbacks_(callbacks) {
   auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
   const std::string& scheme =
@@ -574,37 +558,6 @@ void CombinedUpstream::onAboveWriteBufferHighWatermark() {
 void CombinedUpstream::onBelowWriteBufferLowWatermark() {
   upstream_callbacks_.onBelowWriteBufferLowWatermark();
 }
-
-// void CombinedUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
-//   request_encoder_ = &request_encoder;
-//   request_encoder_->getStream().addCallbacks(*this);
-//   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-//       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-//       {Http::Headers::get().Host, config_.host(downstream_info_)},
-//   });
-//   if (config_.usePost()) {
-//     headers->addReference(Http::Headers::get().Path, config_.postPath());
-//   }
-
-//   if (type_ == Http::CodecType::HTTP1) {
-//     request_encoder_->enableTcpTunneling();
-//     ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
-//   } else {
-//     const std::string& scheme =
-//         is_ssl ? Http::Headers::get().SchemeValues.Https :
-//         Http::Headers::get().SchemeValues.Http;
-
-//     if (config_.usePost()) {
-//       headers->addReference(Http::Headers::get().Scheme, scheme);
-//     }
-//   }
-
-//   config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
-//                                             downstream_info_);
-//   const auto status = request_encoder_->encodeHeaders(*headers, false);
-//   // Encoding can only fail on missing required request headers.
-//   ASSERT(status.ok());
-// }
 
 } // namespace TcpProxy
 } // namespace Envoy

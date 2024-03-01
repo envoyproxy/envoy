@@ -270,7 +270,7 @@ class CombinedUpstream : public GenericUpstream,
                          public Envoy::Router::RouterFilterInterface {
 public:
   CombinedUpstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                   Http::StreamDecoderFilterCallbacks& decoder_callbacks, Router::Route& route,
+                   Http::StreamDecoderFilterCallbacks& decoder_callbacks,
                    const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   ~CombinedUpstream() override = default;
   using UpstreamRequest = Router::UpstreamRequest;
@@ -282,7 +282,6 @@ public:
   void newStream(GenericConnectionPoolCallbacks& callbacks);
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
-  void setRequestEncoder(Http::RequestEncoder&, bool);
   bool isValidResponse(const Http::ResponseHeaderMap&);
   bool readDisable(bool disable) override;
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
@@ -300,20 +299,6 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
-protected:
-  void onResetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
-
-  // The encoder offered by the upstream http client.
-  Http::RequestEncoder* request_encoder_{};
-  // The config object that is owned by the downstream network filter chain factory.
-  const TunnelingConfigHelper& config_;
-  // The downstream info that is owned by the downstream connection.
-  StreamInfo::StreamInfo& downstream_info_;
-  std::list<UpstreamRequestPtr> upstream_requests_;
-  std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
-  HttpConnPool& parent_;
-
-private:
   // Router::RouterFilterInterface
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream) override;
@@ -347,6 +332,19 @@ private:
   bool downstreamResponseStarted() const override { return false; }
   bool downstreamEndStream() const override { return false; }
   uint32_t attemptCount() const override { return 0; }
+
+protected:
+  void onResetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
+
+  // The config object that is owned by the downstream network filter chain factory.
+  const TunnelingConfigHelper& config_;
+  // The downstream info that is owned by the downstream connection.
+  StreamInfo::StreamInfo& downstream_info_;
+  std::list<UpstreamRequestPtr> upstream_requests_;
+  std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
+  HttpConnPool& parent_;
+
+private:
   Http::StreamDecoderFilterCallbacks& decoder_filter_callbacks_;
   class DecoderShim : public Http::ResponseDecoder {
   public:
@@ -360,7 +358,7 @@ private:
       if (!is_valid_response || end_stream) {
         parent_.onResetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
-        parent_.conn_pool_callbacks_->onSuccess(parent_.request_encoder_);
+        parent_.conn_pool_callbacks_->onSuccess(nullptr /*parent_.request_encoder_*/);
         parent_.conn_pool_callbacks_.reset();
       }
     }
@@ -388,7 +386,6 @@ private:
   private:
     CombinedUpstream& parent_;
   };
-  Router::Route* route_;
   DecoderShim response_decoder_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
