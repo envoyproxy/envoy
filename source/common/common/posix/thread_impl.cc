@@ -34,11 +34,11 @@ int64_t getCurrentThreadId() {
 // so we need to truncate the string_view to 15 bytes.
 #define PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE 16
 
-ThreadHandle::ThreadHandle(absl::AnyInvocable<void()> thread_routine)
-    : thread_routine_(std::move(thread_routine)) {}
+ThreadHandle::ThreadHandle(std::function<void()> thread_routine)
+    : thread_routine_(thread_routine) {}
 
 /** Returns the thread routine. */
-absl::AnyInvocable<void()>& ThreadHandle::routine() { return thread_routine_; };
+std::function<void()>& ThreadHandle::routine() { return thread_routine_; };
 
 /** Returns the thread handle. */
 pthread_t& ThreadHandle::handle() { return thread_handle_; }
@@ -127,12 +127,12 @@ class PosixThreadFactoryImpl : public PosixThreadFactory {
 public:
   ThreadPtr createThread(std::function<void()> thread_routine,
                          OptionsOptConstRef options) override {
-    return createThread(std::move(thread_routine), options, /* crash_on_failure= */ true);
+    return createThread(thread_routine, options, /* crash_on_failure= */ true);
   };
 
-  PosixThreadPtr createThread(absl::AnyInvocable<void()> thread_routine, OptionsOptConstRef options,
+  PosixThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options,
                               bool crash_on_failure) override {
-    auto thread_handle = new ThreadHandle(std::move(thread_routine));
+    auto thread_handle = new ThreadHandle(thread_routine);
     const int rc = pthread_create(
         &thread_handle->handle(), nullptr,
         [](void* arg) -> void* {

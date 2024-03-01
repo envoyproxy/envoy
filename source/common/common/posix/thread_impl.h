@@ -7,23 +7,21 @@
 #include "envoy/common/platform.h"
 #include "envoy/thread/thread.h"
 
-#include "absl/functional/any_invocable.h"
-
 namespace Envoy {
 namespace Thread {
 
 class ThreadHandle {
 public:
-  explicit ThreadHandle(absl::AnyInvocable<void()> thread_routine);
+  explicit ThreadHandle(std::function<void()> thread_routine);
 
   /** Returns the thread routine. */
-  absl::AnyInvocable<void()>& routine();
+  std::function<void()>& routine();
 
   /** Returns the thread handle. */
   pthread_t& handle();
 
 private:
-  absl::AnyInvocable<void()> thread_routine_;
+  std::function<void()> thread_routine_;
   pthread_t thread_handle_;
 };
 
@@ -59,7 +57,7 @@ private:
   bool getNameFromOS(std::string& name);
 #endif
 
-  absl::AnyInvocable<void()> thread_routine_;
+  std::function<void()> thread_routine_;
   ThreadHandle* thread_handle_;
   std::string name_;
   bool joined_{false};
@@ -88,7 +86,7 @@ public:
    * `crash_on_failure` is set to true, this function will crash when the thread
    * cannot be created; otherwise a `nullptr` will be returned.
    */
-  virtual PosixThreadPtr createThread(absl::AnyInvocable<void()> thread_routine,
+  virtual PosixThreadPtr createThread(std::function<void()> thread_routine,
                                       OptionsOptConstRef options, bool crash_on_failure) PURE;
 
   /**

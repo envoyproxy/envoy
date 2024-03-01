@@ -42,7 +42,7 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
-  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
     ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
@@ -51,14 +51,14 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
   return run(std::move(options));
 }
 
-envoy_status_t InternalEngine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
-  main_thread_ = thread_factory_->createThread(
-      [&, options = std::move(options)]() mutable -> void { main(std::move(options)); },
-      /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
+  main_thread_ =
+      thread_factory_->createThread([this, options]() mutable -> void { main(options); },
+                                    /* options= */ absl::nullopt, /* crash_on_failure= */ false);
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
-envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
+envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
@@ -88,7 +88,7 @@ envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& op
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      main_common = std::make_unique<EngineCommon>(std::move(options));
+      main_common = std::make_unique<EngineCommon>(options);
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
 

@@ -59,7 +59,7 @@ class MockPosixThreadFactory : public Thread::PosixThreadFactory {
 public:
   MOCK_METHOD(Thread::ThreadPtr, createThread, (std::function<void()>, Thread::OptionsOptConstRef));
   MOCK_METHOD(Thread::PosixThreadPtr, createThread,
-              (absl::AnyInvocable<void()>, Thread::OptionsOptConstRef, bool crash_on_failure));
+              (std::function<void()>, Thread::OptionsOptConstRef, bool crash_on_failure));
   MOCK_METHOD(Thread::ThreadId, currentThreadId, ());
   MOCK_METHOD(Thread::ThreadId, currentPthreadId, ());
 };

@@ -40,7 +40,7 @@ public:
    * @param log_level, the log level.
    */
   envoy_status_t run(const std::string& config, const std::string& log_level);
-  envoy_status_t run(std::unique_ptr<Envoy::OptionsImplBase>&& options);
+  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
 
   /**
    * Immediately terminate the engine, if running. Calling this function when
@@ -126,7 +126,7 @@ private:
   InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
                  envoy_event_tracker event_tracker, Thread::PosixThreadFactoryPtr thread_factory);
 
-  envoy_status_t main(std::unique_ptr<Envoy::OptionsImplBase>&& options);
+  envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
 

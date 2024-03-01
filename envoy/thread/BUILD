@@ -14,6 +14,5 @@ envoy_cc_library(
     deps = [
         "//envoy/common:pure_lib",
         "//source/common/common:thread_annotations",
-        "@com_google_absl//absl/functional:any_invocable",
     ],
 )
