@@ -948,12 +948,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
 
-  if (connection_manager_.remote_close_) {
-    filter_manager_.streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
-    filter_manager_.streamInfo().setResponseFlag(
-        StreamInfo::CoreResponseFlag::DownstreamConnectionTermination);
-  }
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
