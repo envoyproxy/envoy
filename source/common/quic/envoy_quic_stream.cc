@@ -107,7 +107,7 @@ namespace {
 // Returns a new `unique_ptr<char[]>` containing the characters copied from `str`.
 std::unique_ptr<char[]> dataFromString(const std::string& str) {
   auto data = std::make_unique<char[]>(str.length());
-  memcpy(&data[0], str.data(), str.length());
+  safeMemcpyUnsafeSrc(&data[0], str.data());
   return data;
 }
 
