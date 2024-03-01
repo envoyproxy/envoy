@@ -8,6 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
 
 #include "absl/strings/str_cat.h"
@@ -313,8 +314,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                 Event::Dispatcher& dispatcher, Api::Api& api,
                 Server::ServerLifecycleNotifier& lifecycle_notifier,
-                Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
-                CreateWasmCallback&& cb, CreateContextFn create_root_context_for_testing) {
+                RemoteAsyncDataProviderPtr& remote_data_provider, CreateWasmCallback&& cb,
+                CreateContextFn create_root_context_for_testing) {
   auto& stats_handler = getCreateStatsHandler();
   std::string source, code;
   auto config = plugin->wasmConfig();
@@ -453,7 +454,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       cb(nullptr);
       return false;
     } else {
-      remote_data_provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
           cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
           api.randomGenerator(), true, fetch_callback);
     }
