@@ -26,6 +26,8 @@ public:
   // which will eventually drain the HTTP/2 connection.
   const std::string H2ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http2_server_go_away_on_dispatch";
+
+  const std::string HcmCodecCreation = "envoy.load_shed_points.hcm_ondata_creating_codec";
 };
 
 using LoadShedPointName = ConstSingleton<LoadShedPointNameValues>;
