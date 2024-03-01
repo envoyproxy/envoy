@@ -43,12 +43,6 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
-    name = "mock_parent_drained_callback_registrar",
-    hdrs = ["mock_parent_drained_callback_registrar.h"],
-    deps = ["//envoy/network:parent_drained_callback_registrar_interface"],
-)
-
-envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],

@@ -116,6 +116,7 @@ on:
         type: string
       timeout-minutes:
         type: number
+        default: 60
       trusted:
         type: boolean
         required: true
