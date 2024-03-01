@@ -547,6 +547,8 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.scope());
   EXPECT_NO_THROW(stream_decoder_callbacks.route());
   EXPECT_NO_THROW(stream_decoder_callbacks.continueDecoding());
+  EXPECT_NO_THROW(stream_decoder_callbacks.requestHeaders());
+  EXPECT_NO_THROW(stream_decoder_callbacks.requestTrailers());
   EXPECT_NO_THROW(stream_decoder_callbacks.responseHeaders());
   EXPECT_NO_THROW(stream_decoder_callbacks.responseTrailers());
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeMetadata(nullptr));
@@ -556,9 +558,13 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.decoderBufferLimit());
   EXPECT_NO_THROW(stream_decoder_callbacks.recreateStream(nullptr));
   EXPECT_NO_THROW(stream_decoder_callbacks.getUpstreamSocketOptions());
+  Network::Socket::OptionsSharedPtr sock_options =
+      Network::SocketOptionFactory::buildIpTransparentOptions();
+  EXPECT_NO_THROW(stream_decoder_callbacks.addUpstreamSocketOptions(sock_options));
   EXPECT_NO_THROW(stream_decoder_callbacks.mostSpecificPerFilterConfig());
   EXPECT_NO_THROW(stream_decoder_callbacks.account());
-  // EXPECT_NO_THROW(stream_decoder_callbacks.setUpstreamOverrideHost("foo"));
+  EXPECT_NO_THROW(stream_decoder_callbacks.setUpstreamOverrideHost(
+      Upstream::LoadBalancerContext::OverrideHost(std::make_pair("foo", true))));
   EXPECT_NO_THROW(stream_decoder_callbacks.http1StreamEncoderOptions());
   EXPECT_NO_THROW(stream_decoder_callbacks.downstreamCallbacks());
   EXPECT_NO_THROW(stream_decoder_callbacks.upstreamCallbacks());
@@ -582,6 +588,9 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeData(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeTrailers(nullptr));
   EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(0));
+  std::array<char, 256> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  EXPECT_NO_THROW(stream_decoder_callbacks.dumpState(ostream, 0));
 }
 
 TEST_P(TcpProxyTest, RouteWithMetadataMatch) {

@@ -518,22 +518,8 @@ public:
         *upstream_, std::move(generic_conn_pool));
     mock_router_upstream_request_ = mock_upst.get();
     upstream_->setRouterUpstreamRequest(std::move(mock_upst));
-    // EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
-
-    EXPECT_EQ(upstream_->startUpstreamSecureTransport(), false);
-    EXPECT_EQ(upstream_->getUpstreamConnectionSslInfo(), nullptr);
-    EXPECT_NO_THROW(upstream_->onUpstream1xxHeaders(nullptr, *mock_upst.get()));
-    EXPECT_NO_THROW(upstream_->onUpstreamMetadata(nullptr));
-    EXPECT_NO_THROW(upstream_->onPerTryTimeout(*mock_upst.get()));
-    EXPECT_NO_THROW(upstream_->onPerTryIdleTimeout(*mock_upst.get()));
-    EXPECT_NO_THROW(upstream_->onStreamMaxDurationReached(*mock_upst.get()));
-    EXPECT_EQ(upstream_->dynamicMaxStreamDuration(), absl::nullopt);
-    EXPECT_EQ(upstream_->downstreamTrailers(), nullptr);
-    EXPECT_EQ(upstream_->downstreamResponseStarted(), false);
-    EXPECT_EQ(upstream_->downstreamEndStream(), false);
-    EXPECT_EQ(upstream_->attemptCount(), 0);
     EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
-
+    EXPECT_NO_THROW(tunnel_config_->serverFactoryContext());
     upstream_->newStream(*filter_);
   }
 
@@ -559,6 +545,25 @@ public:
   std::unique_ptr<CombinedUpstream> upstream_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
+TEST_F(CombinedUpstreamTest, RouterFilterInterface) {
+  this->setup();
+  EXPECT_EQ(this->upstream_->startUpstreamSecureTransport(), false);
+  EXPECT_EQ(this->upstream_->getUpstreamConnectionSslInfo(), nullptr);
+  auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
+  std::unique_ptr<Router::GenericConnPool> generic_conn_pool = std::move(mock_conn_pool);
+  auto mock_upst = std::make_unique<NiceMock<Router::MockUpstreamRequest>>(
+      *this->upstream_, std::move(generic_conn_pool));
+  EXPECT_NO_THROW(this->upstream_->onUpstream1xxHeaders(nullptr, *mock_upst.get()));
+  EXPECT_NO_THROW(this->upstream_->onUpstreamMetadata(nullptr));
+  EXPECT_NO_THROW(this->upstream_->onPerTryTimeout(*mock_upst.get()));
+  EXPECT_NO_THROW(this->upstream_->onPerTryIdleTimeout(*mock_upst.get()));
+  EXPECT_NO_THROW(this->upstream_->onStreamMaxDurationReached(*mock_upst.get()));
+  EXPECT_EQ(this->upstream_->dynamicMaxStreamDuration(), absl::nullopt);
+  EXPECT_EQ(this->upstream_->downstreamTrailers(), nullptr);
+  EXPECT_EQ(this->upstream_->downstreamResponseStarted(), false);
+  EXPECT_EQ(this->upstream_->downstreamEndStream(), false);
+  EXPECT_EQ(this->upstream_->attemptCount(), 0);
+}
 
 TEST_F(CombinedUpstreamTest, WriteUpstream) {
   this->setup();
