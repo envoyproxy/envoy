@@ -11,9 +11,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/histogram_impl.h"
-#include "source/common/stats/stats_matcher_impl.h"
-#include "source/common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -202,12 +199,6 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
     }
   }
   return rate_limit_settings;
-}
-
-Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                           const Stats::TagVector& cli_tags) {
-  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
 }
 
 absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(

@@ -565,6 +565,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.tracers.opentelemetry",
             "envoy.tracers.opentelemetry.samplers.always_on",
+            "envoy.tracers.opentelemetry.samplers.dynatrace",
         ],
         release_date = "2024-02-17",
         cpe = "N/A",

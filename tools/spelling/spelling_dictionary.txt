@@ -1325,6 +1325,7 @@ suf
 superclass
 superroot
 superset
+supportability
 svc
 symlink
 symlinked

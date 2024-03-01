@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
+        "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
         # use boringssl alias to select fips vs non-fips version.
