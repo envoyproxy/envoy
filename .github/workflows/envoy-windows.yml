@@ -65,6 +65,7 @@ jobs:
       steps-post:
       target: ${{ matrix.target }}
       temp-dir: 'C:\Users\runner\AppData\Local\Temp\bazel-shared'
+      timeout-minutes: 120
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
       upload-name: windows.release
       upload-path: 'C:\Users\runner\AppData\Local\Temp\envoy'
