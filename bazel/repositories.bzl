@@ -388,6 +388,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_wasmtime()
     _com_github_wasm_c_api()
 
+
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
         cc = True,

@@ -1,6 +1,6 @@
 load(":envoy_http_archive.bzl", "envoy_http_archive")
 load(":external_deps.bzl", "load_repository_locations")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 
 REPOSITORY_LOCATIONS = load_repository_locations(REPOSITORY_LOCATIONS_SPEC)
 
@@ -19,12 +19,14 @@ def api_dependencies():
     external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:pgv.patch"],
+        patches = ["//bazel:pgv.patch"],
     )
     external_http_archive(
         name = "com_google_googleapis",
     )
-
+    external_http_archive(
+        name = "com_github_grpc_grpc",
+    )
     external_http_archive(
         name = "com_github_cncf_xds",
     )
@@ -62,6 +64,8 @@ def api_dependencies():
     external_http_archive(
         name = "envoy_toolshed",
     )
+    _com_google_protobuf()
+    _com_google_googletest()
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
@@ -223,3 +227,32 @@ filegroup(
     tags = ["manual"], # buf is downloaded as a linux binary; tagged manual to prevent build for non-linux users
 )
 """
+
+def _com_google_protobuf():
+    for platform in PROTOC_VERSIONS:
+        # Ideally we dont use a private build artefact as done here.
+        # If `rules_proto` implements protoc toolchains in the future (currently it
+        # is there, but is empty) we should remove these and use that rule
+        # instead.
+        external_http_archive(
+            "com_google_protobuf_protoc_%s" % platform,
+            build_file = "@rules_proto//proto/private:BUILD.protoc",
+        )
+    external_http_archive("rules_ruby")
+    external_http_archive(
+        "com_google_protobuf",
+        patches = ["//bazel:protobuf.patch"],
+        patch_args = ["-p1"],
+    )
+    external_http_archive(
+        name = "upb",
+        patch_args = ["-p1"],
+        patches = ["//bazel:upb.patch"],
+    )
+
+def _com_google_googletest():
+    external_http_archive(
+        "com_google_googletest",
+        patches = ["//bazel:googletest.patch"],
+        patch_args = ["-p1"],
+    )

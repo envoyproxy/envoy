@@ -1,0 +1,97 @@
+module(
+    name = "envoy_mobile",
+    version = "0.0.0",
+)
+
+bazel_dep(
+    name = "bazel_skylib",
+    version = "1.5.0",
+)
+bazel_dep(
+    name = "envoy",
+    version = "0.0.0",
+)
+bazel_dep(
+    name = "envoy_api",
+    version = "0.0.0",
+)
+bazel_dep(
+    name = "envoy_build_config",
+    version = "0.0.0",
+)
+bazel_dep(
+    name = "gazelle",
+    version = "0.32.0",
+    repo_name = "bazel_gazelle",
+)
+bazel_dep(
+    name = "platforms",
+    version = "0.0.8",
+)
+bazel_dep(
+    name = "rules_android",
+    version = "0.1.1",
+    repo_name = "build_bazel_rules_android",
+)
+bazel_dep(
+    name = "rules_apple",
+    version = "2.0.0",
+    repo_name = "build_bazel_rules_apple",
+)
+bazel_dep(
+    name = "rules_foreign_cc",
+    version = "0.10.1",
+)
+bazel_dep(
+    name = "rules_java",
+    version = "6.4.0",
+)
+bazel_dep(
+    name = "rules_jvm_external",
+    version = "4.5",
+)
+bazel_dep(
+    name = "rules_proto",
+    version = "4.0.0",
+)
+bazel_dep(
+    name = "rules_swift",
+    version = "1.16.0",
+    repo_name = "build_bazel_rules_swift",
+)
+bazel_dep(
+    name = "rules_xcodeproj",
+    version = "1.2.0",
+    repo_name = "com_github_buildbuddy_io_rules_xcodeproj",
+)
+# -- bazel_dep definitions -- #
+
+local_path_override(
+    module_name = "envoy",
+    path = "..",
+)
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "../api",
+)
+
+local_path_override(
+    module_name = "envoy_build_config",
+    path = "envoy_build_config",
+)
+
+non_module_dependencies = use_extension("@envoy_mobile//bazel:extensions.bzl", "non_module_dependencies")
+use_repo(
+    non_module_dependencies,
+    "io_bazel_rules_kotlin",
+    "pybind11_bazel",
+    "robolectric",
+    "rules_detekt",
+)
+
+swift_non_module_deps = use_extension("@build_bazel_rules_swift//swift:extensions.bzl", "non_module_deps")
+use_repo(
+    swift_non_module_deps,
+    "build_bazel_rules_swift_local_config",
+)

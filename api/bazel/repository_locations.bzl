@@ -1,4 +1,20 @@
 # This should match the schema defined in external_deps.bzl.
+
+PROTOBUF_VERSION = "24.4"
+
+# These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
+# and both must match the names from the protobuf releases (see
+# https://github.com/protocolbuffers/protobuf/releases).
+# The names change in upcoming versions.
+# The shas are calculated from the downloads on the releases page.
+PROTOC_VERSIONS = dict(
+    linux_aarch_64 = "83ac000ff540e242b6a2ff221a3ac88d2d8e55443801b7a28e9697e5f40e8937",
+    linux_x86_64 = "5871398dfd6ac954a6adebf41f1ae3a4de915a36a6ab2fd3e8f2c00d45b50dec",
+    osx_aarch_64 = "d80544480397fe8a05d966fba291cf1233ad0db0ebc24ec72d7bd077d6e7ac59",
+    osx_x86_64 = "6c3b6bf4038d733b6d31f1cc4516a656570b5b5aafb966b650f8182afd0b98cf",
+    win64 = "8f3f92fbf7dd2995129e6fe223c07c0aaa97fb182f19cecfb424e9146b273eb6",
+)
+
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_skylib = dict(
         project_name = "bazel-skylib",
@@ -48,6 +64,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/cncf/xds/blob/{version}/LICENSE",
     ),
+    com_github_grpc_grpc = dict(
+        project_name = "gRPC",
+        project_desc = "gRPC C core library",
+        project_url = "https://grpc.io",
+        version = "1.59.4",
+        sha256 = "6edc67c2ad200c5b618c421f6e8c1b734a4aa3e741975e683491da03390ebf63",
+        strip_prefix = "grpc-{version}",
+        urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2024-02-05",
+        cpe = "cpe:2.3:a:grpc:grpc:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/grpc/grpc/blob/v{version}/LICENSE",
+    ),
     com_github_openzipkin_zipkinapi = dict(
         project_name = "Zipkin API",
         project_desc = "Zipkin's language independent model and HTTP Api Definitions",
@@ -74,6 +104,40 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["api"],
         license = "Apache-2.0",
         license_url = "https://github.com/googleapis/googleapis/blob/{version}/LICENSE",
+    ),
+    com_google_googletest = dict(
+        project_name = "Google Test",
+        project_desc = "Google's C++ test framework",
+        project_url = "https://github.com/google/googletest",
+        # Pick up fix for MOCK_METHOD compilation with clang-cl for Windows (resolved after 1.10.0)
+        # see https://github.com/google/googletest/issues/2490
+        version = "a4ab0abb93620ce26efad9de9296b73b16e88588",
+        sha256 = "7897bfaa5ad39a479177cfb5c3ce010184dbaee22a7c3727b212282871918751",
+        strip_prefix = "googletest-{version}",
+        urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
+        release_date = "2020-09-10",
+        use_category = ["test_only"],
+        cpe = "cpe:2.3:a:google:google_test:*",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/google/googletest/blob/{version}/LICENSE",
+    ),
+    com_google_protobuf = dict(
+        project_name = "Protocol Buffers",
+        project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
+        project_url = "https://developers.google.com/protocol-buffers",
+        version = PROTOBUF_VERSION,
+        # When upgrading the protobuf library, please re-run
+        # test/common/json:gen_excluded_unicodes to recompute the ranges
+        # excluded from differential fuzzing that are populated in
+        # test/common/json/json_sanitizer_test_util.cc.
+        sha256 = "616bb3536ac1fff3fb1a141450fa28b875e985712170ea7f1bfe5e5fc41e2cd8",
+        strip_prefix = "protobuf-{version}",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2023-10-04",
+        cpe = "cpe:2.3:a:google:protobuf:*",
+        license = "Protocol Buffers",
+        license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
     ),
     opencensus_proto = dict(
         project_name = "OpenCensus Proto",
@@ -113,6 +177,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["api"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_proto/blob/{version}/LICENSE",
+    ),
+    rules_python = dict(
+        project_name = "Python rules for Bazel",
+        project_desc = "Bazel rules for the Python language",
+        project_url = "https://github.com/bazelbuild/rules_python",
+        version = "0.31.0",
+        sha256 = "c68bdc4fbec25de5b5493b8819cfc877c4ea299c0dcb15c244c5a00208cde311",
+        release_date = "2024-02-13",
+        strip_prefix = "rules_python-{version}",
+        urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_python/blob/{version}/LICENSE",
     ),
     opentelemetry_proto = dict(
         project_name = "OpenTelemetry Proto",
@@ -162,6 +239,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["build"],
         release_date = "2023-05-03",
     ),
+    rules_ruby = dict(
+        # This is needed only to compile protobuf, not used in Envoy code
+        project_name = "Ruby rules for Bazel",
+        project_desc = "Bazel rules for the Ruby language",
+        project_url = "https://github.com/protocolbuffers/rules_ruby",
+        version = "37cf5900d0b0e44fa379c0ea3f5fcee0035d77ca",
+        sha256 = "24ed42b7e06907be993b21be603c130076c7d7e49d4f4d5bd228c5656a257f5e",
+        release_date = "2023-01-12",
+        strip_prefix = "rules_ruby-{version}",
+        urls = ["https://github.com/protocolbuffers/rules_ruby/archive/{version}.tar.gz"],
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/protocolbuffers/rules_ruby/blob/{version}/LICENSE",
+    ),
     envoy_toolshed = dict(
         project_name = "envoy_toolshed",
         project_desc = "Tooling, libraries, runners and checkers for Envoy proxy's CI",
@@ -176,4 +267,36 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/envoyproxy/envoy/blob/bazel-v{version}/LICENSE",
     ),
+    upb = dict(
+        project_name = "upb",
+        project_desc = "A small protobuf implementation in C (gRPC dependency)",
+        project_url = "https://github.com/protocolbuffers/upb",
+        version = "e074c038c35e781a1876f8eb52b14f822ae2db66",
+        sha256 = "8608c15b5612c6154d4ee0c23910afe6c283985e1d368ea71704dcd8684135d4",
+        release_date = "2023-07-21",
+        strip_prefix = "upb-{version}",
+        urls = ["https://github.com/protocolbuffers/upb/archive/{version}.tar.gz"],
+        use_category = ["controlplane"],
+        cpe = "N/A",
+        license = "upb",
+        license_url = "https://github.com/protocolbuffers/upb/blob/{version}/LICENSE",
+    ),
 )
+
+def _compiled_protoc_deps(locations, versions):
+    for platform, sha in versions.items():
+        locations["com_google_protobuf_protoc_%s" % platform] = dict(
+            project_name = "Protocol Buffers (protoc) %s" % platform,
+            project_desc = "Protoc compiler for protobuf (%s)" % platform,
+            project_url = "https://developers.google.com/protocol-buffers",
+            version = PROTOBUF_VERSION,
+            sha256 = sha,
+            urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
+            use_category = ["dataplane_core", "controlplane"],
+            release_date = "2023-10-04",
+            cpe = "N/A",
+            license = "Protocol Buffers",
+            license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
+        )
+
+_compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)

@@ -26,6 +26,7 @@
 
 /bazel-*
 /mobile/bazel-*
+MODULE.bazel.lock
 BROWSE
 /build
 /build_*
