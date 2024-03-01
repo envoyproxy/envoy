@@ -814,4 +814,39 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
       "overload.envoy.load_shed_points.http2_server_go_away_on_dispatch.scale_percent", 0);
 }
 
+TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreatingCodec) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.hcm_ondata_creating_codec"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.hcm_ondata_creating_codec.scale_percent", 100);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.hcm_ondata_creating_codec.scale_percent", 0);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+}
+
 } // namespace Envoy
