@@ -250,7 +250,7 @@ TEST(GrpcCodecTest, decodeSingleFrameWithMultiBuffersOverLimit) {
   Encoder encoder;
 
   uint32_t max_length = 32 * 1024;
-  uint32_t single_buffer_length = 24 * 1024;
+  uint32_t single_buffer_length = 18 * 1024;
   std::string req_str = std::string(single_buffer_length, 'a');
 
   // First buffer is valid (i.e. within total_frame_length limit).
@@ -269,13 +269,13 @@ TEST(GrpcCodecTest, decodeSingleFrameWithMultiBuffersOverLimit) {
   encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize() + request_2.ByteSize(), header);
 
   size_t size = buffer.length();
-  std::vector<Frame> frames;
+  std::vector<Frame> frames = {};
   Decoder decoder;
   decoder.setMaxFrameLength(max_length);
 
   // The decoder doesn't successfully decode due to oversized frame.
   EXPECT_FALSE(decoder.decode(buffer, frames));
-  ASSERT_EQ(frames.size(), 0);
+  EXPECT_EQ(frames.size(), 0);
   // Buffer does not get drained due to it returning false.
   EXPECT_EQ(buffer.length(), size);
 }
