@@ -256,10 +256,11 @@ TEST(PosixThreadTest, PThreadId) {
   ThreadId thread_id;
   auto thread =
       thread_factory->createThread([&]() { thread_id = thread_factory->currentPthreadId(); },
-                                   /* options= */ absl::nullopt, /* crash_on_failure= */ true);
+                                   /* options= */ absl::nullopt, /* crash_on_failure= */ false);
   thread->join();
 
   EXPECT_EQ(thread->pthreadId(), thread_id);
+  EXPECT_NE(thread->pthreadId(), thread_factory->currentThreadId());
 }
 
 TEST(PosixThreadTest, Joinable) {

@@ -12,6 +12,7 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns2_cert_info.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/thread/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -390,7 +391,7 @@ TEST_P(PlatformBridgeCertValidatorTest, DeletedWithValidationPending) {
 
 TEST_P(PlatformBridgeCertValidatorTest, ThreadCreationFailed) {
   initializeConfig();
-  auto thread_factory = std::make_unique<test::MockPosixThreadFactory>();
+  auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
   PlatformBridgeCertValidator validator(&config_, stats_, std::move(thread_factory));
 

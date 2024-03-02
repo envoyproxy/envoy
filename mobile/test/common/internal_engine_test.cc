@@ -2,6 +2,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/mocks/thread/mocks.h"
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
@@ -611,7 +612,7 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
                                     &engine_cbs_context /*context*/};
-  auto thread_factory = std::make_unique<test::MockPosixThreadFactory>();
+  auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
   std::unique_ptr<Envoy::InternalEngine> engine(
       new Envoy::InternalEngine(engine_cbs, {}, {}, std::move(thread_factory)));
