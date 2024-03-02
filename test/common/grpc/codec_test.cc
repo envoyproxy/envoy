@@ -250,7 +250,7 @@ TEST(GrpcCodecTest, decodeSingleFrameWithMultiBuffersOverLimit) {
   Encoder encoder;
 
   uint32_t max_length = 32 * 1024;
-  uint32_t single_buffer_length = 18 * 1024;
+  uint32_t single_buffer_length = 24 * 1024;
   std::string req_str = std::string(single_buffer_length, 'a');
 
   // First buffer is valid (i.e. within total_frame_length limit).
