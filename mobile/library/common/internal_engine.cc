@@ -38,10 +38,7 @@ InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger lo
     : InternalEngine(callbacks, logger, event_tracker, Thread::PosixThreadFactory::create()) {}
 
 envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
-  // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
-  // std::thread, main_thread_ is the same object after this call, but its state is replaced with
-  // that of the temporary. The temporary object's state becomes the default state, which does
-  // nothing.
+  // Start the Envoy on the dedicated thread.
   auto options = std::make_shared<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
