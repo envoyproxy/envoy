@@ -431,7 +431,6 @@ envoy_cc_posix_library(
     deps = [
         ":assert_lib",
         "//envoy/thread:thread_interface",
-        "@com_google_absl//absl/functional:any_invocable",
     ],
 )
 
