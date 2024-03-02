@@ -87,7 +87,8 @@ private:
   // Create the matcher factory and matcher.
   void createMatcher();
   // Create a new bucket and add it to the quota bucket cache.
-  void createNewBucket(const BucketId& bucket_id, size_t id);
+  void createNewBucket(const BucketId& bucket_id, const RateLimitOnMatchAction& match_action,
+                       size_t id);
   // Send the report to RLQS server immediately.
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
@@ -105,8 +106,6 @@ private:
   BucketsCache& quota_buckets_;
   ThreadLocalClient& client_;
   TimeSource& time_source_;
-
-  bool initiating_call_{};
 };
 
 } // namespace RateLimitQuota

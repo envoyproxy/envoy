@@ -48,6 +48,10 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 
     // Update the last_report time point.
     bucket->quota_usage.last_report = now;
+    // Reset the number of request allowed/denied. The RLQS server expects the client to report
+    // those two usage numbers only for last report period.
+    bucket->quota_usage.num_requests_allowed = 0;
+    bucket->quota_usage.num_requests_denied = 0;
   }
 
   // Set the domain name.

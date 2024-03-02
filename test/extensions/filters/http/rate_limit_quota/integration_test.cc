@@ -19,6 +19,11 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
 
+struct ConfigOption {
+  bool valid_rlqs_server = true;
+  bool no_assignment = false;
+};
+
 // These tests exercise the rate limit quota filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
@@ -38,9 +43,9 @@ protected:
     }
   }
 
-  void initializeConfig(bool valid_rlqs_server = true) {
+  void initializeConfig(ConfigOption config_option = {}) {
     config_helper_.addConfigModifier(
-        [this, valid_rlqs_server](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        [this, config_option](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
           ConfigHelper::setHttp2(
               *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
@@ -54,7 +59,7 @@ protected:
             server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
           }
 
-          if (valid_rlqs_server) {
+          if (config_option.valid_rlqs_server) {
             // Load configuration of the server from YAML and use a helper to add a grpc_service
             // stanza pointing to the cluster that we just made
             setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_server_0",
@@ -71,7 +76,11 @@ protected:
           proto_config_.set_domain("cloud_12345_67890_rlqs");
 
           xds::type::matcher::v3::Matcher matcher;
-          TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+          if (config_option.no_assignment) {
+            TestUtility::loadFromYaml(std::string(ValidMatcherNoAssignmentConfig), matcher);
+          } else {
+            TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+          }
           proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
 
           // Construct a configuration proto for our filter and then re-write it
@@ -131,7 +140,9 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
-  initializeConfig(/*valid_rlqs_server=*/false);
+  ConfigOption option;
+  option.valid_rlqs_server = false;
+  initializeConfig(option);
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
@@ -359,6 +370,92 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
   }
 }
 
+TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequestNoAssignementBehavior) {
+  // no_assignment = true;
+  ConfigOption option;
+  option.no_assignment = true;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+
+  int totol_num_of_request = 10;
+  std::vector<absl::flat_hash_map<std::string, std::string>> custom_headers(
+      totol_num_of_request, {{"environment", "staging"}});
+  std::string key_prefix = "envoy_";
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    custom_headers[i].insert({"group", absl::StrCat(key_prefix, i)});
+  }
+
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    // Send downstream client request to upstream.
+    if (i == 0) {
+      sendClientRequest(&custom_headers[i]);
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The first request is allowed due to ALLOW_ALL no_assignment_behavior
+      EXPECT_EQ(usage.num_requests_allowed(), 1);
+      EXPECT_EQ(usage.num_requests_denied(), 0);
+    } else {
+      sendClientRequest(&custom_headers[i]);
+
+      // No need to start gRPC stream again since it is kept open.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+      std::cout << "tyxia_usage: \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"
+                << std::endl;
+
+      // Verify usage content.
+      for (const auto& usage : reports.bucket_quota_usages()) {
+        // Only the report for the client request that triggers usage report is allowed.
+        // It is because the usage report only account for last reporting period.
+        if (usage.bucket_id().bucket().at("group") == absl::StrCat(key_prefix, i)) {
+          EXPECT_EQ(usage.num_requests_allowed(), 1);
+          EXPECT_EQ(usage.num_requests_denied(), 0);
+        } else {
+          EXPECT_EQ(usage.num_requests_allowed(), 0);
+          EXPECT_EQ(usage.num_requests_denied(), 0);
+        }
+        std::cout << usage.bucket_id().DebugString() << "\n";
+        std::cout << usage.num_requests_allowed() << "\n";
+        std::cout << usage.num_requests_denied() << "\n";
+        std::cout << usage.time_elapsed().DebugString() << "\n";
+        std::cout << "-------------"
+                  << "\n";
+      }
+
+      std::cout << "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"
+                << std::endl;
+    }
+
+    // No RLQS server response is sent back in this test.
+
+    // Handle the request received by upstream.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
+    // open.
+    cleanupUpstreamAndDownstream();
+  }
+}
+
 TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -407,15 +504,27 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
     // Checks that the rate limit server has received the periodical reports.
     ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
+    // // Verify the usage report content.
+    // for (const auto& usage : reports.bucket_quota_usages()) {
+    //   // We only send single downstream client request and it is allowed.
+    //   EXPECT_EQ(usage.num_requests_allowed(), 1);
+    //   EXPECT_EQ(usage.num_requests_denied(), 0);
+    //   // time_elapsed equals to periodical reporting interval.
+    //   EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
+    //             report_interval_sec);
+    // }
+
     // Verify the usage report content.
-    for (const auto& usage : reports.bucket_quota_usages()) {
-      // We only send single downstream client request and it is allowed.
-      EXPECT_EQ(usage.num_requests_allowed(), 1);
-      EXPECT_EQ(usage.num_requests_denied(), 0);
-      // time_elapsed equals to periodical reporting interval.
-      EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
-                report_interval_sec);
-    }
+    ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+    const auto& usage = reports.bucket_quota_usages(0);
+    // Report only represents the usage since last report.
+    // In the periodical report case here, the number of request allowed and denied is 0 since no
+    // new requests comes in.
+    EXPECT_EQ(usage.num_requests_allowed(), 0);
+    EXPECT_EQ(usage.num_requests_denied(), 0);
+    // time_elapsed equals to periodical reporting interval.
+    EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
+              report_interval_sec);
 
     // Build the rlqs server response.
     envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response2;

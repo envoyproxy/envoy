@@ -28,11 +28,11 @@ using BucketQuotaUsage =
 
 struct QuotaUsage {
   // Requests allowed.
-  uint64_t num_requests_allowed;
+  uint64_t num_requests_allowed = {};
   // Requests throttled.
-  uint64_t num_requests_denied;
+  uint64_t num_requests_denied = {};
   // Last report time.
-  std::chrono::nanoseconds last_report;
+  std::chrono::nanoseconds last_report = {};
 };
 
 // This object stores the data for single bucket entry.
