@@ -184,18 +184,19 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   client_.report_interval_ms = std::chrono::milliseconds(reporting_interval);
   client_.send_reports_timer->enableTimer(client_.report_interval_ms);
 
-  // TODO(tyxia) Revisit later.
-  // Stop the iteration for headers as well as data and trailers for the current filter and the
-  // filters following.
+  // The rate limit stragty should be already set in `createNewBucket` when bucket is initially
+  // created.
   if (quota_buckets_[bucket_id]
           ->bucket_action.quota_assignment_action()
           .rate_limit_strategy()
           .blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
     return Http::FilterHeadersStatus::Continue;
   } else {
-    // TODO(tyxia) send local reply
+    // For the request that is rejected due to DENY_ALL no_assignment_behavior, immediate report is
+    // still sent and here send the local reply with deny response.
+    sendDenyResponse();
+    return Envoy::Http::FilterHeadersStatus::StopIteration;
   }
-  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucket_id) {
@@ -219,11 +220,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
       } else {
         // Request is throttled.
         quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
-        // TODO(tyxia) Build the customized response based on `DenyResponseSettings` if it is
-        // configured.
-        callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt,
-                                   "");
-        callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
+        sendDenyResponse();
         return Envoy::Http::FilterHeadersStatus::StopIteration;
       }
     }
