@@ -51,6 +51,9 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
   return run(std::move(options));
 }
 
+// This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
+// copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
+// `std::function`.
 envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
   main_thread_ =
       thread_factory_->createThread([this, options]() mutable -> void { main(options); },
