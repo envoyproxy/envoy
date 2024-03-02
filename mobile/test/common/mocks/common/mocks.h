@@ -1,7 +1,5 @@
 #pragma once
 
-#include "source/common/common/posix/thread_impl.h"
-
 #include "gmock/gmock.h"
 #include "library/common/system/system_helper.h"
 
