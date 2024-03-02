@@ -76,8 +76,7 @@ public:
 
   /**
    * Creates a new generic thread from the specified `thread_routine`. When the
-   * thread cannot be created, this function will crash. When using this class
-   * directly, prefer to use the overloaded `PosixThreadFactory::createThread`.
+   * thread cannot be created, this function will crash.
    */
   ThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options) PURE;
 
