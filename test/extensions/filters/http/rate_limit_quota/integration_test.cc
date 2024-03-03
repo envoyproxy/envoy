@@ -86,13 +86,14 @@ protected:
 
       // Configure the no_assignment behavior.
       if (config_option.no_assignment_blanket_rule != BlanketRule::NOT_SPECIFIED) {
-        auto mutable_config = matcher.mutable_matcher_list()
-                                  ->mutable_matchers(0)
-                                  ->mutable_on_match()
-                                  ->mutable_action()
-                                  ->mutable_typed_config();
+        auto* mutable_config = matcher.mutable_matcher_list()
+                                   ->mutable_matchers(0)
+                                   ->mutable_on_match()
+                                   ->mutable_action()
+                                   ->mutable_typed_config();
         ASSERT_TRUE(mutable_config->Is<::envoy::extensions::filters::http::rate_limit_quota::v3::
                                            RateLimitQuotaBucketSettings>());
+
         auto mutable_bucket_settings = MessageUtil::anyConvert<
             ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>(
             *mutable_config);
@@ -105,7 +106,9 @@ protected:
               ->mutable_fallback_rate_limit()
               ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
         }
+        mutable_config->PackFrom(mutable_bucket_settings);
       }
+
       proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
 
       // Construct a configuration proto for our filter and then re-write it
@@ -471,6 +474,57 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
+    // open.
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll) {
+  // no_assignment = true;
+  ConfigOption option;
+  option.no_assignment_blanket_rule = BlanketRule::DENY_ALL;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+
+  int totol_num_of_request = 5;
+  std::vector<absl::flat_hash_map<std::string, std::string>> custom_headers(
+      totol_num_of_request, {{"environment", "staging"}});
+  std::string key_prefix = "envoy_";
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    custom_headers[i].insert({"group", absl::StrCat(key_prefix, i)});
+  }
+
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers[i]);
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // We only send single downstream client request and it is allowed.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    } else {
+      // No need to start gRPC stream again since it is kept open.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+    }
+    // No RLQS server response is sent back in this test.
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "429");
 
     // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
     // open.
