@@ -59,11 +59,6 @@ protected:
 };
 
 TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
-// TODO(nezdolik) Investigate and fix issue with gperf tcmalloc for memory release.
-// https://github.com/envoyproxy/envoy/issues/32447
-#if defined(GPERFTOOLS_TCMALLOC)
-  GTEST_SKIP() << "Skipping test, memory releasing is not yet supported for gperf tcmalloc.";
-#endif
   size_t initial_allocated_bytes = Stats::totalCurrentlyAllocated();
   auto a = std::make_unique<unsigned char[]>(MB);
   auto b = std::make_unique<unsigned char[]>(MB);
@@ -71,6 +66,10 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
     GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
+#if defined(GPERFTOOLS_TCMALLOC)
+  EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
+               "Memory releasing is not supported for gperf tcmalloc.");
+#else
   EXPECT_LOG_CONTAINS(
       "info",
       "Configured tcmalloc with background release rate: 1048576 bytes per 1000 milliseconds",
@@ -97,10 +96,15 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   EXPECT_LE(released_bytes_before_next_run, final_released_bytes);
   EXPECT_LE(initial_unmapped_bytes, final_released_bytes);
 #endif
+#endif
 }
 
 TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
   auto a = std::make_unique<unsigned char[]>(MB);
+#if defined(GPERFTOOLS_TCMALLOC)
+  EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
+               "Memory releasing is not supported for gperf tcmalloc.");
+#else
   EXPECT_LOG_NOT_CONTAINS(
       "info", "Configured tcmalloc with background release rate: 0 bytes 1000 milliseconds",
       initialiseAllocatorManager(0 /*bytes per second*/, 0));
@@ -108,14 +112,10 @@ TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
   // Release interval was configured to default value (1 second).
   step(std::chrono::milliseconds(3000));
   EXPECT_EQ(0UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
+#endif
 }
 
 TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
-// TODO(nezdolik) Investigate and fix issue with gperf tcmalloc for memory release.
-// https://github.com/envoyproxy/envoy/issues/32447
-#if defined(GPERFTOOLS_TCMALLOC)
-  GTEST_SKIP() << "Skipping test, memory releasing is not yet supported for gperf tcmalloc.";
-#endif
   size_t initial_allocated_bytes = Stats::totalCurrentlyAllocated();
   auto a = std::make_unique<uint32_t[]>(40 * MB);
   auto b = std::make_unique<uint32_t[]>(40 * MB);
@@ -123,6 +123,10 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
     GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
+#if defined(GPERFTOOLS_TCMALLOC)
+  EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
+               "Memory releasing is not supported for gperf tcmalloc.");
+#else
   EXPECT_LOG_CONTAINS(
       "info",
       "Configured tcmalloc with background release rate: 16777216 bytes per 2000 milliseconds",
@@ -141,6 +145,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
 #else
   EXPECT_LE(initial_unmapped_bytes, final_released_bytes);
+#endif
 #endif
 }
 

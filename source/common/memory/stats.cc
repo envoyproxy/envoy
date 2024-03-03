@@ -107,6 +107,32 @@ void Stats::dumpStatsToLog() {
 #endif
 }
 
+AllocatorManager::AllocatorManager(
+    Api::Api& api, Envoy::Stats::Scope& scope,
+    const envoy::config::bootstrap::v3::MemoryAllocatorManager& config)
+    : bytes_to_release_(config.bytes_to_release()),
+      memory_release_interval_msec_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, memory_release_interval, 1000))),
+      allocator_manager_stats_(MemoryAllocatorManagerStats{
+          MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}) {
+#if defined(GPERFTOOLS_TCMALLOC)
+  RELEASE_ASSERT(
+      (bytes_to_release_ == 0 || memory_release_interval_msec_ > std::chrono::milliseconds(0)),
+      "Memory releasing is not supported for gperf tcmalloc.");
+#endif
+  configureBackgroundMemoryRelease(api);
+};
+
+AllocatorManager::~AllocatorManager() {
+  if (tcmalloc_routine_dispatcher_) {
+    tcmalloc_routine_dispatcher_->exit();
+  }
+  if (tcmalloc_thread_) {
+    tcmalloc_thread_->join();
+    tcmalloc_thread_.reset();
+  }
+}
+
 void AllocatorManager::tcmallocRelease() {
 #if defined(TCMALLOC)
   tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
