@@ -105,10 +105,8 @@ using TestOnDemandSslCtxSharedPtr = std::shared_ptr<TestOnDemandSslCtxImpl>;
 
 class TestTlsContextProvider : public virtual Ssl::TlsContextProvider {
 public:
-  TestTlsContextProvider(const ProtobufWkt::Any& typed_config,
-                         TlsContextProviderFactoryContext& factory_context)
-      : ssl_ctx_(std::make_shared<TestOnDemandSslCtxImpl>()), config_(typed_config),
-        factory_context_(factory_context) {}
+  TestTlsContextProvider(const ProtobufWkt::Any&, TlsContextProviderFactoryContext&)
+      : ssl_ctx_(std::make_shared<TestOnDemandSslCtxImpl>()) {}
   SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*, CertSelectionCallbackPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
 
@@ -138,8 +136,6 @@ public:
   Ssl::SelectionResult mod_;
 
 private:
-  const ProtobufWkt::Any& config_;
-  TlsContextProviderFactoryContext& factory_context_;
   CertSelectionCallbackPtr cb_;
 };
 
