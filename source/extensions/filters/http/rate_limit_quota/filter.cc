@@ -186,6 +186,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
 
   // The rate limit strategy should be already set in `createNewBucket` when bucket is initially
   // created.
+  ASSERT(quota_buckets_.find(bucket_id) != quota_buckets_.end());
   if (quota_buckets_[bucket_id]
           ->bucket_action.quota_assignment_action()
           .rate_limit_strategy()
