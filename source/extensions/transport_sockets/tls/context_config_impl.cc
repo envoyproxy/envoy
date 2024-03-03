@@ -330,7 +330,8 @@ Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
 }
 
 Ssl::TlsContextProviderFactoryCb ContextConfigImpl::createTlsContextProvider() const {
-  return tls_context_provider_factory_cb_.value();
+  return tls_context_provider_factory_cb_.has_value() ? tls_context_provider_factory_cb_.value()
+                                                      : nullptr;
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

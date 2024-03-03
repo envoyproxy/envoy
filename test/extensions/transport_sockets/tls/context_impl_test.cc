@@ -1779,7 +1779,7 @@ TEST_F(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl client_context_config(tls_context, factory_context_), EnvoyException,
-      "No TLS certificates found for server context");
+      "No TLS certificates or TLS context provider found for server context");
   const std::string rsa_tls_certificate_yaml = R"EOF(
   certificate_chain:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
@@ -1807,7 +1807,7 @@ TEST_F(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
-      "No TLS certificates found for server context");
+      "No TLS certificates or TLS context provider found for server context");
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
@@ -1909,7 +1909,8 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
           *store.rootScope(), client_context_config, std::vector<std::string>{})),
-      EnvoyException, "Server TlsCertificates must have a certificate specified");
+      EnvoyException,
+      "Server TlsCertificates must have a certificate or context provider specified");
 }
 
 // Cannot ignore certificate expiration without a trusted CA.
