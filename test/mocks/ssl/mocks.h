@@ -76,6 +76,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
+  MOCK_METHOD(void, initSslContext, (SSL_CTX*), (const));
 };
 
 class MockClientContextConfig : public ClientContextConfig {
