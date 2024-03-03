@@ -116,7 +116,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     auto& ctx = tls_contexts_[i];
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
     ssl_contexts[i] = ctx.ssl_ctx_.get();
-    initSslContext(ctx.ssl_ctx_.get());
+    initSslContextHelper(ctx.ssl_ctx_.get());
   }
 
   auto verify_mode = cert_validator_->initializeSslContexts(
