@@ -52,7 +52,6 @@ using BucketsCache = absl::flat_hash_map<size_t, std::unique_ptr<Bucket>>;
 
 struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota> {
   ThreadLocalClient(Envoy::Event::Dispatcher& dispatcher) {
-    // Create the quota usage report method that sends the reports to the RLS server periodically.
     send_reports_timer = dispatcher.createTimer([this] { sendPeriodicalReports(); });
   }
 
@@ -65,7 +64,6 @@ struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota>
 
   ~ThreadLocalClient() {
     if (rate_limit_client != nullptr) {
-      // Close the stream.
       rate_limit_client->closeStream();
     }
   }

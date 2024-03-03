@@ -74,8 +74,6 @@ protected:
         // Set up the gRPC service with wrong cluster name and address.
         setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
                        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
-        // setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
-        //                grpc_upstreams_[0]->localAddress());
       }
 
       // Set the domain name.
@@ -482,7 +480,6 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
 }
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll) {
-  // no_assignment = true;
   ConfigOption option;
   option.no_assignment_blanket_rule = BlanketRule::DENY_ALL;
   initializeConfig(option);
@@ -613,6 +610,9 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   }
 }
 
+// RLQS filter is operating in non-blocking mode now, this test could be flaky until the stats are
+// added to make the test behavior deterministic. (e.g., wait for stats in the test).
+// Disable the test for now.
 TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
   initializeConfig();
   HttpIntegrationTest::initialize();
