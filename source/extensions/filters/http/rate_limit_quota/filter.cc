@@ -205,8 +205,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
     auto rate_limit_strategy =
         quota_buckets_[bucket_id]->bucket_action.quota_assignment_action().rate_limit_strategy();
 
-    // TODO(tyxia) Currently blanket rule and token bucket strategies are implemented.
-    // Change to switch case when `RequestsPerTimeUnit` strategy are implemented.
+    // TODO(tyxia) Currently, blanket rule and token bucket strategies are implemented.
+    // Change to switch case when `RequestsPerTimeUnit` strategy is implemented.
     if (rate_limit_strategy.has_blanket_rule()) {
       if (rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
         quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
