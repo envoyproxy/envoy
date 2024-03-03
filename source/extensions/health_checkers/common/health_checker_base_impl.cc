@@ -18,6 +18,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
+      always_log_health_check_success_(config.always_log_health_check_success()),
       cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
@@ -303,6 +304,11 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       changed_state = HealthTransition::ChangePending;
     }
     host_->setLastHcPassTime(time_source_.monotonicTime());
+  }
+
+  if (changed_state != HealthTransition::Changed && parent_.always_log_health_check_success_ &&
+      parent_.event_logger_) {
+    parent_.event_logger_->logSuccessfulHealthCheck(parent_.healthCheckerType(), host_);
   }
 
   changed_state = clearPendingFlag(changed_state);
