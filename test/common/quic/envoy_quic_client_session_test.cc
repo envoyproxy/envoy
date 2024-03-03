@@ -1,5 +1,6 @@
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/client_codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
@@ -18,6 +19,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -471,6 +473,49 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   }
   EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
 }
+
+class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
+public:
+  MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags),
+              (override));
+  MOCK_METHOD(Api::SysCallIntResult, recvmmsg,
+              (os_fd_t socket, struct mmsghdr* msgvec, unsigned int vlen, int flags,
+               struct timespec* timeout),
+              (override));
+};
+
+// Ensures that the Network::Utility::readFromSocket function uses GRO instead of `recvmmsg`.
+// Only Linux platforms support GRO.
+#if defined(__linux__)
+TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
+  MockOsSysCallsImpl os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
+
+  // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
+  envoy_quic_session_.connect();
+
+  std::string write_data = "abc";
+  Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+
+  // GRO uses `recvmsg`, not `recvmmsg`.
+  EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+            dispatcher_->exit();
+            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+            // use the msghdr that would normally have been populated by recvmsg but is not
+            // populated by this mock.
+            return {-1, SOCKET_ERROR_AGAIN};
+          }));
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+#endif
 
 } // namespace Quic
 } // namespace Envoy
