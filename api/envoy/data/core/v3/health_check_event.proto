@@ -56,7 +56,7 @@ message HealthCheckEvent {
     HealthCheckAddHealthy add_healthy_event = 5;
 
     // A health check was successful. Note: a host will be considered healthy either if it is
-    // the first ever health check, or if the healthy_threadhold reached. This kind of event
+    // the first ever health check, or if the healthy threshold is  reached. This kind of event
     // indicate that a health check was successful, but does not indicate that the host is
     // considered healthy. A host is considered healthy if HealthCheckAddHealthy kind of event is sent.
     HealthCheckSuccessful successful_health_check_event = 12;
