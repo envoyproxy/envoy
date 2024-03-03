@@ -396,6 +396,45 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
   }
 }
 
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = BlanketRule::DENY_ALL;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  for (int i = 0; i < 3; ++i) {
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers);
+
+    // Second downstream client request will not trigger the reports to RLQS server since it is
+    // same as first request, which will find the entry in the cache.
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // We only send single downstream client request and it is allowed.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    }
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "429");
+
+    cleanUp();
+  }
+}
+
 TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll) {
   ConfigOption option;
   option.no_assignment_blanket_rule = BlanketRule::ALLOW_ALL;
@@ -433,9 +472,6 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
       envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
       ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
-      std::cout << "tyxia_usage: \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"
-                << std::endl;
-
       // Verify usage content.
       for (const auto& usage : reports.bucket_quota_usages()) {
         // Only the client request that triggers usage report is allowed.
@@ -447,16 +483,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
           EXPECT_EQ(usage.num_requests_allowed(), 0);
           EXPECT_EQ(usage.num_requests_denied(), 0);
         }
-        std::cout << usage.bucket_id().DebugString() << "\n";
-        std::cout << usage.num_requests_allowed() << "\n";
-        std::cout << usage.num_requests_denied() << "\n";
-        std::cout << usage.time_elapsed().DebugString() << "\n";
-        std::cout << "-------------"
-                  << "\n";
       }
-
-      std::cout << "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"
-                << std::endl;
     }
 
     // No RLQS server response is sent back in this test.
@@ -576,16 +603,6 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
     simTime().advanceTimeWait(std::chrono::milliseconds(report_interval_sec * 1000));
     // Checks that the rate limit server has received the periodical reports.
     ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
-
-    // // Verify the usage report content.
-    // for (const auto& usage : reports.bucket_quota_usages()) {
-    //   // We only send single downstream client request and it is allowed.
-    //   EXPECT_EQ(usage.num_requests_allowed(), 1);
-    //   EXPECT_EQ(usage.num_requests_denied(), 0);
-    //   // time_elapsed equals to periodical reporting interval.
-    //   EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
-    //             report_interval_sec);
-    // }
 
     // Verify the usage report content.
     ASSERT_THAT(reports.bucket_quota_usages_size(), 1);

@@ -94,6 +94,7 @@ private:
                                                 const RateLimitOnMatchAction& match_action);
 
   Http::FilterHeadersStatus processCachedBucket(size_t bucket_id);
+  // TODO(tyxia) Build the customized response based on `DenyResponseSettings`.
   void sendDenyResponse() {
     callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt, "");
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);

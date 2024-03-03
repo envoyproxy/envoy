@@ -205,11 +205,17 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
     auto rate_limit_strategy =
         quota_buckets_[bucket_id]->bucket_action.quota_assignment_action().rate_limit_strategy();
 
-    // TODO(tyxia) Currently only ALLOW_ALL and token bucket strategies are implemented.
-    // Change to switch case when more strategies are implemented.
-    if (rate_limit_strategy.has_blanket_rule() &&
-        rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
-      quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+    // TODO(tyxia) Currently blanket rule and token bucket strategies are implemented.
+    // Change to switch case when `RequestsPerTimeUnit` strategy are implemented.
+    if (rate_limit_strategy.has_blanket_rule()) {
+      if (rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
+        quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+      } else if (rate_limit_strategy.blanket_rule() ==
+                 envoy::type::v3::RateLimitStrategy::DENY_ALL) {
+        quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
+        sendDenyResponse();
+        return Envoy::Http::FilterHeadersStatus::StopIteration;
+      }
     } else if (rate_limit_strategy.has_token_bucket()) {
       ASSERT(quota_buckets_[bucket_id]->token_bucket_limiter != nullptr);
       TokenBucket* limiter = quota_buckets_[bucket_id]->token_bucket_limiter.get();
