@@ -104,9 +104,9 @@ public:
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    */
-  virtual void logSuccessfulHealthCheck(
-      envoy::data::core::v3::HealthCheckerType health_checker_type,
-      const HostDescriptionConstSharedPtr& host) PURE;
+  virtual void
+  logSuccessfulHealthCheck(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                           const HostDescriptionConstSharedPtr& host) PURE;
 
   /**
    * Log a degraded healthy host event.
