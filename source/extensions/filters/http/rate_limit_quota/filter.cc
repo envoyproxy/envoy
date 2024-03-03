@@ -184,7 +184,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   client_.report_interval_ms = std::chrono::milliseconds(reporting_interval);
   client_.send_reports_timer->enableTimer(client_.report_interval_ms);
 
-  // The rate limit stragty should be already set in `createNewBucket` when bucket is initially
+  // The rate limit strategy should be already set in `createNewBucket` when bucket is initially
   // created.
   if (quota_buckets_[bucket_id]
           ->bucket_action.quota_assignment_action()
