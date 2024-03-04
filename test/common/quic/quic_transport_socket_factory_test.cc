@@ -19,6 +19,7 @@ public:
   QuicServerTransportSocketFactoryConfigTest()
       : server_api_(Api::createApiForTest(server_stats_store_, simTime())) {
     ON_CALL(context_.server_context_, api()).WillByDefault(ReturnRef(*server_api_));
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   }
 
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
@@ -35,6 +36,7 @@ public:
   Stats::TestUtil::TestStore server_stats_store_;
   Api::ApiPtr server_api_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, EarlyDataEnabledByDefault) {
@@ -113,6 +115,7 @@ downstream_tls_context:
 class QuicClientTransportSocketFactoryTest : public testing::Test {
 public:
   QuicClientTransportSocketFactoryTest() {
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(nullptr));
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
         .WillOnce(testing::SaveArg<0>(&update_callback_));
@@ -125,6 +128,7 @@ public:
   NiceMock<Ssl::MockClientContextConfig>* context_config_{
       new NiceMock<Ssl::MockClientContextConfig>};
   std::function<void()> update_callback_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {
