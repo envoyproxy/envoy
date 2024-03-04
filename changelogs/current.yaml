@@ -218,14 +218,14 @@ new_features:
     specified in the filter configuration and the default idle timeout.
 - area: ext_authz
   change: |
-    The proto field :ref:`headers <envoy.service.auth.v2.AttributeContext.HttpRequest.headers>`'s
+    The proto field :ref:`headers <envoy.service.auth.v3.AttributeContext.HttpRequest.headers>`'s
     value type is string.  Thus, it is unable to support non-utf8 characters in header values.
     To support header values with non-utf8 characters, a new boolean field was added to the
-    ext_authz config :ref:`headers_as_bytes <envoy.config.filter.http.ext_authz.v2.ExtAuthz.headers_as_bytes>`.
+    ext_authz config :ref:`headers_as_bytes <envoy.config.filter.http.ext_authz.v3.ExtAuthz.headers_as_bytes>`.
     When this is set to true, the new field in HttpRequest
-    :ref:`headers_bytes <envoy.service.auth.v2.AttributeContext.HttpRequest.headers_bytes>` gets
-    populated with the raw header values instead of headers, which normally contains UTF-8
-    sanitized header values.
+    :ref:`header_map <envoy.service.auth.v3.AttributeContext.HttpRequest.header_map>` (specifically
+    ``header_map.headers.raw_value``) gets populated with the raw values instead of ``headers``,
+    which normally contains UTF-8 sanitized header values.
 
 deprecated:
 - area: listener
