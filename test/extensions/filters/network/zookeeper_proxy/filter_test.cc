@@ -1351,8 +1351,8 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
-  EXPECT_EQ(266UL, config_->stats().request_bytes_.value());
-  EXPECT_EQ(266UL, config_->stats().multi_rq_bytes_.value());
+  EXPECT_EQ(274UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(274UL, config_->stats().multi_rq_bytes_.value());
   EXPECT_EQ(1UL, config_->stats().create_rq_.value());
   EXPECT_EQ(1UL, config_->stats().create2_rq_.value());
   EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());
