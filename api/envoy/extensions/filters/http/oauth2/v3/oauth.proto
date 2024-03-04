@@ -138,10 +138,10 @@ message OAuth2Config {
   // the authorization server or the OAuth flow will fail.
   google.protobuf.Duration default_expires_in = 13;
 
-  // Requests that match any of the provided matchers will immediately return unauthorized response
-  // when tokens are not valid (instead of redirecting to authorization server as usual).
-  // This behavior is useful for AJAX and asset requests to avoid the OAuth flood.
-  repeated config.route.v3.HeaderMatcher ajax_request_matcher = 14;
+  // Any request that matches any of the provided matchers won't be redirected to OAuth server when tokens are not valid.
+  // Automatic access token refresh will be performed for these requests, if enabled.
+  // This behavior cam be useful for AJAX requests.
+  repeated config.route.v3.HeaderMatcher deny_redirect_matcher = 14;
 }
 
 // Filter config.

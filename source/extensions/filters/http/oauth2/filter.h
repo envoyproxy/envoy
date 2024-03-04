@@ -122,8 +122,8 @@ public:
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
-  const std::vector<Http::HeaderUtility::HeaderData>& ajaxRequestMatchers() const {
-    return ajax_request_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+    return deny_redirect_header_matchers_;
   }
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
@@ -162,7 +162,7 @@ private:
   const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
-  const std::vector<Http::HeaderUtility::HeaderData> ajax_request_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
   const bool use_refresh_token_{};

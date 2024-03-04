@@ -248,8 +248,8 @@ new_features:
     Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
 - area: oauth
   change: |
-    :ref:`ajax_request_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.ajax_request_matcher>`
-    to support disabling redirects for AJAX requests.
+    :ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>`
+    to support disabling authorization redirects for specific requests, e.g. AJAX requests.
 
 deprecated:
 - area: listener

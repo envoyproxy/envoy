@@ -135,9 +135,9 @@ public:
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->mutable_string_match()->set_exact("OPTIONS");
-    auto* ajax_matcher = p.add_ajax_request_matcher();
-    ajax_matcher->set_name("X-Requested-With");
-    ajax_matcher->mutable_string_match()->set_exact("XMLHttpRequest");
+    auto* deny_redirect_matcher = p.add_deny_redirect_matcher();
+    deny_redirect_matcher->set_name("X-Requested-With");
+    deny_redirect_matcher->mutable_string_match()->set_exact("XMLHttpRequest");
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
@@ -785,7 +785,7 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
 
 /**
  * Scenario: The OAuth filter receives a request without valid OAuth cookies to a non-callback URL
- * that matches the ajax_request_matcher.
+ * that matches the deny_redirect_matcher.
  *
  * Expected behavior: the filter should should return 401 Unauthorized response.
  */
@@ -2201,7 +2201,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
 
 /**
  * Scenario: The OAuth filter refresh flow fails for a request that matches the
- * ajax_request_matcher.
+ * deny_redirect_matcher.
  *
  * Expected behavior: the filter should should return 401 Unauthorized response.
  */
