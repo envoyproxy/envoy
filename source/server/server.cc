@@ -29,12 +29,14 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
+#include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
@@ -499,7 +501,8 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
+  stats_store_.setTagProducer(
+      Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(
@@ -520,9 +523,6 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   validation_context_.setCounters(server_stats_->static_unknown_fields_,
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
-
-  memory_allocator_ = std::make_unique<Memory::AllocatorManager>(
-      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -587,7 +587,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   absl::Status creation_status;
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
-  THROW_IF_NOT_OK(creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();

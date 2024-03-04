@@ -2,23 +2,8 @@
 
 #include <cstdint>
 
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/stats/store.h"
-
-#include "source/common/common/thread.h"
-#include "source/common/protobuf/utility.h"
-
 namespace Envoy {
-
-#define MEMORY_ALLOCATOR_MANAGER_STATS(COUNTER) COUNTER(released_by_timer)
-
-struct MemoryAllocatorManagerStats {
-  MEMORY_ALLOCATOR_MANAGER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 namespace Memory {
-
-constexpr absl::string_view TCMALLOC_ROUTINE_THREAD_ID = "TcmallocProcessBackgroundActions";
 
 /**
  * Runtime stats for process memory usage.
@@ -64,41 +49,6 @@ public:
    * Log detailed stats about current memory allocation. Intended for debugging purposes.
    */
   static void dumpStatsToLog();
-};
-
-class AllocatorManager {
-public:
-  AllocatorManager(Api::Api& api, Envoy::Stats::Scope& scope,
-                   const envoy::config::bootstrap::v3::MemoryAllocatorManager& config)
-      : bytes_to_release_(config.bytes_to_release()),
-        memory_release_interval_msec_(std::chrono::milliseconds(
-            PROTOBUF_GET_MS_OR_DEFAULT(config, memory_release_interval, 1000))),
-        allocator_manager_stats_(MemoryAllocatorManagerStats{
-            MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}) {
-    configureBackgroundMemoryRelease(api);
-  };
-
-  ~AllocatorManager() {
-    if (tcmalloc_routine_dispatcher_) {
-      tcmalloc_routine_dispatcher_->exit();
-    }
-    if (tcmalloc_thread_) {
-      tcmalloc_thread_->join();
-      tcmalloc_thread_.reset();
-    }
-  }
-
-private:
-  const uint64_t bytes_to_release_;
-  const std::chrono::milliseconds memory_release_interval_msec_;
-  MemoryAllocatorManagerStats allocator_manager_stats_;
-  Thread::ThreadPtr tcmalloc_thread_;
-  Event::DispatcherPtr tcmalloc_routine_dispatcher_;
-  Event::TimerPtr memory_release_timer_;
-  void configureBackgroundMemoryRelease(Api::Api& api);
-  void tcmallocRelease();
-  // Used for testing.
-  friend class AllocatorManagerPeer;
 };
 
 } // namespace Memory

@@ -23,6 +23,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
+          *this,
           // Flow control receive window should be larger than 8k so that the send buffer can fully
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
@@ -115,103 +116,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   return Http::okStatus();
 }
 
-void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_STREAM_LOG(debug, "encodeData (end_stream={}) of {} bytes.", *this, end_stream,
-                   data.length());
-  const bool has_data = data.length() > 0;
-  if (!has_data && !end_stream) {
-    return;
-  }
-  if (write_side_closed()) {
-    IS_ENVOY_BUG("encodeData is called on write-closed stream.");
-    return;
-  }
-  ASSERT(!local_end_stream_);
-  local_end_stream_ = end_stream;
-  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (http_datagram_handler_) {
-    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-    if (!http_datagram_handler_->encodeCapsuleFragment(data.toString(), end_stream)) {
-      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-      return;
-    }
-  } else {
-#endif
-    Buffer::RawSliceVector raw_slices = data.getRawSlices();
-    absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
-    quic_slices.reserve(raw_slices.size());
-    for (auto& slice : raw_slices) {
-      ASSERT(slice.len_ != 0);
-      // Move each slice into a stand-alone buffer.
-      // TODO(danzh): investigate the cost of allocating one buffer per slice.
-      // If it turns out to be expensive, add a new function to free data in the middle in buffer
-      // interface and re-design QuicheMemSliceImpl.
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.quiche_use_mem_slice_releasor_api")) {
-        quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
-      } else {
-        auto single_slice_buffer = std::make_unique<Buffer::OwnedImpl>();
-        single_slice_buffer->move(data, slice.len_);
-        quic_slices.emplace_back(
-            reinterpret_cast<char*>(slice.mem_), slice.len_,
-            [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
-              // Free this memory explicitly when the callback is invoked.
-              single_slice_buffer = nullptr;
-            });
-      }
-    }
-    quic::QuicConsumedData result{0, false};
-    absl::Span<quiche::QuicheMemSlice> span(quic_slices);
-    {
-      IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-      result = WriteBodySlices(span, end_stream);
-    }
-    // QUIC stream must take all.
-    if (result.bytes_consumed == 0 && has_data) {
-      IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
-                               "bytes in send buffer. Current write was rejected.",
-                               write_side_closed() ? "closed" : "open", BufferedDataBytes()));
-      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-      return;
-    }
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  }
-#endif
-  if (local_end_stream_) {
-    if (codec_callbacks_) {
-      codec_callbacks_->onCodecEncodeComplete();
-    }
-    onLocalEndStream();
-  }
-}
-
 void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  if (write_side_closed()) {
-    IS_ENVOY_BUG("encodeTrailers is called on write-closed stream.");
-    return;
-  }
-  ASSERT(!local_end_stream_);
-  local_end_stream_ = true;
-  ScopedWatermarkBufferUpdater updater(this, this);
-
-  {
-    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
-    ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers");
-  }
-
-  if (codec_callbacks_) {
-    codec_callbacks_->onCodecEncodeComplete();
-  }
-  onLocalEndStream();
-}
-
-void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-  // Metadata Frame is not supported in QUICHE.
-  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
-  stats_.metadata_not_supported_error_.inc();
+  encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
