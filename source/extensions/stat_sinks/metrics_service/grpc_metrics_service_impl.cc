@@ -135,6 +135,7 @@ void MetricsFlusher::flushSummary(io::prometheus::client::MetricFamily& metrics_
     quantile->set_value(hist_stats.computedQuantiles()[i]);
   }
   summary->set_sample_count(hist_stats.sampleCount());
+  summary->set_sample_sum(hist_stats.sampleSum());
 }
 
 io::prometheus::client::Metric*

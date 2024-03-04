@@ -11,9 +11,22 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
     This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
     be flushed to stat sinks.
+- area: eds
+  change: |
+    Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
+    Prior to this change, Envoy required that EDS assignments were sent after an EDS cluster was updated.
+    If no EDS assignment was received for the cluster, it ended up with an empty assignment.
+    Following this change, after a cluster update, Envoy waits for an EDS assignment until
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
+    the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
+    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: sockets
+  change: |
+    Failure to create an upstream socket should now result in clean connection failure rather than failing a release assert. This behavior
+    can be temporarily reverted by setting runtime feature ``envoy.restart_features_.allow_client_socket_creation_failure`` to false.
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
@@ -47,6 +60,10 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: proxy status
+  change: |
+    Add more conversion in the proxy status utility. It can be disabled by the runtime guard
+    ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -88,6 +105,9 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: quic
+  change: |
+    Fixed crash bug with QUIC upstream + X.509v1 certificates.
 - area: proxy_protocol
   change: |
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
@@ -112,11 +132,14 @@ bug_fixes:
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
 - area: router
   change: |
-    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
+    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happens. This is
     controlled by ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
 - area: deps
   change: |
     Updated QUICHE dependencies to incorporate fixes for https://github.com/envoyproxy/envoy/issues/32401.
+- area: tracing
+  change: |
+    Dynatrace resource detector: Only log warning message when no enrichment attributes are found.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -146,6 +169,15 @@ removed_config_or_runtime:
     removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
+- area: ext_proc
+  change: |
+    Added
+    :ref:`grpc_initial_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_initial_metadata>`
+    config API to allow extending inherited metadata from
+    :ref:`ExternalProcessor.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`
+    and
+    :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
+    with the new or updated values.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
@@ -219,6 +251,18 @@ new_features:
     added an option to dynamically set a per downstream connection idle timeout period object under the key
     ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
     specified in the filter configuration and the default idle timeout.
+- area: load shed point
+  change: |
+    Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
+    Envoy is under pressure, typically memory.
+- area: overload
+  change: |
+    added a :ref:`configuration option
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>` to add
+    ``x-envoy-local-overloaded`` header when Overload Manager is triggered.
+- area: tracing
+  change: |
+    Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
 
 deprecated:
 - area: listener
