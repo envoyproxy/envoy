@@ -76,10 +76,14 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
     // Get the hash id value from BucketId in the response.
     const size_t bucket_id = MessageUtil::hash(action.bucket_id());
+    ENVOY_LOG(trace,
+              "Received a response for bucket id proto :\n {}, and generated "
+              "the associated hashed bucket id: {}",
+              action.bucket_id().DebugString(), bucket_id);
     if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
       // The response should be matched to the report we sent.
       ENVOY_LOG(error,
-                "Received a response, but but it is not matched any quota "
+                "The received response is not matched any quota "
                 "cache entry: ",
                 response->ShortDebugString());
     } else {
@@ -99,10 +103,11 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
               static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
               fill_interval_sec;
           uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
-          ENVOY_LOG(trace,
-                    "Create the token bucket limiter with max_tokens: {}; "
-                    "fill_interval_sec: {}; fill_rate_per_sec: {}",
-                    max_tokens, fill_interval_sec, fill_rate_per_sec);
+          ENVOY_LOG(
+              trace,
+              "Create the token bucket limiter for hashed bucket id: {}, with max_tokens: {}; "
+              "fill_interval_sec: {}; fill_rate_per_sec: {}.",
+              bucket_id, max_tokens, fill_interval_sec, fill_rate_per_sec);
           quota_buckets_[bucket_id]->token_bucket_limiter =
               std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate_per_sec);
         }
