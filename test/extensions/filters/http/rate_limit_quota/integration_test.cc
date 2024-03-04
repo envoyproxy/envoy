@@ -407,8 +407,8 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
     // Send downstream client request to upstream.
     sendClientRequest(&custom_headers);
 
-    // Second downstream client request will not trigger the reports to RLQS server since it is
-    // same as first request, which will find the entry in the cache.
+    // After first request, the downstream client request will not trigger the reports to RLQS
+    // server since the request which is same as first request will find the entry in the cache.
     if (i == 0) {
       // Start the gRPC stream to RLQS server.
       ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
@@ -421,7 +421,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
       // Verify the usage report content.
       ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
       const auto& usage = reports.bucket_quota_usages(0);
-      // We only send single downstream client request and it is allowed.
+      // The request is denied by no_assignment_behavior.
       EXPECT_EQ(usage.num_requests_allowed(), 0);
       EXPECT_EQ(usage.num_requests_denied(), 1);
     }
@@ -429,6 +429,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
     // Verify the response to downstream.
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_TRUE(response_->complete());
+    // Verify that all the denied requests send the 429 local reply.
     EXPECT_EQ(response_->headers().getStatusValue(), "429");
 
     cleanUp();
@@ -535,7 +536,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll)
       // Verify the usage report content.
       ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
       const auto& usage = reports.bucket_quota_usages(0);
-      // We only send single downstream client request and it is allowed.
+      // The request is denied by no_assignment_behavior.
       EXPECT_EQ(usage.num_requests_allowed(), 0);
       EXPECT_EQ(usage.num_requests_denied(), 1);
     } else {
@@ -548,6 +549,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll)
     // Verify the response to downstream.
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_TRUE(response_->complete());
+    // Verify that all the denied requests send the 429 local reply.
     EXPECT_EQ(response_->headers().getStatusValue(), "429");
 
     // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
