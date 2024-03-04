@@ -23,6 +23,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: sockets
+  change: |
+    Failure to create an upstream socket should now result in clean connection failure rather than failing a release assert. This behavior
+    can be temporarily reverted by setting runtime feature ``envoy.restart_features_.allow_client_socket_creation_failure`` to false.
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
@@ -56,9 +60,17 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: proxy status
+  change: |
+    Add more conversion in the proxy status utility. It can be disabled by the runtime guard
+    ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http3_upstream
+  change: |
+    Fixing a bug with HTTP/3 upstream using a non-threadsafe cache cross-thread. Bumping HTTP/3 support down
+    to alpha as the severity of this bug indicates it is both not in use and not GA quality code.
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
