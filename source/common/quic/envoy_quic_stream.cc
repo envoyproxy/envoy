@@ -180,7 +180,7 @@ void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& metadata_map
       quic_stream_.Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
       return;
     }
-    if (session()->connection()->connected()) {
+    if (!session()->connection()->connected()) {
       // Return early if sending METADATA caused the connection to close.
       return;
     }
