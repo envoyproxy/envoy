@@ -196,7 +196,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
     return Http::FilterHeadersStatus::Continue;
   } else {
     // For the request that is rejected due to DENY_ALL no_assignment_behavior, immediate report is
-    // still sent to RLQS server above, and here the ocal reply with deny response is sent.
+    // still sent to RLQS server above, and here the local reply with deny response is sent.
     sendDenyResponse();
     return Envoy::Http::FilterHeadersStatus::StopIteration;
   }
