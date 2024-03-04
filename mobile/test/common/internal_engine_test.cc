@@ -1,3 +1,5 @@
+#include <atomic>
+
 #include "source/common/common/assert.h"
 
 #include "test/common/http/common.h"
@@ -601,10 +603,11 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
 }
 
 TEST_F(InternalEngineTest, SetLogger) {
-  bool logging_was_called = false;
+  std::atomic<bool> logging_was_called{false};
   envoy_logger logger;
   logger.log = [](envoy_log_level, envoy_data data, const void* context) {
-    bool* logging_was_called = const_cast<bool*>(static_cast<const bool*>(context));
+    std::atomic<bool>* logging_was_called =
+        const_cast<std::atomic<bool>*>(static_cast<const std::atomic<bool>*>(context));
     *logging_was_called = true;
     release_envoy_data(data);
   };
@@ -654,7 +657,7 @@ TEST_F(InternalEngineTest, SetLogger) {
 
   EXPECT_EQ(actual_status_code, 200);
   EXPECT_EQ(actual_end_stream, true);
-  EXPECT_TRUE(logging_was_called);
+  EXPECT_TRUE(logging_was_called.load());
   EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
 }
 
