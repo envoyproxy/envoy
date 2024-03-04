@@ -600,4 +600,63 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
+TEST_F(InternalEngineTest, SetLogger) {
+  bool has_logging_data = false;
+  envoy_logger logger;
+  logger.log = [](envoy_log_level, envoy_data data, const void* context) {
+    bool* has_logging_data = const_cast<bool*>(static_cast<const bool*>(context));
+    if (!Data::Utility::copyToString(data).empty()) {
+      *has_logging_data = true;
+    }
+  };
+  logger.release = envoy_noop_const_release;
+  logger.context = &has_logging_data;
+
+  absl::Notification engine_running;
+  Platform::EngineBuilder engine_builder;
+  Platform::EngineSharedPtr engine =
+      engine_builder.addLogLevel(Platform::LogLevel::debug)
+          .setLogger(logger)
+          .setOnEngineRunning([&] { engine_running.Notify(); })
+          .addNativeFilter(
+              "test_remote_response",
+              "{'@type': "
+              "type.googleapis.com/"
+              "envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse}")
+          .build();
+  engine_running.WaitForNotification();
+
+  int actual_status_code = 0;
+  bool actual_end_stream = false;
+  absl::Notification stream_complete;
+  auto stream_prototype = engine->streamClient()->newStreamPrototype();
+  auto stream = (*stream_prototype)
+                    .setOnHeaders([&](Platform::ResponseHeadersSharedPtr headers, bool end_stream,
+                                      envoy_stream_intel) {
+                      actual_status_code = headers->httpStatus();
+                      actual_end_stream = end_stream;
+                    })
+                    .setOnData([&](envoy_data, bool end_stream) { actual_end_stream = end_stream; })
+                    .setOnComplete([&](envoy_stream_intel, envoy_final_stream_intel) {
+                      stream_complete.Notify();
+                    })
+                    .setOnError([&](Platform::EnvoyErrorSharedPtr, envoy_stream_intel,
+                                    envoy_final_stream_intel) { stream_complete.Notify(); })
+                    .setOnCancel([&](envoy_stream_intel, envoy_final_stream_intel) {
+                      stream_complete.Notify();
+                    })
+                    .start();
+
+  auto request_headers =
+      Platform::RequestHeadersBuilder(Platform::RequestMethod::GET, "https", "example.com", "/")
+          .build();
+  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(request_headers), true);
+  stream_complete.WaitForNotification();
+
+  EXPECT_EQ(actual_status_code, 200);
+  EXPECT_EQ(actual_end_stream, true);
+  EXPECT_TRUE(has_logging_data);
+  EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
+}
+
 } // namespace Envoy
