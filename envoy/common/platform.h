@@ -293,7 +293,7 @@ constexpr absl::string_view null_device_path{"/dev/null"};
 #else
 #define ENVOY_MMSG_MORE 0
 #define MSG_WAITFORONE 0x10000 // recvmmsg(): block until 1+ packets avail.
-#if !defined(__ANDROID_API__) // This struct is already defined in Android ndk.
+#if !defined(__ANDROID_API__)  // This struct is already defined in Android ndk.
 // Posix structure for describing messages sent by 'sendmmsg` and received by
 // 'recvmmsg'
 struct mmsghdr {
