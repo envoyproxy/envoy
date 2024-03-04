@@ -139,7 +139,7 @@ message ExternalProcessor {
   //    This protective measure is being explored and developed but has not been ready yet, so please use your own
   //    discretion when enabling this feature.
   //
-  bool observability_mode = 19;
+  bool observability_mode = 17;
 
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
