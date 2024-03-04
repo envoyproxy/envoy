@@ -246,6 +246,10 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added support for variant span attribute type for the OpenTelemetry tracer.
+
 
 deprecated:
 - area: listener
