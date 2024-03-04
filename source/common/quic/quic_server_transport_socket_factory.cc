@@ -49,8 +49,10 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
     std::string cert_str(buf_mem->data, buf_mem->length);
     std::istringstream pem_stream(cert_str);
     auto pem_result = quic::ReadNextPemMessage(&pem_stream);
-    RELEASE_ASSERT(pem_result.status == quic::PemReadResult::Status::kOk,
-                   "Failed to read already loaded cert");
+    if (pem_result.status != quic::PemReadResult::Status::kOk) {
+      throwEnvoyExceptionOrPanic(
+          "Error loading certificate in QUIC context: error from ReadNextPemMessage");
+    }
     chain.push_back(std::move(pem_result.contents));
   };
 
