@@ -60,9 +60,17 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: proxy status
+  change: |
+    Add more conversion in the proxy status utility. It can be disabled by the runtime guard
+    ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http3_upstream
+  change: |
+    Fixing a bug with HTTP/3 upstream using a non-threadsafe cache cross-thread. Bumping HTTP/3 support down
+    to alpha as the severity of this bug indicates it is both not in use and not GA quality code.
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
