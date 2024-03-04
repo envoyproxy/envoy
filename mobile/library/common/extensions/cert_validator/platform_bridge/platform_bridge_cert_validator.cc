@@ -90,7 +90,7 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
   job.result_callback_ = std::move(callback);
   Event::Dispatcher& dispatcher = job.result_callback_->dispatcher();
   job.validation_thread_ = thread_factory_->createThread(
-      [&, certs = std::move(certs), host = std::string(host),
+      [this, &dispatcher, certs = std::move(certs), host = std::string(host),
        subject_alt_names = std::move(subject_alt_names)]() -> void {
         verifyCertChainByPlatform(&dispatcher, certs, host, subject_alt_names, this);
       },
