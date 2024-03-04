@@ -759,7 +759,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleUpstreamQuicConnections) {
   testMultipleUpstreamQuicConnections();
 }
 
->>>>>>> upstream/main
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
   testMultipleQuicConnections();
 }
