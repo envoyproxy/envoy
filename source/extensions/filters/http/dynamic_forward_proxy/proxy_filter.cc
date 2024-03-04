@@ -68,6 +68,31 @@ ProxyFilterConfig::ProxyFilterConfig(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalClusterInfo>(*this); });
 }
 
+ProxyFilterConfig::~ProxyFilterConfig() {
+  if (tls_slot_.isShutdown()) {
+    return;
+  }
+
+  Thread::LockGuard lk(thread_counter_m_);
+  // Unsubscribe "this" from all local threads callbacks lists.
+  tls_slot_.runOnAllThreads([this](OptRef<ThreadLocalClusterInfo> cluster_info) {
+    std::unique_ptr<Thread::LockGuard> lk;
+    if (!Thread::MainThread::isMainOrTestThread()) {
+      lk = std::make_unique<Thread::LockGuard>(thread_counter_m_);
+    }
+    // Release the handle to the callback. It will unsubscribe from list of
+    // callbacks.
+    cluster_info->handle_.reset();
+    // Notify via condition variable that the callback has been removed.
+    cluster_info->parent_.onRemoveThreadLocalClusterUpdateCallbacks();
+  });
+  // Wait until number of threads where "this" pointer is registered as ClusterUpdateCallbacks
+  // drops to zero.
+  while (thread_counter_.load() != 0) {
+    thread_counter_cv_.wait(thread_counter_m_);
+  }
+}
+
 LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
     Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
     const std::string& cluster_name, const std::string& host, const int port,
@@ -102,7 +127,16 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
 
 Upstream::ClusterUpdateCallbacksHandlePtr
 ProxyFilterConfig::addThreadLocalClusterUpdateCallbacks() {
+  thread_counter_++;
   return cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
+}
+
+// Method is called on each thread and its purpose is to notify
+// main thread that cluster callbacks have been removed from
+// thread local cluster manager.
+void ProxyFilterConfig::onRemoveThreadLocalClusterUpdateCallbacks() {
+  thread_counter_--;
+  thread_counter_cv_.notifyOne();
 }
 
 ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
