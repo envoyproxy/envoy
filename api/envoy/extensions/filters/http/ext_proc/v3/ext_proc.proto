@@ -123,24 +123,6 @@ message ExternalProcessor {
   // for a reply.
   bool async_mode = 4;
 
-  // If true, send each part of the HTTP request or response specified by ProcessingMode
-  // without puasing on filter chain iteration. It is "Send and Go" mode that can be used
-  // by external processor to observe Envoy data and status. In this mode:
-  // 1) Only STREAMED body processing mode is supported and any other body processing modes
-  // will be ignored.
-  // 2) External processor is not expected to send back processing response. Any response
-  // will be simply ignored.
-  //
-  //
-  // .. warning::
-  //
-  //    Flow control is necessary mechanism to prevent the fast sender (either downstream client or upstream server)
-  //    from overwhelming the external processor when its processing speed is slower.
-  //    This protective measure is being explored and developed but has not been ready yet, so please use your own
-  //    discretion when enabling this feature.
-  //
-  bool observability_mode = 17;
-
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the request_headers message.
@@ -223,6 +205,24 @@ message ExternalProcessor {
 
   // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 16;
+
+  // If true, send each part of the HTTP request or response specified by ProcessingMode
+  // without puasing on filter chain iteration. It is "Send and Go" mode that can be used
+  // by external processor to observe Envoy data and status. In this mode:
+  // 1) Only STREAMED body processing mode is supported and any other body processing modes
+  // will be ignored.
+  // 2) External processor is not expected to send back processing response. Any response
+  // will be simply ignored.
+  //
+  //
+  // .. warning::
+  //
+  //    Flow control is necessary mechanism to prevent the fast sender (either downstream client or upstream server)
+  //    from overwhelming the external processor when its processing speed is slower.
+  //    This protective measure is being explored and developed but has not been ready yet, so please use your own
+  //    discretion when enabling this feature.
+  //
+  bool observability_mode = 17;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of
