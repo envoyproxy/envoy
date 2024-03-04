@@ -122,8 +122,8 @@ std::unique_ptr<char[]> dataFromString(const std::string& str) {
 
 void serializeMetadata(const Http::MetadataMapPtr& metadata, quic::QuicStreamId id,
                        absl::InlinedVector<quiche::QuicheMemSlice, 2>& slices) {
-  quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate_;
-  quic::QpackEncoder qpack_encoder_(&decoder_stream_error_delegate_,
+  quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
+  quic::QpackEncoder qpack_encoder(&decoder_stream_error_delegate,
                                     quic::HuffmanEncoding::kDisabled);
 
   spdy::Http2HeaderBlock header_block;
@@ -135,7 +135,7 @@ void serializeMetadata(const Http::MetadataMapPtr& metadata, quic::QuicStreamId 
   // length, and a payload, which is the QPACK-encoded metadata block. In order
   // to generate the frame header, the payload needs to be generated first.
   std::string metadata_frame_payload =
-      qpack_encoder_.EncodeHeaderList(id, header_block,
+      qpack_encoder.EncodeHeaderList(id, header_block,
                                       /* encoder_stream_sent_byte_count = */ nullptr);
   std::string metadata_frame_header =
       quic::HttpEncoder::SerializeMetadataFrameHeader(metadata_frame_payload.size());
@@ -178,6 +178,10 @@ void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& metadata_map
                                quic_stream_.write_side_closed() ? "closed" : "open",
                                quic_stream_.BufferedDataBytes()));
       quic_stream_.Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
+    if (session()->connection()->connected()) {
+      // Return early if sending METADATA caused the connection to close.
       return;
     }
   }
