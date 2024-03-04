@@ -103,7 +103,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
           uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
           ENVOY_LOG(
               trace,
-              "Create the token bucket limiter for hashed bucket id: {}, with max_tokens: {}; "
+              "Created the token bucket limiter for hashed bucket id: {}, with max_tokens: {}; "
               "fill_interval_sec: {}; fill_rate_per_sec: {}.",
               bucket_id, max_tokens, fill_interval_sec, fill_rate_per_sec);
           quota_buckets_[bucket_id]->token_bucket_limiter =
