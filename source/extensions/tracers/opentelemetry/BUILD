@@ -26,11 +26,13 @@ envoy_cc_library(
     name = "opentelemetry_tracer_lib",
     srcs = [
         "opentelemetry_tracer_impl.cc",
+        "otlp_utils.cc",
         "span_context_extractor.cc",
         "tracer.cc",
     ],
     hdrs = [
         "opentelemetry_tracer_impl.h",
+        "otlp_utils.h",
         "span_context.h",
         "span_context_extractor.h",
         "tracer.h",
@@ -59,10 +61,12 @@ envoy_cc_library(
     srcs = [
         "grpc_trace_exporter.cc",
         "http_trace_exporter.cc",
+        "otlp_utils.cc",
     ],
     hdrs = [
         "grpc_trace_exporter.h",
         "http_trace_exporter.h",
+        "otlp_utils.h",
         "trace_exporter.h",
     ],
     deps = [

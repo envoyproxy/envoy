@@ -19,6 +19,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 using testing::_;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -78,7 +79,8 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
             callback = &callbacks;
 
             EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
-            EXPECT_EQ("OTel-OTLP-Exporter-Envoy", message->headers().getUserAgentValue());
+            EXPECT_THAT(message->headers().getUserAgentValue(),
+                        HasSubstr("OTel-OTLP-Exporter-Envoy/"));
             EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
                       message->headers().getContentTypeValue());
 

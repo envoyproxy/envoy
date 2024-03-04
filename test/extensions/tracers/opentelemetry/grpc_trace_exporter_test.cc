@@ -15,6 +15,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 using testing::_;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::Return;
 
@@ -73,7 +74,7 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, CreateExporterAndExportSpan) {
 
   Http::TestRequestHeaderMapImpl metadata;
   callbacks_->onCreateInitialMetadata(metadata);
-  EXPECT_EQ("OTel-OTLP-Exporter-Envoy", metadata.getUserAgentValue());
+  EXPECT_THAT(metadata.getUserAgentValue(), HasSubstr("OTel-OTLP-Exporter-Envoy/"));
 }
 
 TEST_F(OpenTelemetryGrpcTraceExporterTest, NoExportWithHighWatermark) {

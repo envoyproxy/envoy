@@ -8,6 +8,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,7 +53,7 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
 
   // User-Agent header follows the OTLP specification:
   // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.30.0/specification/protocol/exporter.md#user-agent
-  message->headers().setReferenceUserAgent("OTel-OTLP-Exporter-Envoy");
+  message->headers().setReferenceUserAgent(OtlpUtils::getOtlpUserAgentHeader());
 
   // Add all custom headers to the request.
   for (const auto& header_pair : parsed_headers_to_add_) {
