@@ -1,5 +1,6 @@
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
@@ -371,14 +372,26 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithHeadersAsBytes) {
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
       Protobuf::Map<std::string, std::string>(), nullptr);
 
-  // Headers field should be empty since ext_authz should populate headers_bytes INSTEAD.
+  // Headers field should be empty since ext_authz should populate header_map INSTEAD.
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
-  // Check the value of the non-utf-8 value header has not been sanitized.
-  ASSERT_TRUE(request.attributes().request().http().headers_bytes().contains(header_key));
-  EXPECT_EQ(header_value, request.attributes().request().http().headers_bytes().at(header_key));
-  // headers_bytes ought to also have the partial body header.
-  EXPECT_TRUE(request.attributes().request().http().headers_bytes().contains(
-      Headers::get().EnvoyAuthPartialBody.get()));
+
+  // Check header map contains expected headers.
+  bool exact_match_utf_8_header = false;
+  bool contains_partial_body_header = false;
+  for (const auto& header : request.attributes().request().http().header_map().headers()) {
+    if (header.key() == header_key && header.raw_value() == header_value) {
+      exact_match_utf_8_header = true;
+    }
+    if (header.key() == Headers::get().EnvoyAuthPartialBody.get()) {
+      contains_partial_body_header = true;
+    }
+
+    if (exact_match_utf_8_header && contains_partial_body_header) {
+      break;
+    }
+  }
+  EXPECT_TRUE(exact_match_utf_8_header);
+  EXPECT_TRUE(contains_partial_body_header);
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest

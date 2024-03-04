@@ -833,10 +833,15 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
         // headers should be empty.
         EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
         // headers_bytes should contain the header we added and it should be unchanged.
-        ASSERT_TRUE(
-            check_request.attributes().request().http().headers_bytes().contains(header_key));
-        EXPECT_EQ(header_value,
-                  check_request.attributes().request().http().headers_bytes().at(header_key));
+        bool exact_match_utf_8_header = false;
+        for (const auto& header :
+             check_request.attributes().request().http().header_map().headers()) {
+          if (header.key() == header_key && header.raw_value() == header_value) {
+            exact_match_utf_8_header = true;
+            break;
+          }
+        }
+        EXPECT_TRUE(exact_match_utf_8_header);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,

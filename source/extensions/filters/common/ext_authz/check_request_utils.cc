@@ -44,6 +44,39 @@ NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>
 
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
+// Convenience function for either adding a new header or appending value to existing header.
+void addOrAppendHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
+                       absl::string_view key, absl::string_view value) {
+  auto* headers = mutable_header_map.mutable_headers();
+  for (auto& header : *headers) {
+    if (header.key() == key) {
+      // Merge duplicate headers.
+      (*header.mutable_raw_value()).append(",").append(std::string(value));
+      return;
+    }
+  }
+  // If we did not find a matching header key...
+  auto* new_header = headers->Add();
+  new_header->set_key(std::string(key));
+  new_header->set_raw_value(std::string(value));
+}
+
+void addOrOverwriteHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
+                          absl::string_view key, absl::string_view value) {
+  auto* headers = mutable_header_map.mutable_headers();
+  for (auto& header : *headers) {
+    if (header.key() == key) {
+      // Merge duplicate headers.
+      header.set_raw_value(std::string(value));
+      return;
+    }
+  }
+  // If we did not find a matching header key...
+  auto* new_header = headers->Add();
+  new_header->set_key(std::string(key));
+  new_header->set_raw_value(std::string(value));
+}
+
 void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
                                            const Network::Connection& connection,
                                            const std::string& service, const bool local,
@@ -134,10 +167,10 @@ void CheckRequestUtils::setHttpRequest(
 
   // Fill in the headers.
   auto* mutable_headers = httpreq.mutable_headers();
-  auto* mutable_headers_bytes = httpreq.mutable_headers_bytes();
+  auto* mutable_header_map = httpreq.mutable_header_map();
 
   headers.iterate([headers_as_bytes, request_header_matchers, mutable_headers,
-                   mutable_headers_bytes](const Envoy::Http::HeaderEntry& e) {
+                   mutable_header_map](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() == Headers::get().EnvoyAuthPartialBody.get()) {
       return Envoy::Http::HeaderMap::Iterate::Continue;
@@ -149,13 +182,7 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     if (headers_as_bytes) {
-      const std::string raw_value(e.value().getStringView());
-
-      if (mutable_headers_bytes->find(key) == mutable_headers_bytes->end()) {
-        (*mutable_headers_bytes)[key] = raw_value;
-      } else {
-        (*mutable_headers_bytes)[key].append(",").append(raw_value); // Merge duplicate headers.
-      }
+      addOrAppendHeader(*mutable_header_map, key, e.value().getStringView());
     } else {
       const std::string sanitized_value =
           MessageUtil::sanitizeUtf8String(e.value().getStringView());
@@ -185,12 +212,12 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     // Add in a header to detect when a partial body is used.
+    std::string partial_body_value = length != decoding_buffer->length() ? "true" : "false";
     if (headers_as_bytes) {
-      (*mutable_headers_bytes)[Headers::get().EnvoyAuthPartialBody.get()] =
-          length != decoding_buffer->length() ? "true" : "false";
+      addOrOverwriteHeader(*mutable_header_map, Headers::get().EnvoyAuthPartialBody.get(),
+                           std::move(partial_body_value));
     } else {
-      (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] =
-          length != decoding_buffer->length() ? "true" : "false";
+      (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] = std::move(partial_body_value);
     }
   }
 }

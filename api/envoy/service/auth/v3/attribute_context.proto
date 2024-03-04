@@ -122,7 +122,7 @@ message AttributeContext {
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
     // Header value is encoded as bytes which can support non-utf8 characters.
-    map<string, bytes> headers_bytes = 13
+    config.core.v3.HeaderMap header_map = 13
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
     // The request target, as it appears in the first line of the HTTP request. This includes
