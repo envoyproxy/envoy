@@ -77,6 +77,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/tracing:trace_context_lib",
+        "//source/common/version:version_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@opentelemetry_proto//:trace_cc_proto",
     ],

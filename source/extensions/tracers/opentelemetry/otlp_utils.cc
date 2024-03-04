@@ -13,7 +13,7 @@ namespace OpenTelemetry {
 
 const std::string& OtlpUtils::getOtlpUserAgentHeader() {
   CONSTRUCT_ON_FIRST_USE(std::string,
-                         fmt::format("OTel-OTLP-Exporter-Envoy/{}", VersionInfo::version()));
+                         fmt::format("OTel-OTLP-Exporter-Envoy/{}", Envoy::VersionInfo::version()));
 }
 
 } // namespace OpenTelemetry
