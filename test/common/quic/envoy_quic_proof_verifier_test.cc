@@ -35,7 +35,7 @@ class EnvoyQuicProofVerifierTest : public testing::Test {
 public:
   EnvoyQuicProofVerifierTest()
       : root_ca_cert_(cert_chain_.substr(cert_chain_.rfind("-----BEGIN CERTIFICATE-----"))),
-        leaf_cert_([=]() {
+        leaf_cert_([this]() {
           std::stringstream pem_stream(cert_chain_);
           std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
           return chain[0];
