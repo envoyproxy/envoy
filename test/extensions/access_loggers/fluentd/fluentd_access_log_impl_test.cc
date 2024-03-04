@@ -228,6 +228,15 @@ TEST_F(FluentdAccessLoggerImplTest, TwoReconnects) {
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
 
+TEST_F(FluentdAccessLoggerImplTest, DisconnectOnNoHealthyUpstream) {
+  init();
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
+  EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
+  EXPECT_CALL(*async_client_, connect()).WillOnce(Return(false));
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+}
+
 class FluentdAccessLoggerCacheImplTest : public testing::Test {
 public:
   FluentdAccessLoggerCacheImplTest() : logger_cache_(cluster_manager_, scope_, tls_) {}
