@@ -69,7 +69,27 @@ void EnvoyQuicClientConnection::processPacket(
       quic::QuicTime::Delta::FromMicroseconds(
           std::chrono::duration_cast<std::chrono::microseconds>(receive_time.time_since_epoch())
               .count());
+  ASSERT(peer_address != nullptr && buffer != nullptr);
   ASSERT(buffer->getRawSlices().size() == 1);
+  if (local_address == nullptr) {
+    // Quic doesn't know how to handle packets without destination address. Drop them here.
+    if (buffer->length() > 0) {
+      ++num_packets_with_unknown_dst_address_;
+      std::string error_message = fmt::format(
+          "Unable to get destination address. Address family {}. Have{} pending path validation. "
+          "self_address is{} initialized.",
+          (peer_address->ip()->version() == Network::Address::IpVersion::v4 ? "v4" : "v6"),
+          (HasPendingPathValidation() ? "" : " no"),
+          (self_address().IsInitialized() ? "" : " not"));
+      ENVOY_CONN_LOG(error, error_message, *this);
+      if (num_packets_with_unknown_dst_address_ > 10) {
+        // If too many packets are without destination addresses, close the connection.
+        CloseConnection(quic::QUIC_PACKET_READ_ERROR, error_message,
+                        quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+      }
+    }
+    return;
+  }
   Buffer::RawSlice slice = buffer->frontSlice();
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,

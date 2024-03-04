@@ -147,6 +147,7 @@ private:
   Event::Dispatcher& dispatcher_;
   bool migrate_port_on_path_degrading_{false};
   uint8_t num_socket_switches_{0};
+  size_t num_packets_with_unknown_dst_address_{0};
 };
 
 } // namespace Quic
