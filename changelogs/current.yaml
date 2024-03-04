@@ -11,9 +11,22 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
     This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
     be flushed to stat sinks.
+- area: eds
+  change: |
+    Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
+    Prior to this change, Envoy required that EDS assignments were sent after an EDS cluster was updated.
+    If no EDS assignment was received for the cluster, it ended up with an empty assignment.
+    Following this change, after a cluster update, Envoy waits for an EDS assignment until
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
+    the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
+    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: sockets
+  change: |
+    Failure to create an upstream socket should now result in clean connection failure rather than failing a release assert. This behavior
+    can be temporarily reverted by setting runtime feature ``envoy.restart_features_.allow_client_socket_creation_failure`` to false.
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
@@ -115,7 +128,7 @@ bug_fixes:
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
 - area: router
   change: |
-    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
+    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happens. This is
     controlled by ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
 - area: deps
   change: |

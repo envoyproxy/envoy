@@ -62,17 +62,6 @@ public:
   virtual void
   registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                 std::shared_ptr<Network::UdpListenerConfig> listener_config) PURE;
-
-  /**
-   * @return An interface on which registerParentDrainedCallback can be called during
-   *         creation of a listener, or nullopt if there is no parent instance.
-   *
-   *         If this is set, any UDP listener should start paused and only begin listening
-   *         when the parent instance is drained; this allows draining QUIC listeners to
-   *         catch their own packets and forward unrecognized packets to the child instance.
-   */
-  virtual OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() PURE;
-
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
    * new child has begun. The hot restart implementation needs to be created early to deal with
