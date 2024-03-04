@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "source/common/version/version.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {

@@ -4,6 +4,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
+#include "source/common/version/version.h"
 
 namespace Envoy {
 namespace Extensions {
