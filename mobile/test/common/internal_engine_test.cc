@@ -608,6 +608,7 @@ TEST_F(InternalEngineTest, SetLogger) {
     if (!Data::Utility::copyToString(data).empty()) {
       *has_logging_data = true;
     }
+    release_envoy_data(data);
   };
   logger.release = envoy_noop_const_release;
   logger.context = &has_logging_data;
