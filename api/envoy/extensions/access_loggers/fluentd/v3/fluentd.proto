@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the Fluentd Forward Protocol as described in: `Fluentd Forward Protocol Specification
 // <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 // [#extension: envoy.access_loggers.fluentd]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message FluentdAccessLogConfig {
   // The upstream cluster to connect to for streaming the Fluentd messages.
   string cluster = 1 [(validate.rules).string = {min_len: 1}];
@@ -67,4 +67,11 @@ message FluentdAccessLogConfig {
   //    "message": "My error message"
   //  }
   google.protobuf.Struct record = 6 [(validate.rules).message = {required: true}];
+
+  // Reconnect to the upstream cluster in case that the TCP connection is closed for any reason.
+  // By default, there will be no reconnect attempts. If the upstream connection is closed, new
+  // log records will be lost.
+  // Caution: while attempting to reconnect, the log buffer may continue to fill. It is recommended
+  // to set this field to a reasonable number to avoid too many log records buffered.
+  uint32 max_reconnect_attempts = 7;
 }

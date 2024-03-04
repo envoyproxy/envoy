@@ -49,6 +49,8 @@ using FluentdAccessLoggerSharedPtr = std::shared_ptr<FluentdAccessLogger>;
   COUNTER(entries_lost)                                                                            \
   COUNTER(entries_buffered)                                                                        \
   COUNTER(events_sent)                                                                             \
+  COUNTER(reconnect_attempts)                                                                      \
+  COUNTER(reconnect_attempts_exceeded)                                                             \
   COUNTER(connections_closed)
 
 struct AccessLogFluentdStats {
@@ -73,11 +75,15 @@ public:
 
 private:
   void flush();
+  void connect();
+  void setDisconnected();
   void clearBuffer();
 
   bool disconnected_ = false;
   bool connecting_ = false;
   std::string tag_;
+  uint32_t reconnect_attempts_{0};
+  const uint32_t max_reconnect_attempts_;
   std::string id_;
   const Stats::ScopeSharedPtr stats_scope_;
   AccessLogFluentdStats fluentd_stats_;

@@ -33,11 +33,12 @@ public:
       : async_client_(new Tcp::AsyncClient::MockAsyncTcpClient()),
         timer_(new Event::MockTimer(&dispatcher_)) {}
 
-  void init(int buffer_size_bytes = 0) {
+  void init(int buffer_size_bytes = 0, int max_reconnect_attempts = 0) {
     EXPECT_CALL(*async_client_, setAsyncTcpClientCallbacks(_));
     EXPECT_CALL(*timer_, enableTimer(_, _));
 
     config_.set_tag(tag_);
+    config_.set_max_reconnect_attempts(max_reconnect_attempts);
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     logger_ = std::make_unique<FluentdAccessLoggerImpl>(
         Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_, *stats_store_.rootScope());
@@ -162,6 +163,69 @@ TEST_F(FluentdAccessLoggerImplTest, CallbacksTest) {
   EXPECT_NO_THROW(logger_->onBelowWriteBufferLowWatermark());
   Buffer::OwnedImpl buffer;
   EXPECT_NO_THROW(logger_->onData(buffer, false));
+}
+
+TEST_F(FluentdAccessLoggerImplTest, SuccessfulReconnect) {
+  init(0, 1);
+  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
+  EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
+  EXPECT_CALL(*async_client_, connect())
+      .WillOnce(Invoke([this]() -> bool {
+        logger_->onEvent(Network::ConnectionEvent::LocalClose);
+        return true;
+      }))
+      .WillOnce(Invoke([this]() -> bool {
+        logger_->onEvent(Network::ConnectionEvent::Connected);
+        return true;
+      }));
+  EXPECT_CALL(*async_client_, write(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
+        EXPECT_FALSE(end_stream);
+        std::string expected_payload = getExpectedMsgpackPayload(1);
+        EXPECT_EQ(expected_payload, buffer.toString());
+      }));
+
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+}
+
+TEST_F(FluentdAccessLoggerImplTest, ReconnectFailure) {
+  init(0, 1);
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
+  EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
+  EXPECT_CALL(*async_client_, connect())
+      .WillOnce(Invoke([this]() -> bool {
+        logger_->onEvent(Network::ConnectionEvent::LocalClose);
+        return true;
+      }))
+      .WillOnce(Invoke([this]() -> bool {
+        logger_->onEvent(Network::ConnectionEvent::LocalClose);
+        return true;
+      }));
+
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+}
+
+TEST_F(FluentdAccessLoggerImplTest, TwoReconnects) {
+  init(0, 2);
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
+  EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
+  EXPECT_CALL(*async_client_, connect())
+      .WillOnce(Invoke([this]() -> bool {
+        logger_->onEvent(Network::ConnectionEvent::LocalClose);
+        return true;
+      }))
+      .WillOnce(Invoke([this]() -> bool {
+        logger_->onEvent(Network::ConnectionEvent::LocalClose);
+        return true;
+      }))
+      .WillOnce(Invoke([this]() -> bool {
+        logger_->onEvent(Network::ConnectionEvent::LocalClose);
+        return true;
+      }));
+
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
 
 class FluentdAccessLoggerCacheImplTest : public testing::Test {

@@ -16,8 +16,8 @@ FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Tcp::AsyncTcpClientPtr client,
                                                  Event::Dispatcher& dispatcher,
                                                  const FluentdAccessLogConfig& config,
                                                  Stats::Scope& parent_scope)
-    : tag_(config.tag()), id_(dispatcher.name()),
-      stats_scope_(parent_scope.createScope(config.stat_prefix())),
+    : tag_(config.tag()), max_reconnect_attempts_(config.max_reconnect_attempts()),
+      id_(dispatcher.name()), stats_scope_(parent_scope.createScope(config.stat_prefix())),
       fluentd_stats_(
           {ACCESS_LOG_FLUENTD_STATS(POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_))}),
       client_(std::move(client)),
@@ -39,14 +39,18 @@ void FluentdAccessLoggerImpl::onEvent(Network::ConnectionEvent event) {
   } else if (event == Network::ConnectionEvent::LocalClose ||
              event == Network::ConnectionEvent::RemoteClose) {
     ENVOY_LOG(debug, "upstream connection was closed");
-    // TODO(ohadvano): add an option to reconnect to the upstream, if configured
-
     fluentd_stats_.connections_closed_.inc();
-    disconnected_ = true;
-    clearBuffer();
 
-    ASSERT(flush_timer_ != nullptr);
-    flush_timer_->disableTimer();
+    if (reconnect_attempts_ < max_reconnect_attempts_) {
+      fluentd_stats_.reconnect_attempts_.inc();
+      reconnect_attempts_++;
+      connect();
+      return;
+    } else if (reconnect_attempts_ > 0) {
+      fluentd_stats_.reconnect_attempts_exceeded_.inc();
+    }
+
+    setDisconnected();
   }
 }
 
@@ -55,7 +59,6 @@ void FluentdAccessLoggerImpl::log(EntryPtr&& entry) {
     fluentd_stats_.entries_lost_.inc();
     // We will lose the data deliberately so the buffer doesn't grow infinitely.
     // Since the client is disconnected, there's nothing much we can do with the data anyway.
-    // TODO(ohadvano): add an option to reconnect to the upstream, if configured
     return;
   }
 
@@ -76,8 +79,7 @@ void FluentdAccessLoggerImpl::flush() {
   }
 
   if (!client_->connected()) {
-    connecting_ = true;
-    client_->connect();
+    connect();
     return;
   }
 
@@ -100,6 +102,23 @@ void FluentdAccessLoggerImpl::flush() {
   client_->write(data, false);
   fluentd_stats_.events_sent_.inc();
   clearBuffer();
+}
+
+void FluentdAccessLoggerImpl::connect() {
+  if (!client_->connect()) {
+    ENVOY_LOG(debug, "no healthy upstream");
+    setDisconnected();
+    return;
+  }
+
+  connecting_ = true;
+}
+
+void FluentdAccessLoggerImpl::setDisconnected() {
+  disconnected_ = true;
+  clearBuffer();
+  ASSERT(flush_timer_ != nullptr);
+  flush_timer_->disableTimer();
 }
 
 void FluentdAccessLoggerImpl::clearBuffer() {
