@@ -86,13 +86,13 @@ private:
 
 // add Dynatrace specific span attributes
 void addSamplingAttributes(uint32_t sampling_exponent,
-                           std::map<std::string, std::string>& attributes) {
+                           std::map<std::string, OTelAttribute>& attributes) {
 
   const auto multiplicity = SamplingState::toMultiplicity(sampling_exponent);
   // The denominator of the sampling ratio. If, for example, the Dynatrace OneAgent samples with a
   // probability of 1/16, the value of supportability sampling ratio would be 16.
   // Note: Ratio is also known as multiplicity.
-  attributes["supportability.atm_sampling_ratio"] = std::to_string(multiplicity);
+  attributes["supportability.atm_sampling_ratio"] = multiplicity;
 
   if (multiplicity > 1) {
     static constexpr uint64_t two_pow_56 = 1llu << 56; // 2^56
@@ -100,7 +100,7 @@ void addSamplingAttributes(uint32_t sampling_exponent,
     // that are discarded out of 2^56. The attribute is only available if the sampling.threshold is
     // not 0 and therefore sampling happened.
     const uint64_t sampling_threshold = two_pow_56 - two_pow_56 / multiplicity;
-    attributes["sampling.threshold"] = std::to_string(sampling_threshold);
+    attributes["sampling.threshold"] = sampling_threshold;
   }
 }
 
@@ -129,7 +129,7 @@ SamplingResult DynatraceSampler::shouldSample(const absl::optional<SpanContext> 
                                               const std::vector<SpanContext>& /*links*/) {
 
   SamplingResult result;
-  std::map<std::string, std::string> att;
+  std::map<std::string, OTelAttribute> att;
 
   // trace_context->path() returns path and query. query part is removed in getSamplingKey()
   const std::string sampling_key =
@@ -175,8 +175,10 @@ SamplingResult DynatraceSampler::shouldSample(const absl::optional<SpanContext> 
   }
 
   if (!att.empty()) {
-    result.attributes = std::make_unique<const std::map<std::string, std::string>>(std::move(att));
+    result.attributes =
+        std::make_unique<const std::map<std::string, OTelAttribute>>(std::move(att));
   }
+
   return result;
 }
 
