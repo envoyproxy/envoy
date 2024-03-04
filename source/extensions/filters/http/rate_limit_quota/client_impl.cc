@@ -82,9 +82,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
               action.bucket_id().DebugString(), bucket_id);
     if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
       // The response should be matched to the report we sent.
-      ENVOY_LOG(error,
-                "The received response is not matched any quota "
-                "cache entry: ",
+      ENVOY_LOG(error, "The received response is not matched to any quota cache entry: ",
                 response->ShortDebugString());
     } else {
       quota_buckets_[bucket_id]->bucket_action = action;
