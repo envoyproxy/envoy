@@ -288,17 +288,19 @@ constexpr absl::string_view null_device_path{"/dev/null"};
 // Therefore, we decided to remove the Android check introduced here in
 // https://github.com/envoyproxy/envoy/pull/10120. If someone out there encounters problems with
 // this please bring up in Envoy's slack channel #envoy-udp-quic-dev.
-#if defined(__linux__) || defined(__EMSCRIPTEN__)
+#if (defined(__linux__) && !defined(__ANDROID_API__)) || defined(__EMSCRIPTEN__)
 #define ENVOY_MMSG_MORE 1
 #else
 #define ENVOY_MMSG_MORE 0
 #define MSG_WAITFORONE 0x10000 // recvmmsg(): block until 1+ packets avail.
+#if !defined(__ANDROID_API__)) // This struct is already defined in Android ndk.
 // Posix structure for describing messages sent by 'sendmmsg` and received by
 // 'recvmmsg'
 struct mmsghdr {
   struct msghdr msg_hdr;
   unsigned int msg_len;
 };
+#endif
 #endif
 
 // TODO: Remove once bazel supports NDKs > 21
