@@ -49,6 +49,8 @@ public:
 
   bool earlyDataEnabled() const { return enable_early_data_; }
 
+  bool handleCertsWithSharedTlsCode() const { return handle_certs_with_shared_tls_code_; }
+
 protected:
   void onSecretUpdated() override;
 

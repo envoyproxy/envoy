@@ -34,12 +34,14 @@ protected:
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
+  struct TransportSocketFactoryWithFilterChain {
+    const QuicServerTransportSocketFactory& transport_socket_factory_;
+    const Network::FilterChain& filter_chain_;
+  };
+
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
-  legacyGetCertChain(const quic::QuicSocketAddress& server_address,
-                     const quic::QuicSocketAddress& client_address, const std::string& hostname,
-                     bool* cert_matched_sni);
-  void legacySignPayload(const quic::QuicSocketAddress& server_address,
-                         const quic::QuicSocketAddress& client_address, const std::string& hostname,
+  legacyGetCertChain(const TransportSocketFactoryWithFilterChain& data);
+  void legacySignPayload(const TransportSocketFactoryWithFilterChain& data,
                          uint16_t signature_algorithm, absl::string_view in,
                          std::unique_ptr<quic::ProofSource::SignatureCallback> callback);
 
@@ -49,8 +51,7 @@ private:
     absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
   };
 
-  CertWithFilterChain getTlsCertAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                               const quic::QuicSocketAddress& client_address,
+  CertWithFilterChain getTlsCertAndFilterChain(const TransportSocketFactoryWithFilterChain& data,
                                                const std::string& hostname, bool* cert_matched_sni);
 
   struct LegacyCertConfigWithFilterChain {
@@ -59,9 +60,12 @@ private:
   };
 
   LegacyCertConfigWithFilterChain
-  legacyGetTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                       const quic::QuicSocketAddress& client_address,
-                                       const std::string& hostname);
+  legacyGetTlsCertConfigAndFilterChain(const TransportSocketFactoryWithFilterChain& data);
+
+  absl::optional<TransportSocketFactoryWithFilterChain>
+  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                   const quic::QuicSocketAddress& client_address,
+                                   const std::string& hostname);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};
