@@ -124,7 +124,7 @@ void serializeMetadata(const Http::MetadataMapPtr& metadata, quic::QuicStreamId 
                        absl::InlinedVector<quiche::QuicheMemSlice, 2>& slices) {
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   quic::QpackEncoder qpack_encoder(&decoder_stream_error_delegate,
-                                    quic::HuffmanEncoding::kDisabled);
+                                   quic::HuffmanEncoding::kDisabled);
 
   spdy::Http2HeaderBlock header_block;
   for (const auto& [key, value] : *metadata) {
@@ -136,7 +136,7 @@ void serializeMetadata(const Http::MetadataMapPtr& metadata, quic::QuicStreamId 
   // to generate the frame header, the payload needs to be generated first.
   std::string metadata_frame_payload =
       qpack_encoder.EncodeHeaderList(id, header_block,
-                                      /* encoder_stream_sent_byte_count = */ nullptr);
+                                     /* encoder_stream_sent_byte_count = */ nullptr);
   std::string metadata_frame_header =
       quic::HttpEncoder::SerializeMetadataFrameHeader(metadata_frame_payload.size());
 
