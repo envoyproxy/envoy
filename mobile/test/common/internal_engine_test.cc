@@ -603,9 +603,10 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
 TEST_F(InternalEngineTest, SetLogger) {
   bool logging_was_called = false;
   envoy_logger logger;
-  logger.log = [](envoy_log_level, envoy_data, const void* context) {
+  logger.log = [](envoy_log_level, envoy_data data, const void* context) {
     bool* logging_was_called = const_cast<bool*>(static_cast<const bool*>(context));
     *logging_was_called = true;
+    release_envoy_data(data);
   };
   logger.release = envoy_noop_const_release;
   logger.context = &logging_was_called;
