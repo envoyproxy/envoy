@@ -484,11 +484,11 @@ public:
               (override));
 };
 
-// Ensures that the Network::Utility::readFromSocket function uses GRO instead of `recvmmsg`.
+// Ensures that the Network::Utility::readFromSocket function uses GRO.
 // Only Linux platforms support GRO.
 #if defined(__linux__)
 TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
-  MockOsSysCallsImpl os_sys_calls_;
+  NiceMock<MockOsSysCallsImpl> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
 
   // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
@@ -498,6 +498,12 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   Buffer::RawSlice slice;
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
+
+  // Make sure the option for GRO is set on the socket.
+  int sock_opt;
+  socklen_t sock_len = sizeof(int);
+  EXPECT_EQ(0, peer_socket_->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len).return_value_);
+  EXPECT_EQ(1, sock_opt);
 
   // GRO uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
