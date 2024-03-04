@@ -186,17 +186,26 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   client_.report_interval_ms = std::chrono::milliseconds(reporting_interval);
   client_.send_reports_timer->enableTimer(client_.report_interval_ms);
 
-  // The rate limit strategy for the first matched request should be already set based on no
-  // assignment behavior in `createNewBucket` when the bucket is initially created.
+  // The rate limit strategy for the first matched request(i.e., its request header is matched with
+  // bucket_matchers for the first time) should be already set based on no assignment behavior in
+  // `createNewBucket` when the bucket is initially created.
   ASSERT(quota_buckets_.find(bucket_id) != quota_buckets_.end());
   if (quota_buckets_[bucket_id]
           ->bucket_action.quota_assignment_action()
           .rate_limit_strategy()
           .blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
+    ENVOY_LOG(
+        trace,
+        "For first matched request with hashed bucket_id {}, it is allowed by ALLOW_ALL strategy.",
+        bucket_id);
     return Http::FilterHeadersStatus::Continue;
   } else {
     // For the request that is rejected due to DENY_ALL no_assignment_behavior, immediate report is
     // still sent to RLQS server above, and here the local reply with deny response is sent.
+    ENVOY_LOG(
+        trace,
+        "For first matched request with hashed bucket_id {}, it is throttled by DENY_ALL strategy.",
+        bucket_id);
     sendDenyResponse();
     return Envoy::Http::FilterHeadersStatus::StopIteration;
   }
@@ -213,9 +222,15 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
     if (rate_limit_strategy.has_blanket_rule()) {
       if (rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
         quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+        ENVOY_LOG(trace,
+                  "Request with hashed bucket_id {} is allowed by cached ALLOW_ALL strategy.",
+                  bucket_id);
       } else if (rate_limit_strategy.blanket_rule() ==
                  envoy::type::v3::RateLimitStrategy::DENY_ALL) {
         quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
+        ENVOY_LOG(trace,
+                  "Request with hashed bucket_id {} is throttled by cached DENY_ALL strategy.",
+                  bucket_id);
         sendDenyResponse();
         return Envoy::Http::FilterHeadersStatus::StopIteration;
       }
