@@ -446,7 +446,7 @@ TEST(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfi
   EXPECT_NE(driver1.get(), driver2.get());
 }
 
-class MaxmindProviderConfigDeathTest : public testing::Test {};
+using MaxmindProviderConfigDeathTest = MaxmindProviderConfigTest;
 
 TEST_F(MaxmindProviderConfigDeathTest, CountryMappingPathDoesNotExist) {
   const auto provider_config_yaml = R"EOF(
