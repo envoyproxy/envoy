@@ -121,7 +121,10 @@ message AttributeContext {
     map<string, string> headers = 3
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
-    // Header value is encoded as bytes which can support non-utf8 characters.
+    // The HTTP request headers with their values stored at bytes. This is used instead of
+    // :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>` when
+    // :ref:`headers_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.headers_as_bytes>`
+    // is set to true.
     config.core.v3.HeaderMap header_map = 13
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
