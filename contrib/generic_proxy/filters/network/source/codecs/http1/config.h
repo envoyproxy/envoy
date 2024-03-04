@@ -44,10 +44,15 @@ public:
 
   FrameFlags frameFlags() const override { return frame_flags_; }
 
-  virtual Http::HeaderMap& headerMap() const PURE;
+  virtual Http::RequestOrResponseHeaderMap& headerMap() const PURE;
+
+  // Optional buffer for the raw body. This is only make sense for local response and
+  // request/responses in single frame mode.
+  Buffer::Instance& optionalBuffer() const { return buffer_; }
 
 protected:
   FrameFlags frame_flags_;
+  mutable Envoy::Buffer::OwnedImpl buffer_;
 };
 
 class HttpRequestFrame : public HttpHeaderFrame<StreamRequest> {
@@ -62,7 +67,7 @@ public:
   absl::string_view path() const override { return request_->getPathValue(); }
   absl::string_view method() const override { return request_->getMethodValue(); }
 
-  Http::HeaderMap& headerMap() const override { return *request_; }
+  Http::RequestOrResponseHeaderMap& headerMap() const override { return *request_; }
   Http::RequestHeaderMapPtr request_;
 };
 
@@ -79,15 +84,16 @@ public:
   }
 
   StreamStatus status() const override {
+    auto status_view = response_->getStatusValue();
     int32_t status = 0;
-    if (absl::SimpleAtoi(response_->getStatusValue(), &status)) {
-      return {status, status < 500 && status >= 100};
+    if (absl::SimpleAtoi(status_view, &status)) {
+      return {status, status < 500 && status > 99};
     }
-    // Unknown HTTP status code.
+    // Unknown HTTP status. Return -1 and false.
     return {-1, false};
   }
 
-  Http::HeaderMap& headerMap() const override { return *response_; }
+  Http::RequestOrResponseHeaderMap& headerMap() const override { return *response_; }
 
   Http::ResponseHeaderMapPtr response_;
 };
@@ -98,12 +104,9 @@ public:
       : frame_flags_({StreamFlags{}, end_stream}) {
     buffer_.move(buffer);
   }
-
   FrameFlags frameFlags() const override { return frame_flags_; }
 
-  uint64_t length() const { return buffer_.length(); }
-  void moveTo(Envoy::Buffer::Instance& t) const { t.move(buffer_); }
-  std::string toString() const { return buffer_.toString(); }
+  Buffer::Instance& buffer() const { return buffer_; }
 
 private:
   mutable Buffer::OwnedImpl buffer_;
@@ -112,24 +115,56 @@ private:
 
 class Utility {
 public:
-  static absl::Status encodeHeaders(Buffer::Instance& buffer, const Http::RequestHeaderMap& headers,
-                                    bool chunk_encoding);
-  static absl::Status encodeHeaders(Buffer::Instance& buffer,
-                                    const Http::ResponseHeaderMap& headers, bool chunk_encoding);
-  static void encodeBody(Buffer::Instance& buffer, const HttpRawBodyFrame& body,
+  static absl::Status encodeRequestHeaders(Buffer::Instance& buffer,
+                                           const Http::RequestHeaderMap& headers,
+                                           bool chunk_encoding);
+  static absl::Status encodeResponseHeaders(Buffer::Instance& buffer,
+                                            const Http::ResponseHeaderMap& headers,
+                                            bool chunk_encoding);
+  static void encodeBody(Buffer::Instance& dst_buffer, Buffer::Instance& src_buffer,
                          bool chunk_encoding, bool end_stream);
 
-  static absl::Status validateHeaders(const Http::RequestHeaderMap& headers);
-  static absl::Status validateHeaders(const Http::ResponseHeaderMap& headers);
+  static absl::Status validateRequestHeaders(Http::RequestHeaderMap& headers);
+  static absl::Status validateResponseHeaders(Http::ResponseHeaderMap& headers,
+                                              Envoy::Http::Code code);
 
-  static bool isChunked(const Http::RequestOrResponseHeaderMap& headers, bool bodiless_message);
+  static bool isChunked(const Http::RequestOrResponseHeaderMap& headers, bool bodiless);
+
+  static bool hasBody(const Envoy::Http::Http1::Parser& parser, bool response,
+                      bool response_for_head_request);
 
   static uint64_t statusToHttpStatus(absl::StatusCode status_code);
 };
 
-class HttpCodecBase : public Http::Http1::ParserCallbacks,
-                      public Envoy::Logger::Loggable<Envoy::Logger::Id::http> {
+struct ActiveRequest {
+  Http::RequestHeaderMapPtr request_headers_;
+
+  bool request_complete_{};
+  bool response_chunk_encoding_{};
+};
+
+struct ExpectResponse {
+  Http::ResponseHeaderMapPtr response_headers_;
+
+  bool request_complete_{};
+  bool head_request_{};
+  bool request_chunk_encoding_{};
+};
+
+class Http1CodecBase : public Http::Http1::ParserCallbacks,
+                       public Envoy::Logger::Loggable<Envoy::Logger::Id::http> {
 public:
+  Http1CodecBase(bool single_frame_mode, uint32_t max_buffer_size, bool server_codec)
+      : single_frame_mode_(single_frame_mode), max_buffer_size_(max_buffer_size) {
+    if (server_codec) {
+      parser_ = Http::Http1::ParserPtr{new Http::Http1::BalsaParser(
+          Http::Http1::MessageType::Request, this, 64 * 1024, false, false)};
+    } else {
+      parser_ = Http::Http1::ParserPtr{new Http::Http1::BalsaParser(
+          Http::Http1::MessageType::Response, this, 64 * 1024, false, false)};
+    }
+  }
+
   // ParserCallbacks.
   Http::Http1::CallbackResult onMessageBegin() override {
     header_parsing_state_ = HeaderParsingState::Field;
@@ -144,22 +179,41 @@ public:
     return Http::Http1::CallbackResult::Success;
   }
   Http::Http1::CallbackResult onHeaderField(const char* data, size_t length) override {
-    onHeaderFieldImpl(data, length);
+    if (header_parsing_state_ == HeaderParsingState::Done) {
+      // Ignore trailers for now.
+      return Http::Http1::CallbackResult::Success;
+    }
+    if (header_parsing_state_ == HeaderParsingState::Value) {
+      completeCurrentHeader();
+    }
+    current_header_field_.append(data, length);
+
+    header_parsing_state_ = HeaderParsingState::Field;
     return Http::Http1::CallbackResult::Success;
   }
   Http::Http1::CallbackResult onHeaderValue(const char* data, size_t length) override {
-    onHeaderValueImpl(data, length);
+    if (header_parsing_state_ == HeaderParsingState::Done) {
+      // Ignore trailers for now.
+      return Http::Http1::CallbackResult::Success;
+    }
+
+    absl::string_view value(data, length);
+    if (current_header_value_.empty()) {
+      value = StringUtil::ltrim(value);
+    }
+
+    current_header_value_.append(value.data(), value.size());
+
+    header_parsing_state_ = HeaderParsingState::Value;
     return Http::Http1::CallbackResult::Success;
   }
   Http::Http1::CallbackResult onHeadersComplete() override {
     completeCurrentHeader();
+    header_parsing_state_ = HeaderParsingState::Done;
     return onHeadersCompleteImpl();
   }
   void bufferBody(const char* data, size_t length) override { buffered_body_.add(data, length); }
-  Http::Http1::CallbackResult onMessageComplete() override {
-    onMessageCompleteImpl();
-    return Http::Http1::CallbackResult::Success;
-  }
+  Http::Http1::CallbackResult onMessageComplete() override { return onMessageCompleteImpl(); }
   void onChunkHeader(bool is_final_chunk) override {
     if (is_final_chunk) {
       dispatchBufferedBody(false);
@@ -169,35 +223,8 @@ public:
   virtual Http::Http1::CallbackResult onMessageBeginImpl() PURE;
   virtual void onUrlImpl(const char* data, size_t length) PURE;
   virtual void onStatusImpl(const char* data, size_t length) PURE;
-  void onHeaderFieldImpl(const char* data, size_t length) {
-    if (header_parsing_state_ == HeaderParsingState::Done) {
-      // Ignore trailers for now.
-      return;
-    }
-
-    if (header_parsing_state_ == HeaderParsingState::Value) {
-      completeCurrentHeader();
-    }
-
-    header_parsing_state_ = HeaderParsingState::Field;
-    current_header_field_.append(data, length);
-  }
-  void onHeaderValueImpl(const char* data, size_t length) {
-    if (header_parsing_state_ == HeaderParsingState::Done) {
-      // Ignore trailers for now.
-      return;
-    }
-
-    header_parsing_state_ = HeaderParsingState::Value;
-    absl::string_view value(data, length);
-    if (current_header_value_.empty()) {
-      value = StringUtil::ltrim(value);
-    }
-
-    current_header_value_.append(value.data(), value.size());
-  }
   virtual Http::Http1::CallbackResult onHeadersCompleteImpl() PURE;
-  virtual void onMessageCompleteImpl() PURE;
+  virtual Http::Http1::CallbackResult onMessageCompleteImpl() PURE;
 
   void completeCurrentHeader() {
     current_header_value_.rtrim();
@@ -209,15 +236,15 @@ public:
   }
 
   bool decodeBuffer(Buffer::Instance& buffer) {
-    decode_buffer_.move(buffer);
+    decoding_buffer_.move(buffer);
 
     // Always resume before decoding.
     parser_->resume();
 
-    while (decode_buffer_.length() > 0) {
-      const auto slice = decode_buffer_.frontSlice();
+    while (decoding_buffer_.length() > 0) {
+      const auto slice = decoding_buffer_.frontSlice();
       const auto nread = parser_->execute(static_cast<const char*>(slice.mem_), slice.len_);
-      decode_buffer_.drain(nread);
+      decoding_buffer_.drain(nread);
 
       const auto status = parser_->getStatus();
       if (status == Http::Http1::ParserStatus::Paused) {
@@ -237,97 +264,67 @@ public:
     return true;
   }
 
+  void dispatchBufferedBody(bool end_stream) {
+    if (single_frame_mode_) {
+      // Do nothing until the onMessageComplete callback if we are in single frame mode.
+      if (buffered_body_.length() >= max_buffer_size_) {
+        ENVOY_LOG(warn,
+                  "Generic proxy HTTP1 codec: buffered body size exceeds max buffer size({} vs {})",
+                  buffered_body_.length(), max_buffer_size_);
+        onDecodingFailure();
+      }
+      return;
+    }
+
+    if (buffered_body_.length() > 0 || end_stream) {
+      ENVOY_LOG(debug,
+                "Generic proxy HTTP1 codec: decoding request/response body (end_stream={} size={})",
+                end_stream, buffered_body_.length());
+      auto frame = std::make_unique<HttpRawBodyFrame>(buffered_body_, end_stream);
+      onDecodingSuccess(std::move(frame));
+    }
+  }
+
   virtual Http::HeaderMap& headerMap() PURE;
-  virtual void dispatchBufferedBody(bool end_stream) PURE;
+
+  virtual void onDecodingSuccess(StreamFramePtr&& frame) PURE;
+  virtual void onDecodingFailure() PURE;
 
 protected:
   enum class HeaderParsingState { Field, Value, Done };
-  HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
 
-  Http::HeaderString current_header_field_;
-  Http::HeaderString current_header_value_;
+  Envoy::Buffer::OwnedImpl decoding_buffer_;
+  Envoy::Buffer::OwnedImpl encoding_buffer_;
 
-  Buffer::OwnedImpl decode_buffer_;
   Buffer::OwnedImpl buffered_body_;
 
   Http::Http1::ParserPtr parser_;
+  Http::HeaderString current_header_field_;
+  Http::HeaderString current_header_value_;
+  HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
+
+  const bool single_frame_mode_{};
+  const uint32_t max_buffer_size_{};
+
+  bool deferred_end_stream_headers_{};
 };
 
-class Http1ServerCodec : public HttpCodecBase, public ServerCodec {
+class Http1ServerCodec : public Http1CodecBase, public ServerCodec {
 public:
-  Http1ServerCodec() {
-    parser_ = Http::Http1::ParserPtr{new Http::Http1::BalsaParser(Http::Http1::MessageType::Request,
-                                                                  this, 64 * 1024, false, false)};
-  }
+  Http1ServerCodec(bool single_frame_mode, uint32_t max_buffer_size)
+      : Http1CodecBase(single_frame_mode, max_buffer_size, true) {}
 
-  Http::Http1::CallbackResult onMessageBeginImpl() override {
-    if (active_request_) {
-      ENVOY_LOG(
-          error,
-          "Generic proxy HTTP1 codec: multiple requests on the same connection at same time.");
-      return Http::Http1::CallbackResult::Error;
-    }
-    active_request_ = true;
-
-    request_headers_ = Http::RequestHeaderMapImpl::create();
-    return Http::Http1::CallbackResult::Success;
-  }
+  Http::Http1::CallbackResult onMessageBeginImpl() override;
   void onUrlImpl(const char* data, size_t length) override {
-    request_headers_->setPath(absl::string_view(data, length));
+    ASSERT(active_request_.has_value());
+    ASSERT(active_request_->request_headers_ != nullptr);
+    active_request_->request_headers_->setPath(absl::string_view(data, length));
   }
   void onStatusImpl(const char*, size_t) override {}
-  Http::Http1::CallbackResult onHeadersCompleteImpl() override {
-    request_headers_->setMethod(parser_->methodName());
+  Http::Http1::CallbackResult onHeadersCompleteImpl() override;
+  Http::Http1::CallbackResult onMessageCompleteImpl() override;
 
-    if (!parser_->isHttp11()) {
-      ENVOY_LOG(error,
-                "Generic proxy HTTP1 codec: unsupported HTTP version, only HTTP/1.1 is supported.");
-      return Http::Http1::CallbackResult::Error;
-    }
-
-    // Validate request headers.
-    const auto validate_headers_status = Utility::validateHeaders(*request_headers_);
-    if (!validate_headers_status.ok()) {
-      ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to validate request headers: {}",
-                validate_headers_status.message());
-      return Http::Http1::CallbackResult::Error;
-    }
-
-    // Upgrade requests have been rejected by above validation and only handle chunked request
-    // or content-length > 0.
-    const bool non_end_stream = parser_->isChunked() || parser_->contentLength().value_or(0) > 0;
-
-    ENVOY_LOG(debug, "decoding request headers complete (end_stream={}):\n{}", !non_end_stream,
-              *request_headers_);
-
-    if (non_end_stream) {
-      auto request = std::make_unique<HttpRequestFrame>(std::move(request_headers_), false);
-      onDecodingSuccess(std::move(request));
-    } else {
-      deferred_end_stream_headers_ = true;
-    }
-
-    return Http::Http1::CallbackResult::Success;
-  }
-  void onMessageCompleteImpl() override {
-    if (deferred_end_stream_headers_) {
-      deferred_end_stream_headers_ = false;
-      auto request = std::make_unique<HttpRequestFrame>(std::move(request_headers_), true);
-      onDecodingSuccess(std::move(request));
-    } else {
-      dispatchBufferedBody(true);
-    }
-    parser_->pause();
-  }
-  Http::HeaderMap& headerMap() override { return *request_headers_; }
-  void dispatchBufferedBody(bool end_stream) override {
-    if (buffered_body_.length() > 0 || end_stream) {
-      ENVOY_LOG(debug, "decoding request body (end_stream={} size={})", end_stream,
-                buffered_body_.length());
-      auto request = std::make_unique<HttpRawBodyFrame>(buffered_body_, end_stream);
-      onDecodingSuccess(std::move(request));
-    }
-  }
+  Http::HeaderMap& headerMap() override { return *active_request_->request_headers_; }
 
   void setCodecCallbacks(ServerCodecCallbacks& callbacks) override { callbacks_ = &callbacks; }
   void decode(Envoy::Buffer::Instance& buffer, bool) override {
@@ -336,98 +333,45 @@ public:
     }
   }
   void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
-  ResponsePtr respond(absl::Status status, absl::string_view, const Request&) override {
+  ResponsePtr respond(absl::Status status, absl::string_view data, const Request&) override {
     auto response = Http::ResponseHeaderMapImpl::create();
     response->setStatus(std::to_string(Utility::statusToHttpStatus(status.code())));
-    response->setContentLength(0);
+    response->setContentLength(data.size());
     response->addCopy(Http::LowerCaseString("reason"), status.message());
-    return std::make_unique<HttpResponseFrame>(std::move(response), true);
+    auto response_frame = std::make_unique<HttpResponseFrame>(std::move(response), true);
+    response_frame->optionalBuffer().add(data.data(), data.size());
+    return response_frame;
   }
 
-  void onDecodingSuccess(StreamFramePtr&& frame) {
-    if (!callbacks_->connection().has_value()) {
-      return;
+  void onDecodingSuccess(StreamFramePtr&& frame) override {
+    if (callbacks_->connection().has_value()) {
+      callbacks_->onDecodingSuccess(std::move(frame));
     }
 
-    callbacks_->onDecodingSuccess(std::move(frame));
-
     // Connection may have been closed by the callback.
-    auto connection_state = callbacks_->connection().has_value()
-                                ? callbacks_->connection()->state()
-                                : Network::Connection::State::Closed;
-    if (connection_state != Network::Connection::State::Open) {
+    if (!callbacks_->connection().has_value() ||
+        callbacks_->connection()->state() != Network::Connection::State::Open) {
       parser_->pause();
     }
   }
+  void onDecodingFailure() override { callbacks_->onDecodingFailure(); }
 
-  Envoy::Buffer::OwnedImpl response_buffer_;
-  Http::RequestHeaderMapPtr request_headers_;
-  bool deferred_end_stream_headers_{};
-  bool chunk_encoding_{};
-
-  // HTTP1.1 only supports a single request/response per connection at same time.
-  bool active_request_{};
-
+  absl::optional<ActiveRequest> active_request_;
   ServerCodecCallbacks* callbacks_{};
 };
 
-class Http1ClientCodec : public HttpCodecBase, public ClientCodec {
+class Http1ClientCodec : public Http1CodecBase, public ClientCodec {
 public:
-  Http1ClientCodec() {
-    parser_ = Http::Http1::ParserPtr{new Http::Http1::BalsaParser(
-        Http::Http1::MessageType::Response, this, 64 * 1024, false, false)};
-  }
+  Http1ClientCodec(bool single_frame_mode, uint32_t max_buffer_size)
+      : Http1CodecBase(single_frame_mode, max_buffer_size, false) {}
 
-  Http::Http1::CallbackResult onMessageBeginImpl() override {
-    response_headers_ = Http::ResponseHeaderMapImpl::create();
-    return Http::Http1::CallbackResult::Success;
-  }
+  Http::Http1::CallbackResult onMessageBeginImpl() override;
   void onUrlImpl(const char*, size_t) override {}
   void onStatusImpl(const char*, size_t) override {}
-  Http::Http1::CallbackResult onHeadersCompleteImpl() override {
-    response_headers_->setStatus(std::to_string(static_cast<uint16_t>(parser_->statusCode())));
+  Http::Http1::CallbackResult onHeadersCompleteImpl() override;
+  Http::Http1::CallbackResult onMessageCompleteImpl() override;
 
-    // Validate response headers.
-    const auto validate_headers_status = Utility::validateHeaders(*response_headers_);
-    if (!validate_headers_status.ok()) {
-      ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to validate response headers: {}",
-                validate_headers_status.message());
-      return Http::Http1::CallbackResult::Error;
-    }
-
-    // TODO(wbpcode): the response requires more complex handling to check if it has body or not.
-    // For example, 204 No Content, 304 Not Modified, 1xx, etc.
-    const bool non_end_stream = parser_->isChunked() || parser_->contentLength().value_or(0) > 0;
-
-    ENVOY_LOG(debug, "decoding response headers complete (end_stream={}):\n{}", !non_end_stream,
-              *response_headers_);
-
-    if (non_end_stream) {
-      auto request = std::make_unique<HttpResponseFrame>(std::move(response_headers_), false);
-      onDecodingSuccess(std::move(request));
-    } else {
-      deferred_end_stream_headers_ = true;
-    }
-
-    return Http::Http1::CallbackResult::Success;
-  }
-  void onMessageCompleteImpl() override {
-    if (deferred_end_stream_headers_) {
-      deferred_end_stream_headers_ = false;
-      auto request = std::make_unique<HttpResponseFrame>(std::move(response_headers_), true);
-      onDecodingSuccess(std::move(request));
-    } else {
-      dispatchBufferedBody(true);
-    }
-    parser_->pause();
-  }
-  Http::HeaderMap& headerMap() override { return *response_headers_; }
-  void dispatchBufferedBody(bool end_stream) override {
-    if (buffered_body_.length() > 0 || end_stream) {
-      auto request = std::make_unique<HttpRawBodyFrame>(buffered_body_, end_stream);
-      onDecodingSuccess(std::move(request));
-    }
-  }
+  Http::HeaderMap& headerMap() override { return *expect_response_->response_headers_; }
 
   void setCodecCallbacks(ClientCodecCallbacks& callbacks) override { callbacks_ = &callbacks; }
   void decode(Envoy::Buffer::Instance& buffer, bool) override {
@@ -437,38 +381,43 @@ public:
   }
   void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
 
-  void onDecodingSuccess(StreamFramePtr&& frame) {
-    if (!callbacks_->connection().has_value()) {
-      return;
+  void onDecodingSuccess(StreamFramePtr&& frame) override {
+    if (callbacks_->connection().has_value()) {
+      callbacks_->onDecodingSuccess(std::move(frame));
     }
 
-    callbacks_->onDecodingSuccess(std::move(frame));
-
     // Connection may have been closed by the callback.
-    auto connection_state = callbacks_->connection().has_value()
-                                ? callbacks_->connection()->state()
-                                : Network::Connection::State::Closed;
-    if (connection_state != Network::Connection::State::Open) {
+    if (!callbacks_->connection().has_value() ||
+        callbacks_->connection()->state() != Network::Connection::State::Open) {
       parser_->pause();
     }
   }
+  void onDecodingFailure() override { callbacks_->onDecodingFailure(); }
 
-  Envoy::Buffer::OwnedImpl request_buffer_;
-  Http::ResponseHeaderMapPtr response_headers_;
-  bool deferred_end_stream_headers_{};
-  bool chunk_encoding_{};
+  absl::optional<ExpectResponse> expect_response_;
 
   ClientCodecCallbacks* callbacks_{};
 };
 
-class HttpCodecFactory : public CodecFactory {
+class Http1CodecFactory : public CodecFactory {
 public:
-  ClientCodecPtr createClientCodec() const override { return std::make_unique<Http1ClientCodec>(); }
+  Http1CodecFactory(bool single_frame_mode, uint32_t max_buffer_size)
+      : single_frame_mode_(single_frame_mode), max_buffer_size_(max_buffer_size) {}
 
-  ServerCodecPtr createServerCodec() const override { return std::make_unique<Http1ServerCodec>(); }
+  ClientCodecPtr createClientCodec() const override {
+    return std::make_unique<Http1ClientCodec>(single_frame_mode_, max_buffer_size_);
+  }
+
+  ServerCodecPtr createServerCodec() const override {
+    return std::make_unique<Http1ServerCodec>(single_frame_mode_, max_buffer_size_);
+  }
+
+private:
+  const bool single_frame_mode_{};
+  const uint32_t max_buffer_size_{};
 };
 
-class HttpCodecFactoryConfig : public CodecFactoryConfig {
+class Http1CodecFactoryConfig : public CodecFactoryConfig {
 public:
   // CodecFactoryConfig
   CodecFactoryPtr

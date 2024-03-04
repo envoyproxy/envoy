@@ -15,19 +15,14 @@ void UpstreamConnection::initialize() {
 }
 
 void UpstreamConnection::cleanUp(bool close_connection) {
-  // If the cleanUp is called multiple times, just return.
-  if (is_cleaned_up_) {
-    return;
-  }
-
-  ENVOY_LOG(debug, "generic proxy upstream manager: clean up upstream connection");
-  // Set is_cleaned_up_ flag to true to avoid double clean up.
-  is_cleaned_up_ = true;
+  ENVOY_LOG(debug, "generic proxy upstream manager: clean up upstream connection ()",
+            close_connection);
 
   if (close_connection && owned_conn_data_ != nullptr) {
     ENVOY_LOG(debug, "generic proxy upstream request: close upstream connection");
     ASSERT(tcp_pool_handle_ == nullptr);
     owned_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    owned_conn_data_.reset();
   }
 
   if (tcp_pool_handle_ != nullptr) {
@@ -40,8 +35,6 @@ void UpstreamConnection::cleanUp(bool close_connection) {
 }
 
 void UpstreamConnection::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(!is_cleaned_up_);
-
   if (data.length() == 0) {
     return;
   }

@@ -23,6 +23,8 @@ static constexpr absl::string_view RESPONSE_PREFIX = "HTTP/1.1 ";
 
 static constexpr absl::string_view HOST_HEADER_PREFIX = ":a";
 
+static constexpr uint32_t MAX_BUFFER_SIZE = 8 * 1024 * 1024;
+
 void encodeNormalHeaders(Buffer::Instance& buffer, const Http::RequestOrResponseHeaderMap& headers,
                          bool chunk_encoding) {
   headers.iterate([&buffer](const Http::HeaderEntry& header) {
@@ -48,20 +50,7 @@ void encodeNormalHeaders(Buffer::Instance& buffer, const Http::RequestOrResponse
   }
 }
 
-bool Utility::isChunked(const Http::RequestOrResponseHeaderMap& headers, bool bodiless_message) {
-  // If the message has body and the content length is not set, then treat it as chunked.
-  // Note all upgrade and connect requests are rejected so this is safe.
-  return !bodiless_message && headers.ContentLength() == nullptr;
-}
-
-absl::Status Utility::validateHeaders(const Http::RequestHeaderMap& headers) {
-  // No upgrade and connect support for now.
-  // TODO(wbpcode): add support for upgrade and connect in the future.
-  if (Http::Utility::isUpgrade(headers) ||
-      headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
-    return absl::InvalidArgumentError("upgrade or connect are not supported");
-  }
-
+absl::Status validateCommonHeaders(const Http::RequestOrResponseHeaderMap& headers) {
   // Both Transfer-Encoding and Content-Length are set.
   if (headers.TransferEncoding() != nullptr && headers.ContentLength() != nullptr) {
     return absl::InvalidArgumentError("Both transfer-encoding and content-length are set");
@@ -73,6 +62,47 @@ absl::Status Utility::validateHeaders(const Http::RequestHeaderMap& headers) {
     if (!absl::EqualsIgnoreCase(encoding, Http::Headers::get().TransferEncodingValues.Chunked)) {
       return absl::InvalidArgumentError("transfer-encoding is not chunked");
     }
+  }
+
+  return absl::OkStatus();
+}
+
+bool Utility::isChunked(const Http::RequestOrResponseHeaderMap& headers, bool bodiless) {
+  // If the message has body and the content length is not set, then treat it as chunked.
+  // Note all upgrade and connect requests are rejected so this is safe.
+  return !bodiless && headers.ContentLength() == nullptr;
+}
+
+bool Utility::hasBody(const Envoy::Http::Http1::Parser& parser, bool response,
+                      bool response_for_head_request) {
+  // Response for HEAD request should not have body.
+  if (response_for_head_request) {
+    ASSERT(response);
+    return false;
+  }
+
+  // 1xx, 204, 304 responses should not have body.
+  if (response) {
+    const Envoy::Http::Code code = parser.statusCode();
+    if (code < Http::Code::OK || code == Http::Code::NoContent || code == Http::Code::NotModified) {
+      return false;
+    }
+  }
+
+  // Check the transfer-encoding and content-length headers in other cases.
+  return parser.isChunked() || parser.contentLength().value_or(0) > 0;
+}
+
+absl::Status Utility::validateRequestHeaders(Http::RequestHeaderMap& headers) {
+  // No upgrade and connect support for now.
+  // TODO(wbpcode): add support for upgrade and connect in the future.
+  if (Http::Utility::isUpgrade(headers) ||
+      headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+    return absl::InvalidArgumentError("upgrade or connect are not supported");
+  }
+
+  if (auto status = validateCommonHeaders(headers); !status.ok()) {
+    return status;
   }
 
   // One of method, path, host is missing.
@@ -83,31 +113,39 @@ absl::Status Utility::validateHeaders(const Http::RequestHeaderMap& headers) {
   return absl::OkStatus();
 }
 
-absl::Status Utility::validateHeaders(const Http::ResponseHeaderMap& headers) {
-
-  // Both Transfer-Encoding and Content-Length are set.
-  if (headers.TransferEncoding() != nullptr && headers.ContentLength() != nullptr) {
-    return absl::InvalidArgumentError("Both transfer-encoding and content-length are set");
+absl::Status Utility::validateResponseHeaders(Http::ResponseHeaderMap& headers,
+                                              Envoy::Http::Code code) {
+  if (auto status = validateCommonHeaders(headers); !status.ok()) {
+    return status;
   }
 
-  // Transfer-Encoding is not chunked.
-  if (headers.TransferEncoding() != nullptr) {
-    absl::string_view encoding = headers.TransferEncoding()->value().getStringView();
-    if (!absl::EqualsIgnoreCase(encoding, Http::Headers::get().TransferEncodingValues.Chunked)) {
-      return absl::InvalidArgumentError("transfer-encoding is not chunked");
+  ASSERT(headers.Status() != nullptr);
+
+  if (code < Http::Code::OK || code == Http::Code::NoContent || code == Http::Code::NotModified) {
+    // There is no clear description in the RFC about the transfer-encoding behavior
+    // of NotModified response. But 1xx, 204 responses should not have transfer-encoding.
+    // See https://datatracker.ietf.org/doc/html/rfc9112#section-6.1-6
+    if (code != Http::Code::NotModified) {
+      if (headers.TransferEncoding() != nullptr) {
+        return absl::InvalidArgumentError("transfer-encoding is set for 1xx, 204 response");
+      }
     }
-  }
 
-  // Status is missing.
-  if (headers.Status() == nullptr) {
-    return absl::InvalidArgumentError("missing required headers");
+    // 1xx, 204, 304 responses should not have body.
+    if (headers.ContentLength() != nullptr) {
+      if (headers.ContentLength()->value().getStringView() != "0") {
+        return absl::InvalidArgumentError(
+            "content-length (non-zero) is set for 1xx, 204, 304 response");
+      }
+    }
   }
 
   return absl::OkStatus();
 }
 
-absl::Status Utility::encodeHeaders(Buffer::Instance& buffer, const Http::RequestHeaderMap& headers,
-                                    bool chunk_encoding) {
+absl::Status Utility::encodeRequestHeaders(Buffer::Instance& buffer,
+                                           const Http::RequestHeaderMap& headers,
+                                           bool chunk_encoding) {
   const Http::HeaderEntry* method = headers.Method();
   const Http::HeaderEntry* path = headers.Path();
   const Http::HeaderEntry* host = headers.Host();
@@ -182,8 +220,9 @@ uint64_t Utility::statusToHttpStatus(absl::StatusCode status_code) {
   }
 }
 
-absl::Status Utility::encodeHeaders(Buffer::Instance& buffer,
-                                    const Http::ResponseHeaderMap& headers, bool chunk_encoding) {
+absl::Status Utility::encodeResponseHeaders(Buffer::Instance& buffer,
+                                            const Http::ResponseHeaderMap& headers,
+                                            bool chunk_encoding) {
   const Http::HeaderEntry* status = headers.Status();
   if (status == nullptr) {
     return absl::InvalidArgumentError("missing required headers");
@@ -202,94 +241,293 @@ absl::Status Utility::encodeHeaders(Buffer::Instance& buffer,
   return absl::OkStatus();
 }
 
-void Utility::encodeBody(Buffer::Instance& buffer, const HttpRawBodyFrame& body,
+void Utility::encodeBody(Buffer::Instance& dst_buffer, Buffer::Instance& src_buffer,
                          bool chunk_encoding, bool end_stream) {
-  if (body.length() > 0) {
+  if (src_buffer.length() > 0) {
     // Chunk header.
     if (chunk_encoding) {
-      buffer.add(absl::StrCat(absl::Hex(body.length()), CRLF));
+      dst_buffer.add(absl::StrCat(absl::Hex(src_buffer.length()), CRLF));
     }
 
     // Body.
-    body.moveTo(buffer);
+    dst_buffer.move(src_buffer);
 
     // Chunk footer.
     if (chunk_encoding) {
-      buffer.add(CRLF);
+      dst_buffer.add(CRLF);
     }
   }
 
   // Add additional LAST_CHUNK if this is the last frame and chunk encoding is enabled.
   if (end_stream) {
     if (chunk_encoding) {
-      buffer.addFragments({LAST_CHUNK, CRLF});
+      dst_buffer.addFragments({LAST_CHUNK, CRLF});
     }
   }
 }
 
+Http::Http1::CallbackResult Http1ServerCodec::onMessageBeginImpl() {
+  if (active_request_.has_value()) {
+    ENVOY_LOG(error,
+              "Generic proxy HTTP1 codec: multiple requests on the same connection at same time.");
+    return Http::Http1::CallbackResult::Error;
+  }
+  active_request_ = ActiveRequest{};
+
+  active_request_->request_headers_ = Http::RequestHeaderMapImpl::create();
+  return Http::Http1::CallbackResult::Success;
+}
+
+Http::Http1::CallbackResult Http1ServerCodec::onHeadersCompleteImpl() {
+  if (!parser_->isHttp11()) {
+    ENVOY_LOG(error,
+              "Generic proxy HTTP1 codec: unsupported HTTP version, only HTTP/1.1 is supported.");
+    return Http::Http1::CallbackResult::Error;
+  }
+
+  active_request_->request_headers_->setMethod(parser_->methodName());
+
+  // Validate request headers.
+  const auto validate_headers_status =
+      Utility::validateRequestHeaders(*active_request_->request_headers_);
+  if (!validate_headers_status.ok()) {
+    ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to validate request headers: {}",
+              validate_headers_status.message());
+    return Http::Http1::CallbackResult::Error;
+  }
+
+  const bool non_end_stream = Utility::hasBody(*parser_, false, false);
+  ENVOY_LOG(debug, "decoding request headers complete (end_stream={}):\n{}", !non_end_stream,
+            *active_request_->request_headers_);
+
+  if (single_frame_mode_) {
+    // Do nothing until the onMessageComplete callback if we are in single frame mode.
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  if (non_end_stream) {
+    auto request =
+        std::make_unique<HttpRequestFrame>(std::move(active_request_->request_headers_), false);
+    onDecodingSuccess(std::move(request));
+  } else {
+    deferred_end_stream_headers_ = true;
+  }
+
+  return Http::Http1::CallbackResult::Success;
+}
+
+Http::Http1::CallbackResult Http1ServerCodec::onMessageCompleteImpl() {
+  active_request_->request_complete_ = true;
+
+  if (single_frame_mode_) {
+    ASSERT(!deferred_end_stream_headers_);
+    auto request =
+        std::make_unique<HttpRequestFrame>(std::move(active_request_->request_headers_), true);
+    request->optionalBuffer().move(buffered_body_);
+
+    if (request->optionalBuffer().length() > 0) {
+      request->headerMap().removeTransferEncoding();
+      request->headerMap().setContentLength(request->optionalBuffer().length());
+    }
+    onDecodingSuccess(std::move(request));
+  } else if (deferred_end_stream_headers_) {
+    deferred_end_stream_headers_ = false;
+    auto request =
+        std::make_unique<HttpRequestFrame>(std::move(active_request_->request_headers_), true);
+    onDecodingSuccess(std::move(request));
+  } else {
+    dispatchBufferedBody(true);
+  }
+
+  parser_->pause();
+  return Http::Http1::CallbackResult::Success;
+}
+
 void Http1ServerCodec::encode(const StreamFrame& frame, EncodingCallbacks& callbacks) {
-  const bool end_stream = frame.frameFlags().endStream();
+  const bool response_end_stream = frame.frameFlags().endStream();
 
   if (auto* headers = dynamic_cast<const HttpResponseFrame*>(&frame); headers != nullptr) {
-    ENVOY_LOG(debug, "encoding response headers (end_stream={}):\n{}", end_stream,
+    ENVOY_LOG(debug, "encoding response headers (end_stream={}):\n{}", response_end_stream,
               *headers->response_);
 
-    chunk_encoding_ = Utility::isChunked(*headers->response_, end_stream);
+    active_request_->response_chunk_encoding_ =
+        Utility::isChunked(*headers->response_, response_end_stream);
 
-    auto status = Utility::encodeHeaders(response_buffer_, *headers->response_, chunk_encoding_);
+    auto status = Utility::encodeResponseHeaders(encoding_buffer_, *headers->response_,
+                                                 active_request_->response_chunk_encoding_);
     if (!status.ok()) {
       ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to encode response headers: {}",
                 status.message());
       callbacks_->connection()->close(Network::ConnectionCloseType::FlushWrite);
       return;
     }
+
+    // Encode the optional buffer if it exists. This is used for local response or for the
+    // request/responses in single frame mode.
+    if (headers->optionalBuffer().length() > 0) {
+      ASSERT(response_end_stream);
+      Utility::encodeBody(encoding_buffer_, headers->optionalBuffer(),
+                          active_request_->response_chunk_encoding_, response_end_stream);
+    }
+
   } else if (auto* body = dynamic_cast<const HttpRawBodyFrame*>(&frame); body != nullptr) {
-    ENVOY_LOG(debug, "encoding response body (end_stream={} size={})", end_stream, body->length());
-    Utility::encodeBody(response_buffer_, *body, chunk_encoding_, end_stream);
+    ENVOY_LOG(debug, "encoding response body (end_stream={} size={})", response_end_stream,
+              body->buffer().length());
+    Utility::encodeBody(encoding_buffer_, body->buffer(), active_request_->response_chunk_encoding_,
+                        response_end_stream);
   }
 
-  callbacks.onEncodingSuccess(response_buffer_, end_stream);
-  if (end_stream) {
-    // Reset the chunk encoding flag after the last frame.
-    chunk_encoding_ = false;
-    active_request_ = false;
+  callbacks.onEncodingSuccess(encoding_buffer_, response_end_stream);
+
+  if (response_end_stream) {
+    if (active_request_->request_complete_) {
+      active_request_.reset();
+      return;
+    }
+    ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: response complete before request complete");
+    if (callbacks_->connection().has_value()) {
+      callbacks_->connection()->close(Network::ConnectionCloseType::FlushWrite);
+    }
   }
 }
 
 void Http1ClientCodec::encode(const StreamFrame& frame, EncodingCallbacks& callbacks) {
-  const bool end_stream = frame.frameFlags().endStream();
+  const bool request_end_stream = frame.frameFlags().endStream();
 
   if (auto* headers = dynamic_cast<const HttpRequestFrame*>(&frame); headers != nullptr) {
-    ENVOY_LOG(debug, "encoding request headers (end_stream={}):\n{}", end_stream,
+    ENVOY_LOG(debug, "encoding request headers (end_stream={}):\n{}", request_end_stream,
               *headers->request_);
-    chunk_encoding_ = Utility::isChunked(*headers->request_, end_stream);
 
-    auto status = Utility::encodeHeaders(request_buffer_, *headers->request_, chunk_encoding_);
+    ASSERT(!expect_response_.has_value());
+    expect_response_ = ExpectResponse{};
+    expect_response_->request_chunk_encoding_ =
+        Utility::isChunked(*headers->request_, request_end_stream);
+    expect_response_->head_request_ =
+        headers->request_->getMethodValue() == Http::Headers::get().MethodValues.Head;
+
+    auto status = Utility::encodeRequestHeaders(encoding_buffer_, *headers->request_,
+                                                expect_response_->request_chunk_encoding_);
     if (!status.ok()) {
       ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to encode request headers: {}",
                 status.message());
       callbacks_->connection()->close(Network::ConnectionCloseType::FlushWrite);
       return;
     }
+
+    // Encode the optional buffer if it exists. This is used for local response or for the
+    // request/responses in single frame mode.
+    if (headers->optionalBuffer().length() > 0) {
+      ASSERT(request_end_stream);
+      Utility::encodeBody(encoding_buffer_, headers->optionalBuffer(),
+                          expect_response_->request_chunk_encoding_, request_end_stream);
+    }
+
   } else if (auto* body = dynamic_cast<const HttpRawBodyFrame*>(&frame); body != nullptr) {
-    ENVOY_LOG(debug, "encoding request body (end_stream={} size={})", end_stream, body->length());
-    Utility::encodeBody(request_buffer_, *body, chunk_encoding_, end_stream);
+    ENVOY_LOG(debug, "encoding request body (end_stream={} size={})", request_end_stream,
+              body->buffer().length());
+    Utility::encodeBody(encoding_buffer_, body->buffer(), expect_response_->request_chunk_encoding_,
+                        request_end_stream);
   }
 
-  callbacks.onEncodingSuccess(request_buffer_, end_stream);
-  if (end_stream) {
-    // Reset the chunk encoding flag after the last frame.
-    chunk_encoding_ = false;
+  if (request_end_stream) {
+    expect_response_->request_complete_ = true;
+  }
+
+  callbacks.onEncodingSuccess(encoding_buffer_, request_end_stream);
+}
+
+Http::Http1::CallbackResult Http1ClientCodec::onMessageBeginImpl() {
+  if (!expect_response_.has_value()) {
+    ENVOY_LOG(error, "Generic proxy HTTP1 codec: unexpected HTTP response from upstream");
+    return Http::Http1::CallbackResult::Error;
+  }
+  expect_response_->response_headers_ = Http::ResponseHeaderMapImpl::create();
+  return Http::Http1::CallbackResult::Success;
+}
+
+Http::Http1::CallbackResult Http1ClientCodec::onHeadersCompleteImpl() {
+  if (!parser_->isHttp11()) {
+    ENVOY_LOG(error,
+              "Generic proxy HTTP1 codec: unsupported HTTP version, only HTTP/1.1 is supported.");
+    return Http::Http1::CallbackResult::Error;
+  }
+
+  expect_response_->response_headers_->setStatus(
+      std::to_string(static_cast<uint16_t>(parser_->statusCode())));
+
+  // Validate response headers.
+  const auto validate_headers_status =
+      Utility::validateResponseHeaders(*expect_response_->response_headers_, parser_->statusCode());
+  if (!validate_headers_status.ok()) {
+    ENVOY_LOG(error, "Generic proxy HTTP1 codec: failed to validate response headers: {}",
+              validate_headers_status.message());
+    return Http::Http1::CallbackResult::Error;
+  }
+
+  const bool non_end_stream = Utility::hasBody(*parser_, true, expect_response_->head_request_);
+
+  ENVOY_LOG(debug, "decoding response headers complete (end_stream={}):\n{}", !non_end_stream,
+            *expect_response_->response_headers_);
+
+  if (single_frame_mode_) {
+    // Do nothing until the onMessageComplete callback if we are in single frame mode.
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  if (non_end_stream) {
+    auto request =
+        std::make_unique<HttpResponseFrame>(std::move(expect_response_->response_headers_), false);
+    onDecodingSuccess(std::move(request));
+  } else {
+    deferred_end_stream_headers_ = true;
+  }
+
+  return Http::Http1::CallbackResult::Success;
+}
+
+Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
+  if (single_frame_mode_) {
+    ASSERT(!deferred_end_stream_headers_);
+    auto response =
+        std::make_unique<HttpResponseFrame>(std::move(expect_response_->response_headers_), true);
+    response->optionalBuffer().move(buffered_body_);
+
+    if (response->optionalBuffer().length() > 0) {
+      response->headerMap().removeTransferEncoding();
+      response->headerMap().setContentLength(response->optionalBuffer().length());
+    }
+
+    onDecodingSuccess(std::move(response));
+  } else if (deferred_end_stream_headers_) {
+    deferred_end_stream_headers_ = false;
+    auto response =
+        std::make_unique<HttpResponseFrame>(std::move(expect_response_->response_headers_), true);
+    onDecodingSuccess(std::move(response));
+  } else {
+    dispatchBufferedBody(true);
+  }
+  // If both request and response is complete, reset the state and pause the parser.
+  if (expect_response_->request_complete_) {
+    parser_->pause();
+    expect_response_.reset();
+    return Http::Http1::CallbackResult::Success;
+  } else {
+    ENVOY_LOG(debug, "Generic proxy HTTP1 client codec: response complete before request complete");
+    return Http::Http1::CallbackResult::Error;
   }
 }
 
 CodecFactoryPtr
-HttpCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
-                                           Envoy::Server::Configuration::FactoryContext&) {
-  return std::make_unique<HttpCodecFactory>();
+Http1CodecFactoryConfig::createCodecFactory(const Protobuf::Message& config,
+                                            Envoy::Server::Configuration::FactoryContext&) {
+  const auto& typed_config = dynamic_cast<const ProtoConfig&>(config);
+
+  return std::make_unique<Http1CodecFactory>(
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, single_frame_mode, true),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, max_buffer_size, MAX_BUFFER_SIZE));
 }
 
-REGISTER_FACTORY(HttpCodecFactoryConfig, CodecFactoryConfig);
+REGISTER_FACTORY(Http1CodecFactoryConfig, CodecFactoryConfig);
 
 } // namespace Http1
 } // namespace Codec
