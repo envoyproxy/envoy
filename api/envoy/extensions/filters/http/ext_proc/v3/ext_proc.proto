@@ -115,7 +115,7 @@ message ExternalProcessor {
   // sent. See ProcessingMode for details.
   ProcessingMode processing_mode = 3;
 
-   // [#not-implemented-hide:]
+  // [#not-implemented-hide:]
   // If true, send each part of the HTTP request or response specified by ProcessingMode
   // asynchronously -- in other words, send the message on the gRPC stream and then continue
   // filter processing. If false, which is the default, suspend filter execution after
