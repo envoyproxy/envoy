@@ -1,6 +1,7 @@
 #include <sys/types.h>
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 
 #include "test/mocks/common.h"
@@ -15,7 +16,6 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 using testing::_;
-using testing::HasSubstr;
 using testing::Invoke;
 using testing::Return;
 
@@ -74,7 +74,8 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, CreateExporterAndExportSpan) {
 
   Http::TestRequestHeaderMapImpl metadata;
   callbacks_->onCreateInitialMetadata(metadata);
-  EXPECT_THAT(metadata.getUserAgentValue(), HasSubstr("OTel-OTLP-Exporter-Envoy/"));
+  EXPECT_EQ(metadata.getUserAgentValue(),
+            "OTel-OTLP-Exporter-Envoy/" + Envoy::VersionInfo::version());
 }
 
 TEST_F(OpenTelemetryGrpcTraceExporterTest, NoExportWithHighWatermark) {
