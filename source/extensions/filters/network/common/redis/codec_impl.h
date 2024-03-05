@@ -42,7 +42,10 @@ private:
     InlineDelimiter,
     InlineString,
     InlineStringQuoted,
-    InlineStringSingleQuoted
+    InlineStringQuotedEscape,
+    InlineStringQuotedEscapeHex,
+    InlineStringSingleQuoted,
+    InlineStringSingleQuotedEscape
   };
 
   struct PendingInteger {

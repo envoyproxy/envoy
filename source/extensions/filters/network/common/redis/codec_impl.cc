@@ -469,48 +469,75 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       } else if (buffer[0] == '"') {
         pending_value_stack_.pop_front();
         state_ = State::InlineDelimiter;
+      } else if (buffer[0] == '\\') {
+        state_ = State::InlineStringQuotedEscape;
       } else {
-        if (buffer[0] == '\\' && remaining > 1) {
-          char c;
-          switch (buffer[1]) {
-          case '\\':
-            c = '\\';
-            break;
-          case 'x':
-            if (remaining > 3 && std::isxdigit(buffer[2]) && std::isxdigit(buffer[3])) {
-              const auto hex = std::string(&buffer[2], 2);
-              c = static_cast<char>(std::stoul(hex, nullptr, 16));
-              remaining -= 2;
-              buffer += 2;
-            } else {
-              c = 'x';
-            }
-            break;
-          case 'n':
-            c = '\n';
-            break;
-          case 'r':
-            c = '\r';
-            break;
-          case 't':
-            c = '\t';
-            break;
-          case 'b':
-            c = '\b';
-            break;
-          case 'a':
-            c = '\a';
-            break;
-          default:
-            c = buffer[1];
-            break;
-          }
-          remaining--;
-          buffer++;
-          pending_value_stack_.front().value_->asString().push_back(c);
-        } else {
-          pending_value_stack_.front().value_->asString().push_back(buffer[0]);
+        pending_value_stack_.front().value_->asString().push_back(buffer[0]);
+      }
+
+      remaining--;
+      buffer++;
+      break;
+    }
+
+    case State::InlineStringQuotedEscape: {
+      ENVOY_LOG(trace, "parse slice: InlineStringQuotedEscape: {}", buffer[0]);
+
+      if (buffer[0] == '\r') {
+        throw ProtocolError("unbalanced quotes in request");
+      } else if (buffer[0] == 'x') {
+        state_ = State::InlineStringQuotedEscapeHex;
+        pending_value_stack_.front().value_->asString().push_back(buffer[0]);
+      } else {
+        char c;
+        switch (buffer[0]) {
+        case '\\':
+          c = '\\';
+          break;
+        case 'n':
+          c = '\n';
+          break;
+        case 'r':
+          c = '\r';
+          break;
+        case 't':
+          c = '\t';
+          break;
+        case 'b':
+          c = '\b';
+          break;
+        case 'a':
+          c = '\a';
+          break;
+        default:
+          c = buffer[0];
+          break;
         }
+        pending_value_stack_.front().value_->asString().push_back(c);
+        state_ = State::InlineStringQuoted;
+      }
+
+      remaining--;
+      buffer++;
+      break;
+    }
+
+    case State::InlineStringQuotedEscapeHex: {
+      ENVOY_LOG(trace, "parse slice: InlineStringQuotedEscapeHex: {}", buffer[0]);
+
+      if (!std::isxdigit(buffer[0])) {
+        state_ = State::InlineStringQuoted;
+        break;
+      }
+
+      auto& s = pending_value_stack_.front().value_->asString();
+      ASSERT((!s.empty() && s.back() == 'x') || (s.size() > 1 && s[s.size() - 2] == 'x'));
+      s.push_back(buffer[0]);
+      if (s[s.size() - 3] == 'x') {
+        char c = static_cast<char>(std::stoul(&s[s.size() - 2], nullptr, 16));
+        s.resize(s.size() - 3);
+        s.push_back(c);
+        state_ = State::InlineStringQuoted;
       }
 
       remaining--;
@@ -526,14 +553,32 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       } else if (buffer[0] == '\'') {
         pending_value_stack_.pop_front();
         state_ = State::InlineDelimiter;
-      } else if (buffer[0] == '\\' && remaining > 1 && buffer[1] == '\'') {
-        pending_value_stack_.front().value_->asString().push_back('\'');
-        remaining--;
-        buffer++;
+      } else if (buffer[0] == '\\') {
+        pending_value_stack_.front().value_->asString().push_back('\\');
+        state_ = State::InlineStringSingleQuotedEscape;
       } else {
         pending_value_stack_.front().value_->asString().push_back(buffer[0]);
       }
 
+      remaining--;
+      buffer++;
+      break;
+    }
+
+    case State::InlineStringSingleQuotedEscape: {
+      ENVOY_LOG(trace, "parse slice: InlineStringSingleQuoted: {}", buffer[0]);
+
+      if (buffer[0] != '\'') {
+        state_ = State::InlineStringSingleQuoted;
+        break;
+      }
+
+      auto& s = pending_value_stack_.front().value_->asString();
+      ASSERT(!s.empty() && s.back() == '\\');
+      s.pop_back();
+      s.push_back(buffer[0]);
+
+      state_ = State::InlineStringSingleQuoted;
       remaining--;
       buffer++;
       break;
