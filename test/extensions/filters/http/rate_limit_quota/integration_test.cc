@@ -372,6 +372,16 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   // reports should be built in filter.cc
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
   ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+  // Verify the usage report content.
+  ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+  const auto& usage = reports.bucket_quota_usages(0);
+  // We only send single downstream client request and it is allowed.
+  EXPECT_EQ(usage.num_requests_allowed(), 1);
+  EXPECT_EQ(usage.num_requests_denied(), 0);
+  // It is first report so the time_elapsed is 0.
+  EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()), 0);
+
   rlqs_stream_->startGrpcStream();
 
   // Build the response.
@@ -408,14 +418,16 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
     ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
     // Verify the usage report content.
-    for (const auto& usage : reports.bucket_quota_usages()) {
-      // We only send single downstream client request and it is allowed.
-      EXPECT_EQ(usage.num_requests_allowed(), 1);
-      EXPECT_EQ(usage.num_requests_denied(), 0);
-      // time_elapsed equals to periodical reporting interval.
-      EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
-                report_interval_sec);
-    }
+    ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+    const auto& usage = reports.bucket_quota_usages(0);
+    // Report only represents the usage since last report.
+    // In the periodical report case here, the number of request allowed and denied is 0 since no
+    // new requests comes in.
+    EXPECT_EQ(usage.num_requests_allowed(), 0);
+    EXPECT_EQ(usage.num_requests_denied(), 0);
+    // time_elapsed equals to periodical reporting interval.
+    EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
+              report_interval_sec);
 
     // Build the rlqs server response.
     envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response2;

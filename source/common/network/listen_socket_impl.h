@@ -53,7 +53,7 @@ public:
                          address) {
     // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
-      RELEASE_ASSERT(io_handle_->isOpen(), "");
+      RELEASE_ASSERT(io_handle_ && io_handle_->isOpen(), "");
       setPrebindSocketOptions();
       setupSocket(options);
     } else {
@@ -68,17 +68,10 @@ public:
     }
   }
 
-  NetworkListenSocket(
-      IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
-      const Network::Socket::OptionsSharedPtr& options,
-      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar = absl::nullopt)
-      : ListenSocketImpl(std::move(io_handle), address),
-        parent_drained_callback_registrar_(parent_drained_callback_registrar) {
+  NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
+                      const Network::Socket::OptionsSharedPtr& options)
+      : ListenSocketImpl(std::move(io_handle), address) {
     setListenSocketOptions(options);
-  }
-
-  OptRef<ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() const override {
-    return parent_drained_callback_registrar_;
   }
 
   Socket::Type socketType() const override { return T::type; }
@@ -117,12 +110,6 @@ public:
   }
 
 protected:
-  // Usually a socket when initialized starts listening for ready-to-read or ready-to-write events;
-  // for a QUIC socket during hot restart this is undesirable as the parent instance needs to
-  // receive all packets; in that case this interface is set, and listening won't begin until the
-  // callback is called.
-  OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar_;
-
   void setPrebindSocketOptions() {
     // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as
     // on Linux and later BSD socket stacks.

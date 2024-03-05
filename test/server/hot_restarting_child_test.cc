@@ -67,11 +67,6 @@ public:
     });
     udp_forwarding_rpc_stream_.sendHotRestartMessage(child_address_udp_forwarding_, message);
   }
-  void expectParentTerminateMessages() {
-    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
-      return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
-    });
-  }
   Api::MockOsSysCalls& os_sys_calls_;
   Event::FileReadyCb udp_file_ready_callback_;
   sockaddr_un child_address_udp_forwarding_;
@@ -104,36 +99,6 @@ public:
   std::unique_ptr<FakeHotRestartingParent> fake_parent_;
   std::unique_ptr<HotRestartingChild> hot_restarting_child_;
 };
-
-TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
-  testing::MockFunction<void()> callback1;
-  testing::MockFunction<void()> callback2;
-  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
-                                                       callback1.AsStdFunction());
-  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr2,
-                                                       callback2.AsStdFunction());
-  EXPECT_CALL(callback1, Call());
-  EXPECT_CALL(callback2, Call());
-  fake_parent_->expectParentTerminateMessages();
-  hot_restarting_child_->sendParentTerminateRequest();
-}
-
-TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlreadyDrained) {
-  auto test_listener_addr = Network::Utility::resolveUrl("udp://127.0.0.1:1234");
-  auto test_listener_addr2 = Network::Utility::resolveUrl("udp://127.0.0.1:1235");
-  testing::MockFunction<void()> callback1;
-  testing::MockFunction<void()> callback2;
-  fake_parent_->expectParentTerminateMessages();
-  hot_restarting_child_->sendParentTerminateRequest();
-  EXPECT_CALL(callback1, Call());
-  EXPECT_CALL(callback2, Call());
-  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
-                                                       callback1.AsStdFunction());
-  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr2,
-                                                       callback2.AsStdFunction());
-}
 
 TEST_F(HotRestartingChildTest, LogsErrorOnReplyMessageInUdpStream) {
   envoy::HotRestartMessage msg;

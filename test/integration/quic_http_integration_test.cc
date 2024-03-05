@@ -300,6 +300,8 @@ public:
     ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(stats_scope_));
     ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager_));
+    ON_CALL(context.server_context_, threadLocal())
+        .WillByDefault(testing::ReturnRef(thread_local_));
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
         quic_transport_socket_config;
     auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
@@ -327,6 +329,60 @@ public:
                 ->mutable_enable_reuse_port()
                 ->set_value(true);
           });
+    }
+  }
+
+  void testMultipleUpstreamQuicConnections() {
+    // As with testMultipleQuicConnections this function may be flaky when run with
+    // --runs_per_test=N where N > 1 but without --jobs=1.
+    setConcurrency(8);
+
+    // Avoid having to figure out which requests land on which connections by
+    // having one request per upstream connection.
+    setUpstreamProtocol(Http::CodecType::HTTP3);
+    envoy::config::listener::v3::QuicProtocolOptions options;
+    options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(1);
+    mergeOptions(options);
+
+    initialize();
+    std::vector<IntegrationCodecClientPtr> codec_clients;
+    std::vector<IntegrationStreamDecoderPtr> responses;
+    std::vector<FakeStreamPtr> upstream_requests;
+    std::vector<FakeHttpConnectionPtr> upstream_connections;
+
+    // Create |concurrency| clients
+    size_t num_requests = concurrency_ * 2;
+    for (size_t i = 1; i <= concurrency_; ++i) {
+      // See testMultipleQuicConnections for why this should result in connection spread.
+      designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
+      codec_clients.push_back(makeHttpConnection(lookupPort("http")));
+    }
+
+    // Create |num_requests| requests and wait for them to be received upstream
+    for (size_t i = 0; i < num_requests; ++i) {
+      responses.push_back(
+          codec_clients[i % concurrency_]->makeHeaderOnlyRequest(default_request_headers_));
+      waitForNextUpstreamRequest();
+      ASSERT(upstream_request_ != nullptr);
+      upstream_connections.push_back(std::move(fake_upstream_connection_));
+      upstream_requests.push_back(std::move(upstream_request_));
+    }
+
+    // Send |num_requests| responses as fast as possible to regression test
+    // against a prior credentials insert race.
+    for (size_t i = 0; i < num_requests; ++i) {
+      upstream_requests[i]->encodeHeaders(default_response_headers_, true);
+    }
+
+    // Wait for |num_requests| responses to complete.
+    for (size_t i = 0; i < num_requests; ++i) {
+      ASSERT_TRUE(responses[i]->waitForEndStream());
+      EXPECT_TRUE(responses[i]->complete());
+    }
+
+    // Close |concurrency| clients
+    for (size_t i = 0; i < concurrency_; ++i) {
+      codec_clients[i]->close();
     }
   }
 
@@ -373,11 +429,8 @@ public:
     for (size_t i = 0; i < concurrency_; ++i) {
       fake_upstream_connection_ = nullptr;
       upstream_request_ = nullptr;
-      auto encoder_decoder =
-          codec_clients[i]->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                        {":path", "/test/long/url"},
-                                                                        {":scheme", "http"},
-                                                                        {":authority", "host"}});
+      auto encoder_decoder = codec_clients[i]->startRequest(default_request_headers_);
+
       auto& request_encoder = encoder_decoder.first;
       auto response = std::move(encoder_decoder.second);
       codec_clients[i]->sendData(request_encoder, 1000, true);
@@ -693,7 +746,13 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   codec_client_->close();
 }
 
-// Ensure multiple quic connections work, regardless of platform BPF support
+// Not only test multiple quic connections, but disconnect and reconnect to
+// trigger resumption.
+TEST_P(QuicHttpIntegrationTest, MultipleUpstreamQuicConnections) {
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  testMultipleUpstreamQuicConnections();
+}
+
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
   testMultipleQuicConnections();
 }
@@ -1804,38 +1863,39 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
 
 TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
   autonomous_upstream_ = true;
-  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listen_address = bootstrap.mutable_static_resources()
-                               ->mutable_listeners(0)
-                               ->mutable_address()
-                               ->mutable_socket_address();
-    // Change listening address to Any.
-    listen_address->set_address(version_ == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::");
-    auto* preferred_address_config = bootstrap.mutable_static_resources()
-                                         ->mutable_listeners(0)
-                                         ->mutable_udp_listener_config()
-                                         ->mutable_quic_options()
-                                         ->mutable_server_preferred_address_config();
-    // Configure a loopback interface as the server's preferred address.
-    preferred_address_config->set_name("quic.server_preferred_address.fixed");
-    envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
-        server_preferred_address;
-    server_preferred_address.set_ipv4_address("127.0.0.2");
-    server_preferred_address.set_ipv6_address("::2");
-    preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+  config_helper_.addConfigModifier(
+      [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listen_address = bootstrap.mutable_static_resources()
+                                   ->mutable_listeners(0)
+                                   ->mutable_address()
+                                   ->mutable_socket_address();
+        // Change listening address to Any.
+        listen_address->set_address(version_ == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::");
+        auto* preferred_address_config = bootstrap.mutable_static_resources()
+                                             ->mutable_listeners(0)
+                                             ->mutable_udp_listener_config()
+                                             ->mutable_quic_options()
+                                             ->mutable_server_preferred_address_config();
+        // Configure a loopback interface as the server's preferred address.
+        preferred_address_config->set_name("quic.server_preferred_address.fixed");
+        envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
+            server_preferred_address;
+        server_preferred_address.set_ipv4_address("127.0.0.2");
+        server_preferred_address.set_ipv6_address("::2");
+        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
-    // Configure a test listener filter which is incompatible with any server preferred addresses
-    // but with any matcher, which effectively disables the filter.
-    auto* listener_filter =
-        bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
-    listener_filter->set_name("dumb_filter");
-    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
-    configuration.set_added_value("foo");
-    configuration.set_allow_server_migration(false);
-    configuration.set_allow_client_migration(false);
-    listener_filter->mutable_typed_config()->PackFrom(configuration);
-    listener_filter->mutable_filter_disabled()->set_any_match(true);
-  });
+        // Configure a test listener filter which is incompatible with any server preferred
+        // addresses but with any matcher, which effectively disables the filter.
+        auto* listener_filter =
+            bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+        listener_filter->set_name("dumb_filter");
+        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        configuration.set_added_value("foo");
+        configuration.set_allow_server_migration(false);
+        configuration.set_allow_client_migration(false);
+        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        listener_filter->mutable_filter_disabled()->set_any_match(true);
+      });
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -1872,38 +1932,39 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressRuntimeFlag) {
   autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients", "false");
-  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listen_address = bootstrap.mutable_static_resources()
-                               ->mutable_listeners(0)
-                               ->mutable_address()
-                               ->mutable_socket_address();
-    // Change listening address to Any.
-    listen_address->set_address(version_ == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::");
-    auto* preferred_address_config = bootstrap.mutable_static_resources()
-                                         ->mutable_listeners(0)
-                                         ->mutable_udp_listener_config()
-                                         ->mutable_quic_options()
-                                         ->mutable_server_preferred_address_config();
-    // Configure a loopback interface as the server's preferred address.
-    preferred_address_config->set_name("quic.server_preferred_address.fixed");
-    envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
-        server_preferred_address;
-    server_preferred_address.set_ipv4_address("127.0.0.2");
-    server_preferred_address.set_ipv6_address("::2");
-    preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+  config_helper_.addConfigModifier(
+      [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listen_address = bootstrap.mutable_static_resources()
+                                   ->mutable_listeners(0)
+                                   ->mutable_address()
+                                   ->mutable_socket_address();
+        // Change listening address to Any.
+        listen_address->set_address(version_ == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::");
+        auto* preferred_address_config = bootstrap.mutable_static_resources()
+                                             ->mutable_listeners(0)
+                                             ->mutable_udp_listener_config()
+                                             ->mutable_quic_options()
+                                             ->mutable_server_preferred_address_config();
+        // Configure a loopback interface as the server's preferred address.
+        preferred_address_config->set_name("quic.server_preferred_address.fixed");
+        envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
+            server_preferred_address;
+        server_preferred_address.set_ipv4_address("127.0.0.2");
+        server_preferred_address.set_ipv6_address("::2");
+        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
-    // Configure a test listener filter which is incompatible with any server preferred addresses
-    // but with any matcher, which effectively disables the filter.
-    auto* listener_filter =
-        bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
-    listener_filter->set_name("dumb_filter");
-    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
-    configuration.set_added_value("foo");
-    configuration.set_allow_server_migration(false);
-    configuration.set_allow_client_migration(false);
-    listener_filter->mutable_typed_config()->PackFrom(configuration);
-    listener_filter->mutable_filter_disabled()->set_any_match(true);
-  });
+        // Configure a test listener filter which is incompatible with any server preferred
+        // addresses but with any matcher, which effectively disables the filter.
+        auto* listener_filter =
+            bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+        listener_filter->set_name("dumb_filter");
+        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        configuration.set_added_value("foo");
+        configuration.set_allow_server_migration(false);
+        configuration.set_allow_client_migration(false);
+        listener_filter->mutable_typed_config()->PackFrom(configuration);
+        listener_filter->mutable_filter_disabled()->set_any_match(true);
+      });
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -1992,36 +2053,38 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
   autonomous_upstream_ = true;
   useAccessLog(fmt::format("%RESPONSE_CODE% %FILTER_STATE({})%",
                            TestQuicListenerFilter::TestStringFilterState::key()));
-  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listen_address = bootstrap.mutable_static_resources()
-                               ->mutable_listeners(0)
-                               ->mutable_address()
-                               ->mutable_socket_address();
-    // Change listening address to Any.
-    listen_address->set_address(version_ == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::");
-    auto* preferred_address_config = bootstrap.mutable_static_resources()
-                                         ->mutable_listeners(0)
-                                         ->mutable_udp_listener_config()
-                                         ->mutable_quic_options()
-                                         ->mutable_server_preferred_address_config();
-    // Configure a loopback interface as the server's preferred address.
-    preferred_address_config->set_name("quic.server_preferred_address.fixed");
-    envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
-        server_preferred_address;
-    server_preferred_address.set_ipv4_address("127.0.0.2");
-    server_preferred_address.set_ipv6_address("::2");
-    preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
+  config_helper_.addConfigModifier(
+      [=, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listen_address = bootstrap.mutable_static_resources()
+                                   ->mutable_listeners(0)
+                                   ->mutable_address()
+                                   ->mutable_socket_address();
+        // Change listening address to Any.
+        listen_address->set_address(version_ == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::");
+        auto* preferred_address_config = bootstrap.mutable_static_resources()
+                                             ->mutable_listeners(0)
+                                             ->mutable_udp_listener_config()
+                                             ->mutable_quic_options()
+                                             ->mutable_server_preferred_address_config();
+        // Configure a loopback interface as the server's preferred address.
+        preferred_address_config->set_name("quic.server_preferred_address.fixed");
+        envoy::extensions::quic::server_preferred_address::v3::FixedServerPreferredAddressConfig
+            server_preferred_address;
+        server_preferred_address.set_ipv4_address("127.0.0.2");
+        server_preferred_address.set_ipv6_address("::2");
+        preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
 
-    // Configure a test listener filter which is incompatible with any server preferred addresses.
-    auto* listener_filter =
-        bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
-    listener_filter->set_name("dumb_filter");
-    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
-    configuration.set_added_value("foo");
-    configuration.set_allow_server_migration(false);
-    configuration.set_allow_client_migration(false);
-    listener_filter->mutable_typed_config()->PackFrom(configuration);
-  });
+        // Configure a test listener filter which is incompatible with any server preferred
+        // addresses.
+        auto* listener_filter =
+            bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+        listener_filter->set_name("dumb_filter");
+        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        configuration.set_added_value("foo");
+        configuration.set_allow_server_migration(false);
+        configuration.set_allow_client_migration(false);
+        listener_filter->mutable_typed_config()->PackFrom(configuration);
+      });
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
