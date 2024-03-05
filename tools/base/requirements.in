@@ -4,8 +4,8 @@ aio.api.github>=0.2.5
 aiohttp>=3.8.1
 aioquic>=0.9.21
 cffi>=1.15.0
-clang-format==14.0.6
-clang-tidy==14.0.6
+clang-format==16.0.0
+clang-tidy==16.0.4
 colorama
 coloredlogs
 cryptography>=42.0.0

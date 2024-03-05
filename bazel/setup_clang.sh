@@ -16,6 +16,13 @@ LLVM_VERSION="$(llvm-config --version)"
 LLVM_LIBDIR="$(llvm-config --libdir)"
 LLVM_TARGET="$(llvm-config --host-target)"
 
+LLVM_VERSION_MAJOR="$(echo "${LLVM_VERSION}" | cut -d. -f1)"
+LLVM_VERSION_MINOR="$(echo "${LLVM_VERSION}" | cut -d. -f2)"
+LLVM_VERSION_PATCH="$(echo "${LLVM_VERSION}" | cut -d. -f3)"
+if [[ "$LLVM_VERSION_MINOR" == "0" && "$LLVM_VERSION_PATCH" == "0" ]]; then
+    LLVM_VERSION="$LLVM_VERSION_MAJOR"
+fi
+
 RT_LIBRARY_PATH="${LLVM_LIBDIR}/clang/${LLVM_VERSION}/lib/${LLVM_TARGET}"
 
 echo "# Generated file, do not edit. If you want to disable clang, just delete this file.

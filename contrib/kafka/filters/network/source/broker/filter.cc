@@ -26,8 +26,8 @@ KafkaMetricsFacadeImpl::KafkaMetricsFacadeImpl(Stats::Scope& scope, TimeSource& 
 KafkaMetricsFacadeImpl::KafkaMetricsFacadeImpl(TimeSource& time_source,
                                                RichRequestMetricsSharedPtr request_metrics,
                                                RichResponseMetricsSharedPtr response_metrics)
-    : time_source_{time_source}, request_metrics_{request_metrics}, response_metrics_{
-                                                                        response_metrics} {};
+    : time_source_{time_source}, request_metrics_{request_metrics},
+      response_metrics_{response_metrics} {};
 
 // When request is successfully parsed, increase type count and store its arrival timestamp.
 void KafkaMetricsFacadeImpl::onMessage(AbstractRequestSharedPtr request) {

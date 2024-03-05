@@ -101,6 +101,7 @@ build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_confi
 build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
 build:clang-tidy --build_tag_filters=-notidy
+build:clang-tidy --test_timeout=120,600,1500,4800
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1
@@ -177,6 +178,7 @@ build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --linkopt -fuse-ld=lld
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+build:clang-msan --copt -fno-sanitize-memory-use-after-dtor
 build:clang-msan --copt -DMEMORY_SANITIZER=1
 build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
 # MSAN needs -O1 to get reasonable performance.
@@ -266,7 +268,7 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/14.0.0/lib/x86_64-unknown-linux-gnu'
+build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/16/lib/x86_64-unknown-linux-gnu'
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
@@ -359,7 +361,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:f94a38f62220a2b017878b790b6ea98a0f6c5f9c@sha256:2dd96b6f43c08ccabd5f4747fce5854f5f96af509b32e5cf6493f136e9833649
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:7d47b66b7c49c5336a1cd0ba4bdb75dd730c62d6@sha256:ec1c62a75d3ca65b4fbef6f3c9664211e1a538eb699553f09e34774666cb7641
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -523,7 +525,7 @@ build:bes-envoy-engflow --bes_upload_mode=fully_async
 build:rbe-envoy-engflow --config=cache-envoy-engflow
 build:rbe-envoy-engflow --config=bes-envoy-engflow
 build:rbe-envoy-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
-build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:f94a38f62220a2b017878b790b6ea98a0f6c5f9c@sha256:2dd96b6f43c08ccabd5f4747fce5854f5f96af509b32e5cf6493f136e9833649
+build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:7d47b66b7c49c5336a1cd0ba4bdb75dd730c62d6@sha256:ec1c62a75d3ca65b4fbef6f3c9664211e1a538eb699553f09e34774666cb7641
 
 #############################################################################
 # debug: Various Bazel debugging flags

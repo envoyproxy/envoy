@@ -56,8 +56,8 @@ class Filter : public Network::Filter,
 public:
   explicit Filter(Server::Configuration::FactoryContext& context, FilterConfigSharedPtr config,
                   uint64_t config_id, Dso::NetworkFilterDsoPtr dynamic_lib)
-      : context_(context), config_(config),
-        config_id_(config_id), plugin_name_{config->pluginName()}, dynamic_lib_(dynamic_lib) {}
+      : context_(context), config_(config), config_id_(config_id),
+        plugin_name_{config->pluginName()}, dynamic_lib_(dynamic_lib) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

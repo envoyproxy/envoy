@@ -37,9 +37,9 @@ public:
                        Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
                        Stats::Store& stats_store)
       : file_flush_interval_msec_(file_flush_interval_msec), api_(api), dispatcher_(dispatcher),
-        lock_(lock), file_stats_{
-                         ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
-                                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
+        lock_(lock),
+        file_stats_{ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
+                                          POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
   ~AccessLogManagerImpl() override;
 
   // AccessLog::AccessLogManager

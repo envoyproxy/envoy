@@ -1,5 +1,13 @@
 # This should match the schema defined in external_deps.bzl.
 
+# Note: the llvm/clang version should match the version specified in:
+#  - .github/workflows/codeql-daily.yml
+#  - .github/workflows/codeql-push.yml
+#  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
+#  - mobile toolchain
+LLVM_VERSION = "16.0.0"
+LLVM_VERSION_DATE = "2023-03-17"
+
 PROTOBUF_VERSION = "24.4"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
@@ -102,11 +110,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "32570f74e1e36d2711f5f0a156b9623cdfa4b384",
-        sha256 = "962e398567306e3230eb2457c5eabec26616667379bfba566894a7bd334416d4",
+        version = "7eea85adc17ebb9af4eefd1d403180a6ff374926",
+        sha256 = "f164809770786ba3f1c2b6ff0e10fa7764623b650a87ba4632b85206df38f3cc",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2024-03-11",
+        release_date = "2024-03-14",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/envoyproxy/envoy-build-tools/blob/{version}/LICENSE",
@@ -1283,16 +1291,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
-        # Note: the llvm/clang version should match the version specified in:
-        #  - .github/workflows/codeql-daily.yml
-        #  - .github/workflows/codeql-push.yml
-        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-        version = "14.0.0",
-        sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
+        version = LLVM_VERSION,
+        sha256 = "a43610aba06538324f4143626c392d51883042685a33d22b629afd8658ea344e",
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-        release_date = "2022-03-23",
+        release_date = LLVM_VERSION_DATE,
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:llvm:compiler-rt:*",
         license = "Apache-2.0",

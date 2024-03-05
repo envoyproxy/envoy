@@ -259,7 +259,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
 
 class MockFluentdAccessLogger : public FluentdAccessLogger {
 public:
-  MOCK_METHOD(void, log, (EntryPtr &&));
+  MOCK_METHOD(void, log, (EntryPtr&&));
 };
 
 class MockFluentdAccessLoggerCache : public FluentdAccessLoggerCache {
