@@ -44,35 +44,10 @@ NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>
 
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
-// Convenience function for either adding a new header or appending value to existing header.
-void addOrAppendHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
+// Convenience function.
+void headerMapAddHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
                        absl::string_view key, absl::string_view value) {
-  auto* headers = mutable_header_map.mutable_headers();
-  for (auto& header : *headers) {
-    if (header.key() == key) {
-      // Merge duplicate headers.
-      (*header.mutable_raw_value()).append(",").append(std::string(value));
-      return;
-    }
-  }
-  // If we did not find a matching header key...
-  auto* new_header = headers->Add();
-  new_header->set_key(std::string(key));
-  new_header->set_raw_value(std::string(value));
-}
-
-void addOrOverwriteHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
-                          absl::string_view key, absl::string_view value) {
-  auto* headers = mutable_header_map.mutable_headers();
-  for (auto& header : *headers) {
-    if (header.key() == key) {
-      // Merge duplicate headers.
-      header.set_raw_value(std::string(value));
-      return;
-    }
-  }
-  // If we did not find a matching header key...
-  auto* new_header = headers->Add();
+  auto* new_header = mutable_header_map.mutable_headers()->Add();
   new_header->set_key(std::string(key));
   new_header->set_raw_value(std::string(value));
 }
@@ -182,7 +157,7 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     if (headers_as_bytes) {
-      addOrAppendHeader(*mutable_header_map, key, e.value().getStringView());
+      headerMapAddHeader(*mutable_header_map, key, e.value().getStringView());
     } else {
       const std::string sanitized_value =
           MessageUtil::sanitizeUtf8String(e.value().getStringView());
@@ -212,10 +187,10 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     // Add in a header to detect when a partial body is used.
-    std::string partial_body_value = length != decoding_buffer->length() ? "true" : "false";
+    const std::string partial_body_value = length != decoding_buffer->length() ? "true" : "false";
     if (headers_as_bytes) {
-      addOrOverwriteHeader(*mutable_header_map, Headers::get().EnvoyAuthPartialBody.get(),
-                           std::move(partial_body_value));
+      headerMapAddHeader(*mutable_header_map, Headers::get().EnvoyAuthPartialBody.get(),
+                         std::move(partial_body_value));
     } else {
       (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] = std::move(partial_body_value);
     }

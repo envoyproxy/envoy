@@ -1,4 +1,5 @@
 #include <string>
+#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
@@ -116,6 +117,38 @@ public:
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("hello");
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("duplicate");
     return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers(), false);
+  }
+
+  static void expectHeadersInHeaderMap(
+      const envoy::config::core::v3::HeaderMap& header_map,
+      const std::vector<std::pair<absl::string_view, absl::string_view>>& expected_headers) {
+    for (const auto& [key, value] : expected_headers) {
+      bool found = false;
+      for (const auto& header : header_map.headers()) {
+        if (header.key() == key && header.raw_value() == value) {
+          found = true;
+          break;
+        }
+      }
+      EXPECT_TRUE(found)
+          << fmt::format("did not find expected header key/value pair: '{}': '{}'", key, value);
+    }
+  }
+
+  static void expectHeadersNotInHeaderMap(
+      const envoy::config::core::v3::HeaderMap& header_map,
+      const std::vector<std::pair<absl::string_view, absl::string_view>>& unexpected_headers) {
+    for (const auto& [key, value] : unexpected_headers) {
+      bool found = false;
+      for (const auto& header : header_map.headers()) {
+        if (header.key() == key && header.raw_value() == value) {
+          found = true;
+          break;
+        }
+      }
+      EXPECT_FALSE(found)
+          << fmt::format("found unexpected header key/value pair: '{}': '{}'", key, value);
+    }
   }
 
   Network::Address::InstanceConstSharedPtr addr_;
@@ -375,23 +408,71 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithHeadersAsBytes) {
   // Headers field should be empty since ext_authz should populate header_map INSTEAD.
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
 
-  // Check header map contains expected headers.
-  bool exact_match_utf_8_header = false;
-  bool contains_partial_body_header = false;
-  for (const auto& header : request.attributes().request().http().header_map().headers()) {
-    if (header.key() == header_key && header.raw_value() == header_value) {
-      exact_match_utf_8_header = true;
-    }
-    if (header.key() == Headers::get().EnvoyAuthPartialBody.get()) {
-      contains_partial_body_header = true;
-    }
+  expectHeadersInHeaderMap(request.attributes().request().http().header_map(),
+                           {{header_key, header_value},
+                            {Headers::get().EnvoyAuthPartialBody.get(), "false"}});
+}
 
-    if (exact_match_utf_8_header && contains_partial_body_header) {
-      break;
-    }
-  }
-  EXPECT_TRUE(exact_match_utf_8_header);
-  EXPECT_TRUE(contains_partial_body_header);
+// Test that headers with the same key are not concatenated in header_map.
+TEST_F(CheckRequestUtilsTest, HeadersAsBytesNoConcatentation) {
+  Http::TestRequestHeaderMapImpl headers;
+  // Add two headers with the same key.
+  absl::string_view header_key = "foo-key";
+  absl::string_view header_value_1 = "foo value 1";
+  absl::string_view header_value_2 = "foo value 2";
+  headers.addCopy(Http::LowerCaseString(header_key), header_value_1);
+  headers.addCopy(Http::LowerCaseString(header_key), header_value_2);
+
+  envoy::service::auth::v3::CheckRequest request;
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  expectBasicHttp();
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
+      buffer_->length(), /*pack_as_bytes=*/false, /*headers_as_bytes=*/true,
+      /*include_peer_certificate=*/false, /*include_tls_session=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr);
+
+  EXPECT_EQ(0, request.attributes().request().http().headers().size());
+
+  // Check headers were not concatenated.
+  expectHeadersInHeaderMap(request.attributes().request().http().header_map(),
+                           {{header_key, header_value_1}, {header_key, header_value_2}});
+}
+
+// If the request already contains the partial body header, it is not included in the authz request.
+TEST_F(CheckRequestUtilsTest, HeadersAsBytesExistingPartialBodyHeader) {
+  Http::TestRequestHeaderMapImpl headers;
+  // Add a partial body header (as if it were defined in the downstream request for some reason).
+  absl::string_view header_key = Headers::get().EnvoyAuthPartialBody.get();
+  absl::string_view partial_body_preexisting_value = "downstream partial body header value";
+  headers.addCopy(Http::LowerCaseString(header_key), partial_body_preexisting_value);
+
+  envoy::service::auth::v3::CheckRequest request;
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  expectBasicHttp();
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
+      buffer_->length(), /*pack_as_bytes=*/false, /*headers_as_bytes=*/true,
+      /*include_peer_certificate=*/false, /*include_tls_session=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr);
+
+  EXPECT_EQ(0, request.attributes().request().http().headers().size());
+
+  // Check preexisting partial body header was not included in the authz request.
+  expectHeadersNotInHeaderMap(request.attributes().request().http().header_map(),
+                              {{header_key, partial_body_preexisting_value}});
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest

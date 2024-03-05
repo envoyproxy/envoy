@@ -128,6 +128,9 @@ message AttributeContext {
     // Note that :ref:`HeaderMap <envoy.config.core.v3.HeaderMap>` is not actually a map type. It
     // only consists of a repeated :ref:`HeaderValue <envoy.config.core.v3.HeaderValue>` field. For
     // ext_authz, only the ``key`` and ``raw_value`` fields will be populated for each HeaderValue.
+    // Also, unlike the
+    // :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`
+    // field, headers with the same key are not concatenated.
     config.core.v3.HeaderMap header_map = 13
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
