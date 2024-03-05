@@ -130,7 +130,7 @@ bool TestUtility::rawSlicesEqual(const Buffer::RawSlice* lhs, const Buffer::RawS
 }
 
 void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
-                                                 uint64_t n_slice, uint64_t seed) {
+                                                 uint64_t seed, uint64_t n_slice) {
   const std::string sample = "Neque porro quisquam est qui dolorem ipsum..";
   std::mt19937 generate(seed);
   std::uniform_int_distribution<> distribute(1, sample.length() - 1);
