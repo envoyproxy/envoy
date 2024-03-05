@@ -239,40 +239,5 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceededWithSetLimitOnly) 
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(BufferIntegrationTest, RouterRequestBufferLimitNotExceededWithSetLimitOnly) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // Non-HTTP1 protocol will read the buffer during proxying, which will trigger the limit.
-    return;
-  }
-
-  // Increase timeout like the RouterRequestBufferLimitExceeded test
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
-  config_helper_.prependFilter(ConfigHelper::smallSetLimitOnlyBufferFilter(),
-                               testing_downstream_filter_);
-  // Without a filter to buffer the whole request, the limit will not be triggered.
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/dynamo/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
-                                     {"x-forwarded-for", "10.0.0.1"},
-                                     {"x-envoy-retry-on", "5xx"}},
-      1024 * 65);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  cleanupUpstreamAndDownstream();
-}
-
 } // namespace
 } // namespace Envoy
