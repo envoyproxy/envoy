@@ -69,7 +69,7 @@ public:
 )EOF";
 
     std::string expected_state = fmt::format(
-        expected_state_template, name, error_response, request.iteration_state,
+        fmt::runtime(expected_state_template), name, error_response, request.iteration_state,
         request.on_headers_called, request.headers_forwarded, request.on_data_called,
         request.data_forwarded, request.on_trailers_called, request.trailers_forwarded,
         request.on_resume_called, request.pending_headers, request.buffer, request.pending_trailers,

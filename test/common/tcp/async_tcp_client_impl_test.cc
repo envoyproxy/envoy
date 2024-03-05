@@ -245,9 +245,46 @@ TEST_F(AsyncTcpClientImplTest, TestActiveCx) {
   expectCreateConnection();
   EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
                      ->upstream_cx_active_.value());
-  client_.reset();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_EQ(0UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
                      ->upstream_cx_active_.value());
+}
+
+TEST_F(AsyncTcpClientImplTest, TestActiveCxWhileNotConnected) {
+  setUpClient();
+  expectCreateConnection(false);
+  EXPECT_EQ(1UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_active_.value());
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(0UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_active_.value());
+}
+
+TEST_F(AsyncTcpClientImplTest, ReconnectWhileClientConnected) {
+  setUpClient();
+  expectCreateConnection();
+  EXPECT_FALSE(client_->connect());
+}
+
+TEST_F(AsyncTcpClientImplTest, ReconnectWhileClientConnecting) {
+  setUpClient();
+  expectCreateConnection(false);
+  EXPECT_FALSE(client_->connect());
+}
+
+TEST_F(AsyncTcpClientImplTest, ReconnectAfterClientDisconnected) {
+  setUpClient();
+  expectCreateConnection();
+
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+  connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  expectCreateConnection();
+
+  EXPECT_EQ(2UL, cluster_manager_.thread_local_cluster_.cluster_.info_->traffic_stats_
+                     ->upstream_cx_total_.value());
 }
 
 } // namespace Tcp
