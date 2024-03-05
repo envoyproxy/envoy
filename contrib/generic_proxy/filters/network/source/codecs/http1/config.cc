@@ -23,7 +23,11 @@ static constexpr absl::string_view RESPONSE_PREFIX = "HTTP/1.1 ";
 
 static constexpr absl::string_view HOST_HEADER_PREFIX = ":a";
 
-static constexpr uint32_t MAX_BUFFER_SIZE = 8 * 1024 * 1024;
+static constexpr uint32_t DEFAULT_MAX_BUFFER_SIZE = 8 * 1024 * 1024;
+
+static constexpr absl::string_view _100_CONTINUE_RESPONSE = "HTTP/1.1 100 Continue\r\n"
+                                                            "content-length: 0\r\n"
+                                                            "\r\n";
 
 void encodeNormalHeaders(Buffer::Instance& buffer, const Http::RequestOrResponseHeaderMap& headers,
                          bool chunk_encoding) {
@@ -367,6 +371,20 @@ Http::Http1::CallbackResult Http1ServerCodec::onHeadersCompleteImpl() {
   ENVOY_LOG(debug, "decoding request headers complete (end_stream={}):\n{}", !non_end_stream,
             *active_request_->request_headers_);
 
+  // Handle the Expect header first.
+  if (active_request_->request_headers_->Expect() != nullptr) {
+    if (absl::EqualsIgnoreCase(active_request_->request_headers_->getExpectValue(),
+                               Envoy::Http::Headers::get().ExpectValues._100Continue)) {
+      // Remove the expect header then the upstream server won't handle it again.
+      active_request_->request_headers_->removeExpect();
+
+      // Send 100 Continue response directly. We won't proxy the 100 Continue because
+      // the complexity in the generic proxy framework is too high.
+      Buffer::OwnedImpl buffer(_100_CONTINUE_RESPONSE);
+      callbacks_->writeToConnection(buffer);
+    }
+  }
+
   if (single_frame_mode_) {
     // Do nothing until the onMessageComplete callback if we are in single frame mode.
     return Http::Http1::CallbackResult::Success;
@@ -557,6 +575,25 @@ Http::Http1::CallbackResult Http1ClientCodec::onHeadersCompleteImpl() {
 }
 
 Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
+  const auto status_code = parser_->statusCode();
+  if (status_code < Envoy::Http::Code::OK) {
+    // There is no difference bewteen single frame mode and normal mode for 1xx responses
+    // because they are headers only responses.
+
+    ASSERT(buffered_body_.length() == 0);
+
+    expect_response_->response_headers_.reset();
+    buffered_body_.drain(buffered_body_.length());
+
+    // 100 Continue response. Ignore it.
+    // 101 Switching Protocols response. Ignore it because we don't support upgrade for now.
+    // 102 Processing response. Ignore it.
+    // 103 Early Hints response. Ignore it.
+
+    // Return success to continue parsing the actual response.
+    return Http::Http1::CallbackResult::Success;
+  }
+
   if (single_frame_mode_) {
     // Check if the buffered body is too large.
     if (bufferedBodyOverflow()) {
@@ -603,7 +640,7 @@ Http1CodecFactoryConfig::createCodecFactory(const Protobuf::Message& config,
 
   return std::make_unique<Http1CodecFactory>(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, single_frame_mode, true),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, max_buffer_size, MAX_BUFFER_SIZE));
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(typed_config, max_buffer_size, DEFAULT_MAX_BUFFER_SIZE));
 }
 
 REGISTER_FACTORY(Http1CodecFactoryConfig, CodecFactoryConfig);
