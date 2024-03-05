@@ -65,10 +65,9 @@ class JvmFilterContext {
    * @param streamIntel, internal HTTP stream metrics, context, and other details.
    * @return Object[],   pair of HTTP filter status and optional modified data.
    */
-  public Object onRequestData(byte[] data, boolean endStream, long[] streamIntel) {
-    ByteBuffer dataBuffer = ByteBuffer.wrap(data);
+  public Object onRequestData(ByteBuffer data, boolean endStream, long[] streamIntel) {
     return toJniFilterDataStatus(
-        filter.onRequestData(dataBuffer, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onRequestData(data, endStream, new EnvoyStreamIntelImpl(streamIntel)));
   }
 
   /**
@@ -108,10 +107,9 @@ class JvmFilterContext {
    * @param streamIntel, internal HTTP stream metrics, context, and other details.
    * @return Object[],   pair of HTTP filter status and optional modified data.
    */
-  public Object onResponseData(byte[] data, boolean endStream, long[] streamIntel) {
-    ByteBuffer dataBuffer = ByteBuffer.wrap(data);
+  public Object onResponseData(ByteBuffer data, boolean endStream, long[] streamIntel) {
     return toJniFilterDataStatus(
-        filter.onResponseData(dataBuffer, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onResponseData(data, endStream, new EnvoyStreamIntelImpl(streamIntel)));
   }
 
   /**
@@ -138,22 +136,21 @@ class JvmFilterContext {
    * @param streamIntel,  internal HTTP stream metrics, context, and other details.
    * @return Object[],    tuple of status with updated entities to be forwarded.
    */
-  public Object onResumeRequest(long headerCount, byte[] data, long trailerCount, boolean endStream,
-                                long[] streamIntel) {
+  public Object onResumeRequest(long headerCount, ByteBuffer data, long trailerCount,
+                                boolean endStream, long[] streamIntel) {
     // Headers are optional in this call, and a negative length indicates omission.
     Map<String, List<String>> headers = null;
     if (headerCount >= 0) {
       assert headerUtility.validateCount(headerCount);
       headers = headerUtility.retrieveHeaders();
     }
-    ByteBuffer dataBuffer = data == null ? null : ByteBuffer.wrap(data);
     // Trailers are optional in this call, and a negative length indicates omission.
     Map<String, List<String>> trailers = null;
     if (trailerCount >= 0) {
       assert trailerUtility.validateCount(trailerCount);
       trailers = trailerUtility.retrieveHeaders();
     }
-    return toJniFilterResumeStatus(filter.onResumeRequest(headers, dataBuffer, trailers, endStream,
+    return toJniFilterResumeStatus(filter.onResumeRequest(headers, data, trailers, endStream,
                                                           new EnvoyStreamIntelImpl(streamIntel)));
   }
 
@@ -167,7 +164,7 @@ class JvmFilterContext {
    * @param streamIntel,  internal HTTP stream metrics, context, and other details.
    * @return Object[],    tuple of status with updated entities to be forwarded.
    */
-  public Object onResumeResponse(long headerCount, byte[] data, long trailerCount,
+  public Object onResumeResponse(long headerCount, ByteBuffer data, long trailerCount,
                                  boolean endStream, long[] streamIntel) {
     // Headers are optional in this call, and a negative length indicates omission.
     Map<String, List<String>> headers = null;
@@ -175,14 +172,13 @@ class JvmFilterContext {
       assert headerUtility.validateCount(headerCount);
       headers = headerUtility.retrieveHeaders();
     }
-    ByteBuffer dataBuffer = data == null ? null : ByteBuffer.wrap(data);
     // Trailers are optional in this call, and a negative length indicates omission.
     Map<String, List<String>> trailers = null;
     if (trailerCount >= 0) {
       assert trailerUtility.validateCount(trailerCount);
       trailers = trailerUtility.retrieveHeaders();
     }
-    return toJniFilterResumeStatus(filter.onResumeResponse(headers, dataBuffer, trailers, endStream,
+    return toJniFilterResumeStatus(filter.onResumeResponse(headers, data, trailers, endStream,
                                                            new EnvoyStreamIntelImpl(streamIntel)));
   }
 

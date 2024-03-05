@@ -1,9 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -76,14 +73,17 @@ class JvmCallbackContext {
    * @param streamIntel, internal HTTP stream metrics, context, and other details.
    * @return Object,     not used for response callbacks.
    */
-  public Object onResponseData(byte[] data, boolean endStream, long[] streamIntel) {
+  public Object onResponseData(ByteBuffer data, boolean endStream, long[] streamIntel) {
+    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
+    // be destroyed after calling this callback.
+    byte[] bytes = new byte[data.capacity()];
+    data.get(bytes);
+    ByteBuffer copiedData = ByteBuffer.wrap(bytes);
     callbacks.getExecutor().execute(new Runnable() {
       public void run() {
-        ByteBuffer dataBuffer = ByteBuffer.wrap(data);
-        callbacks.onData(dataBuffer, endStream, new EnvoyStreamIntelImpl(streamIntel));
+        callbacks.onData(copiedData, endStream, new EnvoyStreamIntelImpl(streamIntel));
       }
     });
-
     return null;
   }
 

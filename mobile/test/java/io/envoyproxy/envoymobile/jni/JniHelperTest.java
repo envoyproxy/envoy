@@ -7,6 +7,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 @RunWith(RobolectricTestRunner.class)
 public class JniHelperTest {
   public JniHelperTest() { System.loadLibrary("envoy_jni_helper_test"); }
@@ -84,6 +87,7 @@ public class JniHelperTest {
                                                        String signature);
   public static native void callStaticVoidMethod(Class<?> clazz, String name, String signature);
   public static native Object callStaticObjectMethod(Class<?> clazz, String name, String signature);
+  public static native Object newDirectByteBuffer();
 
   //================================================================================
   // Object methods used for Call<Type>Method tests.
@@ -423,5 +427,14 @@ public class JniHelperTest {
     assertThat(
         callStaticObjectMethod(JniHelperTest.class, "staticObjectMethod", "()Ljava/lang/String;"))
         .isEqualTo("Hello");
+  }
+
+  @Test
+  public void testNewDirectByteBuffer() {
+    ByteBuffer byteBuffer = ((ByteBuffer)newDirectByteBuffer()).order(ByteOrder.LITTLE_ENDIAN);
+    assertThat(byteBuffer.capacity()).isEqualTo(3);
+    assertThat(byteBuffer.get(0)).isEqualTo(1);
+    assertThat(byteBuffer.get(1)).isEqualTo(2);
+    assertThat(byteBuffer.get(2)).isEqualTo(3);
   }
 }
