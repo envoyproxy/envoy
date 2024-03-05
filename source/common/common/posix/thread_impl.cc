@@ -144,6 +144,8 @@ public:
       delete thread_handle;
       if (crash_on_failure) {
         RELEASE_ASSERT(false, fmt::format("Unable to create a thread with return code: {}", rc));
+      } else {
+        IS_ENVOY_BUG(fmt::format("Unable to create a thread with return code: {}", rc));
       }
       return nullptr;
     }
