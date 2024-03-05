@@ -138,6 +138,11 @@ bug_fixes:
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
+- area: jwt_authn
+  change: |
+    Added
+    :ref:`max_lifetime <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.max_lifetime>` to limit
+    the maximum remaining lifetime of a token from a ``JwtProvider``.
 - area: router
   change: |
     Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happens. This is
