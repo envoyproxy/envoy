@@ -57,7 +57,7 @@ public:
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
 
     // Check if a subject is allowed.
-    virtual bool isSubjectAllowed(const absl::string_view sub) const PURE;
+    virtual bool isSubjectAllowed(absl::string_view sub) const PURE;
 
     // Get the cached config: JWT rule.
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
