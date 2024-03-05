@@ -30,7 +30,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
         headers_with_underscores_action)
     : quic::QuicSpdyServerStreamBase(id, session, type),
       EnvoyQuicStream(
-          *this,
+          *this, *session,
           // Flow control receive window should be larger than 8k to fully utilize congestion
           // control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),

@@ -23,7 +23,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
-          *this,
+          *this, *client_session,
           // Flow control receive window should be larger than 8k so that the send buffer can fully
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
