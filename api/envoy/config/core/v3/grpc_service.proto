@@ -49,6 +49,10 @@ message GrpcService {
     // Currently only supported for xDS gRPC streams.
     // If not set, xDS gRPC streams default base interval:500ms, maximum interval:30s will be applied.
     RetryPolicy retry_policy = 3;
+
+    // Maximum receive message length.
+    // Defaults to 0, which means unlimited.
+    uint32 max_receive_message_length = 4;
   }
 
   // [#next-free-field: 9]

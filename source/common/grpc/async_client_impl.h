@@ -38,6 +38,7 @@ public:
   absl::string_view destination() override { return remote_cluster_name_; }
 
 private:
+  const uint32_t max_recv_message_length_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
