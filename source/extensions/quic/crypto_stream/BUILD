@@ -17,8 +17,14 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "envoy_quic_crypto_server_stream_lib",
-    srcs = ["envoy_quic_crypto_server_stream.cc"],
-    hdrs = ["envoy_quic_crypto_server_stream.h"],
+    srcs = [
+        "envoy_quic_crypto_server_stream.cc",
+        "envoy_tls_server_handshaker.cc",
+    ],
+    hdrs = [
+        "envoy_quic_crypto_server_stream.h",
+        "envoy_tls_server_handshaker.h",
+    ],
     tags = ["nofips"],
     visibility = [
         "//source/common/quic:__subpackages__",
@@ -27,6 +33,8 @@ envoy_cc_library(
     deps = [
         "//envoy/registry",
         "//source/common/quic:envoy_quic_server_crypto_stream_factory_lib",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
+        "@com_github_google_quiche//:quic_server_session_lib",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,

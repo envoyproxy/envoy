@@ -369,6 +369,8 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
 #endif
+  bool enable_test_private_key_provider_{false};
+  bool test_private_key_provider_sync_mode_{false};
 };
 
 // Helper class for integration tests using raw HTTP/2 frames
