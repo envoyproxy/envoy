@@ -51,6 +51,10 @@ minor_behavior_changes:
     Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
     is degrading. Can be manually turned on via
     :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: QUIC
+  change: |
+    Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
+    ``envoy.reloadable_features.quic_upstream_reads_fixed_number_packets`` to false.
 - area: aws
   change: |
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
@@ -278,3 +282,8 @@ deprecated:
   change: |
     deprecated runtime key ``overload.global_downstream_max_connections`` in favor of :ref:`downstream connections monitor
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.
+- area: tracing
+  change: |
+    deprecated :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>`
+    in favor of :ref:`spawn_upstream_span
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.

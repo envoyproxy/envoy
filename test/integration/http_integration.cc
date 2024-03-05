@@ -32,9 +32,9 @@
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
