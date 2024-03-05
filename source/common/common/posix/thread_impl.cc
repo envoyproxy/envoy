@@ -145,6 +145,7 @@ public:
       if (crash_on_failure) {
         RELEASE_ASSERT(false, fmt::format("Unable to create a thread with return code: {}", rc));
       }
+      return nullptr;
     }
     return std::make_unique<PosixThread>(thread_handle, options);
   };
