@@ -54,7 +54,11 @@ void QatzstdCompressorImpl::setInput(const uint8_t* input, size_t size) {
 void QatzstdCompressorImpl::compressProcess(const Buffer::Instance& buffer,
                                             const Buffer::RawSlice& slice,
                                             Buffer::Instance& accumulation_buffer) {
-  if (slice.len_ == buffer.length()) {
+  if (slice.len_ == buffer.length() || slice.len_ > chunk_size_) {
+    if (input_len_ > 0) {
+      setInput(input_ptr_.get(), input_len_);
+      process(accumulation_buffer, ZSTD_e_continue);
+    }
     setInput(static_cast<uint8_t*>(slice.mem_), slice.len_);
     process(accumulation_buffer, ZSTD_e_continue);
   } else {

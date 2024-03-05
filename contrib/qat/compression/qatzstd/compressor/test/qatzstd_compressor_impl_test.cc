@@ -28,9 +28,9 @@ protected:
     Buffer::OwnedImpl accumulation_buffer;
     std::string original_text{};
     for (uint64_t i = 0; i < 10; i++) {
-      TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size_ * i, i);
+      TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size_ * i, i, i);
       original_text.append(buffer.toString());
-      ASSERT_EQ(default_input_size_ * i, buffer.length());
+      ASSERT_EQ(default_input_size_ * i * i, buffer.length());
       compressor->compress(buffer, Envoy::Compression::Compressor::State::Flush);
       accumulation_buffer.add(buffer);
       drainBuffer(buffer);
