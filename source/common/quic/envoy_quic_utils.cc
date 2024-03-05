@@ -151,7 +151,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_udp_gro") &&
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.prefer_quic_client_udp_gro") &&
       Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }

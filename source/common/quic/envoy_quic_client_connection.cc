@@ -231,8 +231,9 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
         *this, dispatcher_.timeSource(),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_udp_gro"),
-        packets_dropped_);
+        Runtime::runtimeFeatureEnabled("envoy.restart_features.prefer_quic_client_udp_gro"),
+        // For client connections, recvmmsg consumes more CPU with no performance improvement.
+        /*allow_mmsg=*/false, packets_dropped_);
     if (err == nullptr) {
       // In the case where the path validation fails, the probing socket will be closed and its IO
       // events are no longer interesting.
