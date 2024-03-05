@@ -208,15 +208,15 @@ TEST(Http1MessageFrameTest, Http1MessageFrameTest) {
 
     EXPECT_EQ(frame.frameFlags().endStream(), true);
 
-    EXPECT_EQ(frame.length(), 4);
-    EXPECT_EQ(frame.toString(), "body");
+    EXPECT_EQ(frame.buffer().length(), 4);
+    EXPECT_EQ(frame.buffer().toString(), "body");
 
     Buffer::OwnedImpl new_buffer;
-    frame.moveTo(new_buffer);
+    new_buffer.move(frame.buffer());
 
     EXPECT_EQ(new_buffer.toString(), "body");
 
-    EXPECT_EQ(frame.length(), 0);
+    EXPECT_EQ(frame.buffer().length(), 0);
   }
 }
 
@@ -224,8 +224,8 @@ class Http1ServerCodecTest : public testing::Test {
 public:
   Http1ServerCodecTest() { initializeCodec(); }
 
-  void initializeCodec() {
-    codec_ = std::make_unique<Http1ServerCodec>();
+  void initializeCodec(bool single_frame_mode = false, uint32_t max_buffer_size = 8 * 1024 * 1024) {
+    codec_ = std::make_unique<Http1ServerCodec>(single_frame_mode, max_buffer_size);
     codec_->setCodecCallbacks(codec_callbacks_);
   }
 
@@ -298,8 +298,8 @@ TEST_F(Http1ServerCodecTest, RequestDecodingTest) {
         if (body != nullptr) {
           EXPECT_EQ(frame->frameFlags().endStream(), true);
 
-          EXPECT_EQ(body->length(), 4);
-          EXPECT_EQ(body->toString(), "body");
+          EXPECT_EQ(body->buffer().length(), 4);
+          EXPECT_EQ(body->buffer().toString(), "body");
         }
       }));
 
@@ -343,10 +343,10 @@ TEST_F(Http1ServerCodecTest, ChunkedRequestDecodingTest) {
         auto* body = dynamic_cast<HttpRawBodyFrame*>(frame.get());
         if (body != nullptr) {
           if (!frame->frameFlags().endStream()) {
-            EXPECT_EQ(body->length(), 4);
-            EXPECT_EQ(body->toString(), "body");
+            EXPECT_EQ(body->buffer().length(), 4);
+            EXPECT_EQ(body->buffer().toString(), "body");
           } else {
-            EXPECT_EQ(body->length(), 0);
+            EXPECT_EQ(body->buffer().length(), 0);
           }
         }
       }));
@@ -387,8 +387,8 @@ TEST_F(Http1ServerCodecTest, MultipleBufferChunkedRequestDecodingTest) {
         } else {
           auto* body = dynamic_cast<HttpRawBodyFrame*>(frame.get());
           EXPECT_EQ(frame->frameFlags().endStream(), false);
-          EXPECT_EQ(body->length(), 4);
-          EXPECT_EQ(body->toString(), "body");
+          EXPECT_EQ(body->buffer().length(), 4);
+          EXPECT_EQ(body->buffer().toString(), "body");
         }
       }));
 
@@ -402,7 +402,7 @@ TEST_F(Http1ServerCodecTest, MultipleBufferChunkedRequestDecodingTest) {
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
     auto* body = dynamic_cast<HttpRawBodyFrame*>(frame.get());
     EXPECT_EQ(frame->frameFlags().endStream(), true);
-    EXPECT_EQ(body->length(), 0);
+    EXPECT_EQ(body->buffer().length(), 0);
   }));
 
   codec_->decode(buffer, false);
@@ -621,13 +621,333 @@ TEST_F(Http1ServerCodecTest, ChunkedResponseEncodingTest) {
   }
 }
 
+TEST_F(Http1ServerCodecTest, RequestAndResponseTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  // Do repeated request and response.
+  for (size_t i = 0; i < 100; i++) {
+    Buffer::OwnedImpl buffer;
+
+    buffer.add("GET / HTTP/1.1\r\n"
+               "Host: host\r\n"
+               "Transfer-Encoding: chunked\r\n"
+               "custom: value\r\n"
+               "\r\n"
+               "4\r\n"  // Chunk header.
+               "body"   // Chunk body.
+               "\r\n"   // Chunk footer.
+               "0\r\n"  // Last chunk header.
+               "\r\n"); // Last chunk footer.
+
+    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+
+    codec_->decode(buffer, false);
+
+    // Create a response.
+    auto headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(200);
+    headers->addCopy(Http::Headers::get().TransferEncoding, "chunked");
+
+    HttpResponseFrame response(std::move(headers), false);
+
+    Buffer::OwnedImpl body_buffer("body");
+    HttpRawBodyFrame body(body_buffer, true);
+
+    NiceMock<MockEncodingCallbacks> encoding_callbacks;
+    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _)).Times(2);
+
+    // Encode the response.
+    codec_->encode(response, encoding_callbacks);
+    codec_->encode(body, encoding_callbacks);
+  }
+}
+
+TEST_F(Http1ServerCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("GET / HTTP/1.1\r\n"
+             "Host: host\r\n"
+             "Transfer-Encoding: chunked\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "4\r\n"  // Chunk header.
+             "body"   // Chunk body.
+             "\r\n"); // Chunk footer. No last chunk header and footer, this is an incomplete
+                      // request.
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(2);
+
+  codec_->decode(buffer, false);
+
+  // Create a response.
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(200);
+  headers->addCopy(Http::Headers::get().TransferEncoding, "chunked");
+
+  HttpResponseFrame response(std::move(headers), false);
+
+  Buffer::OwnedImpl body_buffer("body");
+  HttpRawBodyFrame body(body_buffer, true);
+
+  NiceMock<MockEncodingCallbacks> encoding_callbacks;
+
+  EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, false));
+  // Encode the response.
+  codec_->encode(response, encoding_callbacks);
+
+  EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true));
+  // Response is complete, but request is not complete, so the codec should close the connection.
+  EXPECT_CALL(mock_connection, close(Network::ConnectionCloseType::FlushWrite));
+
+  codec_->encode(body, encoding_callbacks);
+}
+
+TEST_F(Http1ServerCodecTest, NewRequestBeforeFirstRequestCompleteTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("GET / HTTP/1.1\r\n"
+             "Host: host\r\n"
+             "Transfer-Encoding: chunked\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "4\r\n"  // Chunk header.
+             "body"   // Chunk body.
+             "\r\n"   // Chunk footer.
+             "0\r\n"  // Last chunk header.
+             "\r\n"); // Last chunk footer.
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.add(buffer);
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+
+  codec_->decode(buffer, false);
+
+  // First request is not complete, so the codec should close the connection.
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  codec_->decode(buffer2, false);
+}
+
+TEST_F(Http1ServerCodecTest, SingleFrameModeRequestDecodingTest) {
+  initializeCodec(true, 8 * 1024 * 1024);
+
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("GET / HTTP/1.1\r\n"
+             "Host: host\r\n"
+             "Content-Length: 4\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "body");
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
+    auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
+
+    EXPECT_EQ(frame->frameFlags().endStream(), true);
+
+    EXPECT_EQ(request->host(), "host");
+    EXPECT_EQ(request->path(), "/");
+    EXPECT_EQ(request->method(), "GET");
+    EXPECT_EQ(request->get("host").value(), "host");
+    EXPECT_EQ(request->get(":authority").value(), "host");
+    EXPECT_EQ(request->get(":path").value(), "/");
+    EXPECT_EQ(request->get(":method").value(), "GET");
+    EXPECT_EQ(request->get("custom").value(), "value");
+
+    EXPECT_EQ(request->optionalBuffer().length(), 4);
+    EXPECT_EQ(request->optionalBuffer().toString(), "body");
+  }));
+
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ServerCodecTest, SingleFrameModeRequestTooLargeTest) {
+  initializeCodec(true, 4);
+
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("GET / HTTP/1.1\r\n"
+             "Host: host\r\n"
+             "Content-Length: 4\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "body~");
+
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ServerCodecTest, SingleFrameModeChunkedRequestDecodingTest) {
+  initializeCodec(true, 8 * 1024 * 1024);
+
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("GET / HTTP/1.1\r\n"
+             "Host: host\r\n"
+             "Transfer-Encoding: chunked\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "4\r\n"  // Chunk header.
+             "body"   // Chunk body.
+             "\r\n"   // Chunk footer.
+             "0\r\n"  // Last chunk header.
+             "\r\n"); // Last chunk footer.
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
+    auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
+
+    EXPECT_EQ(frame->frameFlags().endStream(), true);
+
+    EXPECT_EQ(request->host(), "host");
+    EXPECT_EQ(request->path(), "/");
+    EXPECT_EQ(request->method(), "GET");
+    EXPECT_EQ(request->get("host").value(), "host");
+    EXPECT_EQ(request->get(":authority").value(), "host");
+    EXPECT_EQ(request->get(":path").value(), "/");
+    EXPECT_EQ(request->get(":method").value(), "GET");
+    EXPECT_EQ(request->get("custom").value(), "value");
+
+    EXPECT_EQ(request->optionalBuffer().length(), 4);
+    EXPECT_EQ(request->optionalBuffer().toString(), "body");
+  }));
+
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ServerCodecTest, SingleFrameModeMultipleBufferChunkedRequestDecodingTest) {
+  initializeCodec(true, 8 * 1024 * 1024);
+
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("GET / HTTP/1.1\r\n"
+             "Host: host\r\n"
+             "Transfer-Encoding: chunked\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "4\r\n"  // Chunk header.
+             "body"   // Chunk body.
+             "\r\n"); // Chunk footer.
+
+  codec_->decode(buffer, false);
+
+  EXPECT_EQ(buffer.length(), 0);
+
+  buffer.add("0\r\n"  // Last chunk header.
+             "\r\n"); // Last chunk footer.
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
+    auto* request = dynamic_cast<HttpRequestFrame*>(frame.get());
+
+    EXPECT_EQ(frame->frameFlags().endStream(), true);
+
+    EXPECT_EQ(request->host(), "host");
+    EXPECT_EQ(request->path(), "/");
+    EXPECT_EQ(request->method(), "GET");
+    EXPECT_EQ(request->get("host").value(), "host");
+    EXPECT_EQ(request->get(":authority").value(), "host");
+    EXPECT_EQ(request->get(":path").value(), "/");
+    EXPECT_EQ(request->get(":method").value(), "GET");
+    EXPECT_EQ(request->get("custom").value(), "value");
+
+    EXPECT_EQ(request->optionalBuffer().length(), 4);
+    EXPECT_EQ(request->optionalBuffer().toString(), "body");
+  }));
+
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ServerCodecTest, SingleFrameModeResponseEncodingTest) {
+  // Create a response.
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(200);
+  headers->setContentLength(4);
+
+  HttpResponseFrame response(std::move(headers), true);
+  response.optionalBuffer().add("body");
+
+  NiceMock<MockEncodingCallbacks> encoding_callbacks;
+
+  // Encode the response.
+  {
+    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
+        .WillOnce(Invoke([](Buffer::Instance& buffer, bool) {
+          EXPECT_EQ(buffer.toString(), "HTTP/1.1 200 OK\r\n"
+                                       "content-length: 4\r\n"
+                                       "\r\n"
+                                       "body");
+          buffer.drain(buffer.length());
+        }));
+    codec_->encode(response, encoding_callbacks);
+  }
+}
+
 class Http1ClientCodecTest : public testing::Test {
 public:
   Http1ClientCodecTest() { initializeCodec(); }
 
-  void initializeCodec() {
-    codec_ = std::make_unique<Http1ClientCodec>();
+  void initializeCodec(bool single_frame_mode = false, uint32_t max_buffer_size = 8 * 1024 * 1024) {
+    codec_ = std::make_unique<Http1ClientCodec>(single_frame_mode, max_buffer_size);
     codec_->setCodecCallbacks(codec_callbacks_);
+  }
+
+  void encodingOneRequest() {
+    ON_CALL(codec_callbacks_, connection())
+        .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+    // Create a request.
+    auto headers = Http::RequestHeaderMapImpl::create();
+    headers->addCopy(Http::Headers::get().HostLegacy, "host");
+    headers->addCopy(Http::Headers::get().Path, "/path");
+    headers->addCopy(Http::Headers::get().Method, "GET");
+    headers->addCopy(Http::Headers::get().ContentLength, "4");
+
+    HttpRequestFrame request(std::move(headers), false);
+
+    Buffer::OwnedImpl body_buffer("body");
+    HttpRawBodyFrame body(body_buffer, true);
+
+    NiceMock<MockEncodingCallbacks> encoding_callbacks;
+
+    // Encode the request.
+    {
+      EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, false))
+          .WillOnce(Invoke([](Buffer::Instance& buffer, bool) {
+            EXPECT_EQ(buffer.toString(), "GET /path HTTP/1.1\r\n"
+                                         "host: host\r\n"
+                                         "content-length: 4\r\n"
+                                         "\r\n");
+            buffer.drain(buffer.length());
+          }));
+
+      codec_->encode(request, encoding_callbacks);
+
+      EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
+          .WillOnce(Invoke([](Buffer::Instance& buffer, bool) {
+            EXPECT_EQ(buffer.toString(), "body");
+            buffer.drain(buffer.length());
+          }));
+
+      codec_->encode(body, encoding_callbacks);
+    }
   }
 
   NiceMock<MockClientCodecCallbacks> codec_callbacks_;
@@ -638,6 +958,8 @@ public:
 TEST_F(Http1ClientCodecTest, HeaderOnlyResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
       .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  encodingOneRequest();
 
   Buffer::OwnedImpl buffer;
 
@@ -659,6 +981,8 @@ TEST_F(Http1ClientCodecTest, HeaderOnlyResponseDecodingTest) {
 TEST_F(Http1ClientCodecTest, ResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
       .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  encodingOneRequest();
 
   Buffer::OwnedImpl buffer;
 
@@ -683,8 +1007,8 @@ TEST_F(Http1ClientCodecTest, ResponseDecodingTest) {
         if (body != nullptr) {
           EXPECT_EQ(frame->frameFlags().endStream(), true);
 
-          EXPECT_EQ(body->length(), 4);
-          EXPECT_EQ(body->toString(), "body");
+          EXPECT_EQ(body->buffer().length(), 4);
+          EXPECT_EQ(body->buffer().toString(), "body");
         }
       }));
 
@@ -694,6 +1018,8 @@ TEST_F(Http1ClientCodecTest, ResponseDecodingTest) {
 TEST_F(Http1ClientCodecTest, ChunkedResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
       .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  encodingOneRequest();
 
   Buffer::OwnedImpl buffer;
 
@@ -721,10 +1047,10 @@ TEST_F(Http1ClientCodecTest, ChunkedResponseDecodingTest) {
         auto* body = dynamic_cast<HttpRawBodyFrame*>(frame.get());
         if (body != nullptr) {
           if (!frame->frameFlags().endStream()) {
-            EXPECT_EQ(body->length(), 4);
-            EXPECT_EQ(body->toString(), "body");
+            EXPECT_EQ(body->buffer().length(), 4);
+            EXPECT_EQ(body->buffer().toString(), "body");
           } else {
-            EXPECT_EQ(body->length(), 0);
+            EXPECT_EQ(body->buffer().length(), 0);
           }
         }
       }));
@@ -735,6 +1061,8 @@ TEST_F(Http1ClientCodecTest, ChunkedResponseDecodingTest) {
 TEST_F(Http1ClientCodecTest, MultipleBufferChunkedResponseDecodingTest) {
   ON_CALL(codec_callbacks_, connection())
       .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  encodingOneRequest();
 
   Buffer::OwnedImpl buffer;
 
@@ -758,8 +1086,8 @@ TEST_F(Http1ClientCodecTest, MultipleBufferChunkedResponseDecodingTest) {
         } else {
           auto* body = dynamic_cast<HttpRawBodyFrame*>(frame.get());
           EXPECT_EQ(frame->frameFlags().endStream(), false);
-          EXPECT_EQ(body->length(), 4);
-          EXPECT_EQ(body->toString(), "body");
+          EXPECT_EQ(body->buffer().length(), 4);
+          EXPECT_EQ(body->buffer().toString(), "body");
         }
       }));
 
@@ -773,7 +1101,7 @@ TEST_F(Http1ClientCodecTest, MultipleBufferChunkedResponseDecodingTest) {
   EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
     auto* body = dynamic_cast<HttpRawBodyFrame*>(frame.get());
     EXPECT_EQ(frame->frameFlags().endStream(), true);
-    EXPECT_EQ(body->length(), 0);
+    EXPECT_EQ(body->buffer().length(), 0);
   }));
 
   codec_->decode(buffer, false);
@@ -786,6 +1114,8 @@ TEST_F(Http1ClientCodecTest, UnexpectedResponseTest) {
   // Transfer-Encoding and Content-Length are set at same time.
   {
     initializeCodec();
+
+    encodingOneRequest();
 
     Buffer::OwnedImpl buffer;
 
@@ -808,6 +1138,8 @@ TEST_F(Http1ClientCodecTest, UnexpectedResponseTest) {
   {
     initializeCodec();
 
+    encodingOneRequest();
+
     Buffer::OwnedImpl buffer;
 
     buffer.add("HTTP/1.1 200 OK\r\n"
@@ -826,6 +1158,9 @@ TEST_F(Http1ClientCodecTest, UnexpectedResponseTest) {
 }
 
 TEST_F(Http1ClientCodecTest, HeaderOnlyRequestEncodingTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
   // Create a request.
   auto headers = Http::RequestHeaderMapImpl::create();
   headers->addCopy(Http::Headers::get().HostLegacy, "host");
@@ -851,45 +1186,12 @@ TEST_F(Http1ClientCodecTest, HeaderOnlyRequestEncodingTest) {
   }
 }
 
-TEST_F(Http1ClientCodecTest, RequestEncodingTest) {
-  // Create a request.
-  auto headers = Http::RequestHeaderMapImpl::create();
-  headers->addCopy(Http::Headers::get().HostLegacy, "host");
-  headers->addCopy(Http::Headers::get().Path, "/path");
-  headers->addCopy(Http::Headers::get().Method, "GET");
-  headers->addCopy(Http::Headers::get().ContentLength, "4");
-
-  HttpRequestFrame request(std::move(headers), false);
-
-  Buffer::OwnedImpl body_buffer("body");
-  HttpRawBodyFrame body(body_buffer, true);
-
-  NiceMock<MockEncodingCallbacks> encoding_callbacks;
-
-  // Encode the request.
-  {
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, false))
-        .WillOnce(Invoke([](Buffer::Instance& buffer, bool) {
-          EXPECT_EQ(buffer.toString(), "GET /path HTTP/1.1\r\n"
-                                       "host: host\r\n"
-                                       "content-length: 4\r\n"
-                                       "\r\n");
-          buffer.drain(buffer.length());
-        }));
-
-    codec_->encode(request, encoding_callbacks);
-
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
-        .WillOnce(Invoke([](Buffer::Instance& buffer, bool) {
-          EXPECT_EQ(buffer.toString(), "body");
-          buffer.drain(buffer.length());
-        }));
-
-    codec_->encode(body, encoding_callbacks);
-  }
-}
+TEST_F(Http1ClientCodecTest, RequestEncodingTest) { encodingOneRequest(); }
 
 TEST_F(Http1ClientCodecTest, ChunkedRequestEncodingTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
   // Create a request.
   auto headers = Http::RequestHeaderMapImpl::create();
   headers->addCopy(Http::Headers::get().HostLegacy, "host");
@@ -929,6 +1231,246 @@ TEST_F(Http1ClientCodecTest, ChunkedRequestEncodingTest) {
 
     codec_->encode(body, encoding_callbacks);
   }
+}
+
+TEST_F(Http1ClientCodecTest, RequestAndResponseTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  // Do repeated request and response.
+  for (size_t i = 0; i < 100; i++) {
+    // Create a request.
+    auto headers = Http::RequestHeaderMapImpl::create();
+    headers->addCopy(Http::Headers::get().HostLegacy, "host");
+    headers->addCopy(Http::Headers::get().Path, "/path");
+    headers->addCopy(Http::Headers::get().Method, "GET");
+    headers->addCopy(Http::Headers::get().TransferEncoding, "chunked");
+
+    HttpRequestFrame request(std::move(headers), false);
+
+    Buffer::OwnedImpl body_buffer("body");
+    HttpRawBodyFrame body(body_buffer, true);
+
+    NiceMock<MockEncodingCallbacks> encoding_callbacks;
+    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _)).Times(2);
+
+    // Encode the request.
+    codec_->encode(request, encoding_callbacks);
+    codec_->encode(body, encoding_callbacks);
+
+    Buffer::OwnedImpl buffer;
+
+    buffer.add("HTTP/1.1 200 OK\r\n"
+               "Transfer-Encoding: chunked\r\n"
+               "custom: value\r\n"
+               "\r\n"
+               "4\r\n"  // Chunk header.
+               "body"   // Chunk body.
+               "\r\n"   // Chunk footer.
+               "0\r\n"  // Last chunk header.
+               "\r\n"); // Last chunk footer.
+
+    // Decode the response.
+    EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+    codec_->decode(buffer, false);
+  }
+}
+
+TEST_F(Http1ClientCodecTest, ResponseCompleteBeforeRequestCompleteTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  // Create a request.
+  auto headers = Http::RequestHeaderMapImpl::create();
+  headers->addCopy(Http::Headers::get().HostLegacy, "host");
+  headers->addCopy(Http::Headers::get().Path, "/path");
+  headers->addCopy(Http::Headers::get().Method, "GET");
+  headers->addCopy(Http::Headers::get().TransferEncoding, "chunked");
+
+  HttpRequestFrame request(std::move(headers), false);
+
+  NiceMock<MockEncodingCallbacks> encoding_callbacks;
+  EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _));
+
+  // Encode the request. Only the headers are encoded and the body is not encoded.
+  codec_->encode(request, encoding_callbacks);
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("HTTP/1.1 200 OK\r\n"
+             "Transfer-Encoding: chunked\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "4\r\n"  // Chunk header.
+             "body"   // Chunk body.
+             "\r\n"   // Chunk footer.
+             "0\r\n"  // Last chunk header.
+             "\r\n"); // Last chunk footer.
+
+  // Decode the response.
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).Times(3);
+  // Finally, the onDecodingFailure() is called because the request is not complete and the
+  // response is complete.
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ClientCodecTest, SingleFrameModeRequestEncodingTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  initializeCodec(true, 8 * 1024 * 1024);
+
+  // Create a request.
+  auto headers = Http::RequestHeaderMapImpl::create();
+  headers->addCopy(Http::Headers::get().HostLegacy, "host");
+  headers->addCopy(Http::Headers::get().Path, "/path");
+  headers->addCopy(Http::Headers::get().Method, "GET");
+  headers->setContentLength(4);
+
+  HttpRequestFrame request(std::move(headers), true);
+  request.optionalBuffer().add("body");
+
+  NiceMock<MockEncodingCallbacks> encoding_callbacks;
+
+  // Encode the request.
+  {
+    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
+        .WillOnce(Invoke([](Buffer::Instance& buffer, bool) {
+          EXPECT_EQ(buffer.toString(), "GET /path HTTP/1.1\r\n"
+                                       "host: host\r\n"
+                                       "content-length: 4\r\n"
+                                       "\r\n"
+                                       "body");
+        }));
+    codec_->encode(request, encoding_callbacks);
+  }
+}
+
+TEST_F(Http1ClientCodecTest, SingleFrameModeResponseDecodingTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  initializeCodec(true, 8 * 1024 * 1024);
+
+  encodingOneRequest();
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("HTTP/1.1 200 OK\r\n"
+             "Content-Length: 4\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "body");
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
+    auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
+
+    EXPECT_EQ(frame->frameFlags().endStream(), true);
+    EXPECT_EQ(response->response_->getStatusValue(), "200");
+    EXPECT_EQ(response->response_->getContentLengthValue(), "4");
+    EXPECT_EQ(response->get("custom").value(), "value");
+
+    EXPECT_EQ(response->optionalBuffer().length(), 4);
+    EXPECT_EQ(response->optionalBuffer().toString(), "body");
+  }));
+
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ClientCodecTest, SingleFrameModeResponseTooLargeTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  initializeCodec(true, 4);
+
+  encodingOneRequest();
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("HTTP/1.1 200 OK\r\n"
+             "Content-Length: 5\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "body~");
+
+  EXPECT_CALL(codec_callbacks_, onDecodingFailure());
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ClientCodecTest, SingleFrameModeChunkedResponseDecodingTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  initializeCodec(true, 8 * 1024 * 1024);
+
+  encodingOneRequest();
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("HTTP/1.1 200 OK\r\n"
+             "Transfer-Encoding: chunked\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "4\r\n"  // Chunk header.
+             "body"   // Chunk body.
+             "\r\n"   // Chunk footer.
+             "0\r\n"  // Last chunk header.
+             "\r\n"); // Last chunk footer.
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
+    auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
+
+    EXPECT_EQ(frame->frameFlags().endStream(), true);
+
+    EXPECT_EQ(response->response_->getStatusValue(), "200");
+    EXPECT_EQ(response->get("custom").value(), "value");
+
+    EXPECT_EQ(response->optionalBuffer().length(), 4);
+    EXPECT_EQ(response->optionalBuffer().toString(), "body");
+  }));
+
+  codec_->decode(buffer, false);
+}
+
+TEST_F(Http1ClientCodecTest, SingleFrameModeMultipleBufferChunkedResponseDecodingTest) {
+  ON_CALL(codec_callbacks_, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
+
+  initializeCodec(true, 8 * 1024 * 1024);
+
+  encodingOneRequest();
+
+  Buffer::OwnedImpl buffer;
+
+  buffer.add("HTTP/1.1 200 OK\r\n"
+             "Transfer-Encoding: chunked\r\n"
+             "custom: value\r\n"
+             "\r\n"
+             "4\r\n"  // Chunk header.
+             "body"   // Chunk body.
+             "\r\n"); // Chunk footer.
+
+  codec_->decode(buffer, false);
+
+  EXPECT_EQ(buffer.length(), 0);
+
+  buffer.add("0\r\n"  // Last chunk header.
+             "\r\n"); // Last chunk footer.
+
+  EXPECT_CALL(codec_callbacks_, onDecodingSuccess(_)).WillOnce(Invoke([](StreamFramePtr frame) {
+    auto* response = dynamic_cast<HttpResponseFrame*>(frame.get());
+
+    EXPECT_EQ(frame->frameFlags().endStream(), true);
+
+    EXPECT_EQ(response->response_->getStatusValue(), "200");
+    EXPECT_EQ(response->get("custom").value(), "value");
+
+    EXPECT_EQ(response->optionalBuffer().length(), 4);
+    EXPECT_EQ(response->optionalBuffer().toString(), "body");
+  }));
+
+  codec_->decode(buffer, false);
 }
 
 } // namespace

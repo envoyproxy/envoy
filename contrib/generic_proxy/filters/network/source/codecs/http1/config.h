@@ -235,55 +235,10 @@ public:
     ASSERT(current_header_value_.empty());
   }
 
-  bool decodeBuffer(Buffer::Instance& buffer) {
-    decoding_buffer_.move(buffer);
+  bool decodeBuffer(Buffer::Instance& buffer);
 
-    // Always resume before decoding.
-    parser_->resume();
-
-    while (decoding_buffer_.length() > 0) {
-      const auto slice = decoding_buffer_.frontSlice();
-      const auto nread = parser_->execute(static_cast<const char*>(slice.mem_), slice.len_);
-      decoding_buffer_.drain(nread);
-
-      const auto status = parser_->getStatus();
-      if (status == Http::Http1::ParserStatus::Paused) {
-        return true;
-      }
-      if (status != Http::Http1::ParserStatus::Ok) {
-        // Decoding error.
-        return false;
-      }
-      if (nread == 0) {
-        // No more data to read and parser is not paused, break to avoid infinite loop.
-        break;
-      }
-    }
-    // Try to dispatch any buffered body. If the message is complete then this will be a no-op.
-    dispatchBufferedBody(false);
-    return true;
-  }
-
-  void dispatchBufferedBody(bool end_stream) {
-    if (single_frame_mode_) {
-      // Do nothing until the onMessageComplete callback if we are in single frame mode.
-      if (buffered_body_.length() >= max_buffer_size_) {
-        ENVOY_LOG(warn,
-                  "Generic proxy HTTP1 codec: buffered body size exceeds max buffer size({} vs {})",
-                  buffered_body_.length(), max_buffer_size_);
-        onDecodingFailure();
-      }
-      return;
-    }
-
-    if (buffered_body_.length() > 0 || end_stream) {
-      ENVOY_LOG(debug,
-                "Generic proxy HTTP1 codec: decoding request/response body (end_stream={} size={})",
-                end_stream, buffered_body_.length());
-      auto frame = std::make_unique<HttpRawBodyFrame>(buffered_body_, end_stream);
-      onDecodingSuccess(std::move(frame));
-    }
-  }
+  void dispatchBufferedBody(bool end_stream);
+  bool bufferedBodyOverflow();
 
   virtual Http::HeaderMap& headerMap() PURE;
 

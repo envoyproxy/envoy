@@ -266,6 +266,73 @@ void Utility::encodeBody(Buffer::Instance& dst_buffer, Buffer::Instance& src_buf
   }
 }
 
+bool Http1CodecBase::decodeBuffer(Buffer::Instance& buffer) {
+  decoding_buffer_.move(buffer);
+
+  // Always resume before decoding.
+  parser_->resume();
+
+  while (decoding_buffer_.length() > 0) {
+    const auto slice = decoding_buffer_.frontSlice();
+    const auto nread = parser_->execute(static_cast<const char*>(slice.mem_), slice.len_);
+    decoding_buffer_.drain(nread);
+    const auto status = parser_->getStatus();
+
+    // Parser is paused by the callback. Do nothing and return. Don't handle the buffered body
+    // because parser is paused and no callback should be called.
+    if (status == Http::Http1::ParserStatus::Paused) {
+      return true;
+    }
+    // Parser has encountered an error. Return false to indicate decoding failure. Ignore the
+    // buffered body.
+    if (status == Http::Http1::ParserStatus::Error) {
+      // Decoding error.
+      return false;
+    }
+    // No more data to read and parser is not paused, break to avoid infinite loop. This is
+    // preventive check. The parser should not be in this state in normal cases.
+    if (nread == 0) {
+      return true;
+    }
+  }
+  // Try to dispatch any buffered body. If the message is complete then this will be a no-op.
+  dispatchBufferedBody(false);
+  return true;
+}
+
+void Http1CodecBase::dispatchBufferedBody(bool end_stream) {
+  if (single_frame_mode_) {
+    // Do nothing until the onMessageComplete callback if we are in single frame mode.
+
+    // Check if the buffered body is too large.
+    if (bufferedBodyOverflow()) {
+      // Pause the parser to avoid further parsing.
+      parser_->pause();
+      // Tell the caller that the decoding failed.
+      onDecodingFailure();
+    }
+    return;
+  }
+
+  if (buffered_body_.length() > 0 || end_stream) {
+    ENVOY_LOG(debug,
+              "Generic proxy HTTP1 codec: decoding request/response body (end_stream={} size={})",
+              end_stream, buffered_body_.length());
+    auto frame = std::make_unique<HttpRawBodyFrame>(buffered_body_, end_stream);
+    onDecodingSuccess(std::move(frame));
+  }
+}
+
+bool Http1CodecBase::bufferedBodyOverflow() {
+  if (buffered_body_.length() < max_buffer_size_) {
+    return false;
+  }
+
+  ENVOY_LOG(warn, "Generic proxy HTTP1 codec: body size exceeds max size({} vs {})",
+            buffered_body_.length(), max_buffer_size_);
+  return true;
+}
+
 Http::Http1::CallbackResult Http1ServerCodec::onMessageBeginImpl() {
   if (active_request_.has_value()) {
     ENVOY_LOG(error,
@@ -303,9 +370,7 @@ Http::Http1::CallbackResult Http1ServerCodec::onHeadersCompleteImpl() {
   if (single_frame_mode_) {
     // Do nothing until the onMessageComplete callback if we are in single frame mode.
     return Http::Http1::CallbackResult::Success;
-  }
-
-  if (non_end_stream) {
+  } else if (non_end_stream) {
     auto request =
         std::make_unique<HttpRequestFrame>(std::move(active_request_->request_headers_), false);
     onDecodingSuccess(std::move(request));
@@ -320,6 +385,14 @@ Http::Http1::CallbackResult Http1ServerCodec::onMessageCompleteImpl() {
   active_request_->request_complete_ = true;
 
   if (single_frame_mode_) {
+    // Check if the buffered body is too large.
+    if (bufferedBodyOverflow()) {
+      // Pause the parser to avoid further parsing.
+      parser_->pause();
+      // Tell the caller that the decoding failed.
+      return Http::Http1::CallbackResult::Error;
+    }
+
     ASSERT(!deferred_end_stream_headers_);
     auto request =
         std::make_unique<HttpRequestFrame>(std::move(active_request_->request_headers_), true);
@@ -472,9 +545,7 @@ Http::Http1::CallbackResult Http1ClientCodec::onHeadersCompleteImpl() {
   if (single_frame_mode_) {
     // Do nothing until the onMessageComplete callback if we are in single frame mode.
     return Http::Http1::CallbackResult::Success;
-  }
-
-  if (non_end_stream) {
+  } else if (non_end_stream) {
     auto request =
         std::make_unique<HttpResponseFrame>(std::move(expect_response_->response_headers_), false);
     onDecodingSuccess(std::move(request));
@@ -487,6 +558,14 @@ Http::Http1::CallbackResult Http1ClientCodec::onHeadersCompleteImpl() {
 
 Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
   if (single_frame_mode_) {
+    // Check if the buffered body is too large.
+    if (bufferedBodyOverflow()) {
+      // Pause the parser to avoid further parsing.
+      parser_->pause();
+      // Tell the caller that the decoding failed.
+      return Http::Http1::CallbackResult::Error;
+    }
+
     ASSERT(!deferred_end_stream_headers_);
     auto response =
         std::make_unique<HttpResponseFrame>(std::move(expect_response_->response_headers_), true);
