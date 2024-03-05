@@ -399,8 +399,8 @@ TEST_P(PlatformBridgeCertValidatorTest, ThreadCreationFailed) {
   PlatformBridgeCertValidator validator(&config_, stats_, std::move(thread_factory));
 
   std::string hostname = "server1.example.com";
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
 
