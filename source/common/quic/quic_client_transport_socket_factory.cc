@@ -33,7 +33,10 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
       fallback_factory_(std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
-          std::move(config), factory_context.sslContextManager(), factory_context.statsScope())) {}
+          std::move(config), factory_context.sslContextManager(), factory_context.statsScope())),
+      tls_slot_(factory_context.serverFactoryContext().threadLocal()) {
+  tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalQuicConfig>(); });
+}
 
 void QuicClientTransportSocketFactory::initialize() {
   if (!fallback_factory_->clientContextConfig()->alpnProtocols().empty()) {
@@ -55,15 +58,18 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
     return nullptr;
   }
 
-  if (client_context_ != context) {
+  ASSERT(tls_slot_.currentThreadRegistered());
+  ThreadLocalQuicConfig& tls_config = *tls_slot_;
+
+  if (tls_config.client_context_ != context) {
     // If the context has been updated, update the crypto config.
-    client_context_ = context;
-    crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
+    tls_config.client_context_ = context;
+    tls_config.crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context)),
         std::make_unique<quic::QuicClientSessionCache>());
   }
   // Return the latest crypto config.
-  return crypto_config_;
+  return tls_config.crypto_config_;
 }
 
 REGISTER_FACTORY(QuicClientTransportSocketConfigFactory,

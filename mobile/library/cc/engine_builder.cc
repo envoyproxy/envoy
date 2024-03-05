@@ -149,6 +149,11 @@ EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setLogger(envoy_logger envoy_logger) {
+  envoy_logger_.emplace(envoy_logger);
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) {
   callbacks_->on_engine_running = std::move(closure);
   return *this;
@@ -813,6 +818,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
+  list->add_patterns()->set_contains("quic_connection_close_error_code");
+  list->add_patterns()->set_contains("quic_reset_stream_error_code");
   bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
 
   // Set up watchdog
@@ -845,12 +852,20 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   ProtobufWkt::Struct envoy_layer;
   ProtobufWkt::Struct& runtime_values =
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
-  ProtobufWkt::Struct& flags =
+  ProtobufWkt::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
   for (auto& guard_and_value : runtime_guards_) {
-    (*flags.mutable_fields())[guard_and_value.first].set_bool_value(guard_and_value.second);
+    (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
+        guard_and_value.second);
   }
-  (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  ProtobufWkt::Struct& restart_features =
+      *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
+  // TODO(abeyad): This runtime flag is set because https://github.com/envoyproxy/envoy/pull/32370
+  // needed to be merged with the default off due to unresolved test issues. Once those are fixed,
+  // and the default for `allow_client_socket_creation_failure` is true, we can remove this.
+  (*restart_features.mutable_fields())["allow_client_socket_creation_failure"].set_bool_value(true);
+
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
@@ -884,8 +899,9 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  Envoy::InternalEngine* envoy_engine =
-      new Envoy::InternalEngine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+  Envoy::InternalEngine* envoy_engine = new Envoy::InternalEngine(
+      callbacks_->asEnvoyEngineCallbacks(),
+      (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

@@ -4,7 +4,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/common/config/datasource.h"
+#include "source/common/secret/secret_provider_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
@@ -37,39 +37,18 @@ public:
 
 class SDSSecretReader : public SecretReader {
 public:
-  SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr certificate_provider,
-                  Secret::GenericSecretConfigProviderSharedPtr private_key_provider, Api::Api& api)
-      : update_callback_client_(readAndWatchSecret(certificate_, certificate_provider, api)),
-        update_callback_token_(readAndWatchSecret(private_key_, private_key_provider, api)) {}
-
+  SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& certificate_provider,
+                  Secret::GenericSecretConfigProviderSharedPtr&& private_key_provider,
+                  ThreadLocal::SlotAllocator& tls, Api::Api& api)
+      : certificate_(std::move(certificate_provider), tls, api),
+        private_key_(std::move(private_key_provider), tls, api) {}
   // SecretReader
-  const std::string& certificate() const override { return certificate_; }
-  const std::string& privateKey() const override { return private_key_; }
+  const std::string& certificate() const override { return certificate_.secret(); }
+  const std::string& privateKey() const override { return private_key_.secret(); }
 
 private:
-  Envoy::Common::CallbackHandlePtr
-  readAndWatchSecret(std::string& value,
-                     Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api) {
-    const auto* secret = secret_provider->secret();
-    if (secret != nullptr) {
-      value =
-          THROW_OR_RETURN_VALUE(Config::DataSource::read(secret->secret(), true, api), std::string);
-    }
-
-    return secret_provider->addUpdateCallback([secret_provider, &api, &value]() {
-      const auto* secret = secret_provider->secret();
-      if (secret != nullptr) {
-        value = THROW_OR_RETURN_VALUE(Config::DataSource::read(secret->secret(), true, api),
-                                      std::string);
-      }
-    });
-  }
-
-  std::string certificate_;
-  std::string private_key_;
-
-  Envoy::Common::CallbackHandlePtr update_callback_client_;
-  Envoy::Common::CallbackHandlePtr update_callback_token_;
+  Secret::ThreadLocalGenericSecretProvider certificate_;
+  Secret::ThreadLocalGenericSecretProvider private_key_;
 };
 
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {
