@@ -38,7 +38,7 @@ envoy_cc_library(
         "@envoy//envoy/thread:thread_interface",
         "@envoy//source/common/common:macros",
         "@envoy//source/common/common:thread_impl_lib_posix",
-        "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "@envoy//source/common/tls/cert_validator:cert_validator_lib",
     ],
 )
 

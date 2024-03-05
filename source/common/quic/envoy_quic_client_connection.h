@@ -80,7 +80,9 @@ public:
     // TODO(mattklein123): Emit a stat for this.
   }
   size_t numPacketsExpectedPerEventLoop() const override {
-    if (delegate_.has_value()) {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_upstream_reads_fixed_number_packets") &&
+        delegate_.has_value()) {
       return delegate_->numPacketsExpectedPerEventLoop();
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
