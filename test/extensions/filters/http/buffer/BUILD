@@ -42,6 +42,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/integration/filters:buffer_continue_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

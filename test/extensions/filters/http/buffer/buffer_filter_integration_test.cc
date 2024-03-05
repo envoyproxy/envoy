@@ -210,31 +210,15 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceededWithSetLimitOnly) {
-  // Make sure the connection isn't closed during request upload.
-  // Without a large drain-close it's possible that the local reply will be sent
-  // during request upload, and continued upload will result in TCP reset before
-  // the response is read.
+  // Increase timeout like the RouterRequestBufferLimitExceeded test
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
   config_helper_.prependFilter(ConfigHelper::smallSetLimitOnlyBufferFilter(),
                                testing_downstream_filter_);
   // Use a filter to buffer the whole request after the buffer filter.
-  // FIXME: this test failed with error "Unable to parse JSON as proto (INVALID_ARGUMENT: could not
-  // find @type 'type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua')"
-  config_helper_.prependFilter(R"EOF(
-name: lua
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-  default_source_code:
-    inline_string: |
-      function envoy_on_request(handle)
-        local always_wrap_body = true
-        local body = handle:body(always_wrap_body)
-        local size = body:length()
-        local data = body:getBytes(0, size)
-      end
-)EOF",
+  config_helper_.prependFilter("{ name: buffer-continue-filter }", testing_downstream_filter_);
+  config_helper_.prependFilter(ConfigHelper::smallSetLimitOnlyBufferFilter(),
                                testing_downstream_filter_);
   initialize();
 
@@ -256,6 +240,13 @@ typed_config:
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitNotExceededWithSetLimitOnly) {
+  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
+      downstreamProtocol() == Http::CodecType::HTTP3) {
+    // Non-HTTP1 protocol will read the buffer during proxying, which will trigger the limit.
+    return;
+  }
+
+  // Increase timeout like the RouterRequestBufferLimitExceeded test
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
