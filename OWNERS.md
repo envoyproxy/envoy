@@ -59,6 +59,8 @@ The following Envoy maintainers have final say over any changes only affecting /
 
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
+* Fredy Wijaya ([fredyw](https://github.com/fredyw)) (fredyw@google.com)
+  * Android, Java, Kotlin, JNI.
 
 # Senior extension maintainers
 

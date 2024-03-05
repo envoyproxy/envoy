@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/ssl_socket.h"
 
 // test_runner setups
 #include "source/exe/process_wide.h"

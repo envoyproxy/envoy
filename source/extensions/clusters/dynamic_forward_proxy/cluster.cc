@@ -12,9 +12,9 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/tls/cert_validator/default_validator.h"
+#include "source/common/tls/utility.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
-#include "source/extensions/transport_sockets/tls/utility.h"
 
 namespace Envoy {
 namespace Extensions {

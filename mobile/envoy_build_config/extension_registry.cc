@@ -6,6 +6,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/upstream/default_local_address_selector_factory.h"
 #include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -28,7 +29,6 @@
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
 
@@ -63,7 +63,7 @@
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #endif
 
 namespace Envoy {
