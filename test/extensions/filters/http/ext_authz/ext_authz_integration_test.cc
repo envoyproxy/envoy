@@ -27,7 +27,7 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 struct GrpcInitializeConfigOpts {
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
-  uint64_t timeout_seconds = 300;
+  uint64_t timeout_ms = 300'000; // 5 minutes.
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -65,7 +65,7 @@ public:
 
       // Override timeout if needed.
       *proto_config_.mutable_grpc_service()->mutable_timeout() =
-          Protobuf::util::TimeUtil::SecondsToDuration(opts.timeout_seconds);
+          Protobuf::util::TimeUtil::MillisecondsToDuration(opts.timeout_ms);
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
@@ -603,9 +603,8 @@ public:
   }
 
   void initializeConfig(bool legacy_allowed_headers = true, bool failure_mode_allow = true,
-                        uint64_t timeout_seconds = 300) {
-    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow,
-                                      timeout_seconds](
+                        uint64_t timeout_ms = 300) {
+    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow, timeout_ms](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -619,7 +618,7 @@ public:
       proto_config_.set_failure_mode_allow(failure_mode_allow);
       proto_config_.set_failure_mode_allow_header_add(failure_mode_allow);
       proto_config_.mutable_http_service()->mutable_server_uri()->mutable_timeout()->CopyFrom(
-          Protobuf::util::TimeUtil::SecondsToDuration(timeout_seconds));
+          Protobuf::util::TimeUtil::MillisecondsToDuration(timeout_ms));
 
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
@@ -904,7 +903,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   GrpcInitializeConfigOpts opts;
   opts.failure_mode_allow = false;
-  opts.timeout_seconds = 1;
+  opts.timeout_ms = 10;
   initializeConfig(opts);
 
   // Use h1, set up the test.
@@ -928,7 +927,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   GrpcInitializeConfigOpts init_opts;
   init_opts.failure_mode_allow = true;
-  init_opts.timeout_seconds = 1;
+  init_opts.timeout_ms = 10;
   initializeConfig(init_opts);
 
   // Use h1, set up the test.
@@ -1158,7 +1157,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailClosed) {
-  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_seconds=*/1);
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/10);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
   waitForExtAuthzRequest();
@@ -1172,7 +1171,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailClosed) {
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
-  initializeConfig(false, /*failure_mode_allow=*/true, /*timeout_seconds=*/1);
+  initializeConfig(false, /*failure_mode_allow=*/true, /*timeout_ms=*/10);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
   waitForExtAuthzRequest();
