@@ -61,6 +61,14 @@ public:
     absl::ReaderMutexLock lock(&address_lock_);
     return HostImpl::address();
   }
+
+  const std::pair<Network::Address::InstanceConstSharedPtr,
+                  const std::vector<Network::Address::InstanceConstSharedPtr>>
+  addressAndListCopy() const {
+    absl::ReaderMutexLock lock(&address_lock_);
+    return {HostImpl::address(), HostImpl::addressList()};
+  }
+
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     absl::ReaderMutexLock lock(&address_lock_);
     return HostImpl::healthCheckAddress();

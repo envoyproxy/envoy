@@ -4921,4 +4921,64 @@ TEST_P(DownstreamProtocolIntegrationTest, UnknownPseudoHeader) {
   }
 }
 
+// This test performs DNS refreshing very fast also keep changing DNS results.
+// It is trying to reproduce a R/W race for logical_dns_cluster.
+class LogicalDnsReadWriteRaceTest : public ProtocolIntegrationTest {
+public:
+  LogicalDnsReadWriteRaceTest() : registered_dns_factory_(dns_resolver_factory_) {}
+
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, LogicalDnsReadWriteRaceTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
+  if (version_ == Network::Address::IpVersion::v4) {
+    return;
+  }
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillRepeatedly(testing::Return(dns_resolver));
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](const std::string&, Network::DnsLookupFamily,
+                     Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
+            // Keep changing the DNS response address list.
+            static int i = 1;
+            dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+                         TestUtility::makeDnsResponse({"::1", ("127.0.0." + std::to_string(i)),
+                                                       ("127.0.0." + std::to_string(i + 1))}));
+            i = (++i) % 128;
+            return nullptr;
+          }));
+  if (use_universal_header_validator_) {
+    return;
+  }
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+    // Make the refresh rate fast to hit the R/W race.
+    cluster.mutable_dns_refresh_rate()->set_nanos(1000001);
+  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_route()->mutable_auto_host_rewrite()->set_value(true);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 } // namespace Envoy
