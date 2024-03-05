@@ -31,6 +31,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
 "source/extensions/filters/http/cache:94.9"
+"source/extensions/filters/http/dynamic_forward_proxy:96.2" # Not covered lines are intentionally skipped on test thread.
 "source/extensions/filters/http/grpc_json_transcoder:93.8" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
