@@ -2,7 +2,7 @@
 
 #include <thread>
 
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"

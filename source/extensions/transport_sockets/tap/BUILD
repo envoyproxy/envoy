@@ -52,6 +52,10 @@ envoy_cc_extension(
     name = "config",
     srcs = envoy_select_admin_functionality(["config.cc"]),
     hdrs = envoy_select_admin_functionality(["config.h"]),
+    extra_visibility = [
+        # test needs refactor
+        "//test/common/tls:__subpackages__",
+    ],
     deps = [
         ":tap_config_impl",
         ":tap_lib",
