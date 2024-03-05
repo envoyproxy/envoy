@@ -584,9 +584,9 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
           "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
     // generic_conn_pool_ is an instance of TcpProxy::HttpConnPool.
     // generic_conn_pool_->newStream() is called in maybeTunnel() which initializes an instance of
-    // Router::UpstreamRequest. If Router::UpstreamRequset receives headers from the upstream which
+    // Router::UpstreamRequest. If Router::UpstreamRequest receives headers from the upstream which
     // results in end_stream=true, then via callbacks passed to Router::UpstreamRequest,
-    // TcpProxy::Filter::onGenericPoolFailure() gets invoked. If we dont do deferredDelete here,
+    // TcpProxy::Filter::onGenericPoolFailure() gets invoked. If we do not do deferredDelete here,
     // then the same instance of UpstreamRequest which is under execution will go out of scope.
     read_callbacks_->connection().dispatcher().deferredDelete(std::move(generic_conn_pool_));
   } else {
