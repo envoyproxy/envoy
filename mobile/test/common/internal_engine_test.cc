@@ -638,7 +638,10 @@ TEST_F(InternalEngineTest, SetLogger) {
                       actual_status_code = headers->httpStatus();
                       actual_end_stream = end_stream;
                     })
-                    .setOnData([&](envoy_data, bool end_stream) { actual_end_stream = end_stream; })
+                    .setOnData([&](envoy_data data, bool end_stream) {
+                      actual_end_stream = end_stream;
+                      release_envoy_data(data);
+                    })
                     .setOnComplete([&](envoy_stream_intel, envoy_final_stream_intel) {
                       stream_complete.Notify();
                     })
