@@ -580,12 +580,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
 void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   absl::string_view failure_reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
-    read_callbacks_->connection().dispatcher().deferredDelete(std::move(generic_conn_pool_));
-  } else {
-    generic_conn_pool_.reset();
-  }
+  generic_conn_pool_.reset();
 
   read_callbacks_->upstreamHost(host);
   getStreamInfo().upstreamInfo()->setUpstreamHost(host);
