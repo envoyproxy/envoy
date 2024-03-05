@@ -2998,6 +2998,33 @@ TEST(OverrideTest, GrpcServiceNonOverride) {
   EXPECT_THAT(*merged_route.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
+// When merging two configurations, second metadata override only extends the first's one.
+TEST(OverrideTest, GrpcMetadataOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_grpc_initial_metadata()->Add()->CopyFrom(
+      makeHeaderValue("a", "a"));
+  cfg1.mutable_overrides()->mutable_grpc_initial_metadata()->Add()->CopyFrom(
+      makeHeaderValue("b", "b"));
+
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_grpc_initial_metadata()->Add()->CopyFrom(
+      makeHeaderValue("b", "c"));
+  cfg2.mutable_overrides()->mutable_grpc_initial_metadata()->Add()->CopyFrom(
+      makeHeaderValue("c", "c"));
+
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute merged_route(route1, route2);
+
+  ASSERT_TRUE(merged_route.grpcInitialMetadata().size() == 3);
+  EXPECT_THAT(merged_route.grpcInitialMetadata()[0],
+              ProtoEq(cfg1.overrides().grpc_initial_metadata()[0]));
+  EXPECT_THAT(merged_route.grpcInitialMetadata()[1],
+              ProtoEq(cfg2.overrides().grpc_initial_metadata()[0]));
+  EXPECT_THAT(merged_route.grpcInitialMetadata()[2],
+              ProtoEq(cfg2.overrides().grpc_initial_metadata()[1]));
+}
+
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
@@ -3851,6 +3878,63 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
 
   Buffer::OwnedImpl fake_input("hello");
   conn_manager_->onData(fake_input, false);
+}
+
+// Test that per route metadata override does override inherited grpc_service configuration.
+TEST_F(HttpFilterTest, GrpcServiceMetadataOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+    initial_metadata:
+      - key: "a"
+        value: "a"
+      - key: "b"
+        value: "b"
+  )EOF");
+
+  // Route configuration overrides the grpc_service metadata.
+  ExtProcPerRoute route_proto;
+  *route_proto.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+      makeHeaderValue("b", "c");
+  *route_proto.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+      makeHeaderValue("c", "c");
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
+      .WillOnce(
+          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+            cb(route_config);
+          }));
+
+  // Build expected merged grpc_service configuration.
+  {
+    std::string expected_config = (R"EOF(
+      grpc_service:
+        envoy_grpc:
+          cluster_name: "ext_proc_server"
+        initial_metadata:
+          - key: "a"
+            value: "a"
+          - key: "b"
+            value: "c"
+          - key: "c"
+            value: "c"
+    )EOF");
+    envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor expected_proto{};
+    TestUtility::loadFromYaml(expected_config, expected_proto);
+    final_expected_grpc_service_.emplace(expected_proto.grpc_service());
+    config_with_hash_key_.setConfig(expected_proto.grpc_service());
+  }
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  const auto& meta = filter_->grpc_service_config().initial_metadata();
+  EXPECT_EQ(meta[0].value(), "a"); // a = a inherited
+  EXPECT_EQ(meta[1].value(), "c"); // b = c overridden
+  EXPECT_EQ(meta[2].value(), "c"); // c = c added
+
+  filter_->onDestroy();
 }
 
 } // namespace

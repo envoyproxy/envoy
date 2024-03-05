@@ -247,7 +247,9 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
       config_source, "token", secret_context, init_manager);
   auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
 
-  SDSSecretReader secret_reader(client_secret_provider, token_secret_provider, *api);
+  NiceMock<ThreadLocal::MockInstance> tls;
+  SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
+                                tls, *api);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
   EXPECT_TRUE(secret_reader.tokenSecret().empty());
 

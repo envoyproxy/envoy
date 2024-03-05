@@ -94,6 +94,7 @@ envoy_cc_library(
         "//source/common/config:subscription_base_interface",
         "//source/common/filesystem:directory_lib",
         "//source/common/grpc:common_lib",
+        "//source/common/http:utility_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
@@ -106,5 +107,6 @@ envoy_cc_library(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic/platform:quiche_flags_impl_lib",
+        "@com_github_google_quiche//:quic_platform_base",
     ]),
 )
