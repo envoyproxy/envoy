@@ -17,7 +17,7 @@ using TunnelingConfig =
 /**
  * Response headers for the tunneling connections.
  */
-class TunnelResponseHeaders : public Http::TunnelResponseHeadersOrTrailers {
+class TunnelResponseHeaders : public Http::TunnelResponseHeadersOrTrailersImpl {
 public:
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
@@ -31,7 +31,7 @@ private:
 /**
  * Response trailers for the tunneling connections.
  */
-class TunnelResponseTrailers : public Http::TunnelResponseHeadersOrTrailers {
+class TunnelResponseTrailers : public Http::TunnelResponseHeadersOrTrailersImpl {
 public:
   TunnelResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers)
       : response_trailers_(std::move(response_trailers)) {}
