@@ -26,20 +26,6 @@ envoy_cc_test(
     deps = [
         "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib_no_stamp",
-        "//library/common/types:c_types_lib",
-        "@envoy//test/common/http:common_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "main_interface_test",
-    srcs = envoy_select_enable_yaml(
-        ["main_interface_test.cc"],
-        "@envoy",
-    ),
-    repository = "@envoy",
-    deps = [
-        "//library/common:internal_engine_lib_no_stamp",
         "//library/common/data:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",

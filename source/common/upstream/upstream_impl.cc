@@ -1167,7 +1167,8 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
   // configured they will interfere with each other and both get incorrect values.
-  if (perEndpointStatsEnabled() &&
+  // TODO(ggreenway): Verify that bypassing virtual dispatch here was intentional
+  if (ClusterInfoImpl::perEndpointStatsEnabled() &&
       server_context.bootstrap().cluster_manager().has_load_stats_config()) {
     throwEnvoyExceptionOrPanic("Only one of cluster per_endpoint_stats and cluster manager "
                                "load_stats_config can be specified");
@@ -1728,7 +1729,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
     return absl::OkStatus();
   }
   const auto& policy = cluster_load_assignment.policy();
-  if (policy.drop_overloads().size() == 0) {
+  if (policy.drop_overloads().empty()) {
     return absl::OkStatus();
   }
   if (policy.drop_overloads().size() > kDropOverloadSize) {

@@ -35,7 +35,7 @@ class EnvoyQuicProofVerifierTest : public testing::Test {
 public:
   EnvoyQuicProofVerifierTest()
       : root_ca_cert_(cert_chain_.substr(cert_chain_.rfind("-----BEGIN CERTIFICATE-----"))),
-        leaf_cert_([=]() {
+        leaf_cert_([this]() {
           std::stringstream pem_stream(cert_chain_);
           std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
           return chain[0];
@@ -397,6 +397,45 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
   EXPECT_EQ("verify cert failed: verify SAN list", error_details);
   EXPECT_NE(verify_details, nullptr);
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyX509v1Cert) {
+  std::string cert_v1 = R"text(
+-----BEGIN CERTIFICATE-----
+MIICpDCCAYwCCQClUY4hwG3eCTANBgkqhkiG9w0BAQsFADAUMRIwEAYDVQQDDAlx
+dWljLnRlc3QwHhcNMjQwMTMxMDUxNDI1WhcNMjUwMTMwMDUxNDI1WjAUMRIwEAYD
+VQQDDAlxdWljLnRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCw
+PmbxO63dR1i7yCADA0Q2N6vWzkZ53lsKktSNeAoV5RM6hbH9zt5BR6blZSJ87Ybl
+otMUioTb3DIF2z99k/QB8xpXevurZ09z9bMricsIM2LiS1hNyF09h1yPnRCy3BB5
+wEwbovKqDaFbCe09iefvsxGMENyDLA+uoisgxgRGfNJwggGy5WTSvpmnn1iEDmHR
+4kEOxlDVHhmWIvr3nGFNuO/YEgPcDVdhu+UVCHan2RDjGX7KfkfNvt6aTLIgq+rO
+CnF5/hFYRO4ypn2Lsw1me1n3H3hEm/5MuY7XdTK8tl/ezaIEHjUt5ExnKy0N2AS9
+LcMpoD4L0DFunxMdH72HAgMBAAEwDQYJKoZIhvcNAQELBQADggEBADNHjJNzozcS
+APuVQCQnrdw7Drou3AyO47F2kxzheh8iqDU77MaH8aWhwmcpdg1vxhTCGkPRNKD8
+7XUpkh7kdpvfzQex12c3DDnVvgsa26aEXsbyxtV3ty+tiIRzRGAEEH4j5n0322Vd
+kcd96WKVplBaYncSiSFCyomAymd+eqhBsVEXDGcf+YtEq8TwGZJ3o0RNm7AfDTu6
+vuvcjdfSQSjwxshGMLq/70K+lYoKKVw6/AaxypJ/YYIHSUtNzu85bO9yW7lG2kov
+Ti7PYy9cxmZTjNqHI7Kghk3FLry/6P2bbclZxdtzJAPzZ9nw6N9xGfj2D8+3VALl
+wYsML58R3P8=
+-----END CERTIFICATE-----
+)text";
+
+  // NOLINTNEXTLINE(modernize-make-shared)
+  transport_socket_options_.reset(new Network::TransportSocketOptionsImpl("", {"non-example.com"}));
+  configCertVerificationDetails(true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  std::stringstream pem_stream(cert_v1);
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyCertChain("localhost", 54321, chain, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr))
+      << error_details;
+  EXPECT_EQ("unable to parse certificate", error_details);
+  EXPECT_EQ(verify_details, nullptr);
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyProof) {

@@ -10,8 +10,7 @@ namespace Platform {
 
 namespace {
 
-void* c_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel intel,
-                   void* context) {
+void c_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel intel, void* context) {
   auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_headers.has_value()) {
     auto raw_headers = envoyHeadersAsRawHeaderMap(headers);
@@ -27,10 +26,9 @@ void* c_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel in
   } else {
     release_envoy_headers(headers);
   }
-  return context;
 }
 
-void* c_on_data(envoy_data data, bool end_stream, envoy_stream_intel, void* context) {
+void c_on_data(envoy_data data, bool end_stream, envoy_stream_intel, void* context) {
   auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_data.has_value()) {
     auto on_data = stream_callbacks->on_data.value();
@@ -38,10 +36,9 @@ void* c_on_data(envoy_data data, bool end_stream, envoy_stream_intel, void* cont
   } else {
     release_envoy_data(data);
   }
-  return context;
 }
 
-void* c_on_trailers(envoy_headers metadata, envoy_stream_intel intel, void* context) {
+void c_on_trailers(envoy_headers metadata, envoy_stream_intel intel, void* context) {
   auto stream_callbacks = *static_cast<StreamCallbacksSharedPtr*>(context);
   if (stream_callbacks->on_trailers.has_value()) {
     auto raw_headers = envoyHeadersAsRawHeaderMap(metadata);
@@ -54,11 +51,10 @@ void* c_on_trailers(envoy_headers metadata, envoy_stream_intel intel, void* cont
   } else {
     release_envoy_headers(metadata);
   }
-  return context;
 }
 
-void* c_on_error(envoy_error raw_error, envoy_stream_intel intel,
-                 envoy_final_stream_intel final_intel, void* context) {
+void c_on_error(envoy_error raw_error, envoy_stream_intel intel,
+                envoy_final_stream_intel final_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_error.has_value()) {
@@ -71,10 +67,9 @@ void* c_on_error(envoy_error raw_error, envoy_stream_intel intel,
   }
   release_envoy_error(raw_error);
   delete stream_callbacks_ptr;
-  return nullptr;
 }
 
-void* c_on_complete(envoy_stream_intel intel, envoy_final_stream_intel final_intel, void* context) {
+void c_on_complete(envoy_stream_intel intel, envoy_final_stream_intel final_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_complete.has_value()) {
@@ -82,10 +77,9 @@ void* c_on_complete(envoy_stream_intel intel, envoy_final_stream_intel final_int
     on_complete(intel, final_intel);
   }
   delete stream_callbacks_ptr;
-  return nullptr;
 }
 
-void* c_on_cancel(envoy_stream_intel intel, envoy_final_stream_intel final_intel, void* context) {
+void c_on_cancel(envoy_stream_intel intel, envoy_final_stream_intel final_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_cancel.has_value()) {
@@ -93,17 +87,15 @@ void* c_on_cancel(envoy_stream_intel intel, envoy_final_stream_intel final_intel
     on_cancel(intel, final_intel);
   }
   delete stream_callbacks_ptr;
-  return nullptr;
 }
 
-void* c_on_send_window_available(envoy_stream_intel intel, void* context) {
+void c_on_send_window_available(envoy_stream_intel intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_send_window_available.has_value()) {
     auto on_send_window_available = stream_callbacks->on_send_window_available.value();
     on_send_window_available(intel);
   }
-  return nullptr;
 }
 
 } // namespace
@@ -118,6 +110,15 @@ envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
       &c_on_complete,
       &c_on_cancel,
       &c_on_send_window_available,
+      // Each of the function pointers in the returned `envoy_http_callbacks` struct have a
+      // `void* context` parameter. The value of the `context` field of this struct is passed in as
+      // the value of that parameter. Because this context passes through JNI, the context field
+      // can not be a smart pointer and must instead be a standard C-pointer. However, the
+      // `StreamCallbacks` object is reference counted and so will be destroyed when the final
+      // shared_ptr is destroyed. So in order to make sure that it lives long enough, the `context`
+      // field here stores a pointer to a newly created `shared_ptr` which will not go out of scope
+      // when this method returns. When the `StreamCallbacks` is no longer need (c_on_complete,
+      // c_on_cancel, c_on_error), this new `shared_ptr` will need to be deleted.
       new StreamCallbacksSharedPtr(shared_from_this()),
   };
 }
