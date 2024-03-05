@@ -127,12 +127,14 @@ public:
     grpc::gcp::HandshakerReq request;
     grpc::gcp::HandshakerResp response;
     while (stream->Read(&request)) {
-      status = ProcessRequest(&context, request, &response);
-      if (!status.ok())
-        return WriteErrorResponse(stream, status);
+      status = processRequest(&context, request, &response);
+      if (!status.ok()) {
+        return writeErrorResponse(stream, status);
+      }
       stream->Write(response);
-      if (context.state == HandshakeState::COMPLETED)
+      if (context.state == HandshakeState::COMPLETED) {
         return grpc::Status::OK;
+      }
       request.Clear();
     }
     return grpc::Status::OK;
@@ -152,33 +154,31 @@ private:
     HandshakeState state = HandshakeState::INITIAL;
   };
 
-  grpc::Status ProcessRequest(HandshakerContext* context, const grpc::gcp::HandshakerReq& request,
+  grpc::Status processRequest(HandshakerContext* context, const grpc::gcp::HandshakerReq& request,
                               grpc::gcp::HandshakerResp* response) {
     response->Clear();
     if (request.has_client_start()) {
-      return ProcessClientStart(context, request.client_start(), response);
+      return processClientStart(context, request.client_start(), response);
     } else if (request.has_server_start()) {
-      return ProcessServerStart(context, request.server_start(), response);
+      return processServerStart(context, request.server_start(), response);
     } else if (request.has_next()) {
-      return ProcessNext(context, request.next(), response);
+      return processNext(context, request.next(), response);
     }
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "Request is empty.");
+    return {grpc::StatusCode::INVALID_ARGUMENT, "Request is empty."};
   }
 
-  grpc::Status ProcessClientStart(HandshakerContext* context,
+  grpc::Status processClientStart(HandshakerContext* context,
                                   const grpc::gcp::StartClientHandshakeReq& request,
                                   grpc::gcp::HandshakerResp* response) {
     // Checks request.
     if (context->state != HandshakeState::INITIAL) {
-      return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
+      return {grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError};
     }
     if (request.application_protocols_size() == 0) {
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
-                          "At least one application protocol needed.");
+      return {grpc::StatusCode::INVALID_ARGUMENT, "At least one application protocol needed."};
     }
     if (request.record_protocols_size() == 0) {
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
-                          "At least one record protocol needed.");
+      return {grpc::StatusCode::INVALID_ARGUMENT, "At least one record protocol needed."};
     }
     // Sets response.
     response->set_out_frames(kClientInitFrame);
@@ -190,20 +190,19 @@ private:
     return grpc::Status::OK;
   }
 
-  grpc::Status ProcessServerStart(HandshakerContext* context,
+  grpc::Status processServerStart(HandshakerContext* context,
                                   const grpc::gcp::StartServerHandshakeReq& request,
                                   grpc::gcp::HandshakerResp* response) {
     // Checks request.
     if (context->state != HandshakeState::INITIAL) {
-      return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
+      return {grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError};
     }
     if (request.application_protocols_size() == 0) {
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
-                          "At least one application protocol needed.");
+      return {grpc::StatusCode::INVALID_ARGUMENT, "At least one application protocol needed."};
     }
     if (request.handshake_parameters().empty()) {
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
-                          "At least one set of handshake parameters needed.");
+      return {grpc::StatusCode::INVALID_ARGUMENT,
+              "At least one set of handshake parameters needed."};
     }
     // Sets response.
     if (request.in_bytes().empty()) {
@@ -217,7 +216,7 @@ private:
         response->set_bytes_consumed(strlen(kClientInitFrame));
         context->state = HandshakeState::SENT;
       } else {
-        return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
+        return {grpc::StatusCode::UNKNOWN, kInvalidFrameError};
       }
     }
     response->mutable_status()->set_code(grpc::StatusCode::OK);
@@ -225,16 +224,16 @@ private:
     return grpc::Status::OK;
   }
 
-  grpc::Status ProcessNext(HandshakerContext* context,
+  grpc::Status processNext(HandshakerContext* context,
                            const grpc::gcp::NextHandshakeMessageReq& request,
                            grpc::gcp::HandshakerResp* response) {
     if (context->is_client) {
       // Processes next request on client side.
       if (context->state != HandshakeState::SENT) {
-        return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
+        return {grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError};
       }
       if (request.in_bytes() != kServerFrame) {
-        return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
+        return {grpc::StatusCode::UNKNOWN, kInvalidFrameError};
       }
       response->set_out_frames(kClientFinishFrame);
       response->set_bytes_consumed(strlen(kServerFrame));
@@ -244,7 +243,7 @@ private:
       HandshakeState current_state = context->state;
       if (current_state == HandshakeState::STARTED) {
         if (request.in_bytes() != kClientInitFrame) {
-          return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
+          return {grpc::StatusCode::UNKNOWN, kInvalidFrameError};
         }
         response->set_out_frames(kServerFrame);
         response->set_bytes_consumed(strlen(kClientInitFrame));
@@ -253,23 +252,23 @@ private:
         // Client finish frame may be sent along with the first payload from the
         // client, handshaker only consumes the client finish frame.
         if (request.in_bytes().substr(0, strlen(kClientFinishFrame)) != kClientFinishFrame) {
-          return grpc::Status(grpc::StatusCode::UNKNOWN, kInvalidFrameError);
+          return {grpc::StatusCode::UNKNOWN, kInvalidFrameError};
         }
         response->set_bytes_consumed(strlen(kClientFinishFrame));
         context->state = HandshakeState::COMPLETED;
       } else {
-        return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError);
+        return {grpc::StatusCode::FAILED_PRECONDITION, kWrongStateError};
       }
     }
     // At this point, processing next request succeeded.
     response->mutable_status()->set_code(grpc::StatusCode::OK);
     if (context->state == HandshakeState::COMPLETED) {
-      *response->mutable_result() = GetHandshakerResult();
+      *response->mutable_result() = getHandshakerResult();
     }
     return grpc::Status::OK;
   }
 
-  grpc::Status WriteErrorResponse(
+  grpc::Status writeErrorResponse(
       grpc::ServerReaderWriter<grpc::gcp::HandshakerResp, grpc::gcp::HandshakerReq>* stream,
       const grpc::Status& status) {
     EXPECT_TRUE(status.ok());
@@ -280,7 +279,7 @@ private:
     return status;
   }
 
-  grpc::gcp::HandshakerResult GetHandshakerResult() {
+  grpc::gcp::HandshakerResult getHandshakerResult() {
     grpc::gcp::HandshakerResult result;
     result.set_application_protocol("grpc");
     result.set_record_protocol("ALTSRP_GCM_AES128_REKEY");
@@ -299,7 +298,7 @@ private:
   const std::string peer_identity_;
 };
 
-std::unique_ptr<Service> CreateFakeHandshakerService(const std::string& peer_identity) {
+std::unique_ptr<Service> createFakeHandshakerService(const std::string& peer_identity) {
   return std::unique_ptr<Service>{new FakeHandshakerService(peer_identity)};
 }
 
@@ -347,7 +346,7 @@ public:
         service = std::unique_ptr<grpc::Service>{capturing_handshaker_service_};
       } else {
         capturing_handshaker_service_ = nullptr;
-        service = CreateFakeHandshakerService("peer_identity");
+        service = createFakeHandshakerService("peer_identity");
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";

@@ -55,12 +55,14 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
     callback = [&context, filter_config, timeout_ms,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
-      auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
+      auto client_or_error =
           context.serverFactoryContext()
               .clusterManager()
               .grpcAsyncClientManager()
-              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true),
-          std::chrono::milliseconds(timeout_ms));
+              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+      THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+      auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
+          client_or_error.value(), std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
   }

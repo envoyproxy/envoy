@@ -19,6 +19,7 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "@envoy_api//envoy/extensions/filters/http/wasm/v3:pkg_cc_proto",
     ],

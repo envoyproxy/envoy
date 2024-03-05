@@ -135,7 +135,7 @@ void Filter::resolveSettings() {
   if (auto route_settings = getRouteSpecificSettings()) {
     payload_passthrough_ = route_settings->payloadPassthrough();
     invocation_mode_ = route_settings->invocationMode();
-    arn_ = std::move(route_settings)->arn();
+    arn_ = route_settings->arn();
     host_rewrite_ = route_settings->hostRewrite();
   } else {
     payload_passthrough_ = settings_.payloadPassthrough();

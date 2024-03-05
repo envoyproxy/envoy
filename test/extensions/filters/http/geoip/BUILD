@@ -59,6 +59,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = select({
         "//bazel:linux": ["geoip_filter_integration_test.cc"],
+        "//bazel:darwin_any": ["geoip_filter_integration_test.cc"],
         "//conditions:default": [],
     }),
     data = [

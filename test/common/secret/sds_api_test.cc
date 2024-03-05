@@ -793,7 +793,7 @@ generic_secret:
   const std::string secret_path =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/aes_128_key";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(secret_path)),
-            Config::DataSource::read(generic_secret.secret(), true, *api_));
+            Config::DataSource::read(generic_secret.secret(), true, *api_).value());
 }
 
 // Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().

@@ -368,7 +368,7 @@ void HttpIntegrationTest::initialize() {
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
   quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
-      *api_, stats_store_, context_manager_, san_to_match_);
+      *api_, stats_store_, context_manager_, thread_local_, san_to_match_);
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().

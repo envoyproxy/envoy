@@ -26,12 +26,15 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
   auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
       data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true);
   THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+  absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
+      Utility::parseRateLimitSettings(api_config_source);
+  THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
   GrpcMuxContext grpc_mux_context{
       factory_or_error.value()->createUncachedRawAsyncClient(),
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),
       /*local_info_=*/data.local_info_,
-      /*rate_limit_settings_=*/Utility::parseRateLimitSettings(api_config_source),
+      /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
       /*scope_=*/data.scope_,
       /*config_validators_=*/std::move(custom_config_validators),
       /*xds_resources_delegate_=*/{},
