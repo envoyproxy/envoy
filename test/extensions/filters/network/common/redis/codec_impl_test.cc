@@ -503,16 +503,16 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandTrimWhitespace) {
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedEmpty) {
-  RespValue ping;
-  ping.type(RespType::BulkString);
-  ping.asString() = "";
+  RespValue empty;
+  empty.type(RespType::BulkString);
+  empty.asString() = "";
 
   buffer_.add("\"\"\r\n");
   decoder_.decode(buffer_);
   EXPECT_EQ(1UL, decoded_values_.size());
   EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
   EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
-  EXPECT_EQ(ping, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(empty, decoded_values_[0]->asArray()[0]);
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedCommand) {
@@ -551,9 +551,9 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedEmptyArgument) {
   echo.type(RespType::BulkString);
   echo.asString() = "echo";
 
-  RespValue hello;
-  hello.type(RespType::BulkString);
-  hello.asString() = "";
+  RespValue empty;
+  empty.type(RespType::BulkString);
+  empty.asString() = "";
 
   buffer_.add("echo \"\"\r\n");
   decoder_.decode(buffer_);
@@ -561,7 +561,7 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedEmptyArgument) {
   EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
   EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
   EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
-  EXPECT_EQ(hello, decoded_values_[0]->asArray()[1]);
+  EXPECT_EQ(empty, decoded_values_[0]->asArray()[1]);
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedWhitespace) {
