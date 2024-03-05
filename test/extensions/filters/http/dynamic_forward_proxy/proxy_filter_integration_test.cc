@@ -165,7 +165,7 @@ typed_config:
     }
     if (use_cache_file_) {
       cache_file_value_contents_ +=
-          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+          absl::StrCat(upstream_address_fn_(0)->ip()->addressAsString(), ":",
                        fake_upstreams_[0]->localAddress()->ip()->port(), "|", dns_cache_ttl_, "|0");
       std::string host =
           fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
@@ -678,6 +678,90 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+// As with UseCacheFileShortTtl set up with a short TTL but make sure the DNS
+// resolution failure doesn't result in killing off a stream in progress.
+TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResFail) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  upstream_tls_ = false; // avoid cert errors for unknown hostname
+  use_cache_file_ = true;
+  dns_cache_ttl_ = 2;
+
+  dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
+  initializeWithArgs();
+  std::string host =
+      fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // When the TTL is hit, the host will be removed from the DNS cache. This
+  // won't break the outstanding connection.
+  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+
+  // Kick off a new request before the first is served.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Make sure response 1 is served.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Because request 2 started after DNS entry eviction it will fail due to DNS lookup failure.
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
+}
+const BaseIntegrationTest::InstanceConstSharedPtrFn alternateLoopbackFunction() {
+  return [](int) { return Network::Utility::parseInternetAddress("127.0.0.2", 0); };
+}
+
+// Like StreamPersistAcrossShortTtlResFail but make sure the stream persists
+// across successful DNS reload.
+TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResSuccess) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    return;
+  }
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  upstream_tls_ = false; // avoid cert errors for unknown hostname
+  use_cache_file_ = true;
+  dns_cache_ttl_ = 2;
+  // The test will start with the fake upstream latched to 127.0.0.2.
+  // Re-resolve will point it at 127.0.0.1
+  upstream_address_fn_ = alternateLoopbackFunction();
+
+  initializeWithArgs();
+  std::string host =
+      fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // When the TTL is hit, the host will be removed from the DNS cache. This
+  // won't break the outstanding connection.
+  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+
+  // Kick off a new request before the first is served.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Make sure response 1 is served.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The request will fail as there's no upstream on 127.0.0.1
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
 }
 
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtlHostActive) {
