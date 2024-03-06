@@ -16,6 +16,7 @@
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/mock_parent_drained_callback_registrar.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -52,6 +53,7 @@ public:
 class UdpListenerImplTest : public UdpListenerImplTestBase {
 public:
   void setup(bool prefer_gro = false) {
+    UdpListenerImplTestBase::setup();
     ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(false));
     // Return the real version by default.
     ON_CALL(override_syscall_, supportsMmsg())
@@ -383,6 +385,106 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+class HotRestartedUdpListenerImplTest : public UdpListenerImplTest {
+public:
+  void SetUp() override {
+#ifdef WIN32
+    GTEST_SKIP() << "Hot restart is not supported on Windows.";
+#endif
+  }
+  void setup() {
+    io_handle_ = &useHotRestartSocket(registrar_);
+    // File event should be created listening to no events (i.e. disabled).
+    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0));
+    // Parent drained callback should be registered when the listener is created.
+    // We capture the callback so we can simulate "drain complete".
+    EXPECT_CALL(registrar_, registerParentDrainedCallback(_, _))
+        .WillOnce(
+            [this](const Address::InstanceConstSharedPtr&, absl::AnyInvocable<void()> callback) {
+              parent_drained_callback_ = std::move(callback);
+            });
+    UdpListenerImplTest::setup();
+    testing::Mock::VerifyAndClearExpectations(&registrar_);
+  }
+
+protected:
+  MockParentDrainedCallbackRegistrar registrar_;
+  MockIoHandle* io_handle_;
+  absl::AnyInvocable<void()> parent_drained_callback_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, HotRestartedUdpListenerImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+/**
+ * During hot restart, while the parent instance is draining, a quic udp
+ * listener (created with a parent_drained_callback_registrar) should not
+ * be reading packets, regardless of enable/disable calls.
+ * It should begin reading packets after drain completes.
+ */
+TEST_P(HotRestartedUdpListenerImplTest, EnableAndDisableDuringParentDrainShouldDoNothing) {
+  setup();
+  // Enabling and disabling listener should *not* trigger any
+  // event actions on the io_handle, because of listener being paused
+  // while draining.
+  EXPECT_CALL(*io_handle_, enableFileEvents(_)).Times(0);
+  listener_->disable();
+  listener_->enable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Ending parent drain should cause io_handle to go into reading mode.
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Enabling and disabling once unpaused should update io_handle.
+  EXPECT_CALL(*io_handle_, enableFileEvents(0));
+  listener_->disable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  listener_->enable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+}
+
+/**
+ * Mostly the same as EnableAndDisableDuringParentDrainShouldDoNothing, but in disabled state when
+ * drain ends.
+ */
+TEST_P(HotRestartedUdpListenerImplTest, EndingParentDrainedWhileDisabledShouldNotStartReading) {
+  setup();
+  // Enabling and disabling listener should *not* trigger any
+  // event actions on the io_handle, because of listener being paused
+  // while draining.
+  EXPECT_CALL(*io_handle_, enableFileEvents(_)).Times(0);
+  listener_->enable();
+  listener_->disable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Ending drain should not trigger any event changes because the last state
+  // of the listener was disabled.
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Enabling after unpaused should set io_handle to reading/writing.
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  listener_->enable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+}
+
+TEST_P(HotRestartedUdpListenerImplTest,
+       ParentDrainedCallbackAfterListenerDestroyedShouldDoNothing) {
+  setup();
+  EXPECT_CALL(*io_handle_, enableFileEvents(_)).Times(0);
+  listener_ = nullptr;
+  // Signaling end-of-drain after the listener was destroyed should do nothing.
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // At this point io_handle should be an invalid reference.
 }
 
 /**
