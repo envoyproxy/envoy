@@ -39,7 +39,6 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   inspect(input);
   output_ = nullptr;
   if (decoding_error_ || is_frame_oversized_) {
-    std::cout << "tyxia_error\n";
     return false;
   }
   input.drain(input.length());
@@ -49,7 +48,6 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
 bool Decoder::frameStart(uint8_t flags) {
   // Unsupported flags.
   if (flags & ~GRPC_FH_COMPRESSED) {
-    std::cout << "tyxia_decoing_error\n";
     decoding_error_ = true;
     return false;
   }
@@ -109,7 +107,6 @@ uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
         // Compares the frame length against maximum length when `max_frame_length_` is configured,
         if (max_frame_length_ != 0 && length_ > max_frame_length_) {
           // Set the flag to indicate the over-limit error and return.
-          std::cout << "tyxia_frame_overlimit\n";
           is_frame_oversized_ = true;
           return delta;
         }
