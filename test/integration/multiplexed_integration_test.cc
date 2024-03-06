@@ -1033,7 +1033,7 @@ TEST_P(MetadataIntegrationTest, Metadata) {
 #ifdef ENVOY_ENABLE_QUIC
   EXPECT_TRUE(GetQuicReloadableFlag(quic_enable_http3_metadata_decoding));
 #else
-  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
+  EXCLUDE_DOWNSTREAM_HTTP3;
 #endif
 
   initialize();
