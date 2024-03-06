@@ -50,6 +50,11 @@ public:
   }
 
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+    if (require_reconnect_ && !client_->connect()) {
+      ENVOY_LOG_MISC(debug, "Unable to reconnect to cluster");
+      return Network::FilterStatus::StopIteration;
+    }
+
     stats_.on_data_.inc();
     ENVOY_LOG_MISC(debug, "Downstream onData: {}, length: {} sending to upstream", data.toString(),
                    data.length());
@@ -75,6 +80,8 @@ public:
     read_callbacks_->connection().enableHalfClose(true);
     read_callbacks_->connection().addConnectionCallbacks(*downstream_callbacks_);
   }
+
+  bool require_reconnect_{false};
 
 private:
   struct DownstreamCallbacks : public Envoy::Network::ConnectionCallbacks {
@@ -121,6 +128,12 @@ private:
     void onEvent(Network::ConnectionEvent event) override {
       ENVOY_LOG_MISC(debug, "tcp client test filter upstream callback onEvent: {}",
                      static_cast<int>(event));
+
+      if (event == Network::ConnectionEvent::RemoteClose ||
+          event == Network::ConnectionEvent::LocalClose) {
+        parent_.require_reconnect_ = true;
+      }
+
       if (event != Network::ConnectionEvent::RemoteClose) {
         return;
       }

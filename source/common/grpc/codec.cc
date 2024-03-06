@@ -41,6 +41,7 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   if (decoding_error_ || is_frame_oversized_) {
     return false;
   }
+
   input.drain(input.length());
   return true;
 }
