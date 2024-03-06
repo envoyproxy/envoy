@@ -148,7 +148,7 @@ public:
       if (parent_.expect_gro_) {
         EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
       }
-      EXPECT_CALL(*socket_->io_handle_, supportsMmsg()).Times(2u);
+      EXPECT_CALL(*socket_->io_handle_, supportsMmsg()).Times(1u);
       // Return the datagram.
       EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
