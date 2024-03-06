@@ -1,6 +1,6 @@
 #include "envoy/admin/v3/memory.pb.h"
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
