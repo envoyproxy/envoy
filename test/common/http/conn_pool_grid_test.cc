@@ -13,6 +13,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/connection.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
@@ -131,7 +132,10 @@ public:
         options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         alternate_protocols_(std::make_shared<HttpServerPropertiesCacheImpl>(
             dispatcher_, std::vector<std::string>(), nullptr, 10)),
-        quic_stat_names_(store_.symbolTable()) {}
+        quic_stat_names_(store_.symbolTable()) {
+    ON_CALL(factory_context_.server_context_, threadLocal())
+        .WillByDefault(ReturnRef(thread_local_));
+  }
 
   void initialize() {
     quic_connection_persistent_info_ =
@@ -194,6 +198,9 @@ public:
 
   StreamInfo::MockStreamInfo info_;
   NiceMock<MockRequestEncoder> encoder_;
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 // Test the first pool successfully connecting.
@@ -945,7 +952,6 @@ TEST_F(ConnectivityGridTest, Http3FailedH2SuceedsInline) {
 } // namespace Http
 } // namespace Envoy
 
-#include "test/mocks/server/transport_socket_factory_context.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 namespace Envoy {
 namespace Http {
@@ -957,9 +963,8 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   auto factory =
-      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
+      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context_);
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
@@ -999,12 +1004,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(factory_context_.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
-      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
+      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context_);
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);

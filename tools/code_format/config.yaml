@@ -119,7 +119,6 @@ paths:
     - source/common/stats/tag_extractor_impl.cc
     - source/common/stats/tag_producer_impl.cc
     - source/common/http/http2/codec_impl.cc
-    - source/common/http/utility.cc
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/http/match_delegate/config.cc
@@ -171,6 +170,8 @@ paths:
     - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
+    - source/common/tls/context_impl.cc
+    - source/common/tls/context_config_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
@@ -392,6 +393,7 @@ visibility_excludes:
 - source/extensions/filters/network/common/BUILD
 - source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
+- source/extensions/transport_sockets/tap/BUILD
 - source/extensions/udp_packet_writer/default/BUILD
 - source/extensions/udp_packet_writer/gso/BUILD
 - source/extensions/path/uri_template_lib/BUILD
