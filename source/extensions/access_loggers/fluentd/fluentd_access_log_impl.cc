@@ -23,7 +23,7 @@ FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Tcp::AsyncTcpClientPtr client,
                                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_options(),
                                                                   max_connect_attempts,
                                                                   DefaultMaxConnectAttempts)
-                                 : DefaultMaxConnectAttempts),
+                                : DefaultMaxConnectAttempts),
       stats_scope_(parent_scope.createScope(config.stat_prefix())),
       fluentd_stats_(
           {ACCESS_LOG_FLUENTD_STATS(POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_))}),
