@@ -59,7 +59,7 @@ minor_behavior_changes:
   change: |
     ``thread_local_cluster_manager.worker_0.*`` metrics are now parsed to use the
     ``worker_id`` tag like other metrics with ``worker_id`` do, when
-    :ref:`use_all_default_tags <envoy_v3_api_msg_config.metrics.v3.StatsConfig.use_all_default_tags>` is true.
+    :ref:`use_all_default_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>` is true.
 - area: aws
   change: |
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
