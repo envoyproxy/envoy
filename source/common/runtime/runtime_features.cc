@@ -57,8 +57,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_connection_close_header_in_redirec
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_decode_metadata_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
-RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_http2_validate_authority_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
@@ -149,6 +147,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
+
+// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
