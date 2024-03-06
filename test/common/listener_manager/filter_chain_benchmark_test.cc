@@ -155,11 +155,11 @@ const char YamlHeader[] = R"EOF(
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 const char YamlSingleServer[] = R"EOF(
     - filter_chain_match:
         server_names: "server1.example.com"
@@ -170,11 +170,11 @@ const char YamlSingleServer[] = R"EOF(
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 const char YamlSingleDstPortTop[] = R"EOF(
     - filter_chain_match:
         destination_port: )EOF";
@@ -185,11 +185,11 @@ const char YamlSingleDstPortBottom[] = R"EOF(
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
 class FilterChainBenchmarkFixture : public ::benchmark::Fixture {

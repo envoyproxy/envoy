@@ -193,6 +193,8 @@ build:mobile-remote-ci-linux --config=mobile-remote-ci-common
 build:mobile-remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
 build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
+# Temporary revert to C++17 for mobile NDK builds.
+build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer

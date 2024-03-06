@@ -6,8 +6,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/http_server_properties_cache_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -261,8 +261,7 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
                                100);
 }
 
-// TODO(32151): Figure out why it's flaky and re-enable.
-TEST_P(FilterIntegrationTest, DISABLED_AltSvcCachedH2Slow) {
+TEST_P(FilterIntegrationTest, AltSvcCachedH2Slow) {
 #ifdef WIN32
   // TODO: sort out what race only happens on windows and GCC.
   GTEST_SKIP() << "Skipping on Windows";
