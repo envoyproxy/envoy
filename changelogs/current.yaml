@@ -204,6 +204,11 @@ new_features:
     Added QUIC protocol option :ref:`send_disable_active_migration
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to make the server send clients a transport
     parameter to discourage client endpoints from active migration.
+- area: quic
+  change: |
+    Added support for QUIC listeners to :ref:`choose certificates based on SNI <arch_overview_ssl_cert_select>` and load certificates
+    from formats other than PEM, such as :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`.
+    This behavior can be disabled with runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code``.
 - area: ext_proc
   change: |
     implemented
@@ -271,6 +276,9 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
 
 deprecated:
 - area: listener

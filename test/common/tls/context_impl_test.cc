@@ -112,8 +112,8 @@ public:
     }};
   }
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{}));
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(manager_.createSslServerContext(
+        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -620,14 +620,15 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_REGEX(
-      manager_.createSslServerContext(*store_.rootScope(), server_context_config, {}),
+      manager_.createSslServerContext(*store_.rootScope(), server_context_config, {}, nullptr),
       EnvoyException, "has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
 public:
   Envoy::Ssl::ServerContextSharedPtr loadConfig(ServerContextConfigImpl& cfg) {
-    return manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{});
+    return manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{},
+                                           nullptr);
   }
 
   Envoy::Ssl::ServerContextSharedPtr loadConfigYaml(const std::string& yaml) {
@@ -826,8 +827,8 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_.createSslServerContext(*store_.rootScope(), cfg, std::vector<std::string>{}));
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(manager_.createSslServerContext(
+        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -1900,7 +1901,7 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
-          *store.rootScope(), client_context_config, std::vector<std::string>{})),
+          *store.rootScope(), client_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Server TlsCertificates must have a certificate specified");
 }
 
@@ -2025,7 +2026,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
-          *store.rootScope(), server_context_config, std::vector<std::string>{})),
+          *store.rootScope(), server_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Failed to get BoringSSL private key method from provider");
 }
 
@@ -2193,13 +2194,15 @@ TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndCertChain) {
       "Certificate configuration can't have both pkcs12 and certificate_chain");
 }
 
+// TODO: test throw from additional_init
+
 // Subclass ContextImpl so we can instantiate directly from tests, despite the
 // constructor being protected.
 class TestContextImpl : public ContextImpl {
 public:
   TestContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
                   TimeSource& time_source)
-      : ContextImpl(scope, config, time_source), pool_(scope.symbolTable()),
+      : ContextImpl(scope, config, time_source, nullptr), pool_(scope.symbolTable()),
         fallback_(pool_.add("fallback")) {}
 
   void incCounter(absl::string_view name, absl::string_view value) {
