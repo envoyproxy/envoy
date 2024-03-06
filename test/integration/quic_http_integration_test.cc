@@ -20,14 +20,14 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/quic/test_utils.h"
+#include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/common/upstream/utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/utility.h"
-#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/filters/test_listener_filter.pb.h"
 #include "test/integration/http_integration.h"
@@ -744,6 +744,12 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, LegacyCertLoadingAndSelection) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.quic_handle_certs_with_shared_tls_code",
+                                    "false");
+  testMultipleQuicConnections();
 }
 
 // Not only test multiple quic connections, but disconnect and reconnect to

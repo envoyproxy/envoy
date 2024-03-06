@@ -473,6 +473,13 @@ absl::Status DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& o
                                                                flag_data.status().message());
 
   const CreateFlags flags = static_cast<CreateFlags>(flag_data.value());
+
+  if (opcode == OpCodes::CreateTtl) {
+    absl::StatusOr<int64_t> ttl = helper_.peekInt64(data, offset);
+    EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(ttl, opcode,
+                                                                 ttl.status().message());
+  }
+
   status = callbacks_.onCreateRequest(path.value(), flags, opcode);
   EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, opcode);
 

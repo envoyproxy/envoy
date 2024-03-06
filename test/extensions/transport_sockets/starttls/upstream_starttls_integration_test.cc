@@ -2,10 +2,10 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/network/connection_impl.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/starttls/starttls_socket.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
