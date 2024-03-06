@@ -65,11 +65,11 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   if (Stats::totalCurrentlyAllocated() <= initial_allocated_bytes) {
     GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
-  auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
 #if defined(GPERFTOOLS_TCMALLOC)
   EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
                "Memory releasing is not supported for gperf tcmalloc.");
 #else
+  auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS(
       "info",
       "Configured tcmalloc with background release rate: 1048576 bytes per 1000 milliseconds",
