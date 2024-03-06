@@ -105,7 +105,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
   EXPECT_EQ(0UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
 }
 
-TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleasedDummy) {
+TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   size_t initial_allocated_bytes = Stats::totalCurrentlyAllocated();
   auto a = std::make_unique<uint32_t[]>(40 * MB);
   auto b = std::make_unique<uint32_t[]>(40 * MB);
