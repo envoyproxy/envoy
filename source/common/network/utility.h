@@ -384,7 +384,7 @@ public:
    * the IoHandle to ensure the platform supports GRO before using it.
    * @param allow_mmsg whether to use recvmmsg, iff the platform supports it. This function will
    * check the IoHandle to ensure the platform supports recvmmsg before using it. If `allow_gro` is
-   * true and the platform supports GRO, then it wil take precedence over using recvmmsg.
+   * true and the platform supports GRO, then it will take precedence over using recvmmsg.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel.
    * Return the io error encountered or nullptr if no io error but read stopped
    * because of MAX_NUM_PACKETS_PER_EVENT_LOOP.
