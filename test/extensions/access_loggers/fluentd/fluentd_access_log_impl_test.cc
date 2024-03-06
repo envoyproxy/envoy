@@ -38,8 +38,8 @@ public:
     EXPECT_CALL(*timer_, enableTimer(_, _));
 
     config_.set_tag(tag_);
-    config_.mutable_retry_options()->mutable_max_connect_attempts()
-        ->set_value(max_connect_attempts);
+    config_.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
+        max_connect_attempts);
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     logger_ = std::make_unique<FluentdAccessLoggerImpl>(
         Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_, *stats_store_.rootScope());

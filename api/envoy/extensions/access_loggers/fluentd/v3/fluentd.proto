@@ -24,7 +24,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.access_loggers.fluentd]
 // [#next-free-field: 8]
 message FluentdAccessLogConfig {
-
   message RetryOptions {
     // The number of times the logger will attempt to connect to the upstream.
     // The default value is 1, i.e. only a single connection attempt will be made and no reconnection
