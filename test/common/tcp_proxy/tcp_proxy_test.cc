@@ -103,7 +103,7 @@ public:
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
             .WillOnce(Invoke(
-                [=](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+                [=, this](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
                   conn_pool_callbacks_.push_back(&cb);
                   return onNewConnection(conn_pool_handles_.at(i).get());
                 }))
