@@ -392,8 +392,8 @@ message HealthCheck {
   // The default value is false.
   bool always_log_health_check_failures = 19;
 
-  // If set to true, health check success events will always be logged. If set to false, only the
-  // initial health check success event will be logged.
+  // If set to true, health check success events will always be logged. If set to false, only host addition event will be logged
+  // if it is the first successful health check, or if the healthy threshold is reached.
   // The default value is false.
   bool always_log_health_check_success = 26;
 
