@@ -33,12 +33,13 @@ public:
       : async_client_(new Tcp::AsyncClient::MockAsyncTcpClient()),
         timer_(new Event::MockTimer(&dispatcher_)) {}
 
-  void init(int buffer_size_bytes = 0, int max_reconnect_attempts = 0) {
+  void init(int buffer_size_bytes = 0, int max_connect_attempts = 1) {
     EXPECT_CALL(*async_client_, setAsyncTcpClientCallbacks(_));
     EXPECT_CALL(*timer_, enableTimer(_, _));
 
     config_.set_tag(tag_);
-    config_.set_max_reconnect_attempts(max_reconnect_attempts);
+    config_.mutable_retry_options()->mutable_max_connect_attempts()
+        ->set_value(max_connect_attempts);
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     logger_ = std::make_unique<FluentdAccessLoggerImpl>(
         Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_, *stats_store_.rootScope());
@@ -166,7 +167,7 @@ TEST_F(FluentdAccessLoggerImplTest, CallbacksTest) {
 }
 
 TEST_F(FluentdAccessLoggerImplTest, SuccessfulReconnect) {
-  init(0, 1);
+  init(0, 2);
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connect())
@@ -189,7 +190,7 @@ TEST_F(FluentdAccessLoggerImplTest, SuccessfulReconnect) {
 }
 
 TEST_F(FluentdAccessLoggerImplTest, ReconnectFailure) {
-  init(0, 1);
+  init(0, 2);
   EXPECT_CALL(*timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
@@ -207,7 +208,7 @@ TEST_F(FluentdAccessLoggerImplTest, ReconnectFailure) {
 }
 
 TEST_F(FluentdAccessLoggerImplTest, TwoReconnects) {
-  init(0, 2);
+  init(0, 3);
   EXPECT_CALL(*timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));

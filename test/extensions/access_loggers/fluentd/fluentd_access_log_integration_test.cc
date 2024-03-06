@@ -33,7 +33,7 @@ public:
   void init(const std::string cluster_name = default_cluster_name,
             bool flush_access_log_on_connected = false,
             absl::optional<uint32_t> buffer_size_bytes = absl::nullopt,
-            absl::optional<uint32_t> max_reconnect_attempts = absl::nullopt) {
+            absl::optional<uint32_t> max_connect_attempts = absl::nullopt) {
     setUpstreamCount(2);
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier(
@@ -65,8 +65,9 @@ public:
             access_log_config.mutable_buffer_size_bytes()->set_value(buffer_size_bytes.value());
           }
 
-          if (max_reconnect_attempts.has_value()) {
-            access_log_config.set_max_reconnect_attempts(max_reconnect_attempts.value());
+          if (max_connect_attempts.has_value()) {
+            access_log_config.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
+                max_connect_attempts.value());
           }
 
           auto* record = access_log_config.mutable_record();
@@ -229,7 +230,7 @@ TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosed) {
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosedWithMultipleReconnects) {
-  init(default_cluster_name, false, {}, /* max_reconnect_attempts = */ 2);
+  init(default_cluster_name, false, {}, /* max_reconnect_attempts = */ 3);
   sendBidirectionalData();
 
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
@@ -254,7 +255,6 @@ TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosedWithMultipleReco
   ASSERT_TRUE(fake_access_log_connection_3->close());
 
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 3);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.reconnect_attempts_exceeded", 1);
 }
 
 } // namespace

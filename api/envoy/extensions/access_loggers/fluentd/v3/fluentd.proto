@@ -24,6 +24,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.access_loggers.fluentd]
 // [#next-free-field: 8]
 message FluentdAccessLogConfig {
+
+  message RetryOptions {
+    // The number of times the logger will attempt to connect to the upstream.
+    // The default value is 1, i.e. only a single connection attempt will be made and no reconnection
+    // attempts will be made if the initial connection had failed.
+    // Note: Reconnection attempts will also be made if the initial connection was established, and
+    // disconnected after some time.
+    // [#comment:TODO(ohadvano): add option to reconnect only if the initial handshake failed.]
+    // Caution: while attempting to reconnect, the log buffer may continue to fill. It is recommended
+    // to set this field to a reasonable number to avoid too many log records buffered.
+    google.protobuf.UInt32Value max_connect_attempts = 1;
+  }
+
   // The upstream cluster to connect to for streaming the Fluentd messages.
   string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -68,10 +81,6 @@ message FluentdAccessLogConfig {
   //  }
   google.protobuf.Struct record = 6 [(validate.rules).message = {required: true}];
 
-  // Reconnect to the upstream cluster in case that the TCP connection is closed for any reason.
-  // By default, there will be no reconnect attempts. If the upstream connection is closed, new
-  // log records will be lost.
-  // Caution: while attempting to reconnect, the log buffer may continue to fill. It is recommended
-  // to set this field to a reasonable number to avoid too many log records buffered.
-  uint32 max_reconnect_attempts = 7;
+  // Optional retry, in case upstream connection has failed.
+  RetryOptions retry_options = 7;
 }
