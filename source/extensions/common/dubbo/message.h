@@ -7,7 +7,7 @@
 #include "envoy/common/pure.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "hessian2/object.hpp"
+#include "source/extensions/common/dubbo/hessian2_utils.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -86,7 +86,7 @@ enum class RpcResponseType : uint8_t {
 };
 
 using Attachments = absl::flat_hash_map<std::string, std::string>;
-using ArgumentArr = absl::InlinedVector<Hessian2::ObjectPtr, 4>;
+using ArgumentVec = absl::InlinedVector<Hessian2::ObjectPtr, 4>;
 
 class RequestContent : Envoy::Logger::Loggable<Envoy::Logger::Id::dubbo> {
 public:
@@ -96,59 +96,55 @@ public:
   // Initialize the content buffer with the given types and arguments and attachments.
   // The initialize() call will also encode these types and arguments into the
   // content buffer.
-  void initialize(std::string&& types, ArgumentArr&& argvs, Attachments&& attachs);
+  void initialize(std::string&& types, ArgumentVec&& argvs, Attachments&& attachs);
 
-  // Underlying content buffer. Never modify the buffer directly except for request
-  // encoding.
-  Buffer::Instance& buffer();
-
-  // Re-encode the content buffer if the content has been modified. For example,
-  // the attachment has been modified.
-  void encode();
+  // Underlying content buffer. Use the const_cast to move the ownership of the buffer
+  // when encoding the whole request.
+  const Buffer::Instance& buffer();
 
   // Get all the arguments of the request.
-  // NOTE: Never modify the arguments directly except for move the ownership.
-  // The whole request content should not be used after the move.
-  ArgumentArr& arguments();
+  const ArgumentVec& arguments();
 
   // Get the argument at the given index. The index is 0-based and should be less than
   // the number of arguments. If the index is out of range, nullptr will be returned.
-  const Hessian2::Object* getArgument(size_t index) const;
+  const Hessian2::Object* getArgument(size_t index);
 
   // Get all the attachments of the request.
-  // NOTE: Never modify the attachments directly except for move the ownership.
-  // The whole request content should not be used after the move.
-  Attachments& attachments();
+  const Attachments& attachments();
 
   // Set the attachment with the given key and value. If the key already exists, the
   // value will be updated. Otherwise, a new key-value pair will be added.
   void setAttachment(absl::string_view key, absl::string_view val);
 
-  // Get the attachment with the given key. If the key does not exist, absl::nullopt
-  // will be returned.
-  absl::optional<absl::string_view> getAttachment(absl::string_view key) const;
-
 private:
   // Decode the content buffer into types, arguments and attachments. The decoding is
   // lazy and will be triggered when the content is accessed.
-  void lazyDecode() const;
+  void lazyDecode();
 
-  void encodeAll();
+  // Re-encode the attachments into the content buffer.
+  void encodeAttachments();
 
-  mutable Buffer::OwnedImpl content_buffer_;
+  // Re-encode the types, arguments and attachments into the content buffer.
+  void encodeEverything();
+
+  // Called when the content is broken. The whole content will be reset to an empty
+  // state.
+  void handleBrokenValue();
+
+  Buffer::OwnedImpl content_buffer_;
 
   // If the content has been decoded. This ensures the decoding is only performed once.
-  mutable bool decoded_{false};
+  bool decoded_{false};
 
-  // If the content has been updated. This ensures the re-serialization is only
-  // when the content has been modified.
-  mutable bool updated_{false};
+  // If the attachments has been updated. This ensures the re-encoding is only
+  // when the attachment has been modified.
+  bool updated_{false};
 
-  mutable uint64_t argvs_size_{0};
+  uint64_t argvs_size_{0};
 
-  mutable std::string types_;
-  mutable ArgumentArr argvs_;
-  mutable Attachments attachs_;
+  std::string types_;
+  ArgumentVec argvs_;
+  Attachments attachs_;
 };
 
 /**
@@ -159,12 +155,10 @@ public:
   absl::string_view service() const;
   absl::string_view method() const;
   absl::string_view version() const;
-  absl::optional<absl::string_view> group() const;
 
   void setService(absl::string_view name);
   void setMethod(absl::string_view name);
   void setVersion(absl::string_view version);
-  void setGroup(absl::string_view group);
 
   RequestContent& content() const;
 
@@ -184,47 +178,52 @@ public:
   // Initialize the content buffer with the given buffer and length.
   void initialize(Buffer::Instance& buffer, uint64_t length);
 
-  // Initialize the content buffer with the given value and attachments. The initialize()
-  // call will also encode the value and attachments into the content buffer.
-  void initialize(Hessian2::ObjectPtr&& value);
+  // Initialize the content buffer with the given result and attachments. The initialize()
+  // call will also encode the result and attachments into the content buffer.
+  void initialize(Hessian2::ObjectPtr&& value, Attachments&& attachs);
 
-  // Underlying content buffer. Never modify the buffer directly except for response
-  // encoding.
-  Buffer::Instance& buffer() { return content_buffer_; }
+  // Underlying content buffer. Use the const_cast to move the ownership of the buffer
+  // when encoding the whole response.
+  const Buffer::Instance& buffer();
 
-  // Re-encode the content buffer if the content has been modified. For example,
-  // the attachment has been modified.
-  void encode();
-
-  // Get the value of the response. If the content has not been decoded, the decoding
+  // Get the result of the response. If the content has not been decoded, the decoding
   // will be triggered.
-  Hessian2::Object* value() const;
+  const Hessian2::Object* result();
+
+  // Get all the attachments of the response.
+  const Attachments& attachments();
 
   // Set the attachment with the given key and value. If the key already exists, the
   // value will be updated. Otherwise, a new key-value pair will be added.
   void setAttachment(absl::string_view key, absl::string_view val);
-
-  // Get the attachment with the given key. If the key does not exist, absl::nullopt
-  // will be returned.
-  absl::string_view getAttachment(absl::string_view key) const;
 
 private:
   // Decode the content buffer into value and attachments. The decoding is lazy and will
   // be triggered when the content is accessed.
   void lazyDecode();
 
+  // Re-encode the attachments into the content buffer.
+  void encodeAttachments();
+
+  // Re-encode the result and attachments into the content buffer.
+  void encodeEverything();
+
+  // Called when the content is broken. The whole content will be reset to an empty
+  // state.
+  void handleBrokenValue();
+
   Buffer::OwnedImpl content_buffer_;
 
   // If the content has been decoded. This ensures the decoding is only performed once.
   bool decoded_{false};
 
-  // If the content has been updated. This ensures the re-serialization is only
-  // when the content has been modified.
+  // If the attachments has been updated. This ensures the re-encoding is only
+  // when the attachment has been modified.
   bool updated_{false};
 
-  uint64_t value_size_{0};
+  uint64_t result_size_{0};
 
-  Hessian2::ObjectPtr value_;
+  Hessian2::ObjectPtr result_;
   Attachments attachs_;
 };
 
@@ -234,6 +233,7 @@ private:
 class RpcResponse {
 public:
   ResponseStatus responseStatus() const;
+
   absl::optional<RpcResponseType> responseType() const;
 
   void setResponseStatus(ResponseStatus status);
@@ -242,7 +242,7 @@ public:
   ResponseContent& content() const;
 
 private:
-  ResponseStatus response_status_{};
+  ResponseStatus response_status_{ResponseStatus::Ok};
   absl::optional<RpcResponseType> response_type_{};
   mutable ResponseContent content_;
 };
