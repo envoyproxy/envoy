@@ -28,7 +28,7 @@ using OTelAttribute = ::opentelemetry::common::AttributeValue;
 /**
  * @brief Container holding Open-telemetry Attributes
  */
-using OtelAttibutes = std::map<std::string, OTelAttribute>;
+using OtelAttributes = std::map<std::string, OTelAttribute>;
 
 /**
  * Contains utility functions  for Otel

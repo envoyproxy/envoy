@@ -85,7 +85,7 @@ private:
 };
 
 // add Dynatrace specific span attributes
-void addSamplingAttributes(uint32_t sampling_exponent, OtelAttibutes& attributes) {
+void addSamplingAttributes(uint32_t sampling_exponent, OtelAttributes& attributes) {
 
   const auto multiplicity = SamplingState::toMultiplicity(sampling_exponent);
   // The denominator of the sampling ratio. If, for example, the Dynatrace OneAgent samples with a
@@ -128,7 +128,7 @@ SamplingResult DynatraceSampler::shouldSample(const absl::optional<SpanContext> 
                                               const std::vector<SpanContext>& /*links*/) {
 
   SamplingResult result;
-  OtelAttibutes att;
+  OtelAttributes att;
 
   // trace_context->path() returns path and query. query part is removed in getSamplingKey()
   const std::string sampling_key =
@@ -174,7 +174,7 @@ SamplingResult DynatraceSampler::shouldSample(const absl::optional<SpanContext> 
   }
 
   if (!att.empty()) {
-    result.attributes = std::make_unique<const OtelAttibutes>(std::move(att));
+    result.attributes = std::make_unique<const OtelAttributes>(std::move(att));
   }
 
   return result;

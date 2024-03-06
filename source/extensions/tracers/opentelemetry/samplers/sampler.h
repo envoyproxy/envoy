@@ -35,7 +35,7 @@ struct SamplingResult {
   /// @see Decision
   Decision decision;
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
-  std::unique_ptr<const OtelAttibutes> attributes;
+  std::unique_ptr<const OtelAttributes> attributes;
   // A Tracestate that will be associated with the Span. If the sampler
   // returns an empty Tracestate here, the Tracestate will be cleared, so samplers SHOULD normally
   // return the passed-in Tracestate if they do not intend to change it
