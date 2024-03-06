@@ -149,6 +149,11 @@ EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setLogger(envoy_logger envoy_logger) {
+  envoy_logger_.emplace(envoy_logger);
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) {
   callbacks_->on_engine_running = std::move(closure);
   return *this;
@@ -894,8 +899,9 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  Envoy::InternalEngine* envoy_engine =
-      new Envoy::InternalEngine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+  Envoy::InternalEngine* envoy_engine = new Envoy::InternalEngine(
+      callbacks_->asEnvoyEngineCallbacks(),
+      (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -923,14 +929,14 @@ EngineSharedPtr EngineBuilder::build() {
 
   Engine* engine = new Engine(envoy_engine);
 
-  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
   if (bootstrap) {
     options->setConfigProto(std::move(bootstrap));
   }
   ENVOY_BUG(options->setLogLevel(logLevelToString(log_level_)).ok(), "invalid log level");
   options->setConcurrency(1);
-  envoy_engine->run(std::move(options));
+  envoy_engine->run(options);
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

@@ -51,6 +51,10 @@ minor_behavior_changes:
     Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
     is degrading. Can be manually turned on via
     :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: QUIC
+  change: |
+    Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
+    ``envoy.reloadable_features.quic_upstream_reads_fixed_number_packets`` to false.
 - area: aws
   change: |
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
@@ -60,9 +64,17 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: proxy status
+  change: |
+    Add more conversion in the proxy status utility. It can be disabled by the runtime guard
+    ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http3_upstream
+  change: |
+    Fixing a bug with HTTP/3 upstream using a non-threadsafe cache cross-thread. Bumping HTTP/3 support down
+    to alpha as the severity of this bug indicates it is both not in use and not GA quality code.
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
@@ -192,6 +204,11 @@ new_features:
     Added QUIC protocol option :ref:`send_disable_active_migration
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to make the server send clients a transport
     parameter to discourage client endpoints from active migration.
+- area: quic
+  change: |
+    Added support for QUIC listeners to :ref:`choose certificates based on SNI <arch_overview_ssl_cert_select>` and load certificates
+    from formats other than PEM, such as :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`.
+    This behavior can be disabled with runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code``.
 - area: ext_proc
   change: |
     implemented
@@ -259,6 +276,9 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
@@ -270,3 +290,8 @@ deprecated:
   change: |
     deprecated runtime key ``overload.global_downstream_max_connections`` in favor of :ref:`downstream connections monitor
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.
+- area: tracing
+  change: |
+    deprecated :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>`
+    in favor of :ref:`spawn_upstream_span
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.

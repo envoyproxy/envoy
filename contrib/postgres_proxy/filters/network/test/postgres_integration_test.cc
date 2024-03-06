@@ -1,7 +1,7 @@
 #include "source/common/network/connection_impl.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
@@ -34,8 +34,8 @@ public:
   std::string postgresConfig(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
                              std::string additional_filters) {
     std::string main_config = fmt::format(
-        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template")),
+        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template"))),
         Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getLoopbackAddressString(GetParam()),
         std::get<1>(upstream_ssl_config), // upstream SSL transport socket

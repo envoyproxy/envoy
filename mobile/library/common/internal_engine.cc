@@ -16,9 +16,10 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
 InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
-                               envoy_event_tracker event_tracker)
-    : callbacks_(callbacks), logger_(logger), event_tracker_(event_tracker),
-      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+                               envoy_event_tracker event_tracker,
+                               Thread::PosixThreadFactoryPtr thread_factory)
+    : thread_factory_(std::move(thread_factory)), callbacks_(callbacks), logger_(logger),
+      event_tracker_(event_tracker), dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   ExtensionRegistry::registerFactories();
 
   // TODO(Augustyniak): Capturing an address of event_tracker_ and registering it in the API
@@ -32,12 +33,13 @@ InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger lo
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
+InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                               envoy_event_tracker event_tracker)
+    : InternalEngine(callbacks, logger, event_tracker, Thread::PosixThreadFactory::create()) {}
+
 envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
-  // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
-  // std::thread, main_thread_ is the same object after this call, but its state is replaced with
-  // that of the temporary. The temporary object's state becomes the default state, which does
-  // nothing.
-  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  // Start the Envoy on the dedicated thread.
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
   if (!log_level.empty()) {
     ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
@@ -46,12 +48,17 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
   return run(std::move(options));
 }
 
-envoy_status_t InternalEngine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
-  main_thread_ = std::thread(&InternalEngine::main, this, std::move(options));
-  return ENVOY_SUCCESS;
+// This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
+// copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
+// `std::function`.
+envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
+  main_thread_ =
+      thread_factory_->createThread([this, options]() mutable -> void { main(options); },
+                                    /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+  return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
-envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
+envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
@@ -81,7 +88,7 @@ envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& op
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      main_common = std::make_unique<EngineCommon>(std::move(options));
+      main_common = std::make_unique<EngineCommon>(options);
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
 
@@ -150,8 +157,12 @@ envoy_status_t InternalEngine::terminate() {
     IS_ENVOY_BUG("attempted to double terminate engine");
     return ENVOY_FAILURE;
   }
+  // The Engine could not be created.
+  if (main_thread_ == nullptr) {
+    return ENVOY_FAILURE;
+  }
   // If main_thread_ has finished (or hasn't started), there's nothing more to do.
-  if (!main_thread_.joinable()) {
+  if (!main_thread_->joinable()) {
     return ENVOY_FAILURE;
   }
 
@@ -170,7 +181,7 @@ envoy_status_t InternalEngine::terminate() {
     dispatcher_->post([this]() { http_client_->shutdownApiListener(); });
 
     // Exit the event loop and finish up in Engine::run(...)
-    if (std::this_thread::get_id() == main_thread_.get_id()) {
+    if (thread_factory_->currentPthreadId() == main_thread_->pthreadId()) {
       // TODO(goaway): figure out some way to support this.
       PANIC("Terminating the engine from its own main thread is currently unsupported.");
     } else {
@@ -178,8 +189,8 @@ envoy_status_t InternalEngine::terminate() {
     }
   } // lock(_mutex)
 
-  if (std::this_thread::get_id() != main_thread_.get_id()) {
-    main_thread_.join();
+  if (thread_factory_->currentPthreadId() != main_thread_->pthreadId()) {
+    main_thread_->join();
   }
   terminated_ = true;
   return ENVOY_SUCCESS;
@@ -265,7 +276,7 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
 }
 
 std::string InternalEngine::dumpStats() {
-  if (!main_thread_.joinable()) {
+  if (!main_thread_->joinable()) {
     return "";
   }
 
