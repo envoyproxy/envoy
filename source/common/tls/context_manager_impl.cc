@@ -30,16 +30,15 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   return context;
 }
 
-Envoy::Ssl::ServerContextSharedPtr
-ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
-                                           const Envoy::Ssl::ServerContextConfig& config,
-                                           const std::vector<std::string>& server_names) {
+Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
+    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+    const std::vector<std::string>& server_names, Ssl::ContextAdditionalInitFunc additional_init) {
   if (!config.isReady()) {
     return nullptr;
   }
 
-  Envoy::Ssl::ServerContextSharedPtr context =
-      std::make_shared<ServerContextImpl>(scope, config, server_names, time_source_);
+  Envoy::Ssl::ServerContextSharedPtr context = std::make_shared<ServerContextImpl>(
+      scope, config, server_names, time_source_, std::move(additional_init));
   contexts_.insert(context);
   return context;
 }

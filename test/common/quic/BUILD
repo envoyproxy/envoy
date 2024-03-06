@@ -65,6 +65,7 @@ envoy_cc_test(
         "//source/common/tls:context_config_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:test_runtime_lib",
         "@com_github_google_quiche//:quic_core_versions_lib",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
