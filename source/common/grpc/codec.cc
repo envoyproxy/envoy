@@ -47,7 +47,6 @@ absl::Status Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output
     return absl::ResourceExhaustedError("Grpc frame length exceeds limit");
   }
 
-
   input.drain(input.length());
   return absl::OkStatus();
 }
