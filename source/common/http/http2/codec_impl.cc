@@ -1886,6 +1886,7 @@ ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_de
 ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connection_(connection) {}
 
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
+  RELEASE_ASSERT(connection_->skipCallbackVisitor(), "Unexpected use of Http2Visitor!");
   return connection_->onSend(reinterpret_cast<const uint8_t*>(serialized.data()),
                              serialized.size());
 }
@@ -1900,7 +1901,7 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
     if (current_frame_.stream_id != stream_id) {
       return false;
     }
-    current_frame_.size += length;
+    current_frame_.length += length;
     current_frame_.flags |= flags;
   } else {
     current_frame_ = {stream_id, length, type, flags};
@@ -1939,7 +1940,7 @@ ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
 bool ConnectionImpl::Http2Visitor::OnEndHeadersForStream(Http2StreamId stream_id) {
   ENVOY_CONN_LOG(debug, "Http2Visitor::OnEndHeadersForStream({})", connection_->connection_,
                  stream_id);
-  Status status = connection_->onHeaders(stream_id, current_frame_.size, current_frame_.flags);
+  Status status = connection_->onHeaders(stream_id, current_frame_.length, current_frame_.flags);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
@@ -1952,7 +1953,7 @@ bool ConnectionImpl::Http2Visitor::OnBeginDataForStream(Http2StreamId stream_id,
   if (remaining_data_payload_ == 0 && (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+    Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
@@ -1969,7 +1970,7 @@ bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
   if (remaining_data_payload_ == 0 && (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+    Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
@@ -1988,7 +1989,7 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
       (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+    Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
@@ -2006,7 +2007,7 @@ bool ConnectionImpl::Http2Visitor::OnEndStream(Http2StreamId stream_id) {
     // processed the entire DATA frame.
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+    Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }

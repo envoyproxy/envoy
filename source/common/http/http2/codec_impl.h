@@ -234,13 +234,13 @@ protected:
   private:
     ConnectionImpl* const connection_;
     std::vector<http2::adapter::Http2Setting> settings_;
-    struct FrameInfo {
+    struct FrameHeaderInfo {
       Http2StreamId stream_id;
-      size_t size;
+      size_t length;
       uint8_t type;
       uint8_t flags;
     };
-    FrameInfo current_frame_ = {};
+    FrameHeaderInfo current_frame_ = {};
     size_t padding_length_ = 0;
     size_t remaining_data_payload_ = 0;
     // TODO: remove when removing `envoy.reloadable_features.http2_use_oghttp2`.
