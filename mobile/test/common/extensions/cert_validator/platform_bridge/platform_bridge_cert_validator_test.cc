@@ -5,15 +5,15 @@
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
-#include "source/extensions/transport_sockets/tls/stats.h"
+#include "source/common/tls/cert_validator/default_validator.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
+#include "source/common/tls/stats.h"
 
 #include "test/common/mocks/common/mocks.h"
 #include "test/common/stats/stat_test_utility.h"
-#include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
-#include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns2_cert_info.h"
+#include "test/common/tls/cert_validator/test_common.h"
+#include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/san_dns2_cert_info.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
@@ -168,8 +168,8 @@ TEST_P(PlatformBridgeCertValidatorTest, NoCallback) {
   initializeConfig();
   PlatformBridgeCertValidator validator(&config_, stats_);
 
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   std::string hostname = "www.example.com";
 
   EXPECT_ENVOY_BUG(
@@ -206,8 +206,8 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
   PlatformBridgeCertValidator validator(&config_, stats_);
 
   std::string hostname = "server1.example.com";
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
   EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
@@ -236,8 +236,8 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySanOverrides) {
   PlatformBridgeCertValidator validator(&config_, stats_);
 
   std::string hostname = "server1.example.com";
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
   EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
@@ -271,8 +271,8 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptyHostNoOverrides) {
   PlatformBridgeCertValidator validator(&config_, stats_);
 
   std::string hostname = "";
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
   EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
@@ -306,8 +306,8 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateButInvalidSni) {
   PlatformBridgeCertValidator validator(&config_, stats_);
 
   std::string hostname = "server2.example.com";
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
   EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());
@@ -338,8 +338,8 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateSniOverride) {
   std::vector<std::string> subject_alt_names = {"server1.example.com"};
 
   std::string hostname = "server2.example.com";
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
   EXPECT_CALL(*mock_validator_, validate(_, StrEq(subject_alt_names[0].c_str())))
       .WillOnce(Return(result));
@@ -369,8 +369,8 @@ TEST_P(PlatformBridgeCertValidatorTest, DeletedWithValidationPending) {
   auto validator = std::make_unique<PlatformBridgeCertValidator>(&config_, stats_);
 
   std::string hostname = "server1.example.com";
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
   envoy_cert_validation_result result = {ENVOY_SUCCESS, 0, NULL};
   EXPECT_CALL(*mock_validator_, validate(_, _)).WillOnce(Return(result));
   EXPECT_CALL(*mock_validator_, cleanup());

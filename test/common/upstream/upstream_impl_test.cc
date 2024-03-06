@@ -4865,12 +4865,12 @@ TEST_F(ClusterInfoImplTest, Http3) {
           common_tls_context:
             tls_certificates:
             - certificate_chain:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
               private_key:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
             validation_context:
               trusted_ca:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
               match_typed_subject_alt_names:
               - matcher:
                   exact: localhost
@@ -4946,12 +4946,12 @@ TEST_F(ClusterInfoImplTest, Http3WithHttp11WrappedSocket) {
               common_tls_context:
                 tls_certificates:
                 - certificate_chain:
-                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+                    filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
                   private_key:
-                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+                    filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
                 validation_context:
                   trusted_ca:
-                    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+                    filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
                   match_typed_subject_alt_names:
                   - matcher:
                       exact: localhost
@@ -5024,12 +5024,12 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
           common_tls_context:
             tls_certificates:
             - certificate_chain:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
               private_key:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
             validation_context:
               trusted_ca:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
               match_typed_subject_alt_names:
               - matcher:
                   exact: localhost
@@ -5073,12 +5073,12 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
           common_tls_context:
             tls_certificates:
             - certificate_chain:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
               private_key:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
             validation_context:
               trusted_ca:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
               match_typed_subject_alt_names:
               - matcher:
                   exact: localhost
@@ -5136,12 +5136,12 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
           common_tls_context:
             tls_certificates:
             - certificate_chain:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
               private_key:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
             validation_context:
               trusted_ca:
-                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+                filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
               match_typed_subject_alt_names:
               - matcher:
                   exact: localhost
@@ -5222,12 +5222,12 @@ TEST_F(ClusterInfoImplTest, Http2Auto) {
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -5320,12 +5320,12 @@ TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcher) {
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -5382,12 +5382,12 @@ TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcherAndValidationOff) {
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
