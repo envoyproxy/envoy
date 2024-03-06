@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.Map;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
@@ -76,9 +75,7 @@ class JvmCallbackContext {
   public Object onResponseData(ByteBuffer data, boolean endStream, long[] streamIntel) {
     // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
     // be destroyed after calling this callback.
-    byte[] bytes = new byte[data.capacity()];
-    data.get(bytes);
-    ByteBuffer copiedData = ByteBuffer.wrap(bytes);
+    ByteBuffer copiedData = ByteBuffers.copy(data);
     callbacks.getExecutor().execute(new Runnable() {
       public void run() {
         callbacks.onData(copiedData, endStream, new EnvoyStreamIntelImpl(streamIntel));
