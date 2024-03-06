@@ -129,8 +129,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_refresh_rtt_after_request);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
-// TODO(steveWang) flip this to true after this is verified in prod.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quiche_use_mem_slice_releasor_api);
 // TODO(suniltheta): Once the newly added http async technique is stabilized move it under
 // RUNTIME_GUARD so that this option becomes default enabled. Once this option proves effective
 // remove the feature flag and remove code path that relies on old technique to fetch credentials
