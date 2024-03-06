@@ -32,10 +32,10 @@ void OtlpUtils::populateAnyValue(opentelemetry::proto::common::v1::AnyValue& val
     value_proto.set_string_value(opentelemetry::nostd::get<const char*>(attribute_value));
     break;
   case opentelemetry::common::AttributeType::kTypeString: {
-    value_proto.set_string_value(
-        opentelemetry::nostd::get<opentelemetry::nostd::string_view>(attribute_value).data(),
-        opentelemetry::nostd::get<opentelemetry::nostd::string_view>(attribute_value).size());
-  } break;
+    const auto sv = opentelemetry::nostd::get<opentelemetry::nostd::string_view>(attribute_value);
+    value_proto.set_string_value(sv.data(), sv.size());
+    break;
+  }
   default:
     return;
   }
