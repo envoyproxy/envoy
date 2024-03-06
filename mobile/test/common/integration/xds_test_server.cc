@@ -5,12 +5,12 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/event/libevent.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"

@@ -10,9 +10,9 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/tracing/trace_context.h"
 
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+
 #include "absl/types/optional.h"
-#include "opentelemetry/common/attribute_value.h"
-#include "opentelemetry/proto/trace/v1/trace.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,25 +30,6 @@ enum class Decision {
   // IsRecording will be true and the Sampled flag MUST be set.
   RecordAndSample
 };
-
-/**
- * @brief The type of the span.
- * see
- * https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#spankind
- */
-using OTelSpanKind = ::opentelemetry::proto::trace::v1::Span::SpanKind;
-
-/**
- * @brief Open-telemetry Attribute
- * see
- * https://github.com/open-telemetry/opentelemetry-cpp/blob/main/api/include/opentelemetry/common/attribute_value.h
- */
-using OTelAttribute = ::opentelemetry::common::AttributeValue;
-
-/**
- * @brief Container holding Open-telemetry Attributes
- */
-using OtelAttibutes = std::map<std::string, OTelAttribute>;
 
 struct SamplingResult {
   /// @see Decision
