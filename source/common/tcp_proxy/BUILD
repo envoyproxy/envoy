@@ -62,6 +62,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config:well_known_names",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/network:application_protocol_lib",

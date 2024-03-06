@@ -1,10 +1,10 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 
 #include "test/common/integration/base_client_integration_test.h"
@@ -700,6 +700,17 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
 
   if (upstreamProtocol() != Http::CodecType::HTTP1) {
     ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  // Close the HTTP3 connection and verify stats are dumped properly.
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    ASSERT_TRUE(upstream_connection_->close());
+    ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+    upstream_connection_.reset();
+    ASSERT_TRUE(
+        waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", 1));
+    ASSERT_TRUE(waitForCounterGe(
+        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED", 1));
   }
 }
 

@@ -39,7 +39,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "listener_manager_impl_test_lib",
     hdrs = ["listener_manager_impl_test.h"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    data = ["//test/common/tls/test_data:certs"],
     deps = [
         ":config_cc_proto",
         "//source/common/init:manager_lib",
@@ -80,6 +80,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
+        "//source/common/tls:ssl_socket_lib",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/listener/tls_inspector:config",
@@ -90,7 +91,6 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//test/integration/filters:test_listener_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:network_utility_lib",
@@ -126,7 +126,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    data = ["//test/common/tls/test_data:certs"],
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -137,11 +137,11 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
+        "//source/common/tls:ssl_socket_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
