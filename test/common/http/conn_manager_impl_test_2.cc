@@ -1769,6 +1769,8 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
   encoder_filters_[0]->callbacks_->resetStream();
 }
 
+// Verify that the response flag is DownstreamRemoteReset when got
+// StreamResetReason::ConnectError from codec.
 TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetConnectError) {
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
   access_logs_ = {handler};
@@ -1796,7 +1798,9 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetConnectError) {
   response_encoder_.stream_.resetStream(StreamResetReason::ConnectError);
 }
 
-TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRemoteReset) {
+// Verify that the response flag is DownstreamRemoteReset when got
+// StreamResetReason::RemoteReset from codec.
+TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteReset) {
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
   access_logs_ = {handler};
 
@@ -1823,7 +1827,9 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRemoteReset) {
   response_encoder_.stream_.resetStream(StreamResetReason::RemoteReset);
 }
 
-TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRemoteRefusedStreamReset) {
+// Verify that the response flag is DownstreamRemoteReset when got
+// StreamResetReason::RemoteRefusedStreamReset from codec.
+TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRefused) {
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
   access_logs_ = {handler};
 
