@@ -5,7 +5,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-UpstreamConnection::~UpstreamConnection() { ASSERT(tcp_pool_handle_ == nullptr); }
+UpstreamConnection::~UpstreamConnection() {
+  // In case we doesn't clean up the pending connecting request.
+  if (tcp_pool_handle_ != nullptr) {
+    // Clear the data first.
+    auto local_handle = tcp_pool_handle_;
+    tcp_pool_handle_ = nullptr;
+
+    local_handle->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
+}
 
 void UpstreamConnection::initialize() {
   if (!initialized_) {
@@ -15,22 +24,29 @@ void UpstreamConnection::initialize() {
 }
 
 void UpstreamConnection::cleanUp(bool close_connection) {
-  ENVOY_LOG(debug, "generic proxy upstream manager: clean up upstream connection ()",
+  ENVOY_LOG(debug, "generic proxy upstream manager: clean up upstream (close: {})",
             close_connection);
 
   if (close_connection && owned_conn_data_ != nullptr) {
     ENVOY_LOG(debug, "generic proxy upstream request: close upstream connection");
     ASSERT(tcp_pool_handle_ == nullptr);
-    owned_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
+
+    // Clear the data first to avoid re-entering this function in the close callback.
+    auto local_data = std::move(owned_conn_data_);
     owned_conn_data_.reset();
+
+    local_data->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 
   if (tcp_pool_handle_ != nullptr) {
     ENVOY_LOG(debug, "generic proxy upstream manager: cacel upstream connection");
-
     ASSERT(owned_conn_data_ == nullptr);
-    tcp_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+
+    // Clear the data first.
+    auto local_handle = tcp_pool_handle_;
     tcp_pool_handle_ = nullptr;
+
+    local_handle->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
   }
 }
 
