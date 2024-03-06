@@ -11,21 +11,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "config",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
-    # TLS is core functionality.
-    visibility = ["//visibility:public"],
-    deps = [
-        ":ssl_socket_lib",
-        "//envoy/network:transport_socket_interface",
-        "//envoy/registry",
-        "//envoy/server:transport_socket_config_interface",
-    ],
-    alwayslink = 1,
-)
-
-envoy_cc_library(
     name = "connection_info_impl_base_lib",
     srcs = ["connection_info_impl_base.cc"],
     hdrs = ["connection_info_impl_base.h"],
