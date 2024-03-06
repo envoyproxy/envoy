@@ -5,6 +5,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/extensions/common/dubbo/message.h"
+#include "hessian2/object.hpp"
 
 #include "absl/types/optional.h"
 
