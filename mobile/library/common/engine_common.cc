@@ -67,8 +67,7 @@ public:
   }
 };
 
-EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImplBase>&& options)
-    : options_(std::move(options)) {
+EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : options_(options) {
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
   registerMobileProtoDescriptors();
