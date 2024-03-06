@@ -148,8 +148,7 @@ void serializeMetadata(const Http::MetadataMapPtr& metadata, quic::QuicStreamId 
 
 void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) {
   if (!http3_options_.allow_metadata()) {
-    // Metadata Frame is not supported in QUICHE.
-    ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
+    ENVOY_STREAM_LOG(debug, "METADATA not supported by config.", *this);
     stats_.metadata_not_supported_error_.inc();
     return;
   }
@@ -177,7 +176,7 @@ void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& metadata_map
                                "bytes in send buffer. Current write was rejected.",
                                quic_stream_.write_side_closed() ? "closed" : "open",
                                quic_stream_.BufferedDataBytes()));
-      quic_stream_.Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      quic_stream_.Reset(quic::QUIC_ERROR_PROCESSING_STREAM);
       return;
     }
     if (!quic_session_.connection()->connected()) {
