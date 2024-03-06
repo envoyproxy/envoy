@@ -61,7 +61,7 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@680d414be3f56cbb161dfdebebece85d81c3f686  # actions-v0.2.24
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.27
       with:
         to_remove: |
           /usr/local/lib/android

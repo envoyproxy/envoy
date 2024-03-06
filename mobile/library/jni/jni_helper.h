@@ -370,6 +370,14 @@ public:
   }
 
   /**
+   * Allocates and returns a direct `java.nio.ByteBuffer` referring to the block of memory starting
+   * at the memory address `address` and extending `capacity` bytes.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#newdirectbytebuffer
+   */
+  LocalRefUniquePtr<jobject> newDirectByteBuffer(void* address, jlong capacity);
+
+  /**
    * Returns the capacity of the memory region referenced by the given `java.nio.Buffer` object.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getdirectbuffercapacity

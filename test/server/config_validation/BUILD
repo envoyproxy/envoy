@@ -15,7 +15,7 @@ envoy_cc_test(
         "//source/common/api:api_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/common/tls:context_lib",
         "//source/server/config_validation:cluster_manager_lib",
         "//source/server/config_validation:dns_lib",
         "//test/mocks/access_log:access_log_mocks",
