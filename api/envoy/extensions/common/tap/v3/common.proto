@@ -42,4 +42,5 @@ message AdminConfig {
   // Opaque configuration ID. When requests are made to the admin handler, the passed opaque ID is
   // matched to the configured filter opaque ID to determine which filter to configure.
   string config_id = 1 [(validate.rules).string = {min_len: 1}];
+  uint64 max_concurrent_streams = 2 [(validate.rules).uint64 = {gt: 0}];
 }

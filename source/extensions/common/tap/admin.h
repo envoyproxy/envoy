@@ -36,7 +36,7 @@ class AdminHandler : public Singleton::Instance,
                      public Extensions::Common::Tap::Sink,
                      Logger::Loggable<Logger::Id::tap> {
 public:
-  AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher);
+  AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher, const uint64_t& max_concurrent_streams);
   ~AdminHandler() override;
 
   /**
@@ -45,7 +45,8 @@ public:
    */
   static AdminHandlerSharedPtr getSingleton(OptRef<Server::Admin> admin,
                                             Singleton::Manager& singleton_manager,
-                                            Event::Dispatcher& main_thread_dispatcher);
+                                            Event::Dispatcher& main_thread_dispatcher,
+                                            const uint64_t& max_concurrent_streams);
 
   /**
    * Register a new extension config to the handler so that it can be admin managed.
@@ -147,16 +148,16 @@ private:
     envoy::config::tap::v3::OutputSink::Format format() const {
       return config_.output_config().sinks()[0].format();
     }
+    std::set<Server::AdminStream*>& streams()  { return admin_stream_set_; }
 
   protected:
     Event::Dispatcher& dispatcher() { return main_thread_dispatcher_; }
-    const Server::AdminStream* stream() const { return admin_stream_; }
 
   private:
     const std::string config_id_;
     const envoy::config::tap::v3::TapConfig config_;
-    const Server::AdminStream* admin_stream_;
     Event::Dispatcher& main_thread_dispatcher_;
+    std::set<Server::AdminStream*> admin_stream_set_;
     friend class BaseAdminHandlerTest;
   };
 
@@ -207,11 +208,13 @@ private:
   Http::Code handler(Http::HeaderMap& response_headers, Buffer::Instance& response,
                      Server::AdminStream& admin_stream);
   Http::Code badRequest(Buffer::Instance& response, absl::string_view error);
+  const uint64_t& max_concurrent() const { return max_concurrent_streams_; }
 
   Server::Admin& admin_;
   Event::Dispatcher& main_thread_dispatcher_;
   absl::node_hash_map<std::string, absl::node_hash_set<ExtensionConfig*>> config_id_map_;
   std::shared_ptr<AttachedRequest> attached_request_;
+  const uint64_t max_concurrent_streams_;
   friend class BaseAdminHandlerTest;     // For testing purposes
   friend class BufferedAdminHandlerTest; // For testing Purposes
 };

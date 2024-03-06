@@ -19,15 +19,20 @@ SINGLETON_MANAGER_REGISTRATION(tap_admin_handler);
 
 AdminHandlerSharedPtr AdminHandler::getSingleton(OptRef<Server::Admin> admin,
                                                  Singleton::Manager& singleton_manager,
-                                                 Event::Dispatcher& main_thread_dispatcher) {
+                                                 Event::Dispatcher& main_thread_dispatcher,
+                                                 const uint64_t& max_concurrent_streams) {
   return singleton_manager.getTyped<AdminHandler>(
-      SINGLETON_MANAGER_REGISTERED_NAME(tap_admin_handler), [&admin, &main_thread_dispatcher] {
-        return std::make_shared<AdminHandler>(admin, main_thread_dispatcher);
+      SINGLETON_MANAGER_REGISTERED_NAME(tap_admin_handler),
+      [&admin, &main_thread_dispatcher, &max_concurrent_streams] {
+        return std::make_shared<AdminHandler>(admin, main_thread_dispatcher,
+                                              max_concurrent_streams);
       });
 }
 
-AdminHandler::AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher)
-    : admin_(admin.value()), main_thread_dispatcher_(main_thread_dispatcher) {
+AdminHandler::AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher,
+                           const uint64_t& max_concurrent_streams)
+    : admin_(admin.value()), main_thread_dispatcher_(main_thread_dispatcher),
+      max_concurrent_streams_(max_concurrent_streams) {
   const bool rc =
       admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
@@ -44,22 +49,44 @@ AdminHandler::~AdminHandler() {
 
 Http::Code AdminHandler::handler(Http::HeaderMap&, Buffer::Instance& response,
                                  Server::AdminStream& admin_stream) {
-  if (attached_request_ != nullptr) {
-    // TODO(mattlklein123): Consider supporting concurrent admin /tap streams. Right now we support
-    // a single stream as a simplification.
-    return badRequest(response, "An attached /tap admin stream already exists. Detach it.");
-  }
+  envoy::admin::v3::TapRequest tap_request;
 
   if (admin_stream.getRequestBody() == nullptr) {
     return badRequest(response, "/tap requires a JSON/YAML body");
   }
 
-  envoy::admin::v3::TapRequest tap_request;
   TRY_NEEDS_AUDIT {
     MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request,
                                          ProtobufMessage::getStrictValidationVisitor());
   }
   END_TRY catch (EnvoyException& e) { return badRequest(response, e.what()); }
+
+  if (attached_request_ != nullptr) {
+    if (config_id_map_.count(tap_request.config_id()) == 0) {
+      return badRequest(
+          response, fmt::format("Unknown config id '{}'. No extension has registered with this id.",
+                                tap_request.config_id()));
+    }
+    if (attached_request_->streams().size() >= max_concurrent()) {
+      return badRequest(
+          response, fmt::format("Maximum concurrent attached request reach. Detach it."));
+    } else {
+      ENVOY_LOG(debug, "New request stream has appended to attached request for tapping.");
+      attached_request_->streams().insert(&admin_stream);
+      admin_stream.setEndStreamOnComplete(false);
+      admin_stream.addOnDestroyCallback([this, &admin_stream] {
+        for (auto config : config_id_map_[attached_request_->id()]) {
+          ENVOY_LOG(debug, "detach tap admin request for config_id={}", attached_request_->id());
+          config->clearTapConfig();
+        }
+        attached_request_->streams().erase(&admin_stream);
+        if (attached_request_->streams().empty()) {
+          attached_request_.reset();
+        }
+      });
+      return Http::Code::OK;
+    }
+  }
 
   ENVOY_LOG(debug, "tap admin request for config_id={}", tap_request.config_id());
   if (config_id_map_.count(tap_request.config_id()) == 0) {
@@ -72,12 +99,15 @@ Http::Code AdminHandler::handler(Http::HeaderMap&, Buffer::Instance& response,
   }
 
   admin_stream.setEndStreamOnComplete(false);
-  admin_stream.addOnDestroyCallback([this] {
-    for (auto config : config_id_map_[attached_request_->id()]) {
-      ENVOY_LOG(debug, "detach tap admin request for config_id={}", attached_request_->id());
-      config->clearTapConfig();
+  admin_stream.addOnDestroyCallback([this, &admin_stream] {
+    attached_request_->streams().erase(&admin_stream);
+    if (attached_request_->streams().empty()) {
+      for (auto config : config_id_map_[attached_request_->id()]) {
+        ENVOY_LOG(debug, "detach tap admin request for config_id={}", attached_request_->id());
+        config->clearTapConfig();
+      }
+      attached_request_.reset();
     }
-    attached_request_.reset(); // remove ref to attached_request_
   });
   attached_request_ = AttachedRequest::createAttachedRequest(this, tap_request, &admin_stream);
   return Http::Code::OK;
@@ -211,8 +241,8 @@ AdminHandler::AttachedRequest::AttachedRequest(AdminHandler* admin_handler,
                                                const envoy::admin::v3::TapRequest& tap_request,
                                                Server::AdminStream* admin_stream)
     : config_id_(tap_request.config_id()), config_(tap_request.tap_config()),
-      admin_stream_(admin_stream), main_thread_dispatcher_(admin_handler->main_thread_dispatcher_) {
-}
+      main_thread_dispatcher_(admin_handler->main_thread_dispatcher_),
+      admin_stream_set_{admin_stream} {}
 
 AdminHandler::AttachedRequestBuffered::AttachedRequestBuffered(
     AdminHandler* admin_handler, const envoy::admin::v3::TapRequest& tap_request,
@@ -268,7 +298,9 @@ void AdminHandler::AttachedRequestBuffered::onTimeout(
 
 void AdminHandler::AttachedRequest::endStream() {
   Buffer::OwnedImpl output_buffer;
-  stream()->getDecoderFilterCallbacks().encodeData(output_buffer, true);
+  for (auto stream : streams()) {
+    stream->getDecoderFilterCallbacks().encodeData(output_buffer, true);
+  }
 }
 
 void AdminHandler::AttachedRequest::streamMsg(const Protobuf::Message& message, bool end_stream) {
@@ -291,9 +323,10 @@ void AdminHandler::AttachedRequest::streamMsg(const Protobuf::Message& message, 
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
     PANIC("not implemented");
   }
-
-  Buffer::OwnedImpl output_buffer{output_string};
-  stream()->getDecoderFilterCallbacks().encodeData(output_buffer, end_stream);
+  for (auto stream : streams()) {
+    Buffer::OwnedImpl output_buffer{output_string};
+    stream->getDecoderFilterCallbacks().encodeData(output_buffer, end_stream);
+  }
 }
 
 std::shared_ptr<AdminHandler::AttachedRequest> AdminHandler::AttachedRequest::createAttachedRequest(

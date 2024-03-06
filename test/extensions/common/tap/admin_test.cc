@@ -72,12 +72,12 @@ private:
 
 class BaseAdminHandlerTest : public testing::Test {
 public:
-  void setup(Network::Address::Type socket_type = Network::Address::Type::Ip) {
+  void setup(Network::Address::Type socket_type = Network::Address::Type::Ip, uint64_t max_concurrent_streams = 1) {
     ON_CALL(admin_.socket_, addressType()).WillByDefault(Return(socket_type));
     EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true, _))
         .WillOnce(DoAll(SaveArg<2>(&cb_), Return(true)));
     EXPECT_CALL(admin_, socket());
-    handler_ = std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_);
+    handler_ = std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_, max_concurrent_streams);
   }
 
   void TearDown() override { main_thread_dispatcher_.drain(); }
@@ -105,6 +105,7 @@ protected:
   Server::Admin::HandlerCb cb_;
   MockDispatcherQueued main_thread_dispatcher_{"test_main_thread"};
   Buffer::OwnedImpl response_;
+  // uint64_t max_concurrent_streams_{2};
 };
 
 class AdminHandlerTest : public BaseAdminHandlerTest {
@@ -327,9 +328,9 @@ TEST_F(AdminHandlerTest, UnknownConfigId) {
             response_.toString());
 }
 
-// Request while there is already an active tap session.
-TEST_F(AdminHandlerTest, RequestTapWhileAttached) {
-  setup();
+// Request while exceeding the max concurrency number (1 in this situation).
+TEST_F(AdminHandlerTest, RequestTapExceedMaxConcurrency) {
+  setup(Network::Address::Type::Pipe,1);
   MockExtensionConfig extension_config;
   handler_->registerConfig(extension_config, "test_config_id");
 
@@ -341,7 +342,22 @@ TEST_F(AdminHandlerTest, RequestTapWhileAttached) {
   EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 
   EXPECT_EQ(Http::Code::BadRequest, makeRequest("/tap"));
-  EXPECT_EQ("An attached /tap admin stream already exists. Detach it.", response_.toString());
+  EXPECT_EQ("Maximum concurrent attached request reach. Detach it.", response_.toString());
+}
+
+// Requests whlie max_concurrent_streams = 2 is set to allow 2 admin request attaching.
+TEST_F(AdminHandlerTest, MultipleRequestTapAttached) {
+  setup(Network::Address::Type::Pipe,2);
+  MockExtensionConfig extension_config;
+  handler_->registerConfig(extension_config, "test_config_id");
+
+  Buffer::OwnedImpl body(streaming_admin_request_yaml_);
+  EXPECT_CALL(admin_stream_, getRequestBody()).WillRepeatedly(Return(&body));
+  EXPECT_CALL(extension_config, newTapConfig(_, handler_.get()));
+  EXPECT_CALL(admin_stream_, setEndStreamOnComplete(false)).Times(2);
+  EXPECT_CALL(admin_stream_, addOnDestroyCallback(_)).Times(2);
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 }
 
 TEST_F(AdminHandlerTest, CloseMidStream) {
