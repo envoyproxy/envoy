@@ -271,6 +271,9 @@ new_features:
 - area: tracing
   change: |
     Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
+- area: redis
+  change: |
+    Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
 
 deprecated:
 - area: listener
