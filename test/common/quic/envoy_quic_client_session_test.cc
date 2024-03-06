@@ -47,7 +47,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator) {
+                                  generator, /*prefer_gro=*/true) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     InstallDecrypter(quic::ENCRYPTION_FORWARD_SECURE,
@@ -77,7 +77,8 @@ public:
         peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
-            quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
+            quic_version_, *dispatcher_,
+            createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
             connection_id_generator_)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
@@ -502,7 +503,9 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   // Make sure the option for GRO is set on the socket.
   int sock_opt;
   socklen_t sock_len = sizeof(int);
-  EXPECT_EQ(0, peer_socket_->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len).return_value_);
+  EXPECT_EQ(0, quic_connection_->connectionSocket()
+                   ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
+                   .return_value_);
   EXPECT_EQ(1, sock_opt);
 
   // GRO uses `recvmsg`, not `recvmmsg`.

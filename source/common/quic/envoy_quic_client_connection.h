@@ -60,7 +60,7 @@ public:
                             Network::Address::InstanceConstSharedPtr local_addr,
                             Event::Dispatcher& dispatcher,
                             const Network::ConnectionSocket::OptionsSharedPtr& options,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -69,7 +69,7 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -133,7 +133,7 @@ private:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 
@@ -147,6 +147,7 @@ private:
   Event::Dispatcher& dispatcher_;
   bool migrate_port_on_path_degrading_{false};
   uint8_t num_socket_switches_{0};
+  const bool prefer_gro_;
 };
 
 } // namespace Quic

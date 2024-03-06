@@ -10,7 +10,6 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -139,7 +138,8 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const bool prefer_gro) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
@@ -151,8 +151,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.prefer_quic_client_udp_gro") &&
-      Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+  if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
   if (options != nullptr) {
