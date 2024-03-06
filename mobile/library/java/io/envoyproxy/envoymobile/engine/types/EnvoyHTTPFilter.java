@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.engine.types;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.Executor;
 import java.util.List;
 import java.util.Map;
 
