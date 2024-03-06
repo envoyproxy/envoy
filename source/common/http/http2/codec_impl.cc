@@ -1772,7 +1772,8 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame->hd.stream_id);
+        Status status =
+            static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame->hd.stream_id);
         return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
@@ -1799,7 +1800,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_begin_frame_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame_hd* hd, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(
+        Status status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(
             hd->stream_id, hd->length, hd->type, hd->flags);
         return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
@@ -1809,14 +1810,15 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
         auto* conn = static_cast<ConnectionImpl*>(user_data);
         RELEASE_ASSERT(!conn->skipCallbackVisitor(), "Unexpected use of nghttp2 callback!");
-        auto status = conn->onFrameReceived(frame);
+        Status status = conn->onFrameReceived(frame);
         return conn->setAndCheckCodecCallbackStatus(std::move(status));
       });
 
   nghttp2_session_callbacks_set_on_stream_close_callback(
       callbacks_,
       [](nghttp2_session*, int32_t stream_id, uint32_t error_code, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
+        Status status =
+            static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
         return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
@@ -1905,12 +1907,12 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
     padding_length_ = 0;
     remaining_data_payload_ = 0;
   }
-  auto status = connection_->onBeforeFrameReceived(stream_id, length, type, flags);
+  Status status = connection_->onBeforeFrameReceived(stream_id, length, type, flags);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
 bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
-  auto status = connection_->onBeginHeaders(stream_id);
+  Status status = connection_->onBeginHeaders(stream_id);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
@@ -1937,7 +1939,7 @@ ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
 bool ConnectionImpl::Http2Visitor::OnEndHeadersForStream(Http2StreamId stream_id) {
   ENVOY_CONN_LOG(debug, "Http2Visitor::OnEndHeadersForStream({})", connection_->connection_,
                  stream_id);
-  auto status = connection_->onHeaders(stream_id, current_frame_.size, current_frame_.flags);
+  Status status = connection_->onHeaders(stream_id, current_frame_.size, current_frame_.flags);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
@@ -1950,8 +1952,8 @@ bool ConnectionImpl::Http2Visitor::OnBeginDataForStream(Http2StreamId stream_id,
   if (remaining_data_payload_ == 0 && (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
-                                           padding_length_);
+    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+                                             padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
   ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
@@ -1967,8 +1969,8 @@ bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
   if (remaining_data_payload_ == 0 && (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
-                                           padding_length_);
+    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+                                             padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
   ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
@@ -1986,8 +1988,8 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
       (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
-                                           padding_length_);
+    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+                                             padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
   ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
@@ -2004,8 +2006,8 @@ bool ConnectionImpl::Http2Visitor::OnEndStream(Http2StreamId stream_id) {
     // processed the entire DATA frame.
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
-    auto status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
-                                           padding_length_);
+    Status status = connection_->onBeginData(stream_id, current_frame_.size, current_frame_.flags,
+                                             padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
   return true;
@@ -2017,7 +2019,7 @@ void ConnectionImpl::Http2Visitor::OnRstStream(Http2StreamId stream_id, Http2Err
 
 bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
                                                  Http2ErrorCode error_code) {
-  auto status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
+  Status status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
   if (stream_close_listener_) {
     ENVOY_CONN_LOG(debug, "Http2Visitor invoking stream close listener for {}",
                    connection_->connection_, stream_id);
@@ -2028,14 +2030,14 @@ bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
 
 void ConnectionImpl::Http2Visitor::OnPing(Http2PingId ping_id, bool is_ack) {
   const uint64_t network_order_opaque_data = quiche::QuicheEndian::HostToNet64(ping_id);
-  auto status = connection_->onPing(network_order_opaque_data, is_ack);
+  Status status = connection_->onPing(network_order_opaque_data, is_ack);
   connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
 bool ConnectionImpl::Http2Visitor::OnGoAway(Http2StreamId /*last_accepted_stream_id*/,
                                             Http2ErrorCode error_code,
                                             absl::string_view /*opaque_data*/) {
-  auto status = connection_->onGoAway(static_cast<uint32_t>(error_code));
+  Status status = connection_->onGoAway(static_cast<uint32_t>(error_code));
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
