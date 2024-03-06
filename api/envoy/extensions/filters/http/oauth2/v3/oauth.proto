@@ -140,7 +140,7 @@ message OAuth2Config {
 
   // Any request that matches any of the provided matchers won't be redirected to OAuth server when tokens are not valid.
   // Automatic access token refresh will be performed for these requests, if enabled.
-  // This behavior cam be useful for AJAX requests.
+  // This behavior can be useful for AJAX requests.
   repeated config.route.v3.HeaderMatcher deny_redirect_matcher = 14;
 }
 
