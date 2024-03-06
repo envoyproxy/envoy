@@ -102,10 +102,24 @@ protected:
    *
    * @param url the admin endpoint to initiate.
    */
-  void blockMainThreadUntilResume(absl::string_view url, absl::string_view method) {
+  /*void blockMainThreadUntilResume(absl::string_view url, absl::string_view method) {
     AdminResponseSharedPtr blocked_response = main_common_->adminRequest(url, method);
     blocked_response->getHeaders(
         [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
+        }*/
+
+  void interlockMainThread(std::function<void()> fn,
+                           std::function<void()> run_before_resume = nullptr) {
+    main_common_->dispatcherForTest().post([this, fn] {
+      resume_.WaitForNotification();
+      fn();
+      pause_point_.Notify();
+    });
+    if (run_before_resume != nullptr) {
+      run_before_resume();
+    }
+    resume_.Notify();
+    pause_point_.WaitForNotification();
   }
 
   /**
@@ -183,10 +197,8 @@ TEST_F(AdminStreamingTest, CancelDuringChunks) {
 }
 
 TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader) {
-  blockMainThreadUntilResume("/ready", "GET");
   AdminResponseSharedPtr response = streamingResponse();
-  response->cancel();
-  resume_.Notify();
+  interlockMainThread([response]() { response->cancel(); });
   int header_calls = 0;
 
   // After 'cancel', the headers function will not be called.
@@ -197,11 +209,12 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader) {
 
 TEST_F(AdminStreamingTest, CancelAfterAskingForHeader1) {
   int header_calls = 0;
-  blockMainThreadUntilResume("/ready", "GET");
+  // blockMainThreadUntilResume("/ready", "GET");
   AdminResponseSharedPtr response = streamingResponse();
-  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
-  response->cancel();
-  resume_.Notify();
+  interlockMainThread([&header_calls, response]() {
+    response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+    response->cancel();
+  });
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, header_calls);
 }
@@ -217,11 +230,12 @@ TEST_F(AdminStreamingTest, CancelAfterAskingForHeader2) {
 
 TEST_F(AdminStreamingTest, DeleteAfterAskingForHeader1) {
   int header_calls = 0;
-  blockMainThreadUntilResume("/ready", "GET");
   AdminResponseSharedPtr response = streamingResponse();
-  response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
-  response.reset();
-  resume_.Notify();
+  // blockMainThreadUntilResume("/ready", "GET");
+  interlockMainThread([&response, &header_calls]() {
+    response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
+    response.reset();
+  });
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(1, header_calls);
 }
@@ -248,11 +262,12 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk1) {
 TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk2) {
   AdminResponseSharedPtr response = streamingResponse();
   waitForHeaders(response);
-  blockMainThreadUntilResume("/ready", "GET");
+  // blockMainThreadUntilResume("/ready", "GET");
   int chunk_calls = 0;
-  response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
-  response->cancel();
-  resume_.Notify();
+  interlockMainThread([&response, &chunk_calls]() {
+    response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
+    response->cancel();
+  });
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, chunk_calls);
 }
@@ -260,14 +275,17 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk2) {
 TEST_F(AdminStreamingTest, CancelAfterAskingForChunk) {
   AdminResponseSharedPtr response = streamingResponse();
   waitForHeaders(response);
-  blockMainThreadUntilResume("/ready", "GET");
   int chunk_calls = 0;
 
   // Cause the /streaming handler to pause while yielding the next chunk, to hit
   // an early exit in requestNextChunk.
   next_chunk_hook_ = [response]() { response->cancel(); };
-  response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
-  resume_.Notify();
+
+  // blockMainThreadUntilResume("/ready", "GET");
+  interlockMainThread([&chunk_calls, response]() {
+    response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
+  });
+
   EXPECT_TRUE(quitAndWait());
   EXPECT_EQ(0, chunk_calls);
 }
@@ -324,14 +342,18 @@ TEST_F(AdminStreamingTest, QuitBeforeCreatingResponse) {
 }
 
 TEST_F(AdminStreamingTest, TimeoutGettingResponse) {
-  blockMainThreadUntilResume("/ready", "GET");
-  AdminResponseSharedPtr response = streamingResponse();
+  // blockMainThreadUntilResume("/ready", "GET");
   absl::Notification got_headers;
-  response->getHeaders(
-      [&got_headers](Http::Code, Http::ResponseHeaderMap&) { got_headers.Notify(); });
-  ENVOY_LOG_MISC(info, "Blocking for 5 seconds to test timeout functionality...");
-  ASSERT_FALSE(got_headers.WaitForNotificationWithTimeout(absl::Seconds(5)));
-  resume_.Notify();
+  AdminResponseSharedPtr response = streamingResponse();
+  interlockMainThread(
+      [response, &got_headers]() {
+        response->getHeaders(
+            [&got_headers](Http::Code, Http::ResponseHeaderMap&) { got_headers.Notify(); });
+        ENVOY_LOG_MISC(info, "Blocking for 5 seconds to test timeout functionality...");
+      },
+      [&got_headers]() {
+        ASSERT_FALSE(got_headers.WaitForNotificationWithTimeout(absl::Seconds(5)));
+      });
   EXPECT_TRUE(quitAndWait());
 }
 
