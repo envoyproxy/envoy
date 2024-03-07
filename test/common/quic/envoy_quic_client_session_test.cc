@@ -509,8 +509,11 @@ public:
 
 // Ensures that the Network::Utility::readFromSocket function uses GRO.
 // Only Linux platforms support GRO.
-#if defined(__linux__)
 TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    GTEST_SKIP() << "Platform doesn't support GRO.";
+  }
+
   NiceMock<MockOsSysCallsImpl> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
 
@@ -544,9 +547,9 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  EXPECT_LOG_CONTAINS("trace", "starting gro recvmsg with max",
+                      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
-#endif
 
 } // namespace Quic
 } // namespace Envoy

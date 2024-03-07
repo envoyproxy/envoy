@@ -48,7 +48,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
       info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator,
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.prefer_quic_client_udp_gro"));
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_quic_client_udp_gro"));
 
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;

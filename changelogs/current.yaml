@@ -73,7 +73,7 @@ minor_behavior_changes:
     Use GRO (Generic Receive Offload) for reading packets from a client QUIC UDP socket. See
     https://www.kernel.org/doc/html/next/networking/segmentation-offloads.html for a description of
     GRO. This behavior change can be reverted by setting
-    ``envoy.restart_features.prefer_quic_client_udp_gro`` to ``false``.
+    ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
