@@ -6,9 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 public interface EnvoyHTTPCallbacks {
-
-  Executor getExecutor();
-
   /**
    * Called when all headers get received on the async HTTP stream.
    *
@@ -25,7 +22,7 @@ public interface EnvoyHTTPCallbacks {
    *
    * @param data,        the buffer of the data received.
    *                     The `data` will be destroyed upon completing this callback. Create a copy
-   *                     of the `data` if the `data` is going to outlive this callback lifetime.
+   *                     of the `data` if the `data` is going to outlive this callback.
    * @param endStream,   whether the data is the last data frame.
    * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */

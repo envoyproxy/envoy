@@ -25,7 +25,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
@@ -126,7 +125,7 @@ public class Http2TestServerTest {
           return null;
         })
         .setOnCancel((ignored) -> { throw new AssertionError("Unexpected OnCancel called."); })
-        .start(Executors.newSingleThreadExecutor())
+        .start()
         .sendHeaders(requestScenario.getHeaders(), false);
 
     latch.await();
@@ -163,7 +162,7 @@ public class Http2TestServerTest {
           return null;
         })
         .setOnCancel((ignored) -> { throw new AssertionError("Unexpected OnCancel called."); })
-        .start(Executors.newSingleThreadExecutor())
+        .start()
         .sendHeaders(requestScenario.getHeaders(), false);
 
     latch.await();
@@ -214,7 +213,7 @@ public class Http2TestServerTest {
           latch.countDown();
           return null;
         })
-        .start(Executors.newSingleThreadExecutor())
+        .start()
         .sendHeaders(requestScenario.getHeaders(), /* hasRequestBody= */ false);
 
     latch.await();

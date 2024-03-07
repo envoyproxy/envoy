@@ -103,7 +103,6 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
   private static final String TAG = CronvoyUrlRequest.class.getSimpleName();
   private static final String USER_AGENT = "User-Agent";
   private static final String CONTENT_TYPE = "Content-Type";
-  private static final Executor DIRECT_EXECUTOR = new DirectExecutor();
 
   private final String mUserAgent;
   private final HeadersList mRequestHeaders = new HeadersList();
@@ -766,22 +765,10 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
 
   private static class HeadersList extends ArrayList<Map.Entry<String, String>> {}
 
-  private static class DirectExecutor implements Executor {
-    @Override
-    public void execute(Runnable runnable) {
-      runnable.run();
-    }
-  }
-
   private class CronvoyHttpCallbacks implements EnvoyHTTPCallbacks {
 
     private final AtomicInteger mCancelState = new AtomicInteger(CancelState.READY);
     private volatile boolean mEndStream = false; // Accessed by different Threads
-
-    @Override
-    public Executor getExecutor() {
-      return DIRECT_EXECUTOR;
-    }
 
     @Override
     public void onHeaders(Map<String, List<String>> headers, boolean endStream,
@@ -880,22 +867,19 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
         return;
       }
 
-      Runnable task = new Runnable() {
-        @Override
-        public void run() {
-          checkCallingThread();
-          try {
-            ByteBuffer userBuffer = mUserCurrentReadBuffer;
-            mUserCurrentReadBuffer = null; // Avoid the reference to a potentially large buffer.
-            int dataRead = data.remaining();
-            userBuffer.put(data); // NPE ==> BUG, BufferOverflowException ==> User not behaving.
-            if (dataRead > 0 || !endStream) {
-              mWaitingOnRead.set(true);
-              mCallback.onReadCompleted(CronvoyUrlRequest.this, mUrlResponseInfo, userBuffer);
-            }
-          } catch (Throwable t) {
-            onCallbackException(t);
+      ByteBuffer userBuffer = mUserCurrentReadBuffer;
+      mUserCurrentReadBuffer = null; // Avoid the reference to a potentially large buffer.
+      int dataRead = data.remaining();
+      userBuffer.put(data); // NPE ==> BUG, BufferOverflowException ==> User not behaving.
+      Runnable task = () -> {
+        checkCallingThread();
+        try {
+          if (dataRead > 0 || !endStream) {
+            mWaitingOnRead.set(true);
+            mCallback.onReadCompleted(CronvoyUrlRequest.this, mUrlResponseInfo, userBuffer);
           }
+        } catch (Throwable t) {
+          onCallbackException(t);
         }
       };
       execute(task);

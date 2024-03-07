@@ -22,7 +22,6 @@ import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -134,7 +133,7 @@ class FilterThrowingExceptionTest {
         assertThat(status).isEqualTo(200)
         onRespondeHeadersLatch.countDown()
       }
-      .start(Executors.newSingleThreadExecutor())
+      .start()
       .sendHeaders(requestHeaders, true)
 
     onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)

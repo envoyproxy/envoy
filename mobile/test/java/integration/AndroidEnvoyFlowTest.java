@@ -313,7 +313,7 @@ public class AndroidEnvoyFlowTest {
                           latch.countDown();
                           return null;
                         })
-                        .start(Executors.newSingleThreadExecutor())
+                        .start()
                         .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
     if (requestScenario.cancelBeforeSendingRequestBody) {
       stream.cancel();

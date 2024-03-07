@@ -16,6 +16,7 @@ import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.ByteBuffers;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
 import io.envoyproxy.envoymobile.engine.testing.Response;
@@ -156,7 +157,7 @@ public class QuicTestServerTest {
                           return null;
                         })
                         .setOnResponseData((data, endStream, ignored) -> {
-                          response.get().addBody(data);
+                          response.get().addBody(ByteBuffers.copy(data));
                           return null;
                         })
                         .setOnResponseTrailers((trailers, ignored) -> {
@@ -177,7 +178,7 @@ public class QuicTestServerTest {
                           latch.countDown();
                           return null;
                         })
-                        .start(Executors.newSingleThreadExecutor())
+                        .start()
                         .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
     requestScenario.getBodyChunks().forEach(stream::sendData);
     requestScenario.getClosingBodyChunk().ifPresent(stream::close);

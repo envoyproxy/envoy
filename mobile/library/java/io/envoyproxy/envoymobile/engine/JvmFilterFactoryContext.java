@@ -1,6 +1,5 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.JvmFilterContext;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 
 /**

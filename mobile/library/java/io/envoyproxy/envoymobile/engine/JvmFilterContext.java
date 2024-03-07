@@ -66,11 +66,8 @@ class JvmFilterContext {
    * @return Object[],   pair of HTTP filter status and optional modified data.
    */
   public Object onRequestData(ByteBuffer data, boolean endStream, long[] streamIntel) {
-    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
-    // be destroyed after calling this callback.
-    ByteBuffer copiedData = ByteBuffers.copy(data);
     return toJniFilterDataStatus(
-        filter.onRequestData(copiedData, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onRequestData(data, endStream, new EnvoyStreamIntelImpl(streamIntel)));
   }
 
   /**
@@ -111,11 +108,8 @@ class JvmFilterContext {
    * @return Object[],   pair of HTTP filter status and optional modified data.
    */
   public Object onResponseData(ByteBuffer data, boolean endStream, long[] streamIntel) {
-    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
-    // be destroyed after calling this callback.
-    ByteBuffer copiedData = ByteBuffers.copy(data);
     return toJniFilterDataStatus(
-        filter.onResponseData(copiedData, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+        filter.onResponseData(data, endStream, new EnvoyStreamIntelImpl(streamIntel)));
   }
 
   /**
@@ -144,9 +138,6 @@ class JvmFilterContext {
    */
   public Object onResumeRequest(long headerCount, ByteBuffer data, long trailerCount,
                                 boolean endStream, long[] streamIntel) {
-    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
-    // be destroyed after calling this callback.
-    ByteBuffer copiedData = ByteBuffers.copy(data);
     // Headers are optional in this call, and a negative length indicates omission.
     Map<String, List<String>> headers = null;
     if (headerCount >= 0) {
@@ -159,7 +150,7 @@ class JvmFilterContext {
       assert trailerUtility.validateCount(trailerCount);
       trailers = trailerUtility.retrieveHeaders();
     }
-    return toJniFilterResumeStatus(filter.onResumeRequest(headers, copiedData, trailers, endStream,
+    return toJniFilterResumeStatus(filter.onResumeRequest(headers, data, trailers, endStream,
                                                           new EnvoyStreamIntelImpl(streamIntel)));
   }
 
@@ -175,9 +166,6 @@ class JvmFilterContext {
    */
   public Object onResumeResponse(long headerCount, ByteBuffer data, long trailerCount,
                                  boolean endStream, long[] streamIntel) {
-    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
-    // be destroyed after calling this callback.
-    ByteBuffer copiedData = ByteBuffers.copy(data);
     // Headers are optional in this call, and a negative length indicates omission.
     Map<String, List<String>> headers = null;
     if (headerCount >= 0) {
@@ -190,7 +178,7 @@ class JvmFilterContext {
       assert trailerUtility.validateCount(trailerCount);
       trailers = trailerUtility.retrieveHeaders();
     }
-    return toJniFilterResumeStatus(filter.onResumeResponse(headers, copiedData, trailers, endStream,
+    return toJniFilterResumeStatus(filter.onResumeResponse(headers, data, trailers, endStream,
                                                            new EnvoyStreamIntelImpl(streamIntel)));
   }
 

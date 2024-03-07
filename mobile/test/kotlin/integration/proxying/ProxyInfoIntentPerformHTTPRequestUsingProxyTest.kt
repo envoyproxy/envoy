@@ -14,7 +14,6 @@ import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -86,7 +85,7 @@ class PerformHTTPRequestUsingProxy {
         assertThat(responseHeaders.value("x-proxy-response")).isEqualTo(listOf("true"))
         onRespondeHeadersLatch.countDown()
       }
-      .start(Executors.newSingleThreadExecutor())
+      .start()
       .sendHeaders(requestHeaders, true)
 
     onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)

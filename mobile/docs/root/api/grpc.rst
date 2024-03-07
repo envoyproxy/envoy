@@ -42,7 +42,7 @@ Start and interact with a gRPC stream in **Kotlin**::
       }
       .setOnError { ... }
       .setOnCancel { ... }
-      .start(Executors.newSingleThreadExecutor())
+      .start()
       .sendHeaders(headers, false)
       .sendMessage(...)
       ...
@@ -180,7 +180,7 @@ stream.
     .newGRPCStreamPrototype()
     ...
   val stream = prototype
-    .start(Executors.newSingleThreadExecutor())
+    .start()
     .sendHeaders(...)
     .sendMessage(...)
 

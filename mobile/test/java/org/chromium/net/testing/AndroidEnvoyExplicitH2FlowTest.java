@@ -73,34 +73,33 @@ public class AndroidEnvoyExplicitH2FlowTest {
     // Loop 100,000 times which should be long enough to wait for the server's
     // response headers to arrive.
     final int numWrites = 100000;
-    stream.set(
-        engine.streamClient()
-            .newStreamPrototype()
-            .setExplicitFlowControl(true)
-            .setOnSendWindowAvailable((streamIntel -> {
-              ByteBuffer bf = ByteBuffer.allocateDirect(1);
-              bf.put((byte)'a');
-              if (bufferSent.incrementAndGet() == numWrites) {
-                stream.get().close(bf);
-              } else {
-                stream.get().sendData(bf);
-              }
-              return null;
-            }))
-            .setOnResponseHeaders((responseHeaders, endStream, ignored) -> {
-              // This was getting executed, even in the initial test, but only
-              // after all the data was sent. With the fix, this should happen
-              // before all the data is sent which is checked in the assert
-              // below.
-              stream.get().cancel();
-              return null;
-            })
-            .setOnCancel((ignored) -> {
-              latch.countDown();
-              return null;
-            })
-            .start(Runnable::run) // direct executor - all the logic runs on the EM Network Thread.
-            .sendHeaders(requestHeaders, false));
+    stream.set(engine.streamClient()
+                   .newStreamPrototype()
+                   .setExplicitFlowControl(true)
+                   .setOnSendWindowAvailable((streamIntel -> {
+                     ByteBuffer bf = ByteBuffer.allocateDirect(1);
+                     bf.put((byte)'a');
+                     if (bufferSent.incrementAndGet() == numWrites) {
+                       stream.get().close(bf);
+                     } else {
+                       stream.get().sendData(bf);
+                     }
+                     return null;
+                   }))
+                   .setOnResponseHeaders((responseHeaders, endStream, ignored) -> {
+                     // This was getting executed, even in the initial test, but only
+                     // after all the data was sent. With the fix, this should happen
+                     // before all the data is sent which is checked in the assert
+                     // below.
+                     stream.get().cancel();
+                     return null;
+                   })
+                   .setOnCancel((ignored) -> {
+                     latch.countDown();
+                     return null;
+                   })
+                   .start() // direct executor - all the logic runs on the EM Network Thread.
+                   .sendHeaders(requestHeaders, false));
     ByteBuffer bf = ByteBuffer.allocateDirect(1);
     bf.put((byte)'a');
     stream.get().sendData(bf);

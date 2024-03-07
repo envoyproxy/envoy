@@ -14,7 +14,6 @@ import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -81,7 +80,7 @@ class PerformHTTPSRequestBadHostname {
       .streamClient()
       .newStreamPrototype()
       .setOnError { _, _ -> onErrorLatch.countDown() }
-      .start(Executors.newSingleThreadExecutor())
+      .start()
       .sendHeaders(requestHeaders, true)
 
     onErrorLatch.await(15, TimeUnit.SECONDS)
