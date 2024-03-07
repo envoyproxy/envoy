@@ -78,7 +78,8 @@ private:
   absl::flat_hash_set<std::string> generateAllowContentTypes(
       const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) const;
   std::vector<Regex::CompiledMatcherPtr> generateAllowContentTypeRegexs(
-      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::RegexMatcher>& proto_allow_content_types_regex) const;
+      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::RegexMatcher>&
+          proto_allow_content_types_regex) const;
   JsonToMetadataStats rqstats_;
   JsonToMetadataStats respstats_;
   const Rules request_rules_;

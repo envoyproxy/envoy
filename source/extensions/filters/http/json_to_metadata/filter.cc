@@ -99,8 +99,8 @@ FilterConfig::FilterConfig(
       response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()),
       request_allow_content_types_regex_(
           generateAllowContentTypeRegexs(proto_config.request_rules().allow_content_types_regex())),
-      response_allow_content_types_regex_(
-          generateAllowContentTypeRegexs(proto_config.response_rules().allow_content_types_regex())) {
+      response_allow_content_types_regex_(generateAllowContentTypeRegexs(
+          proto_config.response_rules().allow_content_types_regex())) {
   if (request_rules_.empty() && response_rules_.empty()) {
     throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
                          "either request or response rules");
@@ -129,8 +129,9 @@ absl::flat_hash_set<std::string> FilterConfig::generateAllowContentTypes(
 }
 
 std::vector<Regex::CompiledMatcherPtr> FilterConfig::generateAllowContentTypeRegexs(
-    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::RegexMatcher>& proto_allow_content_types_regex) const {
-  
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::RegexMatcher>&
+        proto_allow_content_types_regex) const {
+
   std::vector<Regex::CompiledMatcherPtr> allow_content_types_regex;
 
   for (const auto& request_allowed_content_type : proto_allow_content_types_regex) {
