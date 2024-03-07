@@ -52,7 +52,7 @@ class JvmFilterContext {
    */
   public Object onRequestHeaders(long headerCount, boolean endStream, long[] streamIntel) {
     assert headerUtility.validateCount(headerCount);
-    final Map headers = headerUtility.retrieveHeaders();
+    final Map<String, List<String>> headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(
         filter.onRequestHeaders(headers, endStream, new EnvoyStreamIntelImpl(streamIntel)));
   }
@@ -82,7 +82,7 @@ class JvmFilterContext {
    */
   public Object onRequestTrailers(long trailerCount, long[] streamIntel) {
     assert headerUtility.validateCount(trailerCount);
-    final Map trailers = headerUtility.retrieveHeaders();
+    final Map<String, List<String>> trailers = headerUtility.retrieveHeaders();
     return toJniFilterTrailersStatus(
         filter.onRequestTrailers(trailers, new EnvoyStreamIntelImpl(streamIntel)));
   }
@@ -97,7 +97,7 @@ class JvmFilterContext {
    */
   public Object onResponseHeaders(long headerCount, boolean endStream, long[] streamIntel) {
     assert headerUtility.validateCount(headerCount);
-    final Map headers = headerUtility.retrieveHeaders();
+    final Map<String, List<String>> headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(
         filter.onResponseHeaders(headers, endStream, new EnvoyStreamIntelImpl(streamIntel)));
   }
@@ -127,7 +127,7 @@ class JvmFilterContext {
    */
   public Object onResponseTrailers(long trailerCount, long[] streamIntel) {
     assert headerUtility.validateCount(trailerCount);
-    final Map trailers = headerUtility.retrieveHeaders();
+    final Map<String, List<String>> trailers = headerUtility.retrieveHeaders();
     return toJniFilterTrailersStatus(
         filter.onResponseTrailers(trailers, new EnvoyStreamIntelImpl(streamIntel)));
   }
