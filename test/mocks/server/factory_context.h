@@ -3,7 +3,7 @@
 #include "envoy/server/configuration.h"
 
 #include "source/common/router/context_impl.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "admin.h"
 #include "drain_manager.h"

@@ -35,7 +35,10 @@ envoy_cc_library(
         ":c_types_lib",
         ":platform_bridge_cc_proto",
         "//library/common/system:system_helper_lib",
-        "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "@envoy//envoy/thread:thread_interface",
+        "@envoy//source/common/common:macros",
+        "@envoy//source/common/common:thread_impl_lib_posix",
+        "@envoy//source/common/tls/cert_validator:cert_validator_lib",
     ],
 )
 

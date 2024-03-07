@@ -6,7 +6,6 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -630,17 +629,6 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   } else {
     return route_criteria;
   }
-}
-
-ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailers::serializeAsProto() const {
-  auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
-  value().iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
-    auto* new_header = proto_out->add_headers();
-    new_header->set_key(std::string(e.key().getStringView()));
-    new_header->set_value(std::string(e.value().getStringView()));
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  return proto_out;
 }
 
 const std::string& TunnelResponseHeaders::key() {
