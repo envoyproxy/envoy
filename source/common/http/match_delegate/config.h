@@ -104,17 +104,22 @@ private:
 };
 
 class MatchDelegateConfig
-    : public Extensions::HttpFilters::Common::FactoryBase<
+    : public Extensions::HttpFilters::Common::DualFactoryBase<
           envoy::extensions::common::matching::v3::ExtensionWithMatcher,
           envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute> {
 public:
   // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
-  MatchDelegateConfig() : FactoryBase("envoy.filters.http.match_delegate") {}
+  MatchDelegateConfig() : DualFactoryBase("envoy.filters.http.match_delegate") {}
 
 private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-      const std::string&, Server::Configuration::FactoryContext& context) override;
+      const std::string&, DualInfo info, Server::Configuration::FactoryContext& context) override;
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
+      const std::string&, DualInfo info,
+      Server::Configuration::UpstreamFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
@@ -140,7 +145,10 @@ private:
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
 
+using UpstreamMatchDelegateConfig = MatchDelegateConfig;
+
 DECLARE_FACTORY(MatchDelegateConfig);
+DECLARE_FACTORY(UpstreamMatchDelegateConfig);
 
 namespace Factory {
 DECLARE_FACTORY(SkipActionFactory);

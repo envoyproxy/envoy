@@ -23,7 +23,12 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
       const std::string& stats_prefix, DualInfo,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::FactoryContext& context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
+      const std::string& stats_prefix, DualInfo,
+      Server::Configuration::UpstreamFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::buffer::v3::BufferPerRoute&,

@@ -12,7 +12,17 @@ namespace HeaderMutation {
 absl::StatusOr<Http::FilterFactoryCb>
 HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& config, const std::string&, DualInfo,
-    Server::Configuration::ServerFactoryContext&) {
+    Server::Configuration::FactoryContext&) {
+  auto filter_config = std::make_shared<HeaderMutationConfig>(config);
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));
+  };
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
+    const ProtoConfig& config, const std::string&, DualInfo,
+    Server::Configuration::UpstreamFactoryContext&) {
   auto filter_config = std::make_shared<HeaderMutationConfig>(config);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));

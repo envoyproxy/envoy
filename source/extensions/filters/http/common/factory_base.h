@@ -141,8 +141,7 @@ public:
                                Server::Configuration::FactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
-                                             stats_prefix, DualInfo(context),
-                                             context.serverFactoryContext());
+                                             stats_prefix, DualInfo(context), context);
   }
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
@@ -152,13 +151,18 @@ public:
     return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(
             proto_config, context.serverFactoryContext().messageValidationVisitor()),
-        stats_prefix, DualInfo(context), context.serverFactoryContext());
+        stats_prefix, DualInfo(context), context);
   }
 
   virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix, DualInfo info,
-                                    Server::Configuration::ServerFactoryContext& context) PURE;
+                                    Server::Configuration::FactoryContext& context) PURE;
+
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                    const std::string& stats_prefix, DualInfo info,
+                                    Server::Configuration::UpstreamFactoryContext& context) PURE;
 };
 
 } // namespace Common

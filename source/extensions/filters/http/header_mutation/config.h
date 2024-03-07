@@ -23,7 +23,10 @@ private:
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const ProtoConfig& proto_config,
                                     const std::string& stats_prefix, DualInfo info,
-                                    Server::Configuration::ServerFactoryContext& context) override;
+                                    Server::Configuration::FactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+      const ProtoConfig& proto_config, const std::string& stats_prefix, DualInfo info,
+      Server::Configuration::UpstreamFactoryContext& context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,
                                        Server::Configuration::ServerFactoryContext&,

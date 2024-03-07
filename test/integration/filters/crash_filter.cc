@@ -82,7 +82,19 @@ public:
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::CrashFilterConfig& proto_config, const std::string&,
-      DualInfo, Server::Configuration::ServerFactoryContext&) override {
+      DualInfo, Server::Configuration::FactoryContext&) override {
+    auto filter_config = std::make_shared<CrashFilterConfig>(
+        proto_config.crash_in_encode_headers(), proto_config.crash_in_encode_data(),
+        proto_config.crash_in_decode_headers(), proto_config.crash_in_decode_data(),
+        proto_config.crash_in_decode_trailers(), proto_config.crash_in_decode_metadata());
+    return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<CrashFilter>(filter_config));
+    };
+  }
+
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+      const test::integration::filters::CrashFilterConfig& proto_config, const std::string&,
+      DualInfo, Server::Configuration::UpstreamFactoryContext&) override {
     auto filter_config = std::make_shared<CrashFilterConfig>(
         proto_config.crash_in_encode_headers(), proto_config.crash_in_encode_data(),
         proto_config.crash_in_decode_headers(), proto_config.crash_in_decode_data(),

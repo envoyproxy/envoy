@@ -136,7 +136,8 @@ public:
                           "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                           code: 403
     )EOF",
-                                                 name));
+                                                 name),
+                                 downstream_filter_);
   }
 
   void prependCompositeDynamicFilter(const std::string& name = "composite",
@@ -173,7 +174,8 @@ public:
                             type_urls:
                             - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
     )EOF",
-                                                                             name, path)));
+                                                                             name, path)),
+                                 downstream_filter_);
     TestEnvironment::writeStringToFileForTest("set_response_code.yaml", R"EOF(
 resources:
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
@@ -244,6 +246,8 @@ resources:
     BaseIntegrationTest::createUpstreams();
     addFakeUpstream(Http::CodecType::HTTP2);
   }
+
+  bool downstream_filter_{true};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
@@ -255,6 +259,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
 TEST_P(CompositeFilterIntegrationTest, TestBasic) {
   prependCompositeFilter();
   initialize();
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   {
@@ -400,6 +405,61 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
 }
+
+TEST_P(CompositeFilterIntegrationTest, TestBasicUpstreamFilter) {
+  downstream_filter_ = false;
+  prependCompositeFilter();
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
+}
+
+// Verifies that if we don't match the match action the request is proxied as normal, while if the
+// match action is hit we apply the specified dynamic filter to the stream.
+TEST_P(CompositeFilterIntegrationTest, TestBasicDynamicUpstreamFilter) {
+  downstream_filter_ = false;
+  prependCompositeDynamicFilter("composite-dynamic");
+  initialize();
+
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.http_filter.set-response-code.config_reload", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  }
+}
+
 } // namespace
 class CompositeFilterSeverContextIntegrationTest
     : public HttpIntegrationTest,
