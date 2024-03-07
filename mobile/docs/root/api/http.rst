@@ -33,7 +33,7 @@ Start and interact with an HTTP stream in **Kotlin**::
     }
     .setOnError { ... }
     .setOnCancel { ... }
-    .start(Executors.newSingleThreadExecutor())
+    .start()
     .sendHeaders(...)
     .sendData(...)
 
@@ -166,7 +166,7 @@ Doing so returns a ``Stream`` which allows the sender to interact with the strea
     .newStreamPrototype()
     ...
   val stream = prototype
-    .start(Executors.newSingleThreadExecutor())
+    .start()
     .sendHeaders(...)
     .sendData(...)
 
@@ -215,7 +215,7 @@ For example:
     .build()
   val stream = streamClient
     .newStreamPrototype()
-    .start(Executors.newSingleThreadExecutor())
+    .start()
 
   // Headers-only
   stream.sendHeaders(requestHeaders, true)

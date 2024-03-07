@@ -22,7 +22,6 @@ import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter;
 import io.envoyproxy.envoymobile.shared.Success;
 import kotlin.Unit;
 
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -131,7 +130,7 @@ public class MainActivity extends Activity {
           recyclerView.post(() -> viewAdapter.add(new Failure(message)));
           return Unit.INSTANCE;
         })
-        .start(Executors.newSingleThreadExecutor())
+        .start()
         .sendHeaders(requestHeaders, true);
 
     clear_text = !clear_text;
