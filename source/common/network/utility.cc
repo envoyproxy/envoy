@@ -742,6 +742,8 @@ Utility::readFromSocket(IoHandle& handle, const Address::Instance& local_address
     return recvMsgFromSocket(handle, local_address, udp_packet_processor, receive_time,
                              packets_dropped);
   }
+  // Should never get here; need this to make gcc happy.
+  return Api::ioCallUint64ResultNoError();
 }
 
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
