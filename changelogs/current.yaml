@@ -279,6 +279,9 @@ new_features:
 - area: tracing
   change: |
     Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
+- area: tracing
+  change: |
+    Added support for variant span attribute type for the OpenTelemetry tracer.
 
 deprecated:
 - area: listener
