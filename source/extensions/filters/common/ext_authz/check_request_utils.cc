@@ -165,7 +165,8 @@ void CheckRequestUtils::setHttpRequest(
       if (mutable_headers->find(key) == mutable_headers->end()) {
         (*mutable_headers)[key] = sanitized_value;
       } else {
-        (*mutable_headers)[key].append(",").append(sanitized_value); // Merge duplicate headers.
+        // Merge duplicate headers.
+        (*mutable_headers)[key].append(",").append(sanitized_value);
       }
     }
     return Envoy::Http::HeaderMap::Iterate::Continue;
@@ -187,7 +188,12 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     // Add in a header to detect when a partial body is used.
-    const std::string partial_body_value = length != decoding_buffer->length() ? "true" : "false";
+    std::string partial_body_value;
+    if (length != decoding_buffer->length()) {
+      partial_body_value = "true";
+    } else {
+      partial_body_value = "false";
+    }
     if (encode_raw_headers) {
       headerMapAddHeader(*mutable_header_map, Headers::get().EnvoyAuthPartialBody.get(),
                          std::move(partial_body_value));
