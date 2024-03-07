@@ -30,7 +30,9 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
+using testing::Return;
 
 namespace Envoy {
 namespace Quic {
@@ -505,6 +507,7 @@ public:
               (os_fd_t socket, struct mmsghdr* msgvec, unsigned int vlen, int flags,
                struct timespec* timeout),
               (override));
+  MOCK_METHOD(bool, supportsUdpGro, (), (const));
 };
 
 // Ensures that the Network::Utility::readFromSocket function uses GRO.
@@ -534,6 +537,7 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   EXPECT_EQ(1, sock_opt);
 
   // GRO uses `recvmsg`, not `recvmmsg`.
+  EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
   EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _))
       .WillOnce(
@@ -548,6 +552,39 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
   EXPECT_LOG_CONTAINS("trace", "starting gro recvmsg with max",
+                      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
+}
+
+// Ensures that the Network::Utility::readFromSocket function does not use recvmmsg for client
+// QUIC connections, even when GRO is not supported.
+TEST_P(EnvoyQuicClientSessionTest, UsesRecvMsgWithoutGro) {
+  NiceMock<MockOsSysCallsImpl> os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
+
+  // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
+  envoy_quic_session_.connect();
+
+  std::string write_data = "abc";
+  Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+
+  // Make sure recvmmsg isn't used.
+  EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(false));
+  EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+            dispatcher_->exit();
+            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+            // use the msghdr that would normally have been populated by recvmsg but is not
+            // populated by this mock.
+            return {-1, SOCKET_ERROR_AGAIN};
+          }));
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+
+  EXPECT_LOG_CONTAINS("trace", "starting recvmsg with max",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
 
