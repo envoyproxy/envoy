@@ -417,7 +417,6 @@ envoy_cc_library(
         ":listener_hooks_lib",
         ":listener_manager_factory_lib",
         ":regex_engine_lib",
-        ":ssl_context_manager_lib",
         ":utils_lib",
         ":worker_lib",
         "//envoy/event:dispatcher_interface",
@@ -480,16 +479,6 @@ envoy_cc_library(
         ":server_base_lib",
         "//source/common/memory:heap_shrinker_lib",
         "//source/server:overload_manager_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "ssl_context_manager_lib",
-    srcs = ["ssl_context_manager.cc"],
-    hdrs = ["ssl_context_manager.h"],
-    deps = [
-        "//envoy/registry",
-        "//envoy/ssl:context_manager_interface",
     ],
 )
 

@@ -56,7 +56,6 @@
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
-#include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
 namespace Envoy {
@@ -749,7 +748,12 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
+  Ssl::ContextManagerFactory* ssl_factory =
+      Registry::FactoryRegistry<Ssl::ContextManagerFactory>::getFactory("ssl_context_manager");
+  if (!ssl_factory) {
+    throwEnvoyExceptionOrPanic("No SSL factory compiled");
+  }
+  ssl_context_manager_ = ssl_factory->createContextManager(time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,

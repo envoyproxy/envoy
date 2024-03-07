@@ -36,6 +36,9 @@ _core_extensions = [
     "envoy.network.dns_resolver.cares",
     "envoy.network.dns_resolver.apple",
     "envoy.load_balancing_policies.round_robin",
+    "envoy.http.original_ip_detection.xff",
+    "envoy.request_id.uuid",
+    "envoy.transport_sockets.tls",
 ]
 
 # Return all core extensions to be compiled into Envoy.

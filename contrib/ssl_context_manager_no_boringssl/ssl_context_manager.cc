@@ -1,12 +1,11 @@
-#include "source/server/ssl_context_manager.h"
-
 #include <cstddef>
 
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
+#include "envoy/ssl/context_manager.h"
 
 namespace Envoy {
-namespace Server {
+namespace Contrib {
 
 /**
  * A stub that provides a SSL context manager capable of reporting on
@@ -49,16 +48,15 @@ private:
   }
 };
 
-Ssl::ContextManagerPtr createContextManager(const std::string& factory_name,
-                                            TimeSource& time_source) {
-  Ssl::ContextManagerFactory* factory =
-      Registry::FactoryRegistry<Ssl::ContextManagerFactory>::getFactory(factory_name);
-  if (factory != nullptr) {
-    return factory->createContextManager(time_source);
+class SslContextManagerFactoryNoTls : public Ssl::ContextManagerFactory {
+  Ssl::ContextManagerPtr createContextManager(TimeSource&) override {
+    return std::make_unique<SslContextManagerNoTlsStub>();
   }
+};
 
-  return std::make_unique<SslContextManagerNoTlsStub>();
-}
+static Envoy::Registry::RegisterInternalFactory<SslContextManagerFactoryNoTls,
+                                                Ssl::ContextManagerFactory>
+    ssl_manager_registered;
 
-} // namespace Server
+} // namespace Contrib
 } // namespace Envoy

@@ -18,7 +18,6 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
-#include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
 namespace Envoy {
@@ -132,7 +131,13 @@ void ValidationInstance::initialize(const Options& options,
             "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
-  ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
+  Ssl::ContextManagerFactory* ssl_factory =
+      Registry::FactoryRegistry<Ssl::ContextManagerFactory>::getFactory("ssl_context_manager");
+  if (!ssl_factory) {
+    throw EnvoyException("No SSL factory compiled");
+  }
+  ssl_context_manager_ = ssl_factory->createContextManager(api_->timeSource());
+
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
