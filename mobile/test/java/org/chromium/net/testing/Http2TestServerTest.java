@@ -8,6 +8,8 @@ import static org.chromium.net.testing.CronetTestRule.SERVER_KEY_PKCS8_PEM;
 import static org.junit.Assert.assertNotNull;
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
+
+import io.envoyproxy.envoymobile.engine.ByteBuffers;
 import io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
@@ -192,7 +194,7 @@ public class Http2TestServerTest {
           return null;
         })
         .setOnResponseData((data, endStream, ignored) -> {
-          response.get().addBody(data);
+          response.get().addBody(ByteBuffers.copy(data));
           return null;
         })
         .setOnResponseTrailers((trailers, ignored) -> {

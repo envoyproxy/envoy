@@ -17,6 +17,7 @@ import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.StreamIntel;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.ByteBuffers;
 import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
 import io.envoyproxy.envoymobile.engine.testing.Response;
 import java.net.MalformedURLException;
@@ -486,7 +487,7 @@ public class AndroidEnvoyExplicitFlowTest {
                           return null;
                         })
                         .setOnResponseData((data, endStream, streamIntel) -> {
-                          response.get().addBody(data);
+                          response.get().addBody(ByteBuffers.copy(data));
                           response.get().addStreamIntel(streamIntel);
                           if (!endStream) {
                             if (requestScenario.waitOnReadData) {
