@@ -121,7 +121,7 @@ message AttributeContext {
     map<string, string> headers = 3
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
-    // A multimap for the raw HTTP request headers. This is used instead of
+    // A list of the raw HTTP request headers. This is used instead of
     // :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>` when
     // :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
     // is set to true.
