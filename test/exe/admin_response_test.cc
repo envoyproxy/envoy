@@ -98,16 +98,11 @@ protected:
    * the fact that all the admin responses are delivered on the main thread.
    * So we can pause those by blocking the main thread indefinitely.
    *
-   * To resume the main thread, call resume_.Notify();
+   * The provided lambda runs in the main thread, between two notifications
+   * controlled by this function.
    *
-   * @param url the admin endpoint to initiate.
+   * @param fn function to run in the main thread, before interlockMainThread returns.
    */
-  /*void blockMainThreadUntilResume(absl::string_view url, absl::string_view method) {
-    AdminResponseSharedPtr blocked_response = main_common_->adminRequest(url, method);
-    blocked_response->getHeaders(
-        [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
-        }*/
-
   void interlockMainThread(std::function<void()> fn) {
     main_common_->dispatcherForTest().post([this, fn] {
       resume_.WaitForNotification();
@@ -205,7 +200,6 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForHeader) {
 
 TEST_F(AdminStreamingTest, CancelAfterAskingForHeader1) {
   int header_calls = 0;
-  // blockMainThreadUntilResume("/ready", "GET");
   AdminResponseSharedPtr response = streamingResponse();
   interlockMainThread([&header_calls, response]() {
     response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
@@ -227,7 +221,6 @@ TEST_F(AdminStreamingTest, CancelAfterAskingForHeader2) {
 TEST_F(AdminStreamingTest, DeleteAfterAskingForHeader1) {
   int header_calls = 0;
   AdminResponseSharedPtr response = streamingResponse();
-  // blockMainThreadUntilResume("/ready", "GET");
   interlockMainThread([&response, &header_calls]() {
     response->getHeaders([&header_calls](Http::Code, Http::ResponseHeaderMap&) { ++header_calls; });
     response.reset();
@@ -258,7 +251,6 @@ TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk1) {
 TEST_F(AdminStreamingTest, CancelBeforeAskingForChunk2) {
   AdminResponseSharedPtr response = streamingResponse();
   waitForHeaders(response);
-  // blockMainThreadUntilResume("/ready", "GET");
   int chunk_calls = 0;
   interlockMainThread([&response, &chunk_calls]() {
     response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
@@ -277,7 +269,6 @@ TEST_F(AdminStreamingTest, CancelAfterAskingForChunk) {
   // an early exit in requestNextChunk.
   next_chunk_hook_ = [response]() { response->cancel(); };
 
-  // blockMainThreadUntilResume("/ready", "GET");
   interlockMainThread([&chunk_calls, response]() {
     response->nextChunk([&chunk_calls](Buffer::Instance&, bool) { ++chunk_calls; });
   });
@@ -338,24 +329,11 @@ TEST_F(AdminStreamingTest, QuitBeforeCreatingResponse) {
 }
 
 TEST_F(AdminStreamingTest, TimeoutGettingResponse) {
-#if 0
-  // blockMainThreadUntilResume("/ready", "GET");
   absl::Notification got_headers;
   AdminResponseSharedPtr response = streamingResponse();
-  interlockMainThread(
-      [response, &got_headers]() {
-        response->getHeaders(
-            [&got_headers](Http::Code, Http::ResponseHeaderMap&) { got_headers.Notify(); });
-        ENVOY_LOG_MISC(info, "Blocking for 5 seconds to test timeout functionality...");
-      },
-      [&got_headers]() {
-        ASSERT_FALSE(got_headers.WaitForNotificationWithTimeout(absl::Seconds(5)));
-      });
-  EXPECT_TRUE(quitAndWait());
-#else
-  // blockMainThreadUntilResume("/ready", "GET");
-  absl::Notification got_headers;
-  AdminResponseSharedPtr response = streamingResponse();
+
+  // Mimics a slow admin response by adding a blocking notification in front
+  // of a call to initiate an admin request.
   main_common_->dispatcherForTest().post([this, response, &got_headers] {
     resume_.WaitForNotification();
     response->getHeaders(
@@ -368,7 +346,6 @@ TEST_F(AdminStreamingTest, TimeoutGettingResponse) {
   resume_.Notify();
   pause_point_.WaitForNotification();
   EXPECT_TRUE(quitAndWait());
-#endif
 }
 
 } // namespace Envoy
