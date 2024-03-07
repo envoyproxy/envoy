@@ -555,9 +555,9 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
 
-// Ensures that the Network::Utility::readFromSocket function does not use recvmmsg for client
-// QUIC connections, even when GRO is not supported.
-TEST_P(EnvoyQuicClientSessionTest, UsesRecvMsgWithoutGro) {
+// Ensures that the Network::Utility::readFromSocket function does uses recvmmsg for client
+// QUIC connections when GRO is not supported.
+TEST_P(EnvoyQuicClientSessionTest, UsesRecvMmsgWithoutGro) {
   NiceMock<MockOsSysCallsImpl> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
 
@@ -569,10 +569,10 @@ TEST_P(EnvoyQuicClientSessionTest, UsesRecvMsgWithoutGro) {
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
-  // Make sure recvmmsg isn't used.
+  // Make sure recvmmsg is used when GRO isn't supported.
   EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(false));
-  EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
-  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _))
+  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _))
       .WillOnce(
           Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
             dispatcher_->exit();
@@ -584,7 +584,7 @@ TEST_P(EnvoyQuicClientSessionTest, UsesRecvMsgWithoutGro) {
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
-  EXPECT_LOG_CONTAINS("trace", "starting recvmsg with max",
+  EXPECT_LOG_CONTAINS("trace", "starting recvmmsg with packets",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
 

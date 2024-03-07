@@ -363,6 +363,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
+        "//source/common/runtime:runtime_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

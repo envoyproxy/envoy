@@ -151,6 +151,7 @@ private:
   uint8_t num_socket_switches_{0};
   size_t num_packets_with_unknown_dst_address_{0};
   const bool prefer_gro_;
+  const bool allow_mmsg_;
 };
 
 } // namespace Quic

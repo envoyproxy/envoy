@@ -7,6 +7,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -60,7 +61,8 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_CLIENT, supported_versions, generator),
       QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher),
-      prefer_gro_(prefer_gro) {}
+      prefer_gro_(prefer_gro), allow_mmsg_(Runtime::runtimeFeatureEnabled(
+                                   "envoy.reloadable_features.allow_quic_client_udp_mmsg")) {}
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
@@ -253,7 +255,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
         *this, dispatcher_.timeSource(), prefer_gro_,
         // For client connections, recvmmsg consumes more CPU with no performance improvement.
-        /*allow_mmsg=*/false, packets_dropped_);
+        allow_mmsg_, packets_dropped_);
     if (err == nullptr) {
       // In the case where the path validation fails, the probing socket will be closed and its IO
       // events are no longer interesting.
