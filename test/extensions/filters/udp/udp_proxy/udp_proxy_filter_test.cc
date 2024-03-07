@@ -179,7 +179,6 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(
                 Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError()))));
