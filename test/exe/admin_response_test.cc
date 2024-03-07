@@ -108,16 +108,12 @@ protected:
         [this](Http::Code, Http::ResponseHeaderMap&) { resume_.WaitForNotification(); });
         }*/
 
-  void interlockMainThread(std::function<void()> fn,
-                           std::function<void()> run_before_resume = nullptr) {
+  void interlockMainThread(std::function<void()> fn) {
     main_common_->dispatcherForTest().post([this, fn] {
       resume_.WaitForNotification();
       fn();
       pause_point_.Notify();
     });
-    if (run_before_resume != nullptr) {
-      run_before_resume();
-    }
     resume_.Notify();
     pause_point_.WaitForNotification();
   }
@@ -342,6 +338,7 @@ TEST_F(AdminStreamingTest, QuitBeforeCreatingResponse) {
 }
 
 TEST_F(AdminStreamingTest, TimeoutGettingResponse) {
+#if 0
   // blockMainThreadUntilResume("/ready", "GET");
   absl::Notification got_headers;
   AdminResponseSharedPtr response = streamingResponse();
@@ -355,6 +352,23 @@ TEST_F(AdminStreamingTest, TimeoutGettingResponse) {
         ASSERT_FALSE(got_headers.WaitForNotificationWithTimeout(absl::Seconds(5)));
       });
   EXPECT_TRUE(quitAndWait());
+#else
+  // blockMainThreadUntilResume("/ready", "GET");
+  absl::Notification got_headers;
+  AdminResponseSharedPtr response = streamingResponse();
+  main_common_->dispatcherForTest().post([this, response, &got_headers] {
+    resume_.WaitForNotification();
+    response->getHeaders(
+        [&got_headers](Http::Code, Http::ResponseHeaderMap&) { got_headers.Notify(); });
+    pause_point_.Notify();
+  });
+
+  ENVOY_LOG_MISC(info, "Blocking for 5 seconds to test timeout functionality...");
+  ASSERT_FALSE(got_headers.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  resume_.Notify();
+  pause_point_.WaitForNotification();
+  EXPECT_TRUE(quitAndWait());
+#endif
 }
 
 } // namespace Envoy
