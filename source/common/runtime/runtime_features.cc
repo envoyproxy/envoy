@@ -56,7 +56,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_connection_close_header_in_redirec
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_decode_metadata_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
-RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_http2_validate_authority_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
@@ -100,6 +99,10 @@ RUNTIME_GUARD(envoy_restart_features_send_goaway_for_premature_rst_streams);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 
 // Begin false flags. These should come with a TODO to flip true.
+
+// TODO(birenroy) Flip this to true after resolving issues.
+// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(paul-r-gall) Make this enabled by default after additional soak time.
