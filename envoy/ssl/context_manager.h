@@ -12,6 +12,12 @@
 namespace Envoy {
 namespace Ssl {
 
+// Opaque type defined and used by the ``ServerContext``.
+struct TlsContext;
+
+using ContextAdditionalInitFunc =
+    std::function<void(Ssl::TlsContext& context, const Ssl::TlsCertificateConfig& cert)>;
+
 /**
  * Manages all of the SSL contexts in the process
  */
@@ -30,7 +36,8 @@ public:
    */
   virtual ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
-                         const std::vector<std::string>& server_names) PURE;
+                         const std::vector<std::string>& server_names,
+                         ContextAdditionalInitFunc additional_init) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire, the value is

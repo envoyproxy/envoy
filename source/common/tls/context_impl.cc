@@ -40,10 +40,6 @@
 #include "openssl/rand.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace TransportSockets {
-namespace Tls {
-
 namespace {
 
 bool cbsContainsU16(CBS& cbs, uint16_t n) {
@@ -71,6 +67,10 @@ void logSslErrorChain() {
 
 } // namespace
 
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
 int ContextImpl::sslExtendedSocketInfoIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
     int ssl_context_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
@@ -80,7 +80,7 @@ int ContextImpl::sslExtendedSocketInfoIndex() {
 }
 
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-                         TimeSource& time_source)
+                         TimeSource& time_source, Ssl::ContextAdditionalInitFunc additional_init)
     : scope_(scope), stats_(generateSslStats(scope)), time_source_(time_source),
       tls_max_version_(config.maxProtocolVersion()),
       stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
@@ -292,6 +292,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         ctx.loadPrivateKey(tls_certificate.privateKey(), tls_certificate.privateKeyPath(),
                            tls_certificate.password());
       }
+
+      if (additional_init != nullptr) {
+        additional_init(ctx, tls_certificate);
+      }
     }
   }
 
@@ -323,7 +327,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   // Use the SSL library to iterate over the configured ciphers.
   //
   // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
-  for (TlsContext& tls_context : tls_contexts_) {
+  for (Ssl::TlsContext& tls_context : tls_contexts_) {
     for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
       stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
     }
@@ -372,7 +376,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   // As late as possible, run the custom SSL_CTX configuration callback on each
   // SSL_CTX, if set.
   if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
-    for (TlsContext& ctx : tls_contexts_) {
+    for (Ssl::TlsContext& ctx : tls_contexts_) {
       sslctx_cb(ctx.ssl_ctx_.get());
     }
   }
@@ -656,7 +660,7 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ClientContextConfig& config,
                                      TimeSource& time_source)
-    : ContextImpl(scope, config, time_source),
+    : ContextImpl(scope, config, time_source, nullptr /* additional_init */),
       server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
@@ -785,8 +789,10 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     TimeSource& time_source)
-    : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
+                                     TimeSource& time_source,
+                                     Ssl::ContextAdditionalInitFunc additional_init)
+    : ContextImpl(scope, config, time_source, additional_init),
+      session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
@@ -891,7 +897,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   }
 }
 
-void ServerContextImpl::populateServerNamesMap(TlsContext& ctx, int pkey_id) {
+void ServerContextImpl::populateServerNamesMap(Ssl::TlsContext& ctx, int pkey_id) {
   if (ctx.cert_chain_ == nullptr) {
     return;
   }
@@ -913,7 +919,7 @@ void ServerContextImpl::populateServerNamesMap(TlsContext& ctx, int pkey_id) {
       // implemented.
       return;
     }
-    sn_match->second.emplace(std::pair<int, std::reference_wrapper<TlsContext>>(pkey_id, ctx));
+    sn_match->second.emplace(std::pair<int, std::reference_wrapper<Ssl::TlsContext>>(pkey_id, ctx));
   };
 
   bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
@@ -1193,7 +1199,7 @@ bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_h
   return false;
 }
 
-OcspStapleAction ServerContextImpl::ocspStapleAction(const TlsContext& ctx,
+OcspStapleAction ServerContextImpl::ocspStapleAction(const Ssl::TlsContext& ctx,
                                                      bool client_ocsp_capable) {
   if (!client_ocsp_capable) {
     return OcspStapleAction::ClientNotCapable;
@@ -1235,20 +1241,22 @@ OcspStapleAction ServerContextImpl::ocspStapleAction(const TlsContext& ctx,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-enum ssl_select_cert_result_t
-ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
-  const bool client_ecdsa_capable = isClientEcdsaCapable(ssl_client_hello);
-  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
-  absl::string_view sni = absl::NullSafeStringView(
-      SSL_get_servername(ssl_client_hello->ssl, TLSEXT_NAMETYPE_host_name));
+std::pair<const Ssl::TlsContext&, OcspStapleAction>
+ServerContextImpl::findTlsContext(absl::string_view sni, bool client_ecdsa_capable,
+                                  bool client_ocsp_capable, bool* cert_matched_sni) {
+  bool unused = false;
+  if (cert_matched_sni == nullptr) {
+    // Avoid need for nullptr checks when this is set.
+    cert_matched_sni = &unused;
+  }
 
   // selected_ctx represents the final selected certificate, it should meet all requirements or pick
-  // a candidate
-  const TlsContext* selected_ctx = nullptr;
-  const TlsContext* candidate_ctx = nullptr;
+  // a candidate.
+  const Ssl::TlsContext* selected_ctx = nullptr;
+  const Ssl::TlsContext* candidate_ctx = nullptr;
   OcspStapleAction ocsp_staple_action;
 
-  auto selected = [&](const TlsContext& ctx) -> bool {
+  auto selected = [&](const Ssl::TlsContext& ctx) -> bool {
     auto action = ocspStapleAction(ctx, client_ocsp_capable);
     if (action == OcspStapleAction::Fail) {
       // The selected ctx must adhere to OCSP policy
@@ -1311,6 +1319,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
         select_from_map(wildcard);
       }
     }
+    *cert_matched_sni = (selected_ctx != nullptr || candidate_ctx != nullptr);
     tail_select(full_scan_certs_on_sni_mismatch_);
   }
   // Full scan certs if SNI is not provided by client;
@@ -1329,10 +1338,24 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
     tail_select(false);
   }
 
+  ASSERT(selected_ctx != nullptr);
+  return {*selected_ctx, ocsp_staple_action};
+}
+
+enum ssl_select_cert_result_t
+ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  absl::string_view sni = absl::NullSafeStringView(
+      SSL_get_servername(ssl_client_hello->ssl, TLSEXT_NAMETYPE_host_name));
+  const bool client_ecdsa_capable = isClientEcdsaCapable(ssl_client_hello);
+  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
+
+  auto [selected_ctx, ocsp_staple_action] =
+      findTlsContext(sni, client_ecdsa_capable, client_ocsp_capable, nullptr);
+
   // Apply the selected context. This must be done before OCSP stapling below
   // since applying the context can remove the previously-set OCSP response.
   // This will only return NULL if memory allocation fails.
-  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx->ssl_ctx_.get()) != nullptr,
+  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx.ssl_ctx_.get()) != nullptr,
                  "");
 
   if (client_ocsp_capable) {
@@ -1342,9 +1365,9 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   switch (ocsp_staple_action) {
   case OcspStapleAction::Staple: {
     // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
-    RELEASE_ASSERT(selected_ctx->ocsp_response_,
+    RELEASE_ASSERT(selected_ctx.ocsp_response_,
                    "OCSP response must be present under OcspStapleAction::Staple");
-    auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
+    auto& resp_bytes = selected_ctx.ocsp_response_->rawBytes();
     int rc = SSL_set_ocsp_response(ssl_client_hello->ssl, resp_bytes.data(), resp_bytes.size());
     RELEASE_ASSERT(rc != 0, "");
     stats_.ocsp_staple_responses_.inc();
@@ -1360,26 +1383,6 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   }
 
   return ssl_select_cert_success;
-}
-
-bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
-  const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
-  if (c == nullptr) {
-    return false;
-  }
-  // Skip TLS 1.2 only ciphersuites unless the client supports it.
-  if (SSL_CIPHER_get_min_version(c) > client_version) {
-    return false;
-  }
-  if (SSL_CIPHER_get_auth_nid(c) != NID_auth_ecdsa) {
-    return false;
-  }
-  for (const SSL_CIPHER* our_c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
-    if (SSL_CIPHER_get_id(our_c) == SSL_CIPHER_get_id(c)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 ValidationResults ContextImpl::customVerifyCertChainForQuic(
@@ -1399,6 +1402,32 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
       cert_validator_->doVerifyCertChain(cert_chain, std::move(callback), transport_socket_options,
                                          *ssl_ctx, validation_context, is_server, host_name);
   return result;
+}
+
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+
+namespace Ssl {
+
+bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
+  const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
+  if (c == nullptr) {
+    return false;
+  }
+  // Skip TLS 1.2 only ciphersuites unless the client supports it.
+  if (SSL_CIPHER_get_min_version(c) > client_version) {
+    return false;
+  }
+  if (SSL_CIPHER_get_auth_nid(c) != NID_auth_ecdsa) {
+    return false;
+  }
+  for (const SSL_CIPHER* our_c : SSL_CTX_get_ciphers(ssl_ctx_.get())) {
+    if (SSL_CIPHER_get_id(our_c) == SSL_CIPHER_get_id(c)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void TlsContext::loadCertificateChain(const std::string& data, const std::string& data_path) {
@@ -1443,9 +1472,9 @@ void TlsContext::loadPrivateKey(const std::string& data, const std::string& data
                               !password.empty() ? const_cast<char*>(password.c_str()) : nullptr));
 
   if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
-    throwEnvoyExceptionOrPanic(fmt::format("Failed to load private key from {}, Cause: {}",
-                                           data_path,
-                                           Utility::getLastCryptoError().value_or("unknown")));
+    throwEnvoyExceptionOrPanic(fmt::format(
+        "Failed to load private key from {}, Cause: {}", data_path,
+        Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
   checkPrivateKey(pkey, data_path);
@@ -1482,9 +1511,9 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& data_pat
     throwEnvoyExceptionOrPanic(absl::StrCat("Failed to load certificate from ", data_path));
   }
   if (temp_private_key == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
-    throwEnvoyExceptionOrPanic(fmt::format("Failed to load private key from {}, Cause: {}",
-                                           data_path,
-                                           Utility::getLastCryptoError().value_or("unknown")));
+    throwEnvoyExceptionOrPanic(fmt::format(
+        "Failed to load private key from {}, Cause: {}", data_path,
+        Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
   checkPrivateKey(pkey, data_path);
@@ -1518,7 +1547,5 @@ void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
 #endif
 }
 
-} // namespace Tls
-} // namespace TransportSockets
-} // namespace Extensions
+} // namespace Ssl
 } // namespace Envoy

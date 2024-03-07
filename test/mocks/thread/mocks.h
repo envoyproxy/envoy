@@ -1,0 +1,30 @@
+#pragma once
+
+#include "envoy/thread/thread.h"
+
+#if defined(__linux__) || defined(__APPLE__)
+#include "source/common/common/posix/thread_impl.h"
+#endif
+
+namespace Envoy {
+namespace Thread {
+
+class MockThreadFactory : public ThreadFactory {
+public:
+  MOCK_METHOD(ThreadPtr, createThread, (std::function<void()>, OptionsOptConstRef));
+  MOCK_METHOD(ThreadId, currentThreadId, ());
+};
+
+#if defined(__linux__) || defined(__APPLE__)
+class MockPosixThreadFactory : public PosixThreadFactory {
+public:
+  MOCK_METHOD(ThreadPtr, createThread, (std::function<void()>, OptionsOptConstRef));
+  MOCK_METHOD(PosixThreadPtr, createThread,
+              (std::function<void()>, OptionsOptConstRef, bool crash_on_failure));
+  MOCK_METHOD(ThreadId, currentThreadId, ());
+  MOCK_METHOD(ThreadId, currentPthreadId, ());
+};
+#endif
+
+} // namespace Thread
+} // namespace Envoy

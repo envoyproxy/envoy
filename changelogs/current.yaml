@@ -11,6 +11,11 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
     This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
     be flushed to stat sinks.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
+    requests and responses. A number of users have reported issues with oghttp2 including issue 32611 and issue 32401 This behavior
+    can be reverted by setting the feature to ``true``.
 - area: eds
   change: |
     Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
@@ -204,6 +209,11 @@ new_features:
     Added QUIC protocol option :ref:`send_disable_active_migration
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to make the server send clients a transport
     parameter to discourage client endpoints from active migration.
+- area: quic
+  change: |
+    Added support for QUIC listeners to :ref:`choose certificates based on SNI <arch_overview_ssl_cert_select>` and load certificates
+    from formats other than PEM, such as :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`.
+    This behavior can be disabled with runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code``.
 - area: ext_proc
   change: |
     implemented
@@ -277,6 +287,9 @@ new_features:
 - area: http
   change: |
     Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
+- area: tracing
+  change: |
+    Added support for variant span attribute type for the OpenTelemetry tracer.
 
 deprecated:
 - area: listener
