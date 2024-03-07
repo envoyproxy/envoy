@@ -1,7 +1,8 @@
 #pragma once
 
-#include <thread>
-
+#include "source/common/common/macros.h"
+#include "source/common/common/posix/thread_impl.h"
+#include "source/common/common/thread.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -55,6 +56,11 @@ public:
   }
 
 private:
+  GTEST_FRIEND_CLASS(PlatformBridgeCertValidatorTest, ThreadCreationFailed);
+
+  PlatformBridgeCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                              SslStats& stats, Thread::PosixThreadFactoryPtr thread_factory);
+
   enum class ValidationFailureType {
     SUCCESS,
     FAIL_VERIFY_ERROR,
@@ -78,19 +84,20 @@ private:
                                          PlatformBridgeCertValidator* parent);
 
   // Called when a pending verification completes. Must be invoked on the main thread.
-  void onVerificationComplete(std::thread::id thread_id, std::string hostname, bool success,
-                              std::string error_details, uint8_t tls_alert,
+  void onVerificationComplete(const Thread::ThreadId& thread_id, const std::string& hostname,
+                              bool success, const std::string& error_details, uint8_t tls_alert,
                               ValidationFailureType failure_type);
 
   struct ValidationJob {
     Ssl::ValidateResultCallbackPtr result_callback_;
-    std::thread validation_thread_;
+    Thread::PosixThreadPtr validation_thread_;
   };
 
   const bool allow_untrusted_certificate_;
   SslStats& stats_;
-  absl::flat_hash_map<std::thread::id, ValidationJob> validation_jobs_;
+  absl::flat_hash_map<Thread::ThreadId, ValidationJob> validation_jobs_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};
+  Thread::PosixThreadFactoryPtr thread_factory_;
 };
 
 } // namespace Tls

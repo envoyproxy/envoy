@@ -8,6 +8,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/tracing/trace_context_impl.h"
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -44,7 +45,7 @@ void callSampler(SamplerSharedPtr sampler, const absl::optional<SpanContext> spa
 
   if (sampling_result.attributes) {
     for (auto const& attribute : *sampling_result.attributes) {
-      new_span.setTag(attribute.first, attribute.second);
+      new_span.setAttribute(attribute.first, attribute.second);
     }
   }
   if (!sampling_result.tracestate.empty()) {
@@ -96,7 +97,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   traceStateHeader().setRefKey(trace_context, span_.trace_state());
 }
 
-void Span::setTag(absl::string_view name, absl::string_view value) {
+void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_value) {
   // The attribute key MUST be a non-null and non-empty string.
   if (name.empty()) {
     return;
@@ -105,7 +106,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   // If a value already exists for this key, overwrite it.
   for (auto& key_value : *span_.mutable_attributes()) {
     if (key_value.key() == name) {
-      key_value.mutable_value()->set_string_value(std::string{value});
+      OtlpUtils::populateAnyValue(*key_value.mutable_value(), attribute_value);
       return;
     }
   }
@@ -114,11 +115,13 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
       opentelemetry::proto::common::v1::KeyValue();
   opentelemetry::proto::common::v1::AnyValue value_proto =
       opentelemetry::proto::common::v1::AnyValue();
-  value_proto.set_string_value(std::string{value});
+  OtlpUtils::populateAnyValue(value_proto, attribute_value);
   key_value.set_key(std::string{name});
   *key_value.mutable_value() = value_proto;
   *span_.add_attributes() = key_value;
 }
+
+void Span::setTag(absl::string_view name, absl::string_view value) { setAttribute(name, value); }
 
 Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,

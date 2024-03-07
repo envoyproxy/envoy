@@ -122,6 +122,9 @@ public:
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
+  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+    return deny_redirect_header_matchers_;
+  }
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
   }
@@ -159,6 +162,7 @@ private:
   const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
   const bool use_refresh_token_{};
@@ -274,6 +278,7 @@ private:
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
+  bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);

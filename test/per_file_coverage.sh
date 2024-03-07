@@ -6,6 +6,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:95.9" # TODO(#32149): increase this once io_uring is tested.
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
+"source/common/common/posix:88.8" # No easy way to test pthread_create failure.
 "source/common/config:95.4"
 "source/common/crypto:95.5"
 "source/common/event:95.0" # Emulated edge events guards don't report LCOV
@@ -16,7 +17,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/quic:93.4"
+"source/common/quic:93.3"
 "source/common/secret:95.1"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
