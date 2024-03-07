@@ -44,6 +44,10 @@ public:
   // active responses that it is being shut down, and thus all responses need to
   // be terminated. And it gives a reliable way for AdminResponse to detach
   // itself, whether or not MainCommonBase is already deleted.
+  //
+  // In summary:
+  //  * MainCommonBase can outlive AdminResponse so we need detachResponse.
+  //  * AdminResponse can outlive MainCommonBase, so we need shared_ptr.
   class PtrSet {
   public:
     /**
