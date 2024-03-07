@@ -20,6 +20,8 @@ public interface EnvoyHTTPFilter {
    * callback can be invoked multiple times.
    *
    * @param data,        the buffer of the data received.
+   *                     The `data` will be destroyed upon completing this callback. Create a copy
+   *                     of the `data` if the `data` is going to outlive this callback lifetime.
    * @param endStream,   whether the data is the last data frame.
    * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */
@@ -47,7 +49,9 @@ public interface EnvoyHTTPFilter {
    * Called when a data frame is received on the HTTP stream. This
    * callback can be invoked multiple times.
    *
-   * @param data,        the buffer of the data received.
+   * @param data,        the buffer of the data received. The `data` will be destroyed upon
+   *                     completing this callback. Create a copy of the `data` if the `data` is
+   *                     going to outlive this callback.
    * @param endStream,   whether the data is the last data frame.
    * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */
@@ -69,10 +73,12 @@ public interface EnvoyHTTPFilter {
   void setRequestFilterCallbacks(EnvoyHTTPFilterCallbacks callbacks);
 
   /**
-   * Called when request filter iteration has been asynchronsouly resumed via callback.
+   * Called when request filter iteration has been asynchronously resumed via callback.
    *
    * @param headers,     pending headers that have not yet been forwarded along the filter chain.
    * @param data,        pending data that has not yet been forwarded along the filter chain.
+   *                     The `data` will be destroyed upon completing this callback. Create a copy
+   *                     of the `data` if the `data` is going to outlive this callback.
    * @param trailers,    pending trailers that have not yet been forwarded along the filter chain.
    * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */
@@ -88,10 +94,12 @@ public interface EnvoyHTTPFilter {
   void setResponseFilterCallbacks(EnvoyHTTPFilterCallbacks callbacks);
 
   /**
-   * Called when response filter iteration has been asynchronsouly resumed via callback.
+   * Called when response filter iteration has been asynchronously resumed via callback.
    *
    * @param headers,     pending headers that have not yet been forwarded along the filter chain.
    * @param data,        pending data that has not yet been forwarded along the filter chain.
+   *                     The `data` will be destroyed upon completing this callback. Create a copy
+   *                     of the `data` if the `data` is going to outlive this callback.
    * @param trailers,    pending trailers that have not yet been forwarded along the filter chain.
    * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */
