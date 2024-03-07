@@ -255,8 +255,8 @@ TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosedWithMultipleReco
   ASSERT_TRUE(fake_access_log_connection_3->close());
 
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 3);
-  test_server_->waitForCounterEq(
-      "cluster.fluentd_cluster.upstream_cx_connect_attempts_exceeded", 1);
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_connect_attempts_exceeded",
+                                 1);
 }
 
 } // namespace

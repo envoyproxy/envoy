@@ -60,9 +60,9 @@ class FluentdAccessLoggerImpl : public Tcp::AsyncTcpClientCallbacks,
                                 public FluentdAccessLogger,
                                 public Logger::Loggable<Logger::Id::client> {
 public:
-  FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& cluster,
-                          Tcp::AsyncTcpClientPtr client, Event::Dispatcher& dispatcher,
-                          const FluentdAccessLogConfig& config, Stats::Scope& parent_scope);
+  FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& cluster, Tcp::AsyncTcpClientPtr client,
+                          Event::Dispatcher& dispatcher, const FluentdAccessLogConfig& config,
+                          Stats::Scope& parent_scope);
 
   // Tcp::AsyncTcpClientCallbacks
   void onEvent(Network::ConnectionEvent event) override;

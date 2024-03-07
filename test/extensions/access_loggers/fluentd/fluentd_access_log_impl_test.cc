@@ -41,9 +41,9 @@ public:
     config_.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
         max_connect_attempts);
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
-    logger_ = std::make_unique<FluentdAccessLoggerImpl>(
-        cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
-        *stats_store_.rootScope());
+    logger_ =
+        std::make_unique<FluentdAccessLoggerImpl>(cluster_, Tcp::AsyncTcpClientPtr{async_client_},
+                                                  dispatcher_, config_, *stats_store_.rootScope());
   }
 
   std::string getExpectedMsgpackPayload(int entries_count) {
