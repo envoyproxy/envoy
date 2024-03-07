@@ -58,7 +58,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
   uint16_t expiration_time = PROTOBUF_GET_SECONDS_OR_DEFAULT(
       config.query_string(), expiration_time,
-      Extensions::Common::Aws::SignatureQueryParameters::get().DefaultExpiration);
+      Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
 
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(

@@ -19,17 +19,15 @@ namespace Aws {
 
 using SigV4SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 
-class SigV4SignatureConstantValues : public SignatureConstantValues {
+class SigV4SignatureConstants : public SignatureConstants {
 public:
-  const std::string SigV4AuthorizationHeaderFormat{
+  static constexpr absl::string_view SigV4AuthorizationHeaderFormat{
       "{} Credential={}, SignedHeaders={}, Signature={}"};
-  const std::string SigV4CredentialScopeFormat{"{}/{}/{}/aws4_request"};
-  const std::string SigV4SignatureVersion{"AWS4"};
-  const std::string SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
-  const std::string SigV4Algorithm{"AWS4-HMAC-SHA256"};
+  static constexpr absl::string_view SigV4CredentialScopeFormat{"{}/{}/{}/aws4_request"};
+  static constexpr absl::string_view SigV4SignatureVersion{"AWS4"};
+  static constexpr absl::string_view SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
+  static constexpr absl::string_view SigV4Algorithm{"AWS4-HMAC-SHA256"};
 };
-
-using SigV4SignatureConstants = ConstSingleton<SigV4SignatureConstantValues>;
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
@@ -42,11 +40,11 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  */
 class SigV4SignerImpl : public SignerBaseImpl {
 public:
-  SigV4SignerImpl(
-      absl::string_view service_name, absl::string_view region,
-      const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-      const AwsSigningHeaderExclusionVector& matcher_config, const bool query_string = false,
-      const uint16_t expiration_time = SignatureQueryParameters::get().DefaultExpiration)
+  SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
+                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
+                  const AwsSigningHeaderExclusionVector& matcher_config,
+                  const bool query_string = false,
+                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config,
                        query_string, expiration_time) {}
 

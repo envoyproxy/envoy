@@ -34,15 +34,14 @@ void SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
 void SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
                                       const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
-                       SignatureConstants::get().HashedEmptyString);
-  sign(headers, std::string(SignatureConstants::get().HashedEmptyString), override_region);
+                       SignatureConstants::HashedEmptyString);
+  sign(headers, std::string(SignatureConstants::HashedEmptyString), override_region);
 }
 
 void SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
                                          const absl::string_view override_region) {
-  headers.setReference(SignatureHeaders::get().ContentSha256,
-                       SignatureConstants::get().UnsignedPayload);
-  sign(headers, std::string(SignatureConstants::get().UnsignedPayload), override_region);
+  headers.setReference(SignatureHeaders::get().ContentSha256, SignatureConstants::UnsignedPayload);
+  sign(headers, std::string(SignatureConstants::UnsignedPayload), override_region);
 }
 
 // Region support utilities for sigv4a
@@ -123,12 +122,12 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
   // Phase 4: Sign request
   if (query_string_) {
     // Append signature to existing query string
-    query_params.add(SignatureQueryParameters::get().AmzSignature, signature);
+    query_params.add(SignatureQueryParameterValues::AmzSignature, signature);
     headers.setPath(query_params.replaceQueryString(Http::HeaderString(headers.getPathValue())));
     // Sanitize logged query string
-    query_params.overwrite(SignatureQueryParameters::get().AmzSignature, "*****");
-    if (query_params.getFirstValue(SignatureQueryParameters::get().AmzSecurityToken)) {
-      query_params.overwrite(SignatureQueryParameters::get().AmzSecurityToken, "*****");
+    query_params.overwrite(SignatureQueryParameterValues::AmzSignature, "*****");
+    if (query_params.getFirstValue(SignatureQueryParameterValues::AmzSecurityToken)) {
+      query_params.overwrite(SignatureQueryParameterValues::AmzSecurityToken, "*****");
     }
     auto sanitised_query_string =
         query_params.replaceQueryString(Http::HeaderString(headers.getPathValue()));
@@ -150,20 +149,20 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
 
 std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {
   if (!sign_body) {
-    return std::string(SignatureConstants::get().HashedEmptyString);
+    return std::string(SignatureConstants::HashedEmptyString);
   }
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto content_hash = message.body().length() > 0
                                 ? Hex::encode(crypto_util.getSha256Digest(message.body()))
-                                : std::string(SignatureConstants::get().HashedEmptyString);
+                                : std::string(SignatureConstants::HashedEmptyString);
   return content_hash;
 }
 
 std::string
 SignerBaseImpl::createAuthorizationCredential(absl::string_view access_key_id,
                                               absl::string_view credential_scope) const {
-  return fmt::format(fmt::runtime(SignatureConstants::get().AuthorizationCredentialFormat),
-                     access_key_id, credential_scope);
+  return fmt::format(fmt::runtime(SignatureConstants::AuthorizationCredentialFormat), access_key_id,
+                     credential_scope);
 }
 
 void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
@@ -173,11 +172,11 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
                                        const std::map<std::string, std::string>& signed_headers,
                                        const uint16_t expiration_time) const {
   // X-Amz-Algorithm
-  query_params.add(SignatureQueryParameters::get().AmzAlgorithm, getAlgorithmString());
+  query_params.add(SignatureQueryParameterValues::AmzAlgorithm, getAlgorithmString());
   // X-Amz-Date
-  query_params.add(SignatureQueryParameters::get().AmzDate, long_date);
+  query_params.add(SignatureQueryParameterValues::AmzDate, long_date);
   // X-Amz-Expires
-  query_params.add(SignatureQueryParameters::get().AmzExpires, std::to_string(expiration_time));
+  query_params.add(SignatureQueryParameterValues::AmzExpires, std::to_string(expiration_time));
 
   // These three parameters can contain characters that require URL encoding
   if (session_token.has_value()) {
@@ -187,14 +186,14 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
     // be incorrectly double encoding = signs. Will address this in a later patch and add test cases
     // to ensure we haven't broken anything.
     query_params.add(
-        SignatureQueryParameters::get().AmzSecurityToken,
+        SignatureQueryParameterValues::AmzSecurityToken,
         Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(session_token.value()));
   }
   // X-Amz-Credential
-  query_params.add(SignatureQueryParameters::get().AmzCredential,
+  query_params.add(SignatureQueryParameterValues::AmzCredential,
                    Utility::encodeQueryParam(credential));
   // X-Amz-SignedHeaders
-  query_params.add(SignatureQueryParameters::get().AmzSignedHeaders,
+  query_params.add(SignatureQueryParameterValues::AmzSignedHeaders,
                    Utility::encodeQueryParam(Utility::joinCanonicalHeaderNames(signed_headers)));
 }
 

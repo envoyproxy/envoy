@@ -164,7 +164,7 @@ TEST_F(SigV4SignerImplTest, SignEmptyContentHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_, true);
-  EXPECT_EQ(SigV4SignatureConstants::get().HashedEmptyString,
+  EXPECT_EQ(SigV4SignatureConstants::HashedEmptyString,
             message_->headers()
                 .get(SigV4SignatureHeaders::get().ContentSha256)[0]
                 ->value()
@@ -305,23 +305,23 @@ TEST_F(SigV4SignerImplTest, QueryParameters) {
 // Verify signing headers for services.
 TEST_F(SigV4SignerImplTest, SignHeadersByService) {
   expectSignHeaders("s3", "d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
-                    SigV4SignatureConstants::get().UnsignedPayload, true);
+                    SigV4SignatureConstants::UnsignedPayload, true);
   expectSignHeaders("service", "d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
-                    SigV4SignatureConstants::get().HashedEmptyString, false);
+                    SigV4SignatureConstants::HashedEmptyString, false);
   expectSignHeaders("es", "0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
-                    SigV4SignatureConstants::get().UnsignedPayload, true);
+                    SigV4SignatureConstants::UnsignedPayload, true);
   expectSignHeaders("glacier", "8d1f241d77c64cda57b042cd312180f16e98dbd7a96e5545681430f8dbde45a0",
-                    SigV4SignatureConstants::get().UnsignedPayload, true);
+                    SigV4SignatureConstants::UnsignedPayload, true);
 
   // with override region
   expectSignHeaders("s3", "70b80eaedfe73d9cf18a9d2f786f02a7dab013780a8cdc42a7c819a27bfd943c",
-                    SigV4SignatureConstants::get().UnsignedPayload, true, "region1");
+                    SigV4SignatureConstants::UnsignedPayload, true, "region1");
   expectSignHeaders("service", "297ca067391806a1e3cdb25723082063d0bf66a6472b902dd986d540a2058a13",
-                    SigV4SignatureConstants::get().HashedEmptyString, false, "region1");
+                    SigV4SignatureConstants::HashedEmptyString, false, "region1");
   expectSignHeaders("es", "cec43f0777c0d4cb2f3799a5c755dc4c3b893c23e268c1bd4e34f770fba3c1ca",
-                    SigV4SignatureConstants::get().UnsignedPayload, true, "region1");
+                    SigV4SignatureConstants::UnsignedPayload, true, "region1");
   expectSignHeaders("glacier", "0792940297330f2930dc1c18d0b99c0b85429865c09e836f5c086f7f182e2809",
-                    SigV4SignatureConstants::get().UnsignedPayload, true, "region1");
+                    SigV4SignatureConstants::UnsignedPayload, true, "region1");
 }
 
 } // namespace

@@ -92,8 +92,8 @@ public:
     std::string credential_scope = fmt::format(fmt::runtime("{}/service/aws4_request"), short_date);
     std::string long_date = "20180102T030400Z";
     std::string string_to_sign =
-        fmt::format(fmt::runtime(SigV4ASignatureConstants::get().SigV4AStringToSignFormat),
-                    SigV4ASignatureConstants::get().SigV4AAlgorithm, long_date, credential_scope,
+        fmt::format(fmt::runtime(SigV4ASignatureConstants::SigV4AStringToSignFormat),
+                    SigV4ASignatureConstants::SigV4AAlgorithm, long_date, credential_scope,
                     Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
     auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
     std::vector<uint8_t> signature;
@@ -222,7 +222,7 @@ TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
   addPath("/");
   auto signer_ = getTestSigner(false);
   signer_.sign(*message_, true);
-  EXPECT_EQ(SigV4ASignatureConstants::get().HashedEmptyString,
+  EXPECT_EQ(SigV4ASignatureConstants::HashedEmptyString,
             message_->headers()
                 .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
                 ->value()

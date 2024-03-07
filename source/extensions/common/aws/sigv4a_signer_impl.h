@@ -23,17 +23,15 @@ public:
 
 using SigV4ASignatureHeaders = ConstSingleton<SigV4ASignatureHeaderValues>;
 
-class SigV4ASignatureConstantValues : public SignatureConstantValues {
+class SigV4ASignatureConstants : public SignatureConstants {
 public:
-  static constexpr char SigV4AAuthorizationHeaderFormat[] =
+  static constexpr absl::string_view SigV4AAuthorizationHeaderFormat =
       "AWS4-ECDSA-P256-SHA256 Credential={}, SignedHeaders={}, Signature={}";
-  static constexpr char SigV4ACredentialScopeFormat[] = "{}/{}/aws4_request";
-  static constexpr char SigV4ASignatureVersion[] = "AWS4A";
-  static constexpr char SigV4AStringToSignFormat[] = "{}\n{}\n{}\n{}";
-  static constexpr char SigV4AAlgorithm[] = "AWS4-ECDSA-P256-SHA256";
+  static constexpr absl::string_view SigV4ACredentialScopeFormat = "{}/{}/aws4_request";
+  static constexpr absl::string_view SigV4ASignatureVersion = "AWS4A";
+  static constexpr absl::string_view SigV4AStringToSignFormat = "{}\n{}\n{}\n{}";
+  static constexpr absl::string_view SigV4AAlgorithm = "AWS4-ECDSA-P256-SHA256";
 };
-
-using SigV4ASignatureConstants = ConstSingleton<SigV4ASignatureConstantValues>;
 
 enum SigV4AKeyDerivationResult {
   AkdrSuccess,
@@ -57,7 +55,7 @@ public:
       absl::string_view service_name, absl::string_view region,
       const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
       const AwsSigningHeaderExclusionVector& matcher_config, const bool query_string = false,
-      const uint16_t expiration_time = SignatureQueryParameters::get().DefaultExpiration)
+      const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config,
                        query_string, expiration_time) {}
 

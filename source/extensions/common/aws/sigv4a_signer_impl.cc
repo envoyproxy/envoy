@@ -11,11 +11,11 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/headers.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
 #include "source/extensions/common/aws/sigv4a_key_derivation.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
-#include "signer_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +27,7 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
     const std::map<std::string, std::string>& canonical_headers,
     absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  return fmt::format(fmt::runtime(SigV4ASignatureConstants::get().SigV4AAuthorizationHeaderFormat),
+  return fmt::format(fmt::runtime(SigV4ASignatureConstants::SigV4AAuthorizationHeaderFormat),
                      createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
                      signature);
 }
@@ -35,7 +35,7 @@ std::string SigV4ASignerImpl::createAuthorizationHeader(
 std::string SigV4ASignerImpl::createCredentialScope(
     const absl::string_view short_date,
     ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
-  return fmt::format(fmt::runtime(SigV4ASignatureConstants::get().SigV4ACredentialScopeFormat),
+  return fmt::format(fmt::runtime(SigV4ASignatureConstants::SigV4ACredentialScopeFormat),
                      short_date, service_name_);
 }
 
@@ -44,7 +44,7 @@ std::string SigV4ASignerImpl::createStringToSign(const absl::string_view canonic
                                                  const absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   return fmt::format(
-      fmt::runtime(SigV4ASignatureConstants::get().SigV4AStringToSignFormat), getAlgorithmString(),
+      fmt::runtime(SigV4ASignatureConstants::SigV4AStringToSignFormat), getAlgorithmString(),
       long_date, credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
@@ -58,7 +58,7 @@ void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap& headers,
 void SigV4ASignerImpl::addRegionQueryParam(Envoy::Http::Utility::QueryParamsMulti& query_params,
                                            const absl::string_view override_region) const {
   query_params.add(
-      SignatureQueryParameters::get().AmzRegionSet,
+      SignatureQueryParameterValues::AmzRegionSet,
       Utility::encodeQueryParam(override_region.empty() ? getRegion() : override_region));
 }
 
@@ -92,7 +92,7 @@ std::string SigV4ASignerImpl::createSignature(
 }
 
 absl::string_view SigV4ASignerImpl::getAlgorithmString() const {
-  return SigV4ASignatureConstants::get().SigV4AAlgorithm;
+  return SigV4ASignatureConstants::SigV4AAlgorithm;
 }
 
 } // namespace Aws
