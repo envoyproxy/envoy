@@ -343,11 +343,11 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_data(const char* metho
 
   Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmCallbackContext =
       jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onData =
-      jni_helper.getMethodId(jcls_JvmCallbackContext.get(), method, "([BZ[J)Ljava/lang/Object;");
+  jmethodID jmid_onData = jni_helper.getMethodId(jcls_JvmCallbackContext.get(), method,
+                                                 "(Ljava/nio/ByteBuffer;Z[J)Ljava/lang/Object;");
 
-  Envoy::JNI::LocalRefUniquePtr<jbyteArray> j_data =
-      Envoy::JNI::envoyDataToJavaByteArray(jni_helper, data);
+  Envoy::JNI::LocalRefUniquePtr<jobject> j_data =
+      Envoy::JNI::envoyDataToJavaByteBuffer(jni_helper, data);
   Envoy::JNI::LocalRefUniquePtr<jlongArray> j_stream_intel =
       Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> result = jni_helper.callObjectMethod<jobjectArray>(
@@ -605,10 +605,10 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
     headers_length = static_cast<jlong>(headers->length);
     passHeaders("passHeader", *headers, j_context);
   }
-  Envoy::JNI::LocalRefUniquePtr<jbyteArray> j_in_data = Envoy::JNI::LocalRefUniquePtr<jbyteArray>(
+  Envoy::JNI::LocalRefUniquePtr<jobject> j_in_data = Envoy::JNI::LocalRefUniquePtr<jobject>(
       nullptr, Envoy::JNI::LocalRefDeleter(jni_helper.getEnv()));
   if (data) {
-    j_in_data = Envoy::JNI::envoyDataToJavaByteArray(jni_helper, *data);
+    j_in_data = Envoy::JNI::envoyDataToJavaByteBuffer(jni_helper, *data);
   }
   jlong trailers_length = -1;
   if (trailers) {
@@ -620,8 +620,8 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
 
   Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmCallbackContext =
       jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onResume =
-      jni_helper.getMethodId(jcls_JvmCallbackContext.get(), method, "(J[BJZ[J)Ljava/lang/Object;");
+  jmethodID jmid_onResume = jni_helper.getMethodId(
+      jcls_JvmCallbackContext.get(), method, "(JLjava/nio/ByteBuffer;JZ[J)Ljava/lang/Object;");
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> result = jni_helper.callObjectMethod<jobjectArray>(

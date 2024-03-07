@@ -509,6 +509,7 @@ build:rbe-engflow --grpc_keepalive_time=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
 build:rbe-engflow --bes_upload_mode=fully_async
+build:rbe-engflow --nolegacy_important_outputs
 
 build:cache-envoy-engflow --google_default_credentials=false
 build:cache-envoy-engflow --remote_cache=grpcs://morganite.cluster.engflow.com

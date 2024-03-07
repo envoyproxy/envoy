@@ -126,6 +126,7 @@ public:
   virtual ~EngineBuilder() {}
 
   EngineBuilder& addLogLevel(LogLevel log_level);
+  EngineBuilder& setLogger(envoy_logger envoy_logger);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
@@ -213,6 +214,7 @@ private:
   };
 
   LogLevel log_level_ = LogLevel::info;
+  absl::optional<envoy_logger> envoy_logger_;
   EngineCallbacksSharedPtr callbacks_;
 
   int connect_timeout_seconds_ = 30;
