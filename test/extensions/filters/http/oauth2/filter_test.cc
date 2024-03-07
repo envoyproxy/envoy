@@ -135,6 +135,9 @@ public:
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->mutable_string_match()->set_exact("OPTIONS");
+    auto* deny_redirect_matcher = p.add_deny_redirect_matcher();
+    deny_redirect_matcher->set_name("X-Requested-With");
+    deny_redirect_matcher->mutable_string_match()->set_exact("XMLHttpRequest");
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
@@ -778,6 +781,35 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
   EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
   EXPECT_EQ(scope_.counterFromString("test.oauth_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
+}
+
+/**
+ * Scenario: The OAuth filter receives a request without valid OAuth cookies to a non-callback URL
+ * that matches the deny_redirect_matcher.
+ *
+ * Expected behavior: the filter should should return 401 Unauthorized response.
+ */
+TEST_F(OAuth2Test, AjaxDoesNotRedirect) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {"X-Requested-With", "XMLHttpRequest"},
+  };
+
+  // explicitly tell the validator to fail the validation.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Unauthorized response is expected instead of 302 redirect.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
 }
 
 // Validates the behavior of the cookie validator.
@@ -2165,6 +2197,53 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
 
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(1, config_->stats().oauth_refreshtoken_failure_.value());
+}
+
+/**
+ * Scenario: The OAuth filter refresh flow fails for a request that matches the
+ * deny_redirect_matcher.
+ *
+ * Expected behavior: the filter should should return 401 Unauthorized response.
+ */
+TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
+
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
+  // First construct the initial request to the oauth filter with URI parameters.
+  Http::TestRequestHeaderMapImpl first_request_headers{
+      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {"X-Requested-With", "XMLHttpRequest"},
+  };
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  std::string legit_refresh_token{"legit_refresh_token"};
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+
+  // Fail the validation to trigger the OAuth flow with trying to get the access token using by
+  // refresh token.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+  EXPECT_CALL(*oauth_client_,
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(first_request_headers, false));
+
+  // Unauthorized response is expected instead of 302 redirect.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  filter_->onRefreshAccessTokenFailure();
+
+  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, config_->stats().oauth_refreshtoken_failure_.value());
+  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
