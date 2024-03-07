@@ -5,6 +5,7 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.Standard
+import io.envoyproxy.envoymobile.engine.ByteBuffers
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
@@ -51,7 +52,7 @@ class ReceiveDataTest {
         headersExpectation.countDown()
       }
       .setOnResponseData { data, _, _ ->
-        body = data
+        body = ByteBuffers.copy(data)
         dataExpectation.countDown()
       }
       .setOnError { _, _ -> fail("Unexpected error") }
