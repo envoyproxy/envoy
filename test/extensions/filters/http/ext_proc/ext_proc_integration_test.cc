@@ -809,6 +809,165 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
+  proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+  initializeConfig();
+  std::string vhost_domain = "new_host";
+  config_helper_.addConfigModifier([&vhost_domain](HttpConnectionManager& cm) {
+    // Set up vhost domain.
+    auto* vhost = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    vhost->set_name("vhost");
+    vhost->clear_domains();
+    vhost->add_domains(vhost_domain);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true,
+      [&vhost_domain](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+
+        // Set host header to match the domain of virtual host in routing configuration.
+        auto* mut = response_header_mutation->add_set_headers();
+        mut->mutable_header()->set_key(":authority");
+        mut->mutable_header()->set_value(vhost_domain);
+
+        // Clear the route cache to trigger the route re-pick.
+        headers_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Host header is updated when `allow_all_routing` mutation rule is true.
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "new_host"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
+  proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+  initializeConfig();
+  // Set up the route config.
+  std::string vhost_domain = "new_host";
+  config_helper_.addConfigModifier([&vhost_domain](HttpConnectionManager& cm) {
+    // Set up vhost domain.
+    auto* vhost = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    vhost->set_name("vhost");
+    vhost->clear_domains();
+    vhost->add_domains(vhost_domain);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+
+        // Set host header to the wrong value that doesn't match the domain of virtual host in route
+        // configuration.
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key(":authority");
+        mut1->mutable_header()->set_value("wrong_host");
+
+        // Clear the route cache to trigger the route re-pick.
+        headers_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+
+  // The routing to upstream is expected to fail and 500 is returned to downstream client, since no
+  // route is found for mismatched vhost.
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key(":path");
+        mut1->mutable_header()->set_value("/mutated_path/bluh");
+
+        auto* mut2 = response_header_mutation->add_set_headers();
+        mut2->mutable_header()->set_key(":scheme");
+        mut2->mutable_header()->set_value("https");
+
+        auto* mut3 = response_header_mutation->add_set_headers();
+        mut3->mutable_header()->set_key(":authority");
+        mut3->mutable_header()->set_value("new_host");
+
+        auto* mut4 = response_header_mutation->add_set_headers();
+        mut4->mutable_header()->set_key(":method");
+        mut4->mutable_header()->set_value("POST");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Path header is updated.
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":path", "/mutated_path/bluh"));
+  // Routing headers are not updated by ext_proc when `allow_all_routing` mutation rule is false
+  // (default value).
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "http"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "host"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "GET"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersWithLogging) {
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;

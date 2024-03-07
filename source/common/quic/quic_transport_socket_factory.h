@@ -7,7 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/network/transport_socket_options_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_client_config.h"
 

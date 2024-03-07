@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/network/parent_drained_callback_registrar.h"
 #include "envoy/server/instance.h"
 
 #include "source/common/stats/stat_merger.h"
@@ -11,7 +12,8 @@ namespace Server {
 /**
  * The child half of hot restarting. Issues requests and commands to the parent.
  */
-class HotRestartingChild : public HotRestartingBase {
+class HotRestartingChild : public HotRestartingBase,
+                           public Network::ParentDrainedCallbackRegistrar {
 public:
   // A structure to record the set of registered UDP listeners keyed on their addresses,
   // to support QUIC packet forwarding.
@@ -42,7 +44,7 @@ public:
 
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);
-  ~HotRestartingChild() = default;
+  ~HotRestartingChild() override = default;
 
   void initialize(Event::Dispatcher& dispatcher);
   void shutdown();
@@ -50,6 +52,9 @@ public:
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
                                      std::shared_ptr<Network::UdpListenerConfig> listener_config);
+  // From Network::ParentDrainedCallbackRegistrar.
+  void registerParentDrainedCallback(const Network::Address::InstanceConstSharedPtr& addr,
+                                     absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
@@ -60,15 +65,23 @@ public:
 protected:
   void onSocketEventUdpForwarding();
   void onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data);
+  // When call to terminate parent is sent, or parent is already terminated,
+  void allDrainsImplicitlyComplete();
 
 private:
   friend class HotRestartUdpForwardingTestHelper;
+  absl::Mutex registry_mu_;
   const int restart_epoch_;
-  bool parent_terminated_{};
+  bool parent_terminated_;
+  bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
   sockaddr_un parent_address_;
   sockaddr_un parent_address_udp_forwarding_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
   Stats::StatName hot_restart_generation_stat_name_;
+  // There are multiple listener instances per address that must all be reactivated
+  // when the parent is drained, so a multimap is used to contain them.
+  std::unordered_multimap<std::string, absl::AnyInvocable<void()>>
+      on_drained_actions_ ABSL_GUARDED_BY(registry_mu_);
   Event::FileEventPtr socket_event_udp_forwarding_;
   UdpForwardingContext udp_forwarding_context_;
 };

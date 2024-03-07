@@ -20,6 +20,8 @@ public:
   MOCK_METHOD(void, registerUdpForwardingListener,
               (Network::Address::InstanceConstSharedPtr address,
                std::shared_ptr<Network::UdpListenerConfig> listener_config));
+  MOCK_METHOD(OptRef<Network::ParentDrainedCallbackRegistrar>, parentDrainedCallbackRegistrar, ());
+  MOCK_METHOD(void, whenDrainComplete, (absl::string_view addr, absl::AnyInvocable<void()> action));
   MOCK_METHOD(void, initialize, (Event::Dispatcher & dispatcher, Server::Instance& server));
   MOCK_METHOD(absl::optional<AdminShutdownResponse>, sendParentAdminShutdownRequest, ());
   MOCK_METHOD(void, sendParentTerminateRequest, ());
