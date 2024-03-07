@@ -1,24 +1,16 @@
-date: Pending
+date: March 7, 2024
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: http2
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
     requests and responses. A number of users have reported issues with oghttp2 including issue 32611 and issue 32401 This behavior
     can be reverted by setting the feature to ``true``.
 
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
-
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
 - area: google_grpc
@@ -26,5 +18,3 @@ new_features:
     Added an off-by-default runtime flag
     ``envoy.reloadable_features.google_grpc_disable_tls_13`` to disable TLSv1.3
     usage by gRPC SDK for ``google_grpc`` services.
-
-deprecated:
