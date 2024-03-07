@@ -264,8 +264,7 @@ public class AndroidEnvoyExplicitFlowTest {
     assertThat(response.getBodyAsString()).isEqualTo("hello, world");
     assertThat(response.getEnvoyError()).isNull();
     // A "terminating" empty buffer is systematically sent through the setOnResponseData callback.
-    // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
-    assertThat(response.getNbResponseChunks()).isEqualTo(4); // 5 bytes, 5 bytes, 2, and 0 bytes
+    assertThat(response.getNbResponseChunks()).isEqualTo(3); // 5 bytes, 5 bytes, 2
   }
 
   @Test
@@ -286,8 +285,7 @@ public class AndroidEnvoyExplicitFlowTest {
     assertThat(response.getBodyAsString()).isEqualTo("hello, world");
     assertThat(response.getEnvoyError()).isNull();
     // A "terminating" empty buffer is systematically sent through the setOnResponseData callback.
-    // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
-    assertThat(response.getNbResponseChunks()).isEqualTo(6); // 3&2 bytes, 3&2 bytes, 2, and 0 bytes
+    assertThat(response.getNbResponseChunks()).isEqualTo(5); // 3&2 bytes, 3&2 bytes, 2
   }
 
   @Test
@@ -487,17 +485,21 @@ public class AndroidEnvoyExplicitFlowTest {
                           return null;
                         })
                         .setOnResponseData((data, endStream, streamIntel) -> {
-                          response.get().addBody(ByteBuffers.copy(data));
-                          response.get().addStreamIntel(streamIntel);
-                          if (!endStream) {
-                            if (requestScenario.waitOnReadData) {
-                              try {
-                                Thread.sleep(100 + (int)(Math.random() * 50));
-                              } catch (InterruptedException e) {
-                                // Don't care
+                          // Ignore when the data is empty.
+                          // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
+                          if (data.hasRemaining()) {
+                            response.get().addBody(ByteBuffers.copy(data));
+                            response.get().addStreamIntel(streamIntel);
+                            if (!endStream) {
+                              if (requestScenario.waitOnReadData) {
+                                try {
+                                  Thread.sleep(100 + (int)(Math.random() * 50));
+                                } catch (InterruptedException e) {
+                                  // Don't care
+                                }
                               }
+                              streamRef.get().readData(requestScenario.responseBufferSize);
                             }
-                            streamRef.get().readData(requestScenario.responseBufferSize);
                           }
                           return null;
                         })
