@@ -46,7 +46,7 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 
 // Convenience function.
 void headerMapAddHeader(envoy::config::core::v3::HeaderMap& mutable_header_map,
-                       absl::string_view key, absl::string_view value) {
+                        absl::string_view key, absl::string_view value) {
   auto* new_header = mutable_header_map.mutable_headers()->Add();
   new_header->set_key(std::string(key));
   new_header->set_raw_value(std::string(value));
@@ -128,7 +128,7 @@ void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool headers_as_bytes, const MatcherSharedPtr& request_header_matchers) {
+    bool encode_raw_headers, const MatcherSharedPtr& request_header_matchers) {
   httpreq.set_id(std::to_string(stream_id));
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
@@ -144,7 +144,7 @@ void CheckRequestUtils::setHttpRequest(
   auto* mutable_headers = httpreq.mutable_headers();
   auto* mutable_header_map = httpreq.mutable_header_map();
 
-  headers.iterate([headers_as_bytes, request_header_matchers, mutable_headers,
+  headers.iterate([encode_raw_headers, request_header_matchers, mutable_headers,
                    mutable_header_map](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() == Headers::get().EnvoyAuthPartialBody.get()) {
@@ -156,7 +156,7 @@ void CheckRequestUtils::setHttpRequest(
       return Envoy::Http::HeaderMap::Iterate::Continue;
     }
 
-    if (headers_as_bytes) {
+    if (encode_raw_headers) {
       headerMapAddHeader(*mutable_header_map, key, e.value().getStringView());
     } else {
       const std::string sanitized_value =
@@ -188,7 +188,7 @@ void CheckRequestUtils::setHttpRequest(
 
     // Add in a header to detect when a partial body is used.
     const std::string partial_body_value = length != decoding_buffer->length() ? "true" : "false";
-    if (headers_as_bytes) {
+    if (encode_raw_headers) {
       headerMapAddHeader(*mutable_header_map, Headers::get().EnvoyAuthPartialBody.get(),
                          std::move(partial_body_value));
     } else {
@@ -201,10 +201,10 @@ void CheckRequestUtils::setAttrContextRequest(
     envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool headers_as_bytes, const MatcherSharedPtr& request_header_matchers) {
+    bool encode_raw_headers, const MatcherSharedPtr& request_header_matchers) {
   setRequestTime(req, stream_info);
   setHttpRequest(*req.mutable_http(), stream_id, stream_info, decoding_buffer, headers,
-                 max_request_bytes, pack_as_bytes, headers_as_bytes, request_header_matchers);
+                 max_request_bytes, pack_as_bytes, encode_raw_headers, request_header_matchers);
 }
 
 void CheckRequestUtils::createHttpCheck(
@@ -214,7 +214,7 @@ void CheckRequestUtils::createHttpCheck(
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool headers_as_bytes, bool include_peer_certificate, bool include_tls_session,
+    bool encode_raw_headers, bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
     const MatcherSharedPtr& request_header_matchers) {
 
@@ -230,7 +230,7 @@ void CheckRequestUtils::createHttpCheck(
                      include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
-                        headers_as_bytes, request_header_matchers);
+                        encode_raw_headers, request_header_matchers);
 
   if (include_tls_session) {
     if (cb->connection()->ssl() != nullptr) {

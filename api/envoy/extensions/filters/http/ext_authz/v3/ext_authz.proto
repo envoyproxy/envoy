@@ -216,7 +216,7 @@ message ExtAuthz {
   // Defaults to true.
   google.protobuf.BoolValue charge_cluster_response_stats = 20;
 
-  // Whether to send headers values as raw bytes (instead of a string) in authentication request.
+  // Whether to encode the raw headers (i.e. unsanitized, not inlined) in authentication request.
   //
   // The string data type cannot contain non-UTF-8-compliant data or it will create an error when
   // decoding. Thus, if this field is false, header values will be sanitized, and any non-UTF-8-
@@ -225,7 +225,9 @@ message ExtAuthz {
   // When this is set to true, header values are not sanitized. Headers will be added to
   // :ref:`headers_bytes<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers_bytes>`
   // instead of :ref:`headers<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`.
-  bool headers_as_bytes = 23;
+  //
+  // When this is set to true, headers with the same key will also not be inlined.
+  bool encode_raw_headers = 23;
 }
 
 // Configuration for buffering the request data.

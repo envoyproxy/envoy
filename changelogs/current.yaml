@@ -264,11 +264,12 @@ new_features:
     The proto field :ref:`headers <envoy.service.auth.v3.AttributeContext.HttpRequest.headers>`'s
     value type is string.  Thus, it is unable to support non-utf8 characters in header values.
     To support header values with non-utf8 characters, a new boolean field was added to the
-    ext_authz config :ref:`headers_as_bytes <envoy.config.filter.http.ext_authz.v3.ExtAuthz.headers_as_bytes>`.
+    ext_authz config :ref:`encode_raw_headers <envoy.config.filter.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`.
     When this is set to true, the new field in HttpRequest
     :ref:`header_map <envoy.service.auth.v3.AttributeContext.HttpRequest.header_map>` (specifically
     ``header_map.headers.raw_value``) gets populated with the raw values instead of ``headers``,
-    which normally contains UTF-8 sanitized header values.
+    which normally contains UTF-8 sanitized header values. Also, since the new field is a multimap,
+    headers with the same key are not inlined when added.
 - area: load shed point
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if

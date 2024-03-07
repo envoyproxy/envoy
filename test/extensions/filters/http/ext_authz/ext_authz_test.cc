@@ -807,10 +807,10 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
 TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   InSequence s;
 
-  // N.B. headers_as_bytes is set to true.
+  // N.B. encode_raw_headers is set to true.
   initialize(R"EOF(
   transport_api_version: V3
-  headers_as_bytes: true
+  encode_raw_headers: true
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
