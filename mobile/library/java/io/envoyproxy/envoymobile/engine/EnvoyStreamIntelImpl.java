@@ -3,10 +3,10 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel;
 
 class EnvoyStreamIntelImpl implements EnvoyStreamIntel {
-  private long streamId;
-  private long connectionId;
-  private long attemptCount;
-  private long consumedBytesFromResponse;
+  private final long streamId;
+  private final long connectionId;
+  private final long attemptCount;
+  private final long consumedBytesFromResponse;
 
   EnvoyStreamIntelImpl(long[] values) {
     streamId = values[0];

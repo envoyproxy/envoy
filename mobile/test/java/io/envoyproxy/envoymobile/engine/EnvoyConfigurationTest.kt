@@ -165,7 +165,7 @@ class EnvoyConfigurationTest {
   }
 
   fun isEnvoyMobileXdsDisabled(): Boolean {
-    return System.getProperty("envoy_jni_envoy_mobile_xds_disabled") != null;
+    return System.getProperty("envoy_jni_envoy_mobile_xds_disabled") != null
   }
 
   @Test
@@ -195,16 +195,16 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("timeout: 333s")
 
     // H3
-    assertThat(resolvedTemplate).contains("http3_protocol_options:");
-    assertThat(resolvedTemplate).contains("name: alternate_protocols_cache");
-    assertThat(resolvedTemplate).contains("hostname: www.abc.com");
-    assertThat(resolvedTemplate).contains("hostname: www.def.com");
-    assertThat(resolvedTemplate).contains("port: 443");
-    assertThat(resolvedTemplate).contains("canonical_suffixes:");
-    assertThat(resolvedTemplate).contains(".opq.com");
-    assertThat(resolvedTemplate).contains(".xyz.com");
-    assertThat(resolvedTemplate).contains("connection_options: 5RTO");
-    assertThat(resolvedTemplate).contains("client_connection_options: MPQC");
+    assertThat(resolvedTemplate).contains("http3_protocol_options:")
+    assertThat(resolvedTemplate).contains("name: alternate_protocols_cache")
+    assertThat(resolvedTemplate).contains("hostname: www.abc.com")
+    assertThat(resolvedTemplate).contains("hostname: www.def.com")
+    assertThat(resolvedTemplate).contains("port: 443")
+    assertThat(resolvedTemplate).contains("canonical_suffixes:")
+    assertThat(resolvedTemplate).contains(".opq.com")
+    assertThat(resolvedTemplate).contains(".xyz.com")
+    assertThat(resolvedTemplate).contains("connection_options: 5RTO")
+    assertThat(resolvedTemplate).contains("client_connection_options: MPQC")
 
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections: 543")
@@ -226,15 +226,15 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("trusted_ca:")
 
     // Validate ordering between filters and platform filters
-    assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createYaml doesn't change filter order.
     val resolvedTemplate2 = TestJni.createYaml(envoyConfiguration)
-    assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createBootstrap also doesn't change filter order.
     // This may leak memory as the boostrap isn't used.
     envoyConfiguration.createBootstrap()
     val resolvedTemplate3 = TestJni.createYaml(envoyConfiguration)
-    assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
   }
 
   @Test
@@ -270,13 +270,13 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("save_interval: 101")
 
     // enableHttp3 = false
-    assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache");
+    assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache")
 
     // enableGzipDecompression = false
-    assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
+    assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip")
 
     // enableBrotliDecompression = true
-    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli")
 
     // enableInterfaceBinding = true
     assertThat(resolvedTemplate).contains("enable_interface_binding: true")
@@ -285,9 +285,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).doesNotContain("trusted_ca:")
 
     // ADS and RTDS not included by default
-    assertThat(resolvedTemplate).doesNotContain("rtds_layer:");
-    assertThat(resolvedTemplate).doesNotContain("ads_config:");
-    assertThat(resolvedTemplate).doesNotContain("cds_config:");
+    assertThat(resolvedTemplate).doesNotContain("rtds_layer:")
+    assertThat(resolvedTemplate).doesNotContain("ads_config:")
+    assertThat(resolvedTemplate).doesNotContain("cds_config:")
   }
 
   @Test
@@ -299,14 +299,14 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
-    assertThat(resolvedTemplate).contains("test_feature_false");
-    assertThat(resolvedTemplate).contains("test_feature_true");
+    assertThat(resolvedTemplate).contains("test_feature_false")
+    assertThat(resolvedTemplate).contains("test_feature_true")
   }
 
   @Test
   fun `test adding RTDS`() {
     if (isEnvoyMobileXdsDisabled()) {
-      return;
+      return
     }
 
     JniLibrary.loadTestLibrary()
@@ -315,15 +315,15 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-    assertThat(resolvedTemplate).contains("fake_rtds_layer");
-    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s");
+    assertThat(resolvedTemplate).contains("fake_rtds_layer")
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS")
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5432s")
   }
 
   @Test
   fun `test adding RTDS and CDS`() {
     if (isEnvoyMobileXdsDisabled()) {
-      return;
+      return
     }
 
     JniLibrary.loadTestLibrary()
@@ -333,9 +333,9 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
-    assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
-    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 356s");
+    assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR")
+    assertThat(resolvedTemplate).contains("FAKE_ADDRESS")
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 356s")
   }
 
   @Test
@@ -347,14 +347,14 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
-    assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR");
-    assertThat(resolvedTemplate).doesNotContain("initial_fetch_timeout: 356s");
+    assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR")
+    assertThat(resolvedTemplate).doesNotContain("initial_fetch_timeout: 356s")
   }
 
   @Test
   fun `test enableCds with default string`() {
     if (isEnvoyMobileXdsDisabled()) {
-      return;
+      return
     }
 
     JniLibrary.loadTestLibrary()
@@ -364,14 +364,14 @@ class EnvoyConfigurationTest {
 
     val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
 
-    assertThat(resolvedTemplate).contains("cds_config:");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s");
+    assertThat(resolvedTemplate).contains("cds_config:")
+    assertThat(resolvedTemplate).contains("initial_fetch_timeout: 5s")
   }
 
   @Test
   fun `test RTDS default timeout`() {
     if (isEnvoyMobileXdsDisabled()) {
-      return;
+      return
     }
 
     JniLibrary.loadTestLibrary()

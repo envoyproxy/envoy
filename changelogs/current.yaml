@@ -16,15 +16,6 @@ behavior_changes:
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
     requests and responses. A number of users have reported issues with oghttp2 including issue 32611 and issue 32401 This behavior
     can be reverted by setting the feature to ``true``.
-- area: eds
-  change: |
-    Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
-    Prior to this change, Envoy required that EDS assignments were sent after an EDS cluster was updated.
-    If no EDS assignment was received for the cluster, it ended up with an empty assignment.
-    Following this change, after a cluster update, Envoy waits for an EDS assignment until
-    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
-    the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
-    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -287,6 +278,10 @@ new_features:
 - area: tracing
   change: |
     Added support for variant span attribute type for the OpenTelemetry tracer.
+- area: oauth
+  change: |
+    :ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>`
+    to support disabling authorization redirects for specific requests, e.g. AJAX requests.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
