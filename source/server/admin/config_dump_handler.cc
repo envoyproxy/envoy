@@ -106,7 +106,9 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
       ASSERT(inner_descriptor != nullptr);
       std::unique_ptr<Protobuf::Message> inner_message;
       inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
-      MessageUtil::unpackTo(any_message, *inner_message);
+      if (!MessageUtil::unpackTo(any_message, *inner_message).ok()) {
+        return false;
+      }
       // Trim message.
       if (!checkFieldMaskAndTrimMessage(inner_field_mask, *inner_message)) {
         return false;
