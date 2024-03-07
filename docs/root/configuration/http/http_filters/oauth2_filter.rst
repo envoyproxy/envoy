@@ -246,6 +246,11 @@ sending the user to the configured auth endpoint.
 an interface for users to provide specific header matching criteria such that, when applicable, the OAuth flow is entirely skipped.
 When this occurs, the ``oauth_passthrough`` metric is incremented but ``success`` is not.
 
+:ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>` can be used to specify requests for which
+unauthorized response is returned on token expiration and will not automatically redirect to the authorization endpoint. Token refresh can be still performed
+during those requests by enabling the :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` flag.
+This behavior can be useful for AJAX requests which cannot handle redirects correctly.
+
 :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` provides
 possibility to update access token by using a refresh token. By default after expiration the user is always redirected to the authorization endpoint to log in again.
 By enabling this flag a new access token is obtained using by a refresh token without redirecting the user to log in again. This requires the refresh token to be provided by authorization_endpoint when the user logs in.

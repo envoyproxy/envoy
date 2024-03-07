@@ -49,7 +49,7 @@ class PerformHTTPRequestUsingProxy {
     Mockito.doReturn(connectivityManager)
       .`when`(context)
       .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.getDefaultProxy())
+    Mockito.`when`(connectivityManager.defaultProxy)
       .thenReturn(ProxyInfo.buildPacProxy(Uri.parse("https://example.com")))
 
     val onEngineRunningLatch = CountDownLatch(1)

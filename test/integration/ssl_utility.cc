@@ -127,6 +127,9 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   }
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
   quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+  ON_CALL(mock_factory_ctx, statsScope())
+      .WillByDefault(ReturnRef(*upstream_stats_store->rootScope()));
+  ON_CALL(mock_factory_ctx, sslContextManager()).WillByDefault(ReturnRef(context_manager));
 
   std::vector<std::string> server_names;
   auto& config_factory = Config::Utility::getAndCheckFactoryByName<

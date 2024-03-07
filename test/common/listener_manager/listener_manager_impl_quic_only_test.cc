@@ -166,7 +166,9 @@ filter_chain_matcher:
   auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
-  EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
+  auto [cert, key] = quic_socket_factory.getTlsCertificateAndKey("", nullptr);
+  EXPECT_TRUE(cert != nullptr);
+  EXPECT_TRUE(key != nullptr);
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 
   // Stop listening shouldn't close the socket.

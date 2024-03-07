@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "@envoy//test/common/tls/test_data:cert_infos",
         "@envoy//test/mocks/event:event_mocks",
         "@envoy//test/mocks/ssl:ssl_mocks",
+        "@envoy//test/mocks/thread:thread_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy//test/test_common:file_system_for_test_lib",
         "@envoy//test/test_common:test_runtime_lib",
