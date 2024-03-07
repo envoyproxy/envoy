@@ -168,9 +168,12 @@ typed_config:
       HttpIntegrationTest::createUpstreams();
     }
     if (use_cache_file_) {
+      std::string address = version_ == Network::Address::IpVersion::v4
+                                ? upstream_address_fn_(0)->ip()->addressAsString()
+                                : Network::Test::getLoopbackAddressUrlString(version_);
       cache_file_value_contents_ +=
-          absl::StrCat(upstream_address_fn_(0)->ip()->addressAsString(), ":",
-                       fake_upstreams_[0]->localAddress()->ip()->port(), "|", dns_cache_ttl_, "|0");
+          absl::StrCat(address, ":", fake_upstreams_[0]->localAddress()->ip()->port(), "|",
+                       dns_cache_ttl_, "|0");
       std::string host =
           fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
       TestEnvironment::writeStringToFileForTest("dns_cache.txt",
