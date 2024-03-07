@@ -6488,6 +6488,19 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
                          "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
                          "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+                         "cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"metadata\":"
+                         "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
+                         "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"},"
+                         "\"successful_health_check_event\":{}}\n"}));
+  event_logger.logSuccessfulHealthCheck(envoy::data::core::v3::HTTP, host);
+
+  EXPECT_CALL(*file, write(absl::string_view{
+                         "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
                          "\"ipv4_compat\":false}},\"cluster_name\":\"fake_cluster\","
                          "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
                          "\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
@@ -6570,6 +6583,17 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
       "\"metadata\":"
       "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
       "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
+
+  event_logger.logSuccessfulHealthCheck(envoy::data::core::v3::HTTP, host);
+  EXPECT_EQ(
+      file_log_data.value(),
+      "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+      "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
+      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+      "cluster\",\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+      "\"metadata\":"
+      "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
+      "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"},\"successful_health_check_event\":{}}\n");
 
   event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
                             false);
