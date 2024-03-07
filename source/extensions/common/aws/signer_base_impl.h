@@ -27,30 +27,30 @@ using SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 class SignatureQueryParameterValues {
 public:
   // Query string parameters require camel case
-  static constexpr char AmzAlgorithm[] = "X-Amz-Algorithm";
-  static constexpr char AmzCredential[] = "X-Amz-Credential";
-  static constexpr char AmzDate[] = "X-Amz-Date";
-  static constexpr char AmzRegionSet[] = "X-Amz-Region-Set";
-  static constexpr char AmzSecurityToken[] = "X-Amz-Security-Token";
-  static constexpr char AmzSignature[] = "X-Amz-Signature";
-  static constexpr char AmzSignedHeaders[] = "X-Amz-SignedHeaders";
-  static constexpr char AmzExpires[] = "X-Amz-Expires";
+  static constexpr absl::string_view AmzAlgorithm = "X-Amz-Algorithm";
+  static constexpr absl::string_view AmzCredential = "X-Amz-Credential";
+  static constexpr absl::string_view AmzDate = "X-Amz-Date";
+  static constexpr absl::string_view AmzRegionSet = "X-Amz-Region-Set";
+  static constexpr absl::string_view AmzSecurityToken = "X-Amz-Security-Token";
+  static constexpr absl::string_view AmzSignature = "X-Amz-Signature";
+  static constexpr absl::string_view AmzSignedHeaders = "X-Amz-SignedHeaders";
+  static constexpr absl::string_view AmzExpires = "X-Amz-Expires";
   // Expiration time of query parameter request, in seconds
-  const uint16_t DefaultExpiration = 5;
+  static constexpr uint16_t DefaultExpiration = 5;
 };
 
 using SignatureQueryParameters = ConstSingleton<SignatureQueryParameterValues>;
 
 class SignatureConstantValues {
 public:
-  const std::string Aws4Request{"aws4_request"};
-  const std::string HashedEmptyString{
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
+  static constexpr absl::string_view Aws4Request = "aws4_request";
+  static constexpr absl::string_view HashedEmptyString =
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-  const std::string LongDateFormat{"%Y%m%dT%H%M00Z"};
-  const std::string ShortDateFormat{"%Y%m%d"};
-  const std::string UnsignedPayload{"UNSIGNED-PAYLOAD"};
-  const std::string AuthorizationCredentialFormat{"{}/{}"};
+  static constexpr absl::string_view LongDateFormat = "%Y%m%dT%H%M00Z";
+  static constexpr absl::string_view ShortDateFormat = "%Y%m%d";
+  static constexpr absl::string_view UnsignedPayload = "UNSIGNED-PAYLOAD";
+  static constexpr absl::string_view AuthorizationCredentialFormat = "{}/{}";
 };
 
 using SignatureConstants = ConstSingleton<SignatureConstantValues>;
@@ -73,8 +73,8 @@ public:
                  const uint16_t expiration_time = SignatureQueryParameters::get().DefaultExpiration)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
         query_string_(query_string), expiration_time_(expiration_time), time_source_(time_source),
-        long_date_formatter_(SignatureConstants::get().LongDateFormat),
-        short_date_formatter_(SignatureConstants::get().ShortDateFormat) {
+        long_date_formatter_(std::string(SignatureConstants::get().LongDateFormat)),
+        short_date_formatter_(std::string(SignatureConstants::get().ShortDateFormat)) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(

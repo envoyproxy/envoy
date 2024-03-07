@@ -35,14 +35,14 @@ void SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
                                       const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().HashedEmptyString);
-  sign(headers, SignatureConstants::get().HashedEmptyString, override_region);
+  sign(headers, std::string(SignatureConstants::get().HashedEmptyString), override_region);
 }
 
 void SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
                                          const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::get().UnsignedPayload);
-  sign(headers, SignatureConstants::get().UnsignedPayload, override_region);
+  sign(headers, std::string(SignatureConstants::get().UnsignedPayload), override_region);
 }
 
 // Region support utilities for sigv4a
@@ -150,12 +150,12 @@ void SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& co
 
 std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {
   if (!sign_body) {
-    return SignatureConstants::get().HashedEmptyString;
+    return std::string(SignatureConstants::get().HashedEmptyString);
   }
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto content_hash = message.body().length() > 0
                                 ? Hex::encode(crypto_util.getSha256Digest(message.body()))
-                                : SignatureConstants::get().HashedEmptyString;
+                                : std::string(SignatureConstants::get().HashedEmptyString);
   return content_hash;
 }
 
