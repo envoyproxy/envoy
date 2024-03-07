@@ -14,7 +14,8 @@ using MessagePackPacker = msgpack::packer<msgpack::sbuffer>;
 
 constexpr uint32_t DefaultMaxConnectAttempts = 1;
 
-FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Tcp::AsyncTcpClientPtr client,
+FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& cluster,
+                                                 Tcp::AsyncTcpClientPtr client,
                                                  Event::Dispatcher& dispatcher,
                                                  const FluentdAccessLogConfig& config,
                                                  Stats::Scope& parent_scope)
@@ -27,7 +28,7 @@ FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Tcp::AsyncTcpClientPtr client,
       stats_scope_(parent_scope.createScope(config.stat_prefix())),
       fluentd_stats_(
           {ACCESS_LOG_FLUENTD_STATS(POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_))}),
-      client_(std::move(client)),
+      cluster_(cluster), client_(std::move(client)),
       buffer_flush_interval_msec_(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
       max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384)),
       flush_timer_(dispatcher.createTimer([this]() {
@@ -50,6 +51,7 @@ void FluentdAccessLoggerImpl::onEvent(Network::ConnectionEvent event) {
 
     if (connect_attempts_ >= max_connect_attempts_) {
       ENVOY_LOG(debug, "max connection attempts reached");
+      cluster_.info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
       setDisconnected();
       return;
     }
@@ -150,12 +152,12 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
     return it->second.lock();
   }
 
-  auto client =
-      cluster_manager_.getThreadLocalCluster(config->cluster())
-          ->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
+  auto* cluster = cluster_manager_.getThreadLocalCluster(config->cluster());
+  auto client = cluster->tcpAsyncClient(
+      nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
 
   const auto logger = std::make_shared<FluentdAccessLoggerImpl>(
-      std::move(client), cache.dispatcher_, *config, *stats_scope_);
+      *cluster, std::move(client), cache.dispatcher_, *config, *stats_scope_);
   cache.access_loggers_.emplace(cache_key, logger);
   return logger;
 }

@@ -60,7 +60,8 @@ class FluentdAccessLoggerImpl : public Tcp::AsyncTcpClientCallbacks,
                                 public FluentdAccessLogger,
                                 public Logger::Loggable<Logger::Id::client> {
 public:
-  FluentdAccessLoggerImpl(Tcp::AsyncTcpClientPtr client, Event::Dispatcher& dispatcher,
+  FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& cluster,
+                          Tcp::AsyncTcpClientPtr client, Event::Dispatcher& dispatcher,
                           const FluentdAccessLogConfig& config, Stats::Scope& parent_scope);
 
   // Tcp::AsyncTcpClientCallbacks
@@ -88,6 +89,7 @@ private:
   AccessLogFluentdStats fluentd_stats_;
   std::vector<EntryPtr> entries_;
   uint64_t approximate_message_size_bytes_ = 0;
+  Upstream::ThreadLocalCluster& cluster_;
   const Tcp::AsyncTcpClientPtr client_;
   const std::chrono::milliseconds buffer_flush_interval_msec_;
   const uint64_t max_buffer_size_bytes_;

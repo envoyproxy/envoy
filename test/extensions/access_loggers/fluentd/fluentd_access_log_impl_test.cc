@@ -42,7 +42,8 @@ public:
         max_connect_attempts);
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     logger_ = std::make_unique<FluentdAccessLoggerImpl>(
-        Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_, *stats_store_.rootScope());
+        cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
+        *stats_store_.rootScope());
   }
 
   std::string getExpectedMsgpackPayload(int entries_count) {
@@ -64,6 +65,7 @@ public:
   std::string tag_ = "test.tag";
   uint64_t time_ = 123;
   std::vector<uint8_t> data_ = {10, 20};
+  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
   Tcp::AsyncClient::MockAsyncTcpClient* async_client_;
   Stats::IsolatedStoreImpl stats_store_;
   Event::MockDispatcher dispatcher_;
