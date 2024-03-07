@@ -15,8 +15,6 @@
 
 #include "absl/strings/str_join.h"
 
-// #include "signer_base_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
