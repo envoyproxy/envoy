@@ -98,9 +98,13 @@ public:
   // content buffer.
   void initialize(std::string&& types, ArgumentVec&& argvs, Attachments&& attachs);
 
-  // Underlying content buffer. Use the const_cast to move the ownership of the buffer
-  // when encoding the whole request.
+  // Underlying content buffer. This may re-encode the result and attachments into the
+  // content buffer to ensure the returned buffer is up-to-date.
   const Buffer::Instance& buffer();
+
+  // Move the content buffer to the given buffer. This only does the move and does not
+  // re-encode the result and attachments.
+  void bufferMoveTo(Buffer::Instance& buffer);
 
   // Get all the arguments of the request.
   const ArgumentVec& arguments();
@@ -115,6 +119,9 @@ public:
   // Set the attachment with the given key and value. If the key already exists, the
   // value will be updated. Otherwise, a new key-value pair will be added.
   void setAttachment(absl::string_view key, absl::string_view val);
+
+  // Remove the attachment with the given key.
+  void removeAttachment(absl::string_view key);
 
 private:
   // Decode the content buffer into types, arguments and attachments. The decoding is
@@ -152,21 +159,23 @@ private:
  */
 class RpcRequest {
 public:
-  absl::string_view service() const;
-  absl::string_view method() const;
-  absl::string_view version() const;
+  RpcRequest(std::string&& version, std::string&& service, std::string&& service_version,
+             std::string&& method)
+      : version_(std::move(version)), service_(std::move(service)),
+        service_version_(std::move(service_version)), method_(std::move(method)) {}
 
-  void setService(absl::string_view name);
-  void setMethod(absl::string_view name);
-  void setVersion(absl::string_view version);
+  absl::string_view version() const { return version_; }
+  absl::string_view service() const { return service_; }
+  absl::string_view serviceVersion() const { return service_version_; }
+  absl::string_view method() const { return method_; }
 
-  RequestContent& content() const;
+  RequestContent& content() const { return content_; }
 
 private:
-  std::string service_;
-  std::string method_;
   std::string version_;
-  absl::optional<std::string> group_;
+  std::string service_;
+  std::string service_version_;
+  std::string method_;
 
   mutable RequestContent content_;
 };
@@ -182,9 +191,13 @@ public:
   // call will also encode the result and attachments into the content buffer.
   void initialize(Hessian2::ObjectPtr&& value, Attachments&& attachs);
 
-  // Underlying content buffer. Use the const_cast to move the ownership of the buffer
-  // when encoding the whole response.
+  // Underlying content buffer. This may re-encode the result and attachments into the
+  // content buffer to ensure the returned buffer is up-to-date.
   const Buffer::Instance& buffer();
+
+  // Move the content buffer to the given buffer. This only does the move and does not
+  // re-encode the result and attachments.
+  void bufferMoveTo(Buffer::Instance& buffer);
 
   // Get the result of the response. If the content has not been decoded, the decoding
   // will be triggered.
@@ -196,6 +209,9 @@ public:
   // Set the attachment with the given key and value. If the key already exists, the
   // value will be updated. Otherwise, a new key-value pair will be added.
   void setAttachment(absl::string_view key, absl::string_view val);
+
+  // Remove the attachment with the given key.
+  void removeAttachment(absl::string_view key);
 
 private:
   // Decode the content buffer into value and attachments. The decoding is lazy and will
@@ -232,17 +248,14 @@ private:
  */
 class RpcResponse {
 public:
-  ResponseStatus responseStatus() const;
+  RpcResponse() = default;
 
-  absl::optional<RpcResponseType> responseType() const;
+  void setResponseType(RpcResponseType response_type) { response_type_ = response_type; }
+  absl::optional<RpcResponseType> responseType() const { return response_type_; }
 
-  void setResponseStatus(ResponseStatus status);
-  void setResponseType(RpcResponseType type);
-
-  ResponseContent& content() const;
+  ResponseContent& content() const { return content_; }
 
 private:
-  ResponseStatus response_status_{ResponseStatus::Ok};
   absl::optional<RpcResponseType> response_type_{};
   mutable ResponseContent content_;
 };

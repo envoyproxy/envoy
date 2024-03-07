@@ -1,6 +1,7 @@
 #include "source/extensions/common/dubbo/message.h"
-#include "source/extensions/common/dubbo/hessian2_utils.h"
+
 #include "source/common/common/logger.h"
+#include "source/extensions/common/dubbo/hessian2_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,7 +42,7 @@ void RequestContent::initialize(std::string&& types, ArgumentVec&& argvs, Attach
 }
 
 const Buffer::Instance& RequestContent::buffer() {
-  // Ensure the attatchments in the buffer is lastest.
+  // Ensure the attachments in the buffer is latest.
 
   if (content_buffer_.length() == 0) {
     encodeEverything();
@@ -51,6 +52,8 @@ const Buffer::Instance& RequestContent::buffer() {
 
   return content_buffer_;
 }
+
+void RequestContent::bufferMoveTo(Buffer::Instance& buffer) { buffer.move(content_buffer_); }
 
 const ArgumentVec& RequestContent::arguments() {
   lazyDecode();
@@ -81,6 +84,13 @@ void RequestContent::setAttachment(absl::string_view key, absl::string_view val)
   attachs_[key] = val;
 }
 
+void RequestContent::removeAttachment(absl::string_view key) {
+  lazyDecode();
+
+  updated_ = true;
+  attachs_.erase(key);
+}
+
 void RequestContent::lazyDecode() {
   if (decoded_) {
     return;
@@ -100,6 +110,10 @@ void RequestContent::lazyDecode() {
         if (auto types = decoder.decode<std::string>(); types != nullptr) {
           types_ = *types;
           number = Hessian2Utils::getParametersNumber(types_);
+        } else {
+          ENVOY_LOG(error, "Cannot parse RpcInvocation parameter types from buffer");
+          handleBrokenValue();
+          return;
         }
       } else if (direct_num >= 0) {
         number = direct_num;
@@ -123,6 +137,10 @@ void RequestContent::lazyDecode() {
         return;
       }
     }
+  } else {
+    ENVOY_LOG(error, "Cannot parse RpcInvocation from buffer");
+    handleBrokenValue();
+    return;
   }
 
   // Record the size of the arguments in the content buffer. This is useful for
@@ -157,7 +175,7 @@ void RequestContent::encodeAttachments() {
   const uint64_t buffer_length = content_buffer_.length();
   ASSERT(buffer_length > 0, "content buffer is empty");
 
-  // argvs_size_ will be set when doing lazyDecode() or encodeEverything().
+  // The size of arguments will be set when doing lazyDecode() or encodeEverything().
   if (buffer_length < argvs_size_) {
     ENVOY_LOG(error, "arguments size {} is larger than content buffer {}", argvs_size_,
               buffer_length);
@@ -194,7 +212,13 @@ void RequestContent::encodeEverything() {
   Hessian2::Encoder encoder(std::make_unique<BufferWriter>(content_buffer_));
 
   // Encode the types into the content buffer first.
-  encoder.encode(types_);
+  if (!types_.empty()) {
+    encoder.encode(types_);
+  } else if (!argvs_.empty()) {
+    encoder.encode(static_cast<int32_t>(argvs_.size()));
+  } else {
+    encoder.encode(types_);
+  }
 
   // Encode the arguments into the content buffer.
   for (auto& arg : argvs_) {
@@ -233,14 +257,6 @@ void RequestContent::handleBrokenValue() {
   updated_ = false;
 }
 
-absl::string_view RpcRequest::service() const { return service_; }
-
-absl::string_view RpcRequest::method() const { return method_; }
-
-absl::string_view RpcRequest::version() const { return version_; }
-
-RequestContent& RpcRequest::content() const { return content_; };
-
 void ResponseContent::initialize(Buffer::Instance& buffer, uint64_t length) {
   ASSERT(content_buffer_.length() == 0, "content buffer has been initialized");
   content_buffer_.move(buffer, length);
@@ -271,7 +287,7 @@ void ResponseContent::initialize(Hessian2::ObjectPtr&& value, Attachments&& atta
 }
 
 const Buffer::Instance& ResponseContent::buffer() {
-  // Ensure the attatchments in the buffer is lastest.
+  // Ensure the attachments in the buffer is latest.
   if (content_buffer_.length() == 0) {
     encodeEverything();
   } else {
@@ -280,6 +296,8 @@ const Buffer::Instance& ResponseContent::buffer() {
 
   return content_buffer_;
 }
+
+void ResponseContent::bufferMoveTo(Buffer::Instance& buffer) { buffer.move(content_buffer_); }
 
 const Hessian2::Object* ResponseContent::result() {
   lazyDecode();
@@ -298,6 +316,13 @@ void ResponseContent::setAttachment(absl::string_view key, absl::string_view val
 
   updated_ = true;
   attachs_[key] = val;
+}
+
+void ResponseContent::removeAttachment(absl::string_view key) {
+  lazyDecode();
+
+  updated_ = true;
+  attachs_.erase(key);
 }
 
 void ResponseContent::lazyDecode() {
@@ -418,16 +443,6 @@ void ResponseContent::handleBrokenValue() {
   decoded_ = true;
   updated_ = false;
 }
-
-ResponseStatus RpcResponse::responseStatus() const { return response_status_; }
-
-absl::optional<RpcResponseType> RpcResponse::responseType() const { return response_type_; }
-
-void RpcResponse::setResponseStatus(ResponseStatus status) { response_status_ = status; }
-
-void RpcResponse::setResponseType(RpcResponseType type) { response_type_ = type; }
-
-ResponseContent& RpcResponse::content() const { return content_; }
 
 } // namespace Dubbo
 } // namespace Common

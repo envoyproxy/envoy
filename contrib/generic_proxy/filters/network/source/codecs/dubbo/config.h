@@ -35,9 +35,9 @@ public:
   void forEach(IterateCallback callback) const override;
   absl::optional<absl::string_view> get(absl::string_view key) const override;
   void set(absl::string_view key, absl::string_view val) override;
-  absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
-  absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
-  absl::string_view method() const override { return inner_metadata_->request().methodName(); }
+  absl::string_view host() const override { return inner_metadata_->request().service(); }
+  absl::string_view path() const override { return inner_metadata_->request().service(); }
+  absl::string_view method() const override { return inner_metadata_->request().method(); }
   void erase(absl::string_view key) override;
 
   // StreamFrame
