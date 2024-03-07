@@ -96,7 +96,11 @@ FilterConfig::FilterConfig(
       response_allow_content_types_(
           generateAllowContentTypes(proto_config.response_rules().allow_content_types())),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
-      response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {
+      response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()),
+      request_allow_content_types_regex_(
+          generateAllowContentTypeRegexs(proto_config.request_rules().allow_content_types_regex())),
+      response_allow_content_types_regex_(
+          generateAllowContentTypeRegexs(proto_config.response_rules().allow_content_types_regex())) {
   if (request_rules_.empty() && response_rules_.empty()) {
     throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
                          "either request or response rules");
@@ -124,9 +128,26 @@ absl::flat_hash_set<std::string> FilterConfig::generateAllowContentTypes(
   return allow_content_types;
 }
 
+std::vector<Regex::CompiledMatcherPtr> FilterConfig::generateAllowContentTypeRegexs(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::RegexMatcher>& proto_allow_content_types_regex) const {
+  
+  std::vector<Regex::CompiledMatcherPtr> allow_content_types_regex;
+
+  for (const auto& request_allowed_content_type : proto_allow_content_types_regex) {
+    allow_content_types_regex.push_back(Regex::Utility::parseRegex(request_allowed_content_type));
+  }
+  return allow_content_types_regex;
+}
+
 bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) const {
   if (content_type.empty()) {
     return request_allow_empty_content_type_;
+  }
+
+  for (const auto& regex : request_allow_content_types_regex_) {
+    if (regex->match(content_type)) {
+      return true;
+    }
   }
 
   return request_allow_content_types_.contains(content_type);
@@ -135,6 +156,12 @@ bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) con
 bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) const {
   if (content_type.empty()) {
     return response_allow_empty_content_type_;
+  }
+
+  for (const auto& regex : response_allow_content_types_regex_) {
+    if (regex->match(content_type)) {
+      return true;
+    }
   }
 
   return response_allow_content_types_.contains(content_type);
