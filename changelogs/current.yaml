@@ -11,6 +11,11 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
     This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
     be flushed to stat sinks.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
+    requests and responses. A number of users have reported issues with oghttp2 including issue 32611 and issue 32401 This behavior
+    can be reverted by setting the feature to ``true``.
 - area: eds
   change: |
     Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
@@ -279,6 +284,13 @@ new_features:
 - area: tracing
   change: |
     Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
+- area: tracing
+  change: |
+    Added support for variant span attribute type for the OpenTelemetry tracer.
+- area: oauth
+  change: |
+    :ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>`
+    to support disabling authorization redirects for specific requests, e.g. AJAX requests.
 - area: jwt_authn
   change: |
     Added
