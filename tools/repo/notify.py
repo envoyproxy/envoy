@@ -293,9 +293,6 @@ class RepoNotifier(runner.Runner):
                 text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
-                text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
-            await self.send_message(
-                channel='#envoy-maintainer-oncall',
                 text=(f"*Stalled PRs* (PRs with review out-SLO, please address)\n{stalled}"))
             num_issues = await self.track_open_issues()
             await self.send_message(
