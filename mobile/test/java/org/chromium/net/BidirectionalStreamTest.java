@@ -1,6 +1,7 @@
 package org.chromium.net;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -369,7 +370,7 @@ public class BidirectionalStreamTest {
           ByteBuffer pendingBuffer = pendingData.get(0);
           byte[] content = new byte[pendingBuffer.remaining()];
           pendingBuffer.get(content);
-          assertTrue(Arrays.equals("6".getBytes(), content));
+          assertArrayEquals("6".getBytes(), content);
 
           // "4" and "5" have been flushed.
           assertEquals(0, ((CronvoyBidirectionalStream)stream).getFlushDataForTesting().size());
@@ -381,7 +382,7 @@ public class BidirectionalStreamTest {
           ByteBuffer pendingBuffer = pendingData.get(0);
           byte[] content = new byte[pendingBuffer.remaining()];
           pendingBuffer.get(content);
-          assertTrue(Arrays.equals("6".getBytes(), content));
+          assertArrayEquals("6".getBytes(), content);
 
           stream.flush();
 
@@ -1085,7 +1086,7 @@ public class BidirectionalStreamTest {
     stream.start();
     callback.waitForNextReadStep();
 
-    assertEquals(null, callback.mError);
+    assertNull(callback.mError);
     assertFalse(callback.isDone());
     assertEquals(TestBidirectionalStreamCallback.ResponseStep.ON_RESPONSE_STARTED,
                  callback.mResponseStep);
@@ -1178,7 +1179,7 @@ public class BidirectionalStreamTest {
     stream.start();
     callback.waitForNextReadStep();
 
-    assertEquals(null, callback.mError);
+    assertNull(callback.mError);
     assertFalse(callback.isDone());
     assertEquals(TestBidirectionalStreamCallback.ResponseStep.ON_RESPONSE_STARTED,
                  callback.mResponseStep);

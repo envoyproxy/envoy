@@ -35,7 +35,7 @@ public final class CronvoyUserAgent {
     builder.append(" (Linux; U; Android ");
     builder.append(Build.VERSION.RELEASE);
     builder.append("; ");
-    builder.append(Locale.getDefault().toString());
+    builder.append(Locale.getDefault());
 
     String model = Build.MODEL;
     if (model.length() > 0) {
