@@ -2001,8 +2001,7 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
 
 bool ConnectionImpl::Http2Visitor::OnEndStream(Http2StreamId stream_id) {
   ENVOY_CONN_LOG(debug, "Http2Visitor::OnEndStream({})", connection_->connection_, stream_id);
-  if (current_frame_.type == NGHTTP2_DATA &&
-      (current_frame_.flags & NGHTTP2_FLAG_END_STREAM) != 0) {
+  if (current_frame_.type == NGHTTP2_DATA) {
     // `onBeginData` is invoked here to ensure that the connection has successfully validated and
     // processed the entire DATA frame.
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
