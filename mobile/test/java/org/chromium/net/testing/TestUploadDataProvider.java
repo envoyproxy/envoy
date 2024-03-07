@@ -22,7 +22,7 @@ public class TestUploadDataProvider extends UploadDataProvider {
   // synchronously, or invoke callback asynchronously.
   public enum FailMode { NONE, THROWN, CALLBACK_SYNC, CALLBACK_ASYNC }
 
-  private ArrayList<byte[]> mReads = new ArrayList<byte[]>();
+  private final ArrayList<byte[]> mReads = new ArrayList<byte[]>();
   private final SuccessCallbackMode mSuccessCallbackMode;
   private final Executor mExecutor;
 
@@ -47,8 +47,8 @@ public class TestUploadDataProvider extends UploadDataProvider {
   // Used to ensure there are no read/rewind requests after a failure.
   private boolean mFailed;
 
-  private AtomicBoolean mClosed = new AtomicBoolean(false);
-  private ConditionVariable mAwaitingClose = new ConditionVariable(false);
+  private final AtomicBoolean mClosed = new AtomicBoolean(false);
+  private final ConditionVariable mAwaitingClose = new ConditionVariable(false);
 
   public TestUploadDataProvider(SuccessCallbackMode successCallbackMode, final Executor executor) {
     mSuccessCallbackMode = successCallbackMode;
