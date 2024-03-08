@@ -193,6 +193,9 @@ public:
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
 
 private:
+  // Select the TLS certificate context from customer provider.
+  enum ssl_select_cert_result_t
+  selectTlsContextFromProvider(const SSL_CLIENT_HELLO* ssl_client_hello);
   // Currently, at most one certificate of a given key type may be specified for each exact
   // server name or wildcard domain name.
   using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<TlsContext>>;
