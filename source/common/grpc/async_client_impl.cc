@@ -17,8 +17,9 @@ namespace Grpc {
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::config::core::v3::GrpcService& config,
                                  TimeSource& time_source)
-    : max_recv_message_length_(config.envoy_grpc().max_receive_message_length()), cm_(cm),
-      remote_cluster_name_(config.envoy_grpc().cluster_name()),
+    : max_recv_message_length_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
+      cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
       metadata_parser_(Router::HeaderParser::configure(
           config.initial_metadata(),

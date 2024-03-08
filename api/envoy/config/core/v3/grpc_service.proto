@@ -52,7 +52,7 @@ message GrpcService {
 
     // Maximum receive message length.
     // Defaults to 0, which means unlimited.
-    uint32 max_receive_message_length = 4;
+    google.protobuf.UInt32Value max_receive_message_length = 4;
   }
 
   // [#next-free-field: 9]

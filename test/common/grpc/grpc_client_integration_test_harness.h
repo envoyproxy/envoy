@@ -348,7 +348,8 @@ public:
     envoy::config::core::v3::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("fake_cluster");
     if (envoy_grpc_max_recv_msg_length != 0) {
-      config.mutable_envoy_grpc()->set_max_receive_message_length(envoy_grpc_max_recv_msg_length);
+      config.mutable_envoy_grpc()->mutable_max_receive_message_length()->set_value(
+          envoy_grpc_max_recv_msg_length);
     }
 
     fillServiceWideInitialMetadata(config);
