@@ -136,7 +136,7 @@ message AttributeContext {
     //
     // Also, unlike the
     // :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`
-    // field, headers with the same key are not combined into a single comma seperated header.
+    // field, headers with the same key are not combined into a single comma separated header.
     config.core.v3.HeaderMap header_map = 13
         [(udpa.annotations.field_migrate).oneof_promotion = "headers_type"];
 
