@@ -334,7 +334,8 @@ TEST_F(ExtAuthzHttpClientTest, EncodeRawHeaders) {
   opts.encode_raw_headers = true;
   Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
-                   {Http::Headers::get().Method.get(), std::string{"POST"}}}, opts);
+                   {Http::Headers::get().Method.get(), std::string{"POST"}}},
+                  opts);
 
   EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
   EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
