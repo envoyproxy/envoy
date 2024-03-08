@@ -140,18 +140,17 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::AddBodyFilterConfig& proto_config, const std::string&,
       DualInfo, Server::Configuration::FactoryContext&) override {
-    auto filter_config = std::make_shared<AddBodyFilterConfig>(
-        proto_config.where_to_add_body(), proto_config.body_size(),
-        proto_config.where_to_stop_and_buffer(),
-        proto_config.add_trailers_in_encode_decode_header());
-    return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<AddBodyStreamFilter>(filter_config));
-    };
+    return createFilterFactory(proto_config);
   }
 
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::AddBodyFilterConfig& proto_config, const std::string&,
       DualInfo, Server::Configuration::UpstreamFactoryContext&) override {
+    return createFilterFactory(proto_config);
+  }
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const test::integration::filters::AddBodyFilterConfig& proto_config) {
     auto filter_config = std::make_shared<AddBodyFilterConfig>(
         proto_config.where_to_add_body(), proto_config.body_size(),
         proto_config.where_to_stop_and_buffer(),

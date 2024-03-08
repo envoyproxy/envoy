@@ -13,16 +13,18 @@ absl::StatusOr<Http::FilterFactoryCb>
 HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& config, const std::string&, DualInfo,
     Server::Configuration::FactoryContext&) {
-  auto filter_config = std::make_shared<HeaderMutationConfig>(config);
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));
-  };
+  return createFilterFactory(config);
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
 HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& config, const std::string&, DualInfo,
     Server::Configuration::UpstreamFactoryContext&) {
+  return createFilterFactory(config);
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+HeaderMutationFactoryConfig::createFilterFactory(const ProtoConfig& config) {
   auto filter_config = std::make_shared<HeaderMutationConfig>(config);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));

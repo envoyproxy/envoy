@@ -36,6 +36,10 @@ public:
       const std::string& stats_prefix, DualInfo dual_info,
       Server::Configuration::UpstreamFactoryContext& context) override;
 
+  template <class FactoryCtx>
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(const std::string& stat_prefix,
+                                                            FactoryCtx& factory_context);
+
   Server::Configuration::MatchingRequirementsPtr matchingRequirements() override {
     auto requirements = std::make_unique<
         envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
