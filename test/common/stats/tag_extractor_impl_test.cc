@@ -450,6 +450,25 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   rbac_prefix.name_ = tag_names.RBAC_PREFIX;
   rbac_prefix.value_ = "my_rbac_prefix";
   regex_tester.testRegex("my_rbac_prefix.rbac.allowed", "rbac.allowed", {rbac_prefix});
+
+  Tag rbac_hcm;
+  rbac_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  rbac_hcm.value_ = "rbac_connection_manager";
+
+  Tag rbac_policy_name;
+  rbac_policy_name.name_ = tag_names.RBAC_POLICY_NAME;
+  rbac_policy_name.value_ = "my_rbac_policy";
+  regex_tester.testRegex("http.rbac_connection_manager.rbac.policy.my_rbac_policy.allowed",
+                         "http.rbac.policy.allowed", {rbac_hcm, rbac_policy_name});
+  regex_tester.testRegex("http.rbac_connection_manager.rbac.policy.my_rbac_policy.denied",
+                         "http.rbac.policy.denied", {rbac_hcm, rbac_policy_name});
+  regex_tester.testRegex("http.rbac_connection_manager.rbac.my_rbac_shadow_prefix.policy.my_rbac_"
+                         "policy.shadow_allowed",
+                         "http.rbac.my_rbac_shadow_prefix.policy.shadow_allowed",
+                         {rbac_hcm, rbac_policy_name});
+  regex_tester.testRegex(
+      "http.rbac_connection_manager.rbac.my_rbac_shadow_prefix.policy.my_rbac_policy.shadow_denied",
+      "http.rbac.my_rbac_shadow_prefix.policy.shadow_denied", {rbac_hcm, rbac_policy_name});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
