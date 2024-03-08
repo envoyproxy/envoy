@@ -22,7 +22,7 @@ public class EnvoyConfiguration {
     // Connections where the certificate fails verification will be permitted.
     // For HTTP connections, the result of certificate verification can be used in route matching.
     // Used for testing.
-    ACCEPT_UNTRUSTED;
+    ACCEPT_UNTRUSTED
   }
 
   public final Integer connectTimeoutSeconds;
