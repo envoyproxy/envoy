@@ -128,13 +128,28 @@ struct ThreadStatus {
 class CallbackNotInvokedAfterDeletionTest : public ThreadLocalInstanceImplTest {
 protected:
   CallbackNotInvokedAfterDeletionTest() : slot_(TypedSlot<>::makeUnique(tls_)) {
-    EXPECT_CALL(thread_dispatcher_, post(_)).Times(4).WillRepeatedly(Invoke([&](Event::PostCb cb) {
-      // Holds the posted callback.
-      holder_.push_back(std::move(cb));
-    }));
+    EXPECT_CALL(thread_dispatcher_, post(_))
+        .WillOnce(Invoke([&](Event::PostCb cb) {
+          // Hold callback #1.
+          holder_.push_back(std::move(cb));
+        }))
+        .WillOnce(Invoke([&](Event::PostCb cb) {
+          // Hold callback #2.
+          holder_.push_back(std::move(cb));
+        }))
+        .WillOnce(Invoke([&](Event::PostCb cb) {
+          // Hold callback #3.
+          holder_.push_back(std::move(cb));
+        }))
+        .WillOnce(Invoke([](Event::PostCb cb) {
+          // Do not block this callback - it is called when the slot is released.
+          cb();
+        }));
+    ;
 
     slot_->set([this](Event::Dispatcher&) {
       // Callbacks happen on the main thread but not the workers, so track the total.
+      // This is callback #1 (will be stored in holder_ on thread_dispatcher).
       total_callbacks_++;
       return std::make_shared<ThreadLocalObject>();
     });
@@ -170,10 +185,12 @@ TEST_F(CallbackNotInvokedAfterDeletionTest, WithData) {
   slot_->runOnAllThreads([this](OptRef<ThreadLocalObject> obj) {
     EXPECT_TRUE(obj.has_value());
     // Callbacks happen on the main thread but not the workers, so track the total.
+    // This is callback #2 (will be stored in holder_ on thread_dispatcher).
     total_callbacks_++;
   });
   slot_->runOnAllThreads(
       [this](OptRef<ThreadLocalObject> obj) {
+        // This is callback #3 (will be stored in holder_ on thread_dispatcher).
         EXPECT_TRUE(obj.has_value());
         ++thread_status_.thread_local_calls_;
       },

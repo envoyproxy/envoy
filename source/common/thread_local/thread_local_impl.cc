@@ -10,6 +10,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/stl_helpers.h"
 
+#include "absl/synchronization/blocking_counter.h"
+
 namespace Envoy {
 namespace ThreadLocal {
 
@@ -136,7 +138,8 @@ void InstanceImpl::removeSlot(uint32_t slot) {
              free_slot_indexes_.end(),
          fmt::format("slot index {} already in free slot set!", slot));
   free_slot_indexes_.push_back(slot);
-  runOnAllThreads([slot]() -> void {
+  absl::BlockingCounter counter(registered_threads_.size() + 1);
+  runOnAllThreads([slot, &counter]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
     // will be sequenced after this removal. It is also safe if there are callbacks pending on
@@ -144,7 +147,9 @@ void InstanceImpl::removeSlot(uint32_t slot) {
     if (slot < thread_local_data_.data_.size()) {
       thread_local_data_.data_[slot] = nullptr;
     }
+    counter.DecrementCount();
   });
+  counter.Wait();
 }
 
 void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
