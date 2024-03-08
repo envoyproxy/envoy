@@ -123,7 +123,8 @@ private:
   CountryMappingPtr country_mapping_;
   MaxmindDbPtr initMaxMindDb(const absl::optional<std::string>& db_path);
   CountryMappingPtr initCountryMapping(const absl::optional<std::string>& country_mapping_path);
-  CountryMappingPtr parseCountryMapping(const std::string& file_data, const std::string& file_path);
+  void parseCountryMapping(const std::string& file_data, const std::string& file_path,
+                           const CountryMappingPtr& country_mapping);
   void lookupInCityDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAsnDb(const Network::Address::InstanceConstSharedPtr& remote_address,
