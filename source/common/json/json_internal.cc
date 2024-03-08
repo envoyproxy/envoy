@@ -726,8 +726,8 @@ absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string
   ObjectHandler handler;
   auto json_container = JsonContainer(json.c_str(), &handler);
 
-  nlohmann::json::sax_parse(json_container, &handler, nlohmann::detail::input_format_t::json, true,
-                            ignore_comments);
+  nlohmann::json::sax_parse(json_container, &handler, nlohmann::detail::input_format_t::json,
+                            true /* strict */, ignore_comments /* ignore_comments */);
 
   if (handler.hasParseError()) {
     return absl::InternalError(fmt::format("JSON supplied is not valid. Error({}): {}\n",
