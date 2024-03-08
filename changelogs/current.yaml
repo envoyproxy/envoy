@@ -275,6 +275,9 @@ new_features:
 - area: tracing
   change: |
     Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
+- area: http
+  change: |
+    Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
 - area: tracing
   change: |
     Added support for variant span attribute type for the OpenTelemetry tracer.
