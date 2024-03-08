@@ -1203,6 +1203,7 @@ private:
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
   std::string direct_response_body_;
+  Filesystem::WatcherPtr direct_response_file_watcher_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;

@@ -537,10 +537,26 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
+  Api::Api& api = factory_context.api();
   auto body_or_error = ConfigUtility::parseDirectResponseBody(
-      route, factory_context.api(), vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+      route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
   THROW_IF_STATUS_NOT_OK(body_or_error, throw);
+
   direct_response_body_ = body_or_error.value();
+  if (envoy::config::core::v3::DataSource::SpecifierCase::kFilename ==
+      route.direct_response().body().specifier_case()) {
+    direct_response_file_watcher_ =
+        factory_context.mainThreadDispatcher().createFilesystemWatcher();
+    direct_response_file_watcher_->addWatch(
+        route.direct_response().body().filename(),
+        Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
+        [this, &api, &route](uint32_t) {
+          auto body_or_error = ConfigUtility::parseDirectResponseBody(
+              route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+          THROW_IF_STATUS_NOT_OK(body_or_error, throw);
+          direct_response_body_ = body_or_error.value();
+        });
+  }
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =
         HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
