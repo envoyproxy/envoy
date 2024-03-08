@@ -106,7 +106,20 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+
+  // These are needed for string matcher extensions. It is too painful to pass these objects through
+  // all call chains that construct a `StringMatcherImpl`, so these are singletons.
+  //
+  // They must be cleared before being set to make the multi-envoy integration test pass. Note that
+  // this means that extensions relying on these singletons probably will not function correctly in
+  // some Envoy mobile setups where multiple Envoy engines are used in the same process. The same
+  // caveat also applies to a few other singletons, such as the global regex engine.
+  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
+  InjectableSingleton<ThreadLocal::SlotAllocator>::initialize(&thread_local_);
+  InjectableSingleton<Api::Api>::clear();
+  InjectableSingleton<Api::Api>::initialize(api_.get());
+}
 
 InstanceBase::~InstanceBase() {
   terminate();
@@ -138,6 +151,9 @@ InstanceBase::~InstanceBase() {
     close(tracing_fd_);
   }
 #endif
+
+  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
+  InjectableSingleton<Api::Api>::clear();
 }
 
 Upstream::ClusterManager& InstanceBase::clusterManager() {

@@ -264,6 +264,10 @@ new_features:
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
     Envoy is under pressure, typically memory.
+- area: string matcher
+  change: |
+    Added an :ref:`extension point for custom string matcher implementations <envoy_v3_api_field_type.matcher.v3.StringMatcher.custom>`.
+    An implementation for :ref:`running a Lua script <envoy_v3_api_msg_extensions.string_matcher.lua.v3.Lua>` is included.
 - area: overload
   change: |
     added a :ref:`configuration option
