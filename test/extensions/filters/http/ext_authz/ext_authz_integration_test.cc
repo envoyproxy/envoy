@@ -583,10 +583,22 @@ attributes:
   )EOF";
 };
 
-class ExtAuthzHttpIntegrationTest : public HttpIntegrationTest,
-                                    public TestWithParam<Network::Address::IpVersion> {
+class ExtAuthzHttpIntegrationTest
+    : public HttpIntegrationTest,
+      public TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
-  ExtAuthzHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  ExtAuthzHttpIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  static std::string testParamsToString(
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
+    return fmt::format("{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+                       std::get<1>(p.param) ? "RawHeaders" : "LegacyHeaders");
+  }
+
+  bool encodeRawHeaders() const {
+    return std::get<1>(GetParam());
+  }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -631,11 +643,6 @@ public:
     result = ext_authz_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    // Duplicate headers in the check request should be merged.
-    const auto duplicate =
-        ext_authz_request_->headers().get(Http::LowerCaseString(std::string("x-duplicate")));
-    EXPECT_EQ(1, duplicate.size());
-    EXPECT_EQ("one,two,three", duplicate[0]->value().getStringView());
     EXPECT_EQ("one", ext_authz_request_->headers()
                          .get(Http::LowerCaseString(std::string("allowed-prefix-one")))[0]
                          ->value()
@@ -659,6 +666,30 @@ public:
                           .get(Http::LowerCaseString(std::string("regex-fool")))[0]
                           ->value()
                           .getStringView());
+    if (encodeRawHeaders()) {
+      // Duplicate headers should NOT be merged.
+      const auto duplicate =
+          ext_authz_request_->headers().get(Http::LowerCaseString(std::string("x-duplicate")));
+      EXPECT_EQ(3, duplicate.size());
+      for (const auto& expected_value : { "one", "two", "three" }) {
+        bool found = false;
+        for (size_t i = 0; i < duplicate.size(); i++) {
+          if (duplicate[i]->value().getStringView() == expected_value) {
+            found = true;
+            break;
+          }
+        }
+        EXPECT_TRUE(found)
+            << fmt::format("did not find expected value of 'x-duplicate' header: '{}'",
+                           expected_value);
+      }
+    } else {
+      // Duplicate headers in the check request should be merged.
+      const auto duplicate =
+          ext_authz_request_->headers().get(Http::LowerCaseString(std::string("x-duplicate")));
+      EXPECT_EQ(1, duplicate.size());
+      EXPECT_EQ("one,two,three", duplicate[0]->value().getStringView());
+    }
   }
 
   void sendExtAuthzResponse() {
@@ -703,6 +734,7 @@ public:
       proto_config_.set_failure_mode_allow_header_add(failure_mode_allow);
       proto_config_.mutable_http_service()->mutable_server_uri()->mutable_timeout()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(timeout_ms));
+      proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
@@ -1092,9 +1124,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
   cleanup();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
-                         ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, ExtAuthzHttpIntegrationTest,
+    testing::Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ExtAuthzHttpIntegrationTest::testParamsToString);
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher
 // (uses legacy config for allowed_headers).
