@@ -42,33 +42,33 @@ struct RoleBasedAccessControlFilterStats {
   const Stats::StatName unknown_shadow_policy_allowed_;
   const Stats::StatName unknown_shadow_policy_denied_;
 
-  void add_policy(const std::string& name) {
+  void addPolicy(const std::string& name) {
     stat_name_set_->rememberBuiltin(absl::StrCat(name, ".allowed"));
     stat_name_set_->rememberBuiltin(absl::StrCat(name, ".denied"));
   }
 
-  void add_shadow_policy(const std::string& name) {
+  void addShadowPolicy(const std::string& name) {
     stat_name_set_->rememberBuiltin(absl::StrCat(name, ".shadow_allowed"));
     stat_name_set_->rememberBuiltin(absl::StrCat(name, ".shadow_denied"));
   }
 
-  void inc_policy_allowed(absl::string_view name) {
+  void incPolicyAllowed(absl::string_view name) {
     incCounter(per_policy_stat_,
                stat_name_set_->getBuiltin(absl::StrCat(name, ".allowed"), unknown_policy_allowed_));
   }
 
-  void inc_policy_denied(absl::string_view name) {
+  void incPolicyDenied(absl::string_view name) {
     incCounter(per_policy_stat_,
                stat_name_set_->getBuiltin(absl::StrCat(name, ".denied"), unknown_policy_denied_));
   }
 
-  void inc_policy_shadow_allowed(absl::string_view name) {
+  void incPolicyShadowAllowed(absl::string_view name) {
     incCounter(per_policy_shadow_stat_,
                stat_name_set_->getBuiltin(absl::StrCat(name, ".shadow_allowed"),
                                           unknown_shadow_policy_allowed_));
   }
 
-  void inc_policy_shadow_denied(absl::string_view name) {
+  void incPolicyShadowDenied(absl::string_view name) {
     incCounter(per_policy_shadow_stat_,
                stat_name_set_->getBuiltin(absl::StrCat(name, ".shadow_denied"),
                                           unknown_shadow_policy_denied_));

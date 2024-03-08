@@ -69,11 +69,13 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
                                                   action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
           proto_config, context, validation_visitor, action_validation_visitor_)) {
-  for (const auto& policy : proto_config.rules().policies()) {
-    stats().add_policy(policy.first);
-  }
-  for (const auto& policy : proto_config.shadow_rules().policies()) {
-    stats().add_shadow_policy(policy.first);
+  if (perRuleStatsEnabled()) {
+    for (const auto& policy : proto_config.rules().policies()) {
+      stats().addPolicy(policy.first);
+    }
+    for (const auto& policy : proto_config.shadow_rules().policies()) {
+      stats().addShadowPolicy(policy.first);
+    }
   }
 }
 
@@ -137,14 +139,14 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_allowed_.inc();
       if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
-        config_->stats().inc_policy_shadow_allowed(effective_policy_id);
+        config_->stats().incPolicyShadowAllowed(effective_policy_id);
       }
     } else {
       ENVOY_LOG(debug, "shadow denied, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
       config_->stats().shadow_denied_.inc();
       if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
-        config_->stats().inc_policy_shadow_denied(effective_policy_id);
+        config_->stats().incPolicyShadowDenied(effective_policy_id);
       }
       shadow_resp_code =
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
@@ -171,7 +173,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();
       if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
-        config_->stats().inc_policy_allowed(effective_policy_id);
+        config_->stats().incPolicyAllowed(effective_policy_id);
       }
       return Http::FilterHeadersStatus::Continue;
     } else {
@@ -181,7 +183,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
                                  Filters::Common::RBAC::responseDetail(log_policy_id));
       config_->stats().denied_.inc();
       if (!effective_policy_id.empty() && config_->perRuleStatsEnabled()) {
-        config_->stats().inc_policy_denied(effective_policy_id);
+        config_->stats().incPolicyDenied(effective_policy_id);
       }
       return Http::FilterHeadersStatus::StopIteration;
     }
