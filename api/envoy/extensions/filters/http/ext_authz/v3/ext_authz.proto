@@ -216,7 +216,8 @@ message ExtAuthz {
   // Defaults to true.
   google.protobuf.BoolValue charge_cluster_response_stats = 20;
 
-  // Whether to encode the raw headers (i.e. unsanitized, not inlined) in authentication request.
+  // Whether to encode the raw headers (i.e. unsanitized values & unconcatenated multi-line headers)
+  // in authentication request.
   //
   // The string data type cannot contain non-UTF-8-compliant data or it will create an error when
   // decoding. Thus, if this field is false, header values will be sanitized, and any non-UTF-8-
