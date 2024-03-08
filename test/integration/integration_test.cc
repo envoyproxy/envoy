@@ -2409,6 +2409,103 @@ TEST_P(IntegrationTest, RandomPreconnect) {
   }
 }
 
+/*
+This test ensure that the feature flag: envoy.restart_features.ensure_connection_retry
+enables retries on connection timeouts even if the buffer limit has been reached.
+Also check that the router pause the reading on the downstream connection when the buffer limit was
+reached.
+*/
+TEST_P(IntegrationTest, EnsureConnectionRetry) {
+  // Set buffer limits per requests
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0)->mutable_per_request_buffer_limit_bytes();
+        route->set_value(64);
+      });
+  // increase the base backoff to ensure we have time to see the connection failure and start
+  // the new upstream before the retry.
+  config_helper_.addRuntimeOverride("upstream.base_retry_backoff_ms", "200");
+  // enable feature flags envoy.restart_features.ensure_connection_retry
+  config_helper_.addRuntimeOverride("envoy.restart_features.ensure_connection_retry", "true");
+
+  // start Envoy and close the socket of the upstream
+  initialize();
+  Network::Address::InstanceConstSharedPtr upstream_address = fake_upstreams_[0]->localAddress();
+  fake_upstreams_[0]->closeSocket();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "connect-failure"},
+                                     {"x-envoy-max-retries", "5"}});
+
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+  // Send more data than the buffer limit, and not end-stream
+  codec_client_->sendData(encoder, 128, false);
+
+  // waiting to have at least one connection failure
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 0);
+
+  createUpstream(upstream_address, upstreamConfig());
+
+  // send more data end end-stream
+  codec_client_->sendData(encoder, 32, true);
+  // the connection should have retry and succeed to the new upstream, cancelling retry and shadow
+  test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  // server got data
+  EXPECT_EQ(160U, upstream_request_->bodyLength());
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// same test has above but without the feature
+TEST_P(IntegrationTest, BufferOverflowConnectionRetry) {
+  // Set buffer limits upstream and downstream.
+  config_helper_.setBufferLimits(64, 64);
+  // increase the base backoff to ensure we have time to see the connection failure and start
+  // the new upstream before the retry.
+  config_helper_.addRuntimeOverride("upstream.base_retry_backoff_ms", "200");
+
+  initialize();
+  fake_upstreams_[0]->closeSocket();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "connect-failure"},
+                                     {"x-envoy-max-retries", "1"}});
+
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+  // Send more data than the buffer limit, and not end-stream
+  codec_client_->sendData(encoder, 128, false);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_fail", 1);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("503"));
+}
+
 class TestRetryOptionsPredicateFactory : public Upstream::RetryOptionsPredicateFactory {
 public:
   Upstream::RetryOptionsPredicateConstSharedPtr

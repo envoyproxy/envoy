@@ -45,7 +45,7 @@ public:
           .WillByDefault(Return(true));
     }
     if (retry_connection_failure) {
-      ON_CALL(*retry_state_, retryOnConnectionFailure()).WillByDefault(Return(true));
+      ON_CALL(*retry_state_, shouldRetryOnConnectionFailure()).WillByDefault(Return(true));
     }
     return RetryStatePtr{retry_state_};
   }

@@ -746,9 +746,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
-  if (retry_state_ && retry_state_->retryOnConnectionFailure()) {
+  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() &&
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.ensure_connection_retry")) {
     upstream_request->addUpstreamCallbacks(*this);
-    wait_for_connect_ = 1;
+    wait_for_connect_ = true;
   }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
@@ -841,17 +842,32 @@ void Filter::sendNoHealthyUpstreamResponse() {
                              StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
-void Filter::onUpstreamConnectionEstablished() {
-  wait_for_connect_ = 0;
-  if (high_watermark_enable_) {
-    // disabling retry and shadow: the requests is to big
-    cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
-    retry_state_.reset();
-    active_shadow_policies_.clear();
-    request_buffer_overflowed_ = true;
-    high_watermark_enable_ = false;
-    // read again from downstream
+void Filter::giveUpRetryAndShadow(bool drain_buffer) {
+  cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
+  retry_state_.reset();
+  active_shadow_policies_.clear();
+  if (buffer_limit_exceeded_no_connection_) {
     callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+  }
+  request_buffer_overflowed_ = true;
+  buffer_limit_exceeded_no_connection_ = false;
+  if (drain_buffer) {
+    // we previously went over the buffer limit, which pause the read on the downstream connection.
+    // draining the buffer so we enable read on the downstream connection;
+    // the buffer size will go bellow
+    // this buffer is only used to send the body when retrying and shadowing which has been disable
+    // above.
+    callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
+  }
+}
+
+void Filter::onUpstreamConnectionEstablished() {
+  wait_for_connect_ = false;
+  ENVOY_LOG(trace, "Got connection with upstream");
+  if (buffer_limit_exceeded_no_connection_) {
+    ENVOY_LOG(debug, "Giving up on retry and shadow and enabling read on downstream connection");
+    // disabling retry and shadow: the requests is to big
+    giveUpRetryAndShadow(true);
   }
 }
 
@@ -866,13 +882,19 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   bool buffering = (retry_state_ && retry_state_->enabled()) ||
                    (!active_shadow_policies_.empty() && !streaming_shadows_) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
-  if (buffering && !high_watermark_enable_ &&
+  if (buffering && !buffer_limit_exceeded_no_connection_ &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     if (wait_for_connect_) {
-      ENVOY_LOG(debug, "going over buffer limit {} due to wait on connect. buffer limit: {}",
+      // we are still waiting for a connection, going over the buffer limit which will pause the
+      // read on the downstream connection
+      ENVOY_LOG(debug,
+                "Going over buffer limit {} due to wait on connect. buffer size: {}."
+                "This will pause read on downstream connection.",
                 retry_shadow_buffer_limit_,
                 getLength(callbacks_->decodingBuffer()) + data.length());
-      high_watermark_enable_ = 1;
+      buffer_limit_exceeded_no_connection_ = true;
+      // ensure we stop on reading, the buffer limit might be greater than
+      // retry_shadow_buffer_limit_ due to an override per route of the retry_shadow_buffer limit
       callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     } else {
       ENVOY_LOG(
@@ -880,11 +902,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
           "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
           "up on the retry/shadow.",
           getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
-      cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
-      retry_state_.reset();
       buffering = false;
-      active_shadow_policies_.clear();
-      request_buffer_overflowed_ = true;
+      // give up retrying but do not drain the buffer
+      // it can happen that the buffer has never been initialized
+      giveUpRetryAndShadow(false);
 
       // If we had to abandon buffering and there's no request in progress, abort the request and
       // clean up. This happens if the initial upstream request failed, and we are currently waiting
@@ -1391,6 +1412,12 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   // don't return anything downstream.
   if (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0) {
     return;
+  }
+
+  // we never got a connection and pause the read on downstream
+  // we probably did not retry because we reached the maximum allowed number of retries
+  if (buffer_limit_exceeded_no_connection_) {
+    giveUpRetryAndShadow(true);
   }
 
   const StreamInfo::CoreResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
@@ -2003,7 +2030,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   }
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
-  if (retry_state_ && retry_state_->retryOnConnectionFailure()) {
+  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() && wait_for_connect_) {
     upstream_request->addUpstreamCallbacks(*this);
   }
 

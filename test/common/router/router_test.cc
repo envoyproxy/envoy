@@ -2881,6 +2881,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts, and wait to get a new connection.
 TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.ensure_connection_retry", "true"}});
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
@@ -2930,19 +2932,16 @@ TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
 
-  // router_->retry_state_->expectResetRetry();
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  // Complete request while there is no upstream request.
-
-  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{remote_reset}");
+  // verify number of retries and metrics
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("retry_or_shadow_abandoned")
                     .value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
   EXPECT_EQ(router_->attemptCount(), 2);
-
-  router_->onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
 // Two requests are sent (slow request + hedged retry) and then global timeout
