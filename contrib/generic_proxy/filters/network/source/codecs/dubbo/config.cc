@@ -56,7 +56,7 @@ void DubboRequest::set(absl::string_view key, absl::string_view val) {
 }
 
 void DubboRequest::erase(absl::string_view key) {
-  inner_metadata_->request().content().removeAttachment(key);
+  inner_metadata_->request().content().delAttachment(key);
 }
 
 void DubboResponse::refreshStatus() {

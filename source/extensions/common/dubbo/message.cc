@@ -61,16 +61,6 @@ const ArgumentVec& RequestContent::arguments() {
   return argvs_;
 }
 
-const Hessian2::Object* RequestContent::getArgument(size_t index) {
-  lazyDecode();
-
-  if (index >= argvs_.size()) {
-    return nullptr;
-  }
-
-  return argvs_[index].get();
-}
-
 const Attachments& RequestContent::attachments() {
   lazyDecode();
 
@@ -84,7 +74,7 @@ void RequestContent::setAttachment(absl::string_view key, absl::string_view val)
   attachs_[key] = val;
 }
 
-void RequestContent::removeAttachment(absl::string_view key) {
+void RequestContent::delAttachment(absl::string_view key) {
   lazyDecode();
 
   updated_ = true;
@@ -318,7 +308,7 @@ void ResponseContent::setAttachment(absl::string_view key, absl::string_view val
   attachs_[key] = val;
 }
 
-void ResponseContent::removeAttachment(absl::string_view key) {
+void ResponseContent::delAttachment(absl::string_view key) {
   lazyDecode();
 
   updated_ = true;

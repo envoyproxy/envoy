@@ -109,10 +109,6 @@ public:
   // Get all the arguments of the request.
   const ArgumentVec& arguments();
 
-  // Get the argument at the given index. The index is 0-based and should be less than
-  // the number of arguments. If the index is out of range, nullptr will be returned.
-  const Hessian2::Object* getArgument(size_t index);
-
   // Get all the attachments of the request.
   const Attachments& attachments();
 
@@ -121,7 +117,7 @@ public:
   void setAttachment(absl::string_view key, absl::string_view val);
 
   // Remove the attachment with the given key.
-  void removeAttachment(absl::string_view key);
+  void delAttachment(absl::string_view key);
 
 private:
   // Decode the content buffer into types, arguments and attachments. The decoding is
@@ -211,7 +207,7 @@ public:
   void setAttachment(absl::string_view key, absl::string_view val);
 
   // Remove the attachment with the given key.
-  void removeAttachment(absl::string_view key);
+  void delAttachment(absl::string_view key);
 
 private:
   // Decode the content buffer into value and attachments. The decoding is lazy and will

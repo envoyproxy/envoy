@@ -36,9 +36,6 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
     // Try get the argument vector.
     EXPECT_EQ(request.content().arguments().size(), 0);
 
-    // Try get the argument at index 0.
-    EXPECT_EQ(request.content().getArgument(0), nullptr);
-
     // Try get the attachment group.
     EXPECT_FALSE(request.content().attachments().contains("group"));
 
@@ -85,9 +82,6 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
     // Try get the argument vector.
     EXPECT_EQ(request.content().arguments().size(), 0);
 
-    // Try get the argument at index 0.
-    EXPECT_EQ(request.content().getArgument(0), nullptr);
-
     // Try get the attachment group.
     EXPECT_EQ("group", request.content().attachments().at("group"));
 
@@ -113,7 +107,7 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
                   'Z'                                // Attachments end
               }));
 
-    request.content().removeAttachment("group");
+    request.content().delAttachment("group");
 
     // buffer() call will re-encode the attachments into the content buffer.
     EXPECT_EQ(request.content().buffer().toString(),
@@ -137,7 +131,27 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
     // Initialize the request with the broken buffer.
     request.content().initialize(buffer, buffer.length());
 
-    EXPECT_EQ(nullptr, request.content().getArgument(0));
+    EXPECT_EQ(0, request.content().arguments().size());
+
+    // The content is broken, so the content will be reset to an empty state:
+    // empty types, empty arguments, empty attachments.
+    EXPECT_EQ(request.content().buffer().toString(), std::string({0x0, 'H', 'Z'}));
+  }
+
+  // Broken buffer where -2 is used to tell the arguments number. This is
+  // unexpected number.
+  {
+    RpcRequest request("a", "b", "c", "d");
+    Buffer::OwnedImpl buffer(std::string({
+        '\x8e', // -2 is unexpected
+        'H',
+        'Z',
+    }));
+
+    // Initialize the request with the broken buffer.
+    request.content().initialize(buffer, buffer.length());
+
+    EXPECT_EQ(0, request.content().arguments().size());
 
     // The content is broken, so the content will be reset to an empty state:
     // empty types, empty arguments, empty attachments.
@@ -257,6 +271,8 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
         'H',                          // Attachments start
         0x5, 'g', 'r', 'o', 'u', 'p', // Key
         0x5, 'g', 'r', 'o', 'u', 'p', // Value
+        'T',                          // Key
+        'F',                          // Value
         'Z'                           // Attachments end
     }));
 
@@ -273,6 +289,9 @@ TEST(RpcRequestTest, InitializeWithBufferTest) {
     EXPECT_EQ(true, args[0]->toBoolean().value().get());
     // The second argument is false.
     EXPECT_EQ(false, args[1]->toBoolean().value().get());
+
+    // Only string key and value are used.
+    EXPECT_EQ(1, request.content().attachments().size());
 
     // Get the attachment group.
     EXPECT_EQ("group", request.content().attachments().at("group"));
@@ -471,7 +490,7 @@ TEST(RpcResponseTest, InitializeWithBufferTest) {
                                                       }));
 
     // Remove the attachment.
-    response.content().removeAttachment("group");
+    response.content().delAttachment("group");
 
     // buffer() call will re-encode the attachments into the content buffer.
     EXPECT_EQ(response.content().buffer().toString(), std::string({
@@ -490,6 +509,8 @@ TEST(RpcResponseTest, InitializeWithBufferTest) {
         'H',                          // Attachments start
         0x5, 'g', 'r', 'o', 'u', 'p', // Key
         0x5, 'g', 'r', 'o', 'u', 'p', // Value
+        'T',                          // Key
+        'F',                          // Value
         'Z'                           // Attachments end
     }));
 
@@ -501,6 +522,9 @@ TEST(RpcResponseTest, InitializeWithBufferTest) {
 
     // The result is a boolean.
     EXPECT_EQ(true, result->toBoolean().value().get());
+
+    // Only string key and value are used.
+    EXPECT_EQ(1, response.content().attachments().size());
 
     // Get the attachment group.
     EXPECT_EQ("group", response.content().attachments().at("group"));
