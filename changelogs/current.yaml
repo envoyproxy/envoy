@@ -144,6 +144,10 @@ bug_fixes:
 - area: tracing
   change: |
     Dynatrace resource detector: Only log warning message when no enrichment attributes are found.
+- area: oauth
+  change: |
+    When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as 
+    another Cookie header
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
