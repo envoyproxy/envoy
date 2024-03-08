@@ -615,7 +615,7 @@ private:
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionNoMmsgTests, EnvoyQuicClientSessionNoMmsgTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
-TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgNotAllowed) {
+TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) {
   // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
   envoy_quic_session_->connect();
 
