@@ -206,6 +206,12 @@ TagNameValues::TagNameValues() {
   // connection_limit.(<stat_prefix>.)*
   addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
 
+  // http.[<stat_prefix>.]rbac.[<optional stat_prefix>]policy.(<policy
+  // name>.).(allowed|shadow_allowed|denied|shadow_denied)
+  addRe2(
+      RBAC_POLICY_NAME,
+      R"(^http\.<TAG_VALUE>\.rbac\.(?:<TAG_VALUE>\.)?policy\.((<TAG_VALUE>)\.)(allowed|shadow_allowed|denied|shadow_denied)$)");
+
   // (<stat_prefix>.).rbac.**
   addTokenized(RBAC_PREFIX, "$.rbac.**");
 
