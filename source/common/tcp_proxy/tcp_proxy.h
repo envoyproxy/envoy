@@ -502,7 +502,11 @@ public:
           ->info();
     }
     uint64_t streamId() const override {
-      return parent_->getStreamInfo().getStreamIdProvider()->toInteger().value();
+      auto sip = parent_->getStreamInfo().getStreamIdProvider();
+      if (sip) {
+        return sip->toInteger().value();
+      }
+      return 0;
     }
     Tracing::Span& activeSpan() override { return parent_->active_span_; }
     OptRef<const Tracing::Config> tracingConfig() const override {
