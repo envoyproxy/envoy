@@ -99,6 +99,8 @@ providers:
       claim_name: "nested.nested-2.key-4"
     - header_name: "x-jwt-claim-object-key"
       claim_name: "nested.nested-2.key-5"
+    - header_name: "x-jwt-chinese-claim"
+      claim_name: "nested.nested-2.key-6"
 rules:
 - match:
     path: "/"
@@ -312,7 +314,8 @@ const char OtherGoodToken[] =
 //      "key-2": "value2",
 //      "key-3": true,
 //      "key-4": 9999,
-//      "key-5": ["str1", "str2"]
+//      "key-5": ["str1", "str2"],
+//      "key-6": "中文"
 //  }
 // }
 //}
@@ -320,12 +323,12 @@ const char NestedGoodToken[] =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImF1ZCI6ImV4YW1wbGVfc2"
     "VydmljZSIsImV4cCI6MjAwMTAwMTAwMSwibmVzdGVkIjp7ImtleS0xIjoidmFsdWUxIiwibmVzdGVkLTIiOnsia2V5LTIi"
-    "OiJ2YWx1ZTIiLCJrZXktMyI6dHJ1ZSwia2V5LTQiOjk5OTksImtleS01IjpbInN0cjEiLCJzdHIyIl19fX0."
-    "uCXNQUSualacToI0gyXz5NStad2aNBfZHiLB5mTddy-uV8Dxsa8U81NwDHGlvNksmMTodBwIeEYJ0ISkl03kKN_"
-    "VepiEpNNWJNpgOcdTqAE9-aGip-kGWZAavJS6r3fystUGIjXyI9EKNEqeUFCihpiII-"
-    "MTbcqdaSzwdbJPeGQzHyensPG6BfDjdv39b_gdO_eH1azaVwi4HnChoJcsGrBjsH6-IyJVR6Ux_"
-    "43fo3Wbs0SB82hLpiWPsucO7l4CyII5d5jPQbAM9ajcvAmh7FprIsf35acOT2bQ8dmrSD9KSjsYomkF_OAci-"
-    "osyRzYOgkGHIDGDyjj87xaPPuzIw";
+    "OiJ2YWx1ZTIiLCJrZXktMyI6dHJ1ZSwia2V5LTQiOjk5OTksImtleS01IjpbInN0cjEiLCJzdHIyIl0sImtleS02Ijoi5L"
+    "it5paHIn19fQ.cRNCcZ3QbrF9i_dbFLyXJl0uJtYU7Jouel0LHjY_iuX-IomA_"
+    "1WyZTVWaL0OpF7KTMw331PsNuCfzJsXtnD0cA4ajtQuT4hcV75q9Vi4XkL-2_kMe1WDS-"
+    "UxQYj6ohd6A5nQqrpbsU867S3f1BqH4pOteedN9DbGQfPPC-tSZf12z_p94cQktuXwx-"
+    "FzKTyGKkvflrUQ4T2in7JGsUObMOXMoR2khbTf57KkpRFrHImKXoNLEDgtI2ygQd82hPM0pBcWDu2PsHQrb8Qu-"
+    "SNER1JmU9cQbw_aeJQkm5HvkDMRgPAy-gYwYWkkCts1jQHFHBAuIeoYVEa3HkZUIN9lcQ";
 
 // Expected base64 payload value.
 const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"

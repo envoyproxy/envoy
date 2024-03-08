@@ -157,6 +157,8 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
   EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
   EXPECT_EQ(headers.get_("x-jwt-bool-claim"), "true");
   EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
+  EXPECT_EQ(headers.get_("x-jwt-chinese-claim"),
+            Http::Utility::PercentEncoding::urlEncodeQueryParameter("中文"));
 
   // This check verifies whether the claim with non-primitive type are
   // successfully serialized and added to headers.

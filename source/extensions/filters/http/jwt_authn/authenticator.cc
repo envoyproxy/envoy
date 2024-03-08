@@ -87,7 +87,7 @@ private:
   // finds one to verify with key.
   void startVerify();
 
-  // Copy the JWT Claim to HTTP Header. Returns true iff header is added.
+  // Copy the JWT Claim to HTTP Header. Returns true if header is added.
   bool addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
 
   // The jwks cache object.
@@ -319,7 +319,10 @@ bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
   if (status == StructUtils::OK) {
     switch (claim_value->kind_case()) {
     case Envoy::ProtobufWkt::Value::kStringValue:
-      str_claim_value = claim_value->string_value();
+      // maybe the string value has non-ascii characters
+      // so we should urlEncode it
+      str_claim_value =
+          Http::Utility::PercentEncoding::urlEncodeQueryParameter(claim_value->string_value());
       break;
     case Envoy::ProtobufWkt::Value::kNumberValue:
       str_claim_value = convertClaimDoubleToString(claim_value->number_value());
