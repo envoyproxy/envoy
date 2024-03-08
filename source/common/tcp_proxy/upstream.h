@@ -101,7 +101,7 @@ public:
     virtual void onSuccess(Http::RequestEncoder* request_encoder) {
       ASSERT(conn_pool_ != nullptr);
       if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+              "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
         ASSERT(request_encoder != nullptr);
         conn_pool_->onGenericPoolReady(host_, request_encoder->getStream().connectionInfoProvider(),
                                        ssl_info_);
@@ -145,7 +145,6 @@ private:
   std::unique_ptr<CombinedUpstream> combined_upstream_;
   StreamInfo::StreamInfo& downstream_info_;
   std::unique_ptr<Router::GenericConnPool> generic_conn_pool_;
-  std::shared_ptr<Http::NullRouteImpl> route_;
 };
 
 class TcpUpstream : public GenericUpstream {

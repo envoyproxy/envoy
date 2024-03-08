@@ -60,7 +60,7 @@ inline Config constructConfigFromYaml(const std::string& yaml,
 class TcpProxyTestBase : public testing::TestWithParam<bool> {
 public:
   TcpProxyTestBase() {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.upstream_http_filters_with_tcp_proxy",
+    scoped_runtime_.mergeValues({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
                                   GetParam() ? "true" : "false"}});
     ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));

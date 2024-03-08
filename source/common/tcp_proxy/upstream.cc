@@ -277,11 +277,7 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
                            Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), decoder_filter_callbacks_(&stream_decoder_callbacks),
-      upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info),
-      route_(std::make_shared<Http::NullRouteImpl>(
-          thread_local_cluster.info()->name(),
-          *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()})) {
-  // config.serverFactoryContext().singletonManager())) {
+      upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
@@ -289,9 +285,8 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
     protocol = Http::Protocol::Http2;
   }
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+          "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     absl::optional<Envoy::Http::Protocol> upstream_protocol = protocol;
-    generic_conn_pool_ = nullptr;
     generic_conn_pool_ = createConnPool(thread_local_cluster, context, upstream_protocol);
     return;
   }
@@ -307,13 +302,12 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
   factory = Envoy::Config::Utility::getFactoryByName<Router::GenericConnPoolFactory>(
       "envoy.filters.connection_pools.http.generic");
   if (!factory) {
-    return nullptr;
+    throw EnvoyException("No generic connection pool factory found");
   }
 
   return factory->createGenericConnPool(
-      cluster,
-      Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP /*should_tcp_proxy*/ /*,*/,
-      route_->route_entry_.priority(), protocol, context);
+      cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context);
 }
 
 HttpConnPool::~HttpConnPool() {
@@ -330,7 +324,7 @@ HttpConnPool::~HttpConnPool() {
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+          "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     combined_upstream_ = std::make_unique<CombinedUpstream>(
         *this, upstream_callbacks_, *decoder_filter_callbacks_, config_, downstream_info_);
     RouterUpstreamRequestPtr upstream_request = std::make_unique<RouterUpstreamRequest>(
@@ -390,7 +384,7 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
                                       const Network::ConnectionInfoProvider& address_provider,
                                       Ssl::ConnectionInfoConstSharedPtr ssl_info) {
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+          "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
 
     callbacks_->onGenericPoolReady(nullptr, std::move(combined_upstream_), host, address_provider,
                                    ssl_info);

@@ -27,7 +27,7 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value);
 constexpr absl::string_view defer_processing_backedup_streams =
     "envoy.reloadable_features.defer_processing_backedup_streams";
 constexpr absl::string_view upstream_http_filters_with_tcp_proxy =
-    "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy";
+    "envoy.restart_features.upstream_http_filters_with_tcp_proxy";
 
 } // namespace Runtime
 } // namespace Envoy

@@ -174,8 +174,6 @@ public:
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
-
-  uint64_t streamId() const override { return stream_id_; }
   Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_factory_context_;
   }
@@ -189,7 +187,6 @@ private:
   std::string post_path_;
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
-  uint64_t stream_id_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
 };
 
@@ -505,7 +502,7 @@ public:
           ->info();
     }
     uint64_t streamId() const override {
-      return parent_->config_->tunnelingConfigHelper()->streamId();
+      return parent_->getStreamInfo().getStreamIdProvider()->toInteger().value();
     }
     Tracing::Span& activeSpan() override { return parent_->active_span_; }
     OptRef<const Tracing::Config> tracingConfig() const override {

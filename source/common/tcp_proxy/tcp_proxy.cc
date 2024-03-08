@@ -559,9 +559,13 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   if (!factory) {
     return false;
   }
-  upstream_decoder_filter_callbacks_.route_ = std::make_shared<Http::NullRouteImpl>(
-      cluster.info()->name(),
-      *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()});
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
+    // TODO(vikaschoudhary16): Initialize route_ once per cluster.
+    upstream_decoder_filter_callbacks_.route_ = std::make_shared<Http::NullRouteImpl>(
+        cluster.info()->name(),
+        *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()});
+  }
   generic_conn_pool_ = factory->createGenericConnPool(
       cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
       upstream_decoder_filter_callbacks_, getStreamInfo());
@@ -581,7 +585,7 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   absl::string_view failure_reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+          "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     // generic_conn_pool_ is an instance of TcpProxy::HttpConnPool.
     // generic_conn_pool_->newStream() is called in maybeTunnel() which initializes an instance of
     // Router::UpstreamRequest. If Router::UpstreamRequest receives headers from the upstream which
@@ -690,6 +694,8 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
       post_path_(config_message.tunneling_config().post_path()),
       route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
+      // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
+      // not required by tcp_proxy and move them to a different class
       router_config_(route_stat_name_storage_.statName(),
                      context.serverFactoryContext().localInfo(), stats_scope,
                      context.serverFactoryContext().clusterManager(),
@@ -701,7 +707,6 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                      context.serverFactoryContext().api().timeSource(),
                      context.serverFactoryContext().httpContext(),
                      context.serverFactoryContext().routerContext()),
-      stream_id_(context.serverFactoryContext().api().randomGenerator().random()),
       server_factory_context_(context.serverFactoryContext()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");
@@ -855,7 +860,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.upstream_http_filters_with_tcp_proxy")) {
+            "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
     } else {
       upstream_.reset();

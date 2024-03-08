@@ -70,7 +70,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_send_early_data, bool can_use_http3, bool enable_tcp_tunneling);
+                  bool can_send_early_data, bool can_use_http3, bool enable_half_close);
   ~UpstreamRequest() override;
   void deleteIsPending() override { cleanUp(); }
 

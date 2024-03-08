@@ -909,8 +909,6 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
     if (end_stream && !filter_manager_callbacks_.isHalfCloseEnabled()) {
       ASSERT(!state_.local_complete_);
       state_.local_complete_ = true;
-    } else {
-      state_.local_complete_ = false;
     }
     return encoder_filters_.begin();
   }
