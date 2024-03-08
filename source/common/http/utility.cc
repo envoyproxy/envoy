@@ -1381,9 +1381,30 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
       Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
 
   // set all the other fields with appropriate values.
-  route_retry_policy.set_retry_on(retry_on);
+  if (!retry_on.empty()) {
+    route_retry_policy.set_retry_on(retry_on);
+  } else {
+    route_retry_policy.set_retry_on(retry_policy.retry_on());
+  }
   route_retry_policy.mutable_per_try_timeout()->CopyFrom(
       route_retry_policy.retry_back_off().max_interval());
+
+  if (retry_policy.has_retry_priority()) {
+    route_retry_policy.mutable_retry_priority()->set_name(retry_policy.retry_priority().name());
+    route_retry_policy.mutable_retry_priority()->mutable_typed_config()->MergeFrom(
+        retry_policy.retry_priority().typed_config());
+  }
+
+  if (!retry_policy.retry_host_predicate().empty()) {
+    for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
+      auto* route_host_predicate = route_retry_policy.mutable_retry_host_predicate()->Add();
+      route_host_predicate->set_name(host_predicate.name());
+      route_host_predicate->mutable_typed_config()->MergeFrom(host_predicate.typed_config());
+    }
+  }
+
+  route_retry_policy.set_host_selection_retry_max_attempts(
+      retry_policy.host_selection_retry_max_attempts());
 
   return route_retry_policy;
 }

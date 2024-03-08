@@ -2,7 +2,6 @@
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/tls/cert_validator/default_validator.h"
@@ -16,6 +15,7 @@
 #include "test/common/tls/test_data/san_dns2_cert_info.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/thread/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -32,6 +32,7 @@ using SSLContextPtr = Envoy::CSmartPtr<SSL_CTX, SSL_CTX_free>;
 using envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext;
 
 using testing::_;
+using testing::ByMove;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -63,11 +64,12 @@ class PlatformBridgeCertValidatorTest
     : public testing::TestWithParam<CertificateValidationContext::TrustChainVerification> {
 protected:
   PlatformBridgeCertValidatorTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
+      : thread_factory_(Thread::PosixThreadFactory::create()), api_(Api::createApiForTest()),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         stats_(generateSslStats(*test_store_.rootScope())), ssl_ctx_(SSL_CTX_new(TLS_method())),
         callback_(std::make_unique<MockValidateResultCallback>()), is_server_(false),
         mock_validator_(std::make_unique<MockValidator>()),
-        main_thread_id_(std::this_thread::get_id()),
+        main_thread_id_(thread_factory_->currentPthreadId()),
         helper_handle_(test::SystemHelperPeer::replaceSystemHelper()) {
     ON_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _))
         .WillByDefault(WithArgs<0, 1>(Invoke(this, &PlatformBridgeCertValidatorTest::validate)));
@@ -86,7 +88,7 @@ protected:
 
   ~PlatformBridgeCertValidatorTest() {
     mock_validator_.reset();
-    main_thread_id_ = std::thread::id();
+    main_thread_id_ = thread_factory_->currentPthreadId();
     Envoy::Assert::resetEnvoyBugCountersForTest();
   }
 
@@ -104,7 +106,7 @@ protected:
   envoy_cert_validation_result validate(const std::vector<std::string>& certs,
                                         absl::string_view hostname) {
     // Validate must be called on the worker thread, not the main thread.
-    EXPECT_NE(main_thread_id_, std::this_thread::get_id());
+    EXPECT_NE(main_thread_id_, thread_factory_->currentPthreadId());
 
     // Make sure the cert was converted correctly.
     const Buffer::InstancePtr buffer(new Buffer::OwnedImpl(certs[0]));
@@ -115,10 +117,11 @@ protected:
 
   void cleanup() {
     // Validate must be called on the worker thread, not the main thread.
-    EXPECT_NE(main_thread_id_, std::this_thread::get_id());
+    EXPECT_NE(main_thread_id_, thread_factory_->currentPthreadId());
     mock_validator_->cleanup();
   }
 
+  Thread::PosixThreadFactoryPtr thread_factory_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Stats::TestUtil::TestStore test_store_;
@@ -131,7 +134,7 @@ protected:
   std::unique_ptr<MockValidateResultCallback> callback_;
   bool is_server_;
   std::unique_ptr<MockValidator> mock_validator_;
-  std::thread::id main_thread_id_;
+  Thread::ThreadId main_thread_id_;
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
 };
 
@@ -222,7 +225,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
       .WillOnce(Invoke([this]() {
-        EXPECT_EQ(main_thread_id_, std::this_thread::get_id());
+        EXPECT_EQ(main_thread_id_, thread_factory_->currentPthreadId());
         dispatcher_->exit();
       }));
   EXPECT_FALSE(waitForDispatcherToExit());
@@ -257,7 +260,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySanOverrides) {
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
       .WillOnce(Invoke([this]() {
-        EXPECT_EQ(main_thread_id_, std::this_thread::get_id());
+        EXPECT_EQ(main_thread_id_, thread_factory_->currentPthreadId());
         dispatcher_->exit();
       }));
   EXPECT_FALSE(waitForDispatcherToExit());
@@ -292,7 +295,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptyHostNoOverrides) {
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
       .WillOnce(Invoke([this]() {
-        EXPECT_EQ(main_thread_id_, std::this_thread::get_id());
+        EXPECT_EQ(main_thread_id_, thread_factory_->currentPthreadId());
         dispatcher_->exit();
       }));
   EXPECT_FALSE(waitForDispatcherToExit());
@@ -387,6 +390,26 @@ TEST_P(PlatformBridgeCertValidatorTest, DeletedWithValidationPending) {
   // Since the validator was deleted, the callback should not be invoked and
   // so the dispatcher will not exit until the alarm fires.
   EXPECT_TRUE(waitForDispatcherToExit());
+}
+
+TEST_P(PlatformBridgeCertValidatorTest, ThreadCreationFailed) {
+  initializeConfig();
+  auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
+  EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
+  PlatformBridgeCertValidator validator(&config_, stats_, std::move(thread_factory));
+
+  std::string hostname = "server1.example.com";
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns2_cert.pem"));
+  auto& callback_ref = *callback_;
+  EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+
+  ValidationResults results =
+      validator.doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
+                                  *ssl_ctx_, validation_context_, is_server_, hostname);
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
+  EXPECT_EQ(Ssl::ClientValidationStatus::NotValidated, results.detailed_status);
+  EXPECT_EQ("Failed creating a thread for cert chain validation.", *results.error_details);
 }
 
 } // namespace Tls

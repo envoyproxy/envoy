@@ -480,6 +480,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.filters.http.lua",
             "envoy.router.cluster_specifier_plugin.lua",
+            "envoy.string_matcher.lua",
         ],
         cpe = "cpe:2.3:a:luajit:luajit:*",
         license = "MIT",

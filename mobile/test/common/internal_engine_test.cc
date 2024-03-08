@@ -4,6 +4,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/mocks/thread/mocks.h"
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
@@ -17,6 +18,7 @@
 namespace Envoy {
 
 using testing::_;
+using testing::ByMove;
 using testing::HasSubstr;
 using testing::Return;
 using testing::ReturnRef;
@@ -114,8 +116,6 @@ struct EngineTestContext {
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
 struct TestEngine {
-  std::unique_ptr<InternalEngine> engine_;
-  envoy_engine_t handle() const { return reinterpret_cast<envoy_engine_t>(engine_.get()); }
   TestEngine(envoy_engine_callbacks callbacks, const std::string& level) {
     engine_.reset(new Envoy::InternalEngine(callbacks, {}, {}));
     Platform::EngineBuilder builder;
@@ -124,14 +124,13 @@ struct TestEngine {
     engine_->run(yaml, level);
   }
 
+  envoy_engine_t handle() const { return reinterpret_cast<envoy_engine_t>(engine_.get()); }
+
   envoy_status_t terminate() const { return engine_->terminate(); }
+
   [[nodiscard]] bool isTerminated() const { return engine_->isTerminated(); }
 
-  ~TestEngine() {
-    if (!engine_->isTerminated()) {
-      engine_->terminate();
-    }
-  }
+  std::unique_ptr<InternalEngine> engine_;
 };
 
 // Transform C map to C++ map.
@@ -662,6 +661,29 @@ TEST_F(InternalEngineTest, SetLogger) {
   EXPECT_EQ(actual_end_stream, true);
   EXPECT_TRUE(logging_was_called.load());
   EXPECT_EQ(engine->terminate(), ENVOY_SUCCESS);
+}
+
+TEST_F(InternalEngineTest, ThreadCreationFailed) {
+  const std::string level = "debug";
+  EngineTestContext engine_cbs_context{};
+  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+                                      auto* engine_running =
+                                          static_cast<EngineTestContext*>(context);
+                                      engine_running->on_engine_running.Notify();
+                                    } /*on_engine_running*/,
+                                    [](void* context) -> void {
+                                      auto* exit = static_cast<EngineTestContext*>(context);
+                                      exit->on_exit.Notify();
+                                    } /*on_exit*/,
+                                    &engine_cbs_context /*context*/};
+  auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
+  EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
+  std::unique_ptr<Envoy::InternalEngine> engine(
+      new Envoy::InternalEngine(engine_cbs, {}, {}, std::move(thread_factory)));
+  envoy_status_t status = engine->run(BUFFERED_TEST_CONFIG, level);
+  EXPECT_EQ(status, ENVOY_FAILURE);
+  // Calling `terminate()` should not crash.
+  EXPECT_EQ(engine->terminate(), ENVOY_FAILURE);
 }
 
 } // namespace Envoy

@@ -163,6 +163,7 @@ envoy_cc_library(
         "//source/common/tls/cert_validator:cert_validator_lib",
         "//source/common/tls/ocsp:ocsp_lib",
         "//source/common/tls/private_key:private_key_manager_lib",
+        "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
