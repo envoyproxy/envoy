@@ -20,6 +20,7 @@ ContextManagerImpl::ContextManagerImpl(TimeSource& time_source) : time_source_(t
 Envoy::Ssl::ClientContextSharedPtr
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
                                            const Envoy::Ssl::ClientContextConfig& config) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!config.isReady()) {
     return nullptr;
   }
@@ -33,6 +34,7 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
 Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
     Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
     const std::vector<std::string>& server_names, Ssl::ContextAdditionalInitFunc additional_init) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!config.isReady()) {
     return nullptr;
   }
