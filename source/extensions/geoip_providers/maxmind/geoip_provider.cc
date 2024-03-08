@@ -82,7 +82,7 @@ GeoipProviderConfig::GeoipProviderConfig(
     registerGeoDbStats("anon_db");
   }
   stat_name_set_->rememberBuiltin(absl::StrCat("country_mapping", ".parse_error"));
-  stat_name_set_->rememberBuiltin(absl::StrCat("country_mapping", ".file_doesnt_exists"));
+  stat_name_set_->rememberBuiltin(absl::StrCat("country_mapping", ".file_not_found"));
 };
 
 void GeoipProviderConfig::registerGeoDbStats(const std::string& db_type) {

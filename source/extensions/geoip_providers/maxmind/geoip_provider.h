@@ -58,7 +58,7 @@ public:
   }
 
   void incCountryMappingFileDoesntExists() {
-    incCounter(stat_name_set_->getBuiltin(absl::StrCat("country_mapping", ".file_doesnt_exists"),
+    incCounter(stat_name_set_->getBuiltin(absl::StrCat("country_mapping", ".file_not_found"),
                                           unknown_hit_));
   }
 

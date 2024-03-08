@@ -42,6 +42,10 @@ message MaxMindConfig {
       [(validate.rules).message = {required: true}];
 
   // Optional full file path to the config for country mapping overrides, e.g. ``/etc/country-mapping.conf``.
+  // The country mapping file is JSON like format containing the ISO code to be mapped from:to so it is possible to override the result
+  // read from the Maxmind database.
+  // When the country mapping file is not found or it is invalid an exception is thrown.
+  // If the value is empty, the country mapping is not used.
   // The file is expected to have a ``.conf`` extension, and should be JSON with the following format:
   //
   // .. code-block:: json
@@ -51,9 +55,7 @@ message MaxMindConfig {
   //  }
   //
   // Comments can be used in the config file by starting a line with a ``//`` or enclosing with ``/* */`` and they are ignored when parsed.
-  //
-  // The country mapping file is JSON containing the ISO code to be mapped from:to so it is possible to override the result
-  // read from the Maxmind database.
+  // This is not standard JSON, but it is a common format used in configuration files to allow comments.
   //
   string country_mapping_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.conf$"}];
 }
