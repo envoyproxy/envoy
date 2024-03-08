@@ -25,6 +25,7 @@
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
@@ -440,19 +441,37 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
-      ProtobufWkt::Value metadata_value;
-      // Sanitize any non utf8 characters.
-      auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
-      metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.use_typed_metadata_in_proxy_protol_listener")) {
+        auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
+        std::string metadata_key = key_value_pair->metadata_namespace().empty()
+                                       ? "envoy.filters.listener.proxy_protocol"
+                                       : key_value_pair->metadata_namespace();
+        const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
+        Protobuf::BytesValue tlv_byte_value;
+        tlv_byte_value.set_value(tlv_value.data(), tlv_value.size());
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvsMetadata
+            tlvs_metadata;
+        if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
+          MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
+        }
+        tlvs_metadata.mutable_typed_metadata()->insert({key_value_pair->key(), tlv_byte_value});
+        ProtobufWkt::Any typed_metadata;
+        typed_metadata.PackFrom(tlvs_metadata);
+        cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
+      } else {
+        ProtobufWkt::Value metadata_value;
+        metadata_value.set_string_value(tlv_value.data(), tlv_value.size());
 
-      std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                     ? "envoy.filters.listener.proxy_protocol"
-                                     : key_value_pair->metadata_namespace();
+        std::string metadata_key = key_value_pair->metadata_namespace().empty()
+                                       ? "envoy.filters.listener.proxy_protocol"
+                                       : key_value_pair->metadata_namespace();
 
-      ProtobufWkt::Struct metadata(
-          (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
-      metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
-      cb_->setDynamicMetadata(metadata_key, metadata);
+        ProtobufWkt::Struct metadata(
+            (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
+        metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
+        cb_->setDynamicMetadata(metadata_key, metadata);
+      }
     } else {
       ENVOY_LOG(trace,
                 "proxy_protocol: Skip TLV of type {} since it's not needed for dynamic metadata",

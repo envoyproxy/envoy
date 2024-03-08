@@ -836,6 +836,9 @@ public:
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
+  // todo add comments
+  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+
   /**
    * Object on which filters can share data on a per-request basis. For singleton data objects, only
    * one filter can produce a named data object. List data objects can be updated by multiple
