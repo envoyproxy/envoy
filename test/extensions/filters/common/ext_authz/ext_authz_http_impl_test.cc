@@ -268,7 +268,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
 // Verify request body is set correctly when the normal body is empty and raw body is set.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRawBody) {
   Http::RequestMessagePtr message_ptr = sendRequest(
-      {{":path", "/foo"}, {"foo", "bar"}}, {.body_content = "raw_body", .use_raw_body = true});
+      {{":path", "/foo"}, {"foo", "bar"}}, {/*body_content=*/"raw_body", /*use_raw_body=*/true});
 
   EXPECT_EQ(message_ptr->bodyAsString(), "raw_body");
 }
@@ -276,7 +276,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRawBody) {
 // Verify request body is set correctly when the normal body is set and raw body is empty.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithBody) {
   Http::RequestMessagePtr message_ptr = sendRequest(
-      {{":path", "/foo"}, {"foo", "bar"}}, {.body_content = "body", .use_raw_body = false});
+      {{":path", "/foo"}, {"foo", "bar"}}, {/*body_content=*/"body", /*use_raw_body=*/false});
 
   EXPECT_EQ(message_ptr->bodyAsString(), "body");
 }
@@ -330,10 +330,11 @@ TEST_F(ExtAuthzHttpClientTest, EncodeRawHeaders) {
 
   initialize(yaml);
 
+  SendRequestOpts opts;
+  opts.encode_raw_headers = true;
   Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
-                   {Http::Headers::get().Method.get(), std::string{"POST"}}},
-                  {.encode_raw_headers = true});
+                   {Http::Headers::get().Method.get(), std::string{"POST"}}}, opts);
 
   EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
   EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
