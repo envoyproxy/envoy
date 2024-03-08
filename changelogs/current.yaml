@@ -261,12 +261,12 @@ new_features:
     specified in the filter configuration and the default idle timeout.
 - area: ext_authz
   change: |
-    The proto field :ref:`headers <envoy.service.auth.v3.AttributeContext.HttpRequest.headers>`'s
+    The proto field :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`'s
     value type is string.  Thus, it is unable to support non-utf8 characters in header values.
     To support header values with non-utf8 characters, a new boolean field was added to the
-    ext_authz config :ref:`encode_raw_headers <envoy.config.filter.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`.
+    ext_authz config :ref:`encode_raw_headers <envoy_v3_api_field_config.filter.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`.
     When this is set to true, the new field in HttpRequest
-    :ref:`header_map <envoy.service.auth.v3.AttributeContext.HttpRequest.header_map>` (specifically
+    :ref:`header_map <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>` (specifically
     ``header_map.headers.raw_value``) gets populated with the raw values instead of ``headers``,
     which normally contains UTF-8 sanitized header values. Also, since the new field is not a map,
     headers with the same key are not combined into a single comma-seperated header.
