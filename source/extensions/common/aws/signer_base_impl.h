@@ -24,33 +24,53 @@ public:
 
 using SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 
-class SignatureConstantValues {
+class SignatureQueryParameterValues {
 public:
-  const std::string Aws4Request{"aws4_request"};
-  const std::string HashedEmptyString{
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
-
-  const std::string LongDateFormat{"%Y%m%dT%H%M00Z"};
-  const std::string ShortDateFormat{"%Y%m%d"};
-  const std::string UnsignedPayload{"UNSIGNED-PAYLOAD"};
+  // Query string parameters require camel case
+  static constexpr absl::string_view AmzAlgorithm = "X-Amz-Algorithm";
+  static constexpr absl::string_view AmzCredential = "X-Amz-Credential";
+  static constexpr absl::string_view AmzDate = "X-Amz-Date";
+  static constexpr absl::string_view AmzRegionSet = "X-Amz-Region-Set";
+  static constexpr absl::string_view AmzSecurityToken = "X-Amz-Security-Token";
+  static constexpr absl::string_view AmzSignature = "X-Amz-Signature";
+  static constexpr absl::string_view AmzSignedHeaders = "X-Amz-SignedHeaders";
+  static constexpr absl::string_view AmzExpires = "X-Amz-Expires";
+  // Expiration time of query parameter request, in seconds
+  static constexpr uint16_t DefaultExpiration = 5;
 };
 
-using SignatureConstants = ConstSingleton<SignatureConstantValues>;
+class SignatureConstants {
+public:
+  static constexpr absl::string_view Aws4Request = "aws4_request";
+  static constexpr absl::string_view HashedEmptyString =
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+  static constexpr absl::string_view LongDateFormat = "%Y%m%dT%H%M00Z";
+  static constexpr absl::string_view ShortDateFormat = "%Y%m%d";
+  static constexpr absl::string_view UnsignedPayload = "UNSIGNED-PAYLOAD";
+  static constexpr absl::string_view AuthorizationCredentialFormat = "{}/{}";
+};
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4 signing process.
  * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
+ *
+ * Query parameter support is implemented as per:
+ * https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
  */
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
                  const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-                 const AwsSigningHeaderExclusionVector& matcher_config)
+                 const AwsSigningHeaderExclusionVector& matcher_config,
+                 const bool query_string = false,
+                 const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
-        time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
-        short_date_formatter_(SignatureConstants::get().ShortDateFormat) {
+        query_string_(query_string), expiration_time_(expiration_time), time_source_(time_source),
+        long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
+        short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
@@ -74,6 +94,10 @@ protected:
 
   virtual void addRegionHeader(Http::RequestHeaderMap& headers,
                                const absl::string_view override_region) const;
+  virtual void addRegionQueryParam(Envoy::Http::Utility::QueryParamsMulti& query_params,
+                                   const absl::string_view override_region) const;
+
+  virtual absl::string_view getAlgorithmString() const PURE;
 
   virtual std::string createCredentialScope(const absl::string_view short_date,
                                             const absl::string_view override_region) const PURE;
@@ -94,6 +118,16 @@ protected:
                             const std::map<std::string, std::string>& canonical_headers,
                             const absl::string_view signature) const PURE;
 
+  std::string createAuthorizationCredential(absl::string_view access_key_id,
+                                            absl::string_view credential_scope) const;
+
+  void createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
+                         const absl::string_view authorization_credential,
+                         const absl::string_view long_date,
+                         const absl::optional<std::string> session_token,
+                         const std::map<std::string, std::string>& signed_headers,
+                         const uint16_t expiration_time) const;
+
   std::vector<Matchers::StringMatcherPtr> defaultMatchers() const {
     std::vector<Matchers::StringMatcherPtr> matcher_ptrs{};
     for (const auto& header : default_excluded_headers_) {
@@ -113,6 +147,8 @@ protected:
       "x-amzn-trace-id"};
   std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_ = defaultMatchers();
   CredentialsProviderSharedPtr credentials_provider_;
+  const bool query_string_;
+  const uint16_t expiration_time_;
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
