@@ -302,7 +302,7 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
   factory = Envoy::Config::Utility::getFactoryByName<Router::GenericConnPoolFactory>(
       "envoy.filters.connection_pools.http.generic");
   if (!factory) {
-    throw EnvoyException("No generic connection pool factory found");
+    return nullptr;
   }
 
   return factory->createGenericConnPool(
