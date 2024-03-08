@@ -32,7 +32,7 @@ namespace Common {
 namespace ExtAuthz {
 namespace {
 
-struct SendRequestOpts{
+struct SendRequestOpts {
   const std::string body_content = EMPTY_STRING;
   bool use_raw_body = false;
   bool encode_raw_headers = false;
@@ -149,9 +149,11 @@ public:
                                       SendRequestOpts opts = {}) {
     envoy::service::auth::v3::CheckRequest request{};
     if (opts.encode_raw_headers) {
-      auto mutable_headers =
-          request.mutable_attributes()->mutable_request()->mutable_http()->mutable_header_map()
-          ->mutable_headers();
+      auto mutable_headers = request.mutable_attributes()
+                                 ->mutable_request()
+                                 ->mutable_http()
+                                 ->mutable_header_map()
+                                 ->mutable_headers();
       for (const auto& header : headers) {
         auto* new_header = mutable_headers->Add();
         new_header->set_key(header.first);
@@ -265,18 +267,16 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
 
 // Verify request body is set correctly when the normal body is empty and raw body is set.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRawBody) {
-  Http::RequestMessagePtr message_ptr =
-      sendRequest({{":path", "/foo"}, {"foo", "bar"}},
-                  { .body_content="raw_body", .use_raw_body=true });
+  Http::RequestMessagePtr message_ptr = sendRequest(
+      {{":path", "/foo"}, {"foo", "bar"}}, {.body_content = "raw_body", .use_raw_body = true});
 
   EXPECT_EQ(message_ptr->bodyAsString(), "raw_body");
 }
 
 // Verify request body is set correctly when the normal body is set and raw body is empty.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithBody) {
-  Http::RequestMessagePtr message_ptr =
-      sendRequest({{":path", "/foo"}, {"foo", "bar"}},
-                  { .body_content="body", .use_raw_body=false });
+  Http::RequestMessagePtr message_ptr = sendRequest(
+      {{":path", "/foo"}, {"foo", "bar"}}, {.body_content = "body", .use_raw_body = false});
 
   EXPECT_EQ(message_ptr->bodyAsString(), "body");
 }
@@ -333,7 +333,7 @@ TEST_F(ExtAuthzHttpClientTest, EncodeRawHeaders) {
   Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
                    {Http::Headers::get().Method.get(), std::string{"POST"}}},
-                  { .encode_raw_headers = true });
+                  {.encode_raw_headers = true});
 
   EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
   EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");

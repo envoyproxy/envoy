@@ -596,9 +596,7 @@ public:
                        std::get<1>(p.param) ? "RawHeaders" : "LegacyHeaders");
   }
 
-  bool encodeRawHeaders() const {
-    return std::get<1>(GetParam());
-  }
+  bool encodeRawHeaders() const { return std::get<1>(GetParam()); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -671,7 +669,7 @@ public:
       const auto duplicate =
           ext_authz_request_->headers().get(Http::LowerCaseString(std::string("x-duplicate")));
       EXPECT_EQ(3, duplicate.size());
-      for (const auto& expected_value : { "one", "two", "three" }) {
+      for (const auto& expected_value : {"one", "two", "three"}) {
         bool found = false;
         for (size_t i = 0; i < duplicate.size(); i++) {
           if (duplicate[i]->value().getStringView() == expected_value) {
@@ -679,9 +677,8 @@ public:
             break;
           }
         }
-        EXPECT_TRUE(found)
-            << fmt::format("did not find expected value of 'x-duplicate' header: '{}'",
-                           expected_value);
+        EXPECT_TRUE(found) << fmt::format(
+            "did not find expected value of 'x-duplicate' header: '{}'", expected_value);
       }
     } else {
       // Duplicate headers in the check request should be merged.
@@ -1124,10 +1121,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
   cleanup();
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, ExtAuthzHttpIntegrationTest,
-    testing::Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ExtAuthzHttpIntegrationTest::testParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
+                         testing::Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                          testing::Bool()),
+                         ExtAuthzHttpIntegrationTest::testParamsToString);
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher
 // (uses legacy config for allowed_headers).

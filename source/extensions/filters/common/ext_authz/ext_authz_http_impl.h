@@ -91,7 +91,6 @@ public:
    */
   bool encodeRawHeaders() const { return encode_raw_headers_; }
 
-
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr
