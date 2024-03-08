@@ -53,8 +53,9 @@ void testGetOrCreateAsyncClientWithConfig(::benchmark::State& state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
-          async_client_man_test.async_client_manager_.getOrCreateRawAsyncClient(
-              grpc_service, async_client_man_test.scope_, true);
+          async_client_man_test.async_client_manager_
+              .getOrCreateRawAsyncClient(grpc_service, async_client_man_test.scope_, true)
+              .value();
     }
   }
 }
@@ -70,8 +71,10 @@ void testGetOrCreateAsyncClientWithHashConfig(::benchmark::State& state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
-          async_client_man_test.async_client_manager_.getOrCreateRawAsyncClientWithHashKey(
-              config_with_hash_key_a, async_client_man_test.scope_, true);
+          async_client_man_test.async_client_manager_
+              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key_a,
+                                                    async_client_man_test.scope_, true)
+              .value();
     }
   }
 }

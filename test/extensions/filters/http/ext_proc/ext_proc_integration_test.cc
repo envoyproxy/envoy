@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/network/address.h"
@@ -40,6 +41,7 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
+using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
 using Http::LowerCaseString;
@@ -293,7 +295,6 @@ protected:
       ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_headers());
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -794,6 +795,165 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 
   EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
+  proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+  initializeConfig();
+  std::string vhost_domain = "new_host";
+  config_helper_.addConfigModifier([&vhost_domain](HttpConnectionManager& cm) {
+    // Set up vhost domain.
+    auto* vhost = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    vhost->set_name("vhost");
+    vhost->clear_domains();
+    vhost->add_domains(vhost_domain);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true,
+      [&vhost_domain](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+
+        // Set host header to match the domain of virtual host in routing configuration.
+        auto* mut = response_header_mutation->add_set_headers();
+        mut->mutable_header()->set_key(":authority");
+        mut->mutable_header()->set_value(vhost_domain);
+
+        // Clear the route cache to trigger the route re-pick.
+        headers_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Host header is updated when `allow_all_routing` mutation rule is true.
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "new_host"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
+  proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+  initializeConfig();
+  // Set up the route config.
+  std::string vhost_domain = "new_host";
+  config_helper_.addConfigModifier([&vhost_domain](HttpConnectionManager& cm) {
+    // Set up vhost domain.
+    auto* vhost = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    vhost->set_name("vhost");
+    vhost->clear_domains();
+    vhost->add_domains(vhost_domain);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+
+        // Set host header to the wrong value that doesn't match the domain of virtual host in route
+        // configuration.
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key(":authority");
+        mut1->mutable_header()->set_value("wrong_host");
+
+        // Clear the route cache to trigger the route re-pick.
+        headers_resp.mutable_response()->set_clear_route_cache(true);
+        return true;
+      });
+
+  // The routing to upstream is expected to fail and 500 is returned to downstream client, since no
+  // route is found for mismatched vhost.
+  verifyDownstreamResponse(*response, 500);
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key(":path");
+        mut1->mutable_header()->set_value("/mutated_path/bluh");
+
+        auto* mut2 = response_header_mutation->add_set_headers();
+        mut2->mutable_header()->set_key(":scheme");
+        mut2->mutable_header()->set_value("https");
+
+        auto* mut3 = response_header_mutation->add_set_headers();
+        mut3->mutable_header()->set_key(":authority");
+        mut3->mutable_header()->set_value("new_host");
+
+        auto* mut4 = response_header_mutation->add_set_headers();
+        mut4->mutable_header()->set_key(":method");
+        mut4->mutable_header()->set_value("POST");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Path header is updated.
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":path", "/mutated_path/bluh"));
+  // Routing headers are not updated by ext_proc when `allow_all_routing` mutation rule is false
+  // (default value).
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":scheme", "http"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":authority", "host"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs(":method", "GET"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -2580,6 +2740,43 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
 }
 
+// Set up per-route configuration that extends original metadata.
+TEST_P(ExtProcIntegrationTest, PerRouteGrpcMetadata) {
+  initializeConfig();
+
+  // Override metadata from route config.
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    // Set up "/foo" so that it will use a different GrpcService
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("b", "c");
+    *per_route.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+        makeHeaderValue("c", "c");
+    setPerRouteConfig(route, per_route);
+  });
+
+  HttpIntegrationTest::initialize();
+
+  // Request that matches route directed to ext_proc_server_0
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  EXPECT_EQ(
+      "c",
+      processor_stream_->headers().get(Http::LowerCaseString("b"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "c",
+      processor_stream_->headers().get(Http::LowerCaseString("c"))[0]->value().getStringView());
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
 // Sending new timeout API in both downstream request and upstream response
 // handling path with header mutation.
 TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMutation) {
@@ -3429,44 +3626,81 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 }
 
 #if defined(USE_CEL_PARSER)
-// Test the filter using the default configuration by connecting to
-// an ext_proc server that responds to the request_headers message
-// by requesting to modify the request headers.
-TEST_P(ExtProcIntegrationTest, GetAndSetRequestResponseAttributes) {
+TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_request_attributes()->Add("request.path");
   proto_config_.mutable_request_attributes()->Add("request.method");
   proto_config_.mutable_request_attributes()->Add("request.scheme");
   proto_config_.mutable_request_attributes()->Add("connection.mtls");
+  proto_config_.mutable_request_attributes()->Add("response.code");
   proto_config_.mutable_response_attributes()->Add("response.code");
   proto_config_.mutable_response_attributes()->Add("response.code_details");
 
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders& req, HeadersResponse&) {
+
+  // Handle request headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_request_headers()) = headers_resp;
+
+        EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
         EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
         EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
         EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
+        // Make sure we did not include the attribute which was not yet available.
+        EXPECT_EQ(proto_struct.fields().size(), 4);
+        EXPECT_FALSE(proto_struct.fields().contains("response.code"));
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.request_headers().attributes().empty());
         return true;
       });
 
-  handleUpstreamRequest();
+  handleUpstreamRequestWithTrailer();
 
-  processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [](const HttpHeaders& req, HeadersResponse&) {
+  // Handle response headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], false, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_response_headers()) = headers_resp;
+
+        EXPECT_TRUE(req.has_response_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
         EXPECT_EQ(proto_struct.fields().at("response.code").string_value(), "200");
         EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(),
                   StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+
+        // Make sure we didn't include request attributes in the response-path processing request.
+        EXPECT_FALSE(proto_struct.fields().contains("request.method"));
+
+        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
+        EXPECT_TRUE(req.response_headers().attributes().empty());
         return true;
       });
+
+  // Handle response trailers message, making sure we did not send request or response attributes
+  // again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Add something to the response so the message isn't seen as spurious
+                          envoy::service::ext_proc::v3::TrailersResponse trailer_resp;
+                          *(resp.mutable_response_trailers()) = trailer_resp;
+
+                          EXPECT_TRUE(req.has_response_trailers());
+                          EXPECT_TRUE(req.attributes().empty());
+                          return true;
+                        });
 
   verifyDownstreamResponse(*response, 200);
 }

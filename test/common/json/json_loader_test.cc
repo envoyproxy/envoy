@@ -510,6 +510,21 @@ TEST_F(JsonLoaderTest, LoadFromStructUnknownValueCase) {
                             "Protobuf value case not implemented");
 }
 
+TEST_F(JsonLoaderTest, JsonToMsgpack) {
+  std::vector<uint8_t> msgpack = Factory::jsonToMsgpack("{\"hello\":\"world\"}");
+  std::vector<uint8_t> expected_bytes = {0x81, 0xA5, 0x68, 0x65, 0x6C, 0x6C, 0x6F,
+                                         0xA5, 0x77, 0x6F, 0x72, 0x6C, 0x64};
+  EXPECT_EQ(msgpack, expected_bytes);
+}
+
+TEST_F(JsonLoaderTest, InvalidJsonToMsgpack) {
+  EXPECT_EQ(0, Factory::jsonToMsgpack("").size());
+  EXPECT_EQ(0, Factory::jsonToMsgpack("{").size());
+  EXPECT_EQ(0, Factory::jsonToMsgpack("{\"hello\":}").size());
+  EXPECT_EQ(0, Factory::jsonToMsgpack("\"hello\":\"world\"}").size());
+  EXPECT_EQ(0, Factory::jsonToMsgpack("{\"hello\":\"world\"").size());
+}
+
 } // namespace
 } // namespace Json
 } // namespace Envoy

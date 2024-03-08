@@ -249,6 +249,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/common/network:listener_impl_test_base_lib",
+        "//test/mocks/network:mock_parent_drained_callback_registrar",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

@@ -4,8 +4,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 namespace Envoy {
 namespace Extensions {

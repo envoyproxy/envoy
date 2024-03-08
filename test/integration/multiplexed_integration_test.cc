@@ -1944,6 +1944,42 @@ public:
   }
 };
 
+TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHeader) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makeRequest(1, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  // A malformed frame is translated to 103 header with END_STREAM by the underlying codec.
+  // Typically we should get a protocol error, but this should not crash Envoy.
+  // PAYLOAD_LENGTH: \x05
+  // FRAME_TYPE: \x01
+  // FLAGS: \x32
+  // STREAM_ID: \x01
+  // ASCII: \x31, \x30, \x33 for 1, 0, 3 respectively
+  const std::vector<uint8_t> header_frame = {
+      0x00, 0x00, 0x05, 0x01, 0x32, 0x00, 0x00, 0x00, 0x01, 0x2d, 0xfe, 0xff, 0x01, 0x10,
+      0x00, 0x00, 0x05, 0x09, 0x0d, 0x00, 0x00, 0x00, 0x01, 0x09, 0x03, 0x31, 0x30, 0x33};
+  const std::string header_frame_str(reinterpret_cast<const char*>(header_frame.data()),
+                                     header_frame.size());
+  ASSERT_TRUE(fake_upstream_connection->write(header_frame_str));
+
+  const Http2Frame response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+
+  tcp_client_->close();
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
+}
+
 TEST_P(Http2FrameIntegrationTest, MaxConcurrentStreamsIsRespected) {
   const int kTotalRequests = 101;
   config_helper_.addConfigModifier(

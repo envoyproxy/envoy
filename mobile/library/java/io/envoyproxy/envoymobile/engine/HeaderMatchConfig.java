@@ -15,7 +15,6 @@ public class HeaderMatchConfig {
     // Indicates the match value is a regular expression.
     SAFE_REGEX
   }
-  ;
 
   // The name of the matcher.
   public final String name;

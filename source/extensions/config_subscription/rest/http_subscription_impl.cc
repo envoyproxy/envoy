@@ -152,7 +152,7 @@ void HttpSubscriptionImpl::disableInitFetchTimeoutTimer() {
 std::chrono::milliseconds HttpSubscriptionFactory::apiConfigSourceRefreshDelay(
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   if (!api_config_source.has_refresh_delay()) {
-    throwEnvoyExceptionOrPanic("refresh_delay is required for REST API configuration sources");
+    throw EnvoyException("refresh_delay is required for REST API configuration sources");
   }
 
   return std::chrono::milliseconds(

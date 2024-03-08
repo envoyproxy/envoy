@@ -36,7 +36,8 @@ public:
       // remote_jwks.retry_policy has an invalid case that could not be validated by the
       // proto validation annotation. It has to be validated by the code.
       if (jwt_provider_.remote_jwks().has_retry_policy()) {
-        Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy());
+        THROW_IF_NOT_OK(
+            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()));
       }
       if (jwt_provider_.remote_jwks().has_cache_duration()) {
         // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
@@ -62,8 +63,10 @@ public:
       return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
     });
 
-    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true,
-                                                      context.serverFactoryContext().api());
+    const auto inline_jwks =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(jwt_provider_.local_jwks(), true,
+                                                       context.serverFactoryContext().api()),
+                              std::string);
     if (!inline_jwks.empty()) {
       auto jwks =
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);

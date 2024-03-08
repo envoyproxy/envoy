@@ -50,6 +50,8 @@ MATCHER_P2(SingleProtoHeaderValueIs, key, value,
   return false;
 }
 
+envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
+                                                     const std::string& value);
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

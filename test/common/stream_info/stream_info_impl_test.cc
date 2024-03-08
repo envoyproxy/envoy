@@ -185,8 +185,10 @@ enum LegacyResponseFlag {
   DnsResolutionFailed = 0x4000000,
   // Drop certain percentage of overloaded traffic.
   DropOverLoad = 0x8000000,
+  // Downstream remote codec level reset was received on the stream.
+  DownstreamRemoteReset = 0x10000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DropOverLoad,
+  LastFlag = DownstreamRemoteReset,
 };
 
 TEST_F(StreamInfoImplTest, LegacyResponseFlagTest) {
@@ -227,6 +229,7 @@ TEST_F(StreamInfoImplTest, LegacyResponseFlagTest) {
       {LegacyResponseFlag::OverloadManager, CoreResponseFlag::OverloadManager},
       {LegacyResponseFlag::DnsResolutionFailed, CoreResponseFlag::DnsResolutionFailed},
       {LegacyResponseFlag::DropOverLoad, CoreResponseFlag::DropOverLoad},
+      {LegacyResponseFlag::DownstreamRemoteReset, CoreResponseFlag::DownstreamRemoteReset},
   };
 
   for (auto& flag : flags) {
@@ -258,7 +261,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
               stream_info.responseFlags()[i].value());
   }
 
-  EXPECT_EQ(0xFFFFFFF, stream_info.legacyResponseFlags());
+  EXPECT_EQ(0x1FFFFFFF, stream_info.legacyResponseFlags());
 }
 
 TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {

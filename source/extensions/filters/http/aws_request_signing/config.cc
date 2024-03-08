@@ -20,6 +20,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
+using namespace envoy::extensions::filters::http::aws_request_signing::v3;
+
 bool isARegionSet(std::string region) {
   for (const char& c : "*,") {
     if (region.find(c) != std::string::npos) {
@@ -27,24 +29,6 @@ bool isARegionSet(std::string region) {
     }
   }
   return false;
-}
-
-SigningAlgorithm getSigningAlgorithm(
-    const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config) {
-  using namespace envoy::extensions::filters::http::aws_request_signing::v3;
-  auto& logger = Logger::Registry::getLog(Logger::Id::filter);
-
-  switch (config.signing_algorithm()) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case AwsRequestSigning_SigningAlgorithm_AWS_SIGV4:
-    ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4");
-    return SigningAlgorithm::SIGV4;
-
-  case AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A:
-    ENVOY_LOG_TO_LOGGER(logger, debug, "Signing Algorithm is SigV4A");
-    return SigningAlgorithm::SIGV4A;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
@@ -58,7 +42,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   if (region.empty()) {
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
     absl::optional<std::string> regionOpt;
-    if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
+    if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
       regionOpt = region_provider->getRegionSet();
     } else {
       regionOpt = region_provider->getRegion();
@@ -70,6 +54,12 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     region = regionOpt.value();
   }
 
+  bool query_string = config.has_query_string();
+
+  uint16_t expiration_time = PROTOBUF_GET_SECONDS_OR_DEFAULT(
+      config.query_string(), expiration_time,
+      Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
+
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           server_context.api(), makeOptRef(server_context), region,
@@ -79,10 +69,11 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
 
-  if (getSigningAlgorithm(config) == SigningAlgorithm::SIGV4A) {
+  if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         config.service_name(), region, credentials_provider,
-        server_context.mainThreadDispatcher().timeSource(), matcher_config);
+        server_context.mainThreadDispatcher().timeSource(), matcher_config, query_string,
+        expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
@@ -91,7 +82,8 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         config.service_name(), region, credentials_provider,
-        server_context.mainThreadDispatcher().timeSource(), matcher_config);
+        server_context.mainThreadDispatcher().timeSource(), matcher_config, query_string,
+        expiration_time);
   }
 
   auto filter_config =
@@ -114,7 +106,8 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   if (region.empty()) {
     auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
     absl::optional<std::string> regionOpt;
-    if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SIGV4A) {
+    if (per_route_config.aws_request_signing().signing_algorithm() ==
+        AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
       regionOpt = region_provider->getRegionSet();
     } else {
       regionOpt = region_provider->getRegion();
@@ -126,6 +119,10 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     region = regionOpt.value();
   }
 
+  bool query_string = per_route_config.aws_request_signing().has_query_string();
+  uint16_t expiration_time = PROTOBUF_GET_SECONDS_OR_DEFAULT(
+      per_route_config.aws_request_signing().query_string(), expiration_time, 5);
+
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           context.api(), makeOptRef(context), region,
@@ -136,10 +133,11 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
       per_route_config.aws_request_signing().match_excluded_headers().end());
   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
 
-  if (getSigningAlgorithm(per_route_config.aws_request_signing()) == SigningAlgorithm::SIGV4A) {
+  if (per_route_config.aws_request_signing().signing_algorithm() ==
+      AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     signer = std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
         per_route_config.aws_request_signing().service_name(), region, credentials_provider,
-        context.mainThreadDispatcher().timeSource(), matcher_config);
+        context.mainThreadDispatcher().timeSource(), matcher_config, query_string, expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
@@ -148,7 +146,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         per_route_config.aws_request_signing().service_name(), region, credentials_provider,
-        context.mainThreadDispatcher().timeSource(), matcher_config);
+        context.mainThreadDispatcher().timeSource(), matcher_config, query_string, expiration_time);
   }
 
   return std::make_shared<const FilterConfigImpl>(

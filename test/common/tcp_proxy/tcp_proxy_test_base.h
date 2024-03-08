@@ -121,7 +121,7 @@ public:
   void raiseEventUpstreamConnected(uint32_t conn_index) {
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
     EXPECT_CALL(*upstream_connection_data_.at(conn_index), addUpstreamCallbacks(_))
-        .WillOnce(Invoke([=](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
+        .WillOnce(Invoke([=, this](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
 
           // Simulate TCP conn pool upstream callbacks. This is safe because the TCP proxy never

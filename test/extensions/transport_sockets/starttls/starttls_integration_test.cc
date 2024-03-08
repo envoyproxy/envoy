@@ -71,7 +71,7 @@ Network::FilterStatus StartTlsSwitchFilter::onCommand(Buffer::Instance& buf, boo
   if (message == "switch") {
     buf.drain(buf.length());
     buf.add("usetls");
-    read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
+    read_callbacks_->connection().addBytesSentCallback([=, this](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "usetls" has been sent.
       if (bytes >= 6) {
         read_callbacks_->connection().startSecureTransport();

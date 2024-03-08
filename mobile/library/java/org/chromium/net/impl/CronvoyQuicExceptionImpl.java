@@ -30,9 +30,7 @@ public class CronvoyQuicExceptionImpl extends QuicException {
 
   @Override
   public String getMessage() {
-    StringBuilder b = new StringBuilder(mNetworkException.getMessage());
-    b.append(", QuicDetailedErrorCode=").append(mQuicDetailedErrorCode);
-    return b.toString();
+    return mNetworkException.getMessage() + ", QuicDetailedErrorCode=" + mQuicDetailedErrorCode;
   }
 
   @Override

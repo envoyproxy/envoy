@@ -9,8 +9,8 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"

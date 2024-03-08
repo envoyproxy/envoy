@@ -183,7 +183,6 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       response_body_(std::make_unique<Buffer::OwnedImpl>()),
       hostname_(
           HealthCheckerFactory::getHostname(host, parent_.host_value_, parent_.cluster_.info())),
-
       local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           Network::Utility::getCanonicalIpv4LoopbackAddress(),
           Network::Utility::getCanonicalIpv4LoopbackAddress())),

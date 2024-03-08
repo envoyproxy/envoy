@@ -22,7 +22,7 @@ OptRef<ShadowRouterHandle> ShadowWriterImpl::submit(const std::string& cluster_n
                                                           original_transport, original_protocol);
   const bool created = shadow_router->createUpstreamRequest();
   if (!created || !tls_.get().has_value()) {
-    stats_.named_.shadow_request_submit_failure_.inc();
+    stats_.routerStats().shadow_request_submit_failure_.inc();
     return absl::nullopt;
   }
 

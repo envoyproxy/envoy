@@ -147,6 +147,11 @@ public:
   }
 
   /**
+   * Sets a span attribute.
+   */
+  void setAttribute(absl::string_view name, const OTelAttribute& value);
+
+  /**
    * Method to access the span for testing.
    */
   const ::opentelemetry::proto::trace::v1::Span& spanForTest() const { return span_; }

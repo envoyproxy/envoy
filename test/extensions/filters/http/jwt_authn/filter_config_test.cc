@@ -14,7 +14,6 @@
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
 using testing::HasSubstr;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {

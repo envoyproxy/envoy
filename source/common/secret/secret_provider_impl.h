@@ -6,6 +6,8 @@
 #include "envoy/secret/secret_provider.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 namespace Envoy {
 namespace Secret {
@@ -106,6 +108,29 @@ public:
 
 private:
   Secret::GenericSecretPtr generic_secret_;
+};
+
+/**
+ * A utility secret provider that uses thread local values to share the updates to the secrets from
+ * the main to the workers.
+ **/
+class ThreadLocalGenericSecretProvider {
+public:
+  ThreadLocalGenericSecretProvider(GenericSecretConfigProviderSharedPtr&& provider,
+                                   ThreadLocal::SlotAllocator& tls, Api::Api& api);
+  const std::string& secret() const;
+
+private:
+  struct ThreadLocalSecret : public ThreadLocal::ThreadLocalObject {
+    explicit ThreadLocalSecret(const std::string& value) : value_(value) {}
+    std::string value_;
+  };
+  void update();
+  GenericSecretConfigProviderSharedPtr provider_;
+  Api::Api& api_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalSecret> tls_;
+  // Must be last since it has a non-trivial de-registering destructor.
+  Common::CallbackHandlePtr cb_;
 };
 
 } // namespace Secret

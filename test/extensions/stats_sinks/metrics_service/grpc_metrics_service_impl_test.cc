@@ -344,6 +344,7 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeBoth) {
 
     const auto& metric1 = (*metrics)[0].metric(0);
     EXPECT_TRUE(metric1.has_summary());
+    EXPECT_TRUE(metric1.summary().has_sample_sum());
     const auto& metric2 = (*metrics)[1].metric(0);
     EXPECT_TRUE(metric2.has_histogram());
   }));
@@ -364,6 +365,7 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeSummary) {
 
     const auto& metric1 = (*metrics)[0].metric(0);
     EXPECT_TRUE(metric1.has_summary());
+    EXPECT_TRUE(metric1.summary().has_sample_sum());
   }));
   sink.flush(snapshot_);
 }

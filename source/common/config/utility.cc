@@ -11,9 +11,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/histogram_impl.h"
-#include "source/common/stats/stats_matcher_impl.h"
-#include "source/common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -183,7 +180,7 @@ std::chrono::milliseconds Utility::configSourceInitialFetchTimeout(
       PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 15000));
 }
 
-RateLimitSettings
+absl::StatusOr<RateLimitSettings>
 Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   RateLimitSettings rate_limit_settings;
   if (api_config_source.has_rate_limit_settings()) {
@@ -194,14 +191,14 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
     rate_limit_settings.fill_rate_ =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), fill_rate,
                                         Envoy::Config::RateLimitSettings::DefaultFillRate);
+    // Reject the NaN and Inf values.
+    if (std::isnan(rate_limit_settings.fill_rate_) || std::isinf(rate_limit_settings.fill_rate_)) {
+      return absl::InvalidArgumentError(
+          fmt::format("The value of fill_rate in RateLimitSettings ({}) must not be NaN nor Inf",
+                      rate_limit_settings.fill_rate_));
+    }
   }
   return rate_limit_settings;
-}
-
-Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                           const Stats::TagVector& cli_tags) {
-  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
 }
 
 absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(

@@ -18,5 +18,9 @@ ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& proto
   return Nlohmann::Factory::loadFromProtobufStruct(protobuf_struct);
 }
 
+std::vector<uint8_t> Factory::jsonToMsgpack(const std::string& json) {
+  return Nlohmann::Factory::jsonToMsgpack(json);
+}
+
 } // namespace Json
 } // namespace Envoy

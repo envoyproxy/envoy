@@ -276,6 +276,8 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
+    # The :config_impl_test_static target does not build with coverage
+    tags = ["nocoverage"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",

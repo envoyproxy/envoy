@@ -114,8 +114,9 @@ ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& ro
   }
   const auto& body = route.direct_response().body();
 
-  const std::string string_body =
-      Envoy::Config::DataSource::read(body, true, api, max_body_size_bytes);
+  auto body_or_error = Envoy::Config::DataSource::read(body, true, api, max_body_size_bytes);
+  RETURN_IF_STATUS_NOT_OK(body_or_error);
+  const std::string& string_body = body_or_error.value();
   if (string_body.length() > max_body_size_bytes) {
     return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
                                                   string_body.length(), max_body_size_bytes));

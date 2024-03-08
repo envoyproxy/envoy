@@ -808,15 +808,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            "for the Lua filter.");
     }
 
-    const std::string code =
-        Config::DataSource::read(proto_config.default_source_code(), true, api);
+    const std::string code = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
   } else if (!proto_config.inline_code().empty()) {
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
   }
 
   for (const auto& source : proto_config.source_codes()) {
-    const std::string code = Config::DataSource::read(source.second, true, api);
+    const std::string code =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
     auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
     if (!per_lua_code_setup_ptr) {
       continue;
@@ -834,7 +835,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     return;
   }
   // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = Config::DataSource::read(config.source_code(), true, context.api());
+  const std::string code_str = THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(config.source_code(), true, context.api()), std::string);
   per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
 }
 

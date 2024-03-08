@@ -10,7 +10,7 @@ namespace Config {
 template <class RequestProto, class ResponseProto>
 class MockGrpcStream : public GrpcStreamInterface<RequestProto, ResponseProto> {
 public:
-  MockGrpcStream() {}
+  MockGrpcStream() = default;
   ~MockGrpcStream() override = default;
 
   MOCK_METHOD(void, establishNewStream, ());

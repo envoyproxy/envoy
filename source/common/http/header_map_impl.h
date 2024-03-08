@@ -8,6 +8,7 @@
 #include <type_traits>
 
 #include "envoy/common/optref.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/non_copyable.h"
@@ -634,6 +635,11 @@ private:
   }
 
   HeaderEntryImpl* inline_headers_[];
+};
+
+class TunnelResponseHeadersOrTrailersImpl : public TunnelResponseHeadersOrTrailers {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
 };
 
 template <class T>

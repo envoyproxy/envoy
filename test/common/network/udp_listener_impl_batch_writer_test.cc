@@ -61,6 +61,7 @@ size_t getPacketLength(const msghdr* msg) {
 class UdpListenerImplBatchWriterTest : public UdpListenerImplTestBase {
 public:
   void SetUp() override {
+    UdpListenerImplTestBase::setup();
     // Set listening socket options and set UdpGsoBatchWriter
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());

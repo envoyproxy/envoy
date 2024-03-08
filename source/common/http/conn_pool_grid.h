@@ -96,6 +96,12 @@ public:
                                   StreamInfo::StreamInfo& info,
                                   absl::optional<Http::Protocol> protocol);
 
+    // Called by onConnectionAttemptFailed and on grid deletion destruction to let wrapper
+    // callback subscribers know the connect attempt failed.
+    void signalFailureAndDeleteSelf(ConnectionPool::PoolFailureReason reason,
+                                    absl::string_view transport_failure_reason,
+                                    Upstream::HostDescriptionConstSharedPtr host);
+
   private:
     // Removes this from the owning list, deleting it.
     void deleteThis();

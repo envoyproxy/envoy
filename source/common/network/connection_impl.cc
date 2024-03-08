@@ -88,7 +88,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // Keep it as a bool flag to reduce the times calling runtime method..
   enable_rst_detect_send_ = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.detect_and_raise_rst_tcp_connection");
-
+  if (!socket_->isOpen()) {
+    IS_ENVOY_BUG("Client socket failure");
+    return;
+  }
   if (!connected) {
     connecting_ = true;
   }
@@ -110,7 +113,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(!ioHandle().isOpen() && delayed_close_timer_ == nullptr,
+  ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -137,7 +140,7 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -230,7 +233,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return State::Closed;
   } else if (inDelayedClose()) {
     return State::Closing;
@@ -265,7 +268,7 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (!ConnectionImpl::ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -322,7 +325,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -360,7 +363,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (inDelayedClose() || !filterChainWantsData()) {
     return;
   }
-  ASSERT(ioHandle().isOpen());
+  ASSERT(socket_->isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -646,7 +649,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore read event processing.
-  if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
+  if (socket_->isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
 }
@@ -815,7 +818,7 @@ void ConnectionImpl::onWriteReady() {
         }
 
         // If a callback closes the socket, stop iterating.
-        if (!ioHandle().isOpen()) {
+        if (!socket_->isOpen()) {
           return;
         }
       }
@@ -956,6 +959,13 @@ ClientConnectionImpl::ClientConnectionImpl(
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
+  if (!socket_->isOpen()) {
+    setFailureReason("socket creation failure");
+    // Set up the dispatcher to "close" the connection on the next loop after
+    // the owner has a chance to add callbacks.
+    dispatcher_.post([this]() { raiseEvent(ConnectionEvent::LocalClose); });
+    return;
+  }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 

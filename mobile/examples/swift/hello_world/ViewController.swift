@@ -22,6 +22,7 @@ final class ViewController: UITableViewController {
       .addPlatformFilter(DemoFilter.init)
       .addPlatformFilter(BufferDemoFilter.init)
       .addPlatformFilter(AsyncDemoFilter.init)
+      .respectSystemProxySettings(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
         typedConfig: """

@@ -7,6 +7,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+Grpc::RawAsyncClientSharedPtr
+getOrThrow(absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error) {
+  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  return client_or_error.value();
+}
+
+RateLimitClientImpl::RateLimitClientImpl(
+    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+    Server::Configuration::FactoryContext& context, absl::string_view domain_name,
+    RateLimitQuotaCallbacks* callbacks, BucketsCache& quota_buckets)
+    : domain_name_(domain_name),
+      aync_client_(getOrThrow(
+          context.serverFactoryContext()
+              .clusterManager()
+              .grpcAsyncClientManager()
+              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true))),
+      rlqs_callback_(callbacks), quota_buckets_(quota_buckets),
+      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
+
 RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_t> bucket_id) {
   RateLimitQuotaUsageReports report;
   // Build the report from quota bucket cache.
@@ -15,6 +34,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
     *usage->mutable_bucket_id() = bucket->bucket_id;
     usage->set_num_requests_allowed(bucket->quota_usage.num_requests_allowed);
     usage->set_num_requests_denied(bucket->quota_usage.num_requests_denied);
+
     auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
         time_source_.monotonicTime().time_since_epoch());
     // For the newly created bucket (i.e., `bucket_id` input is not null), its time
@@ -29,6 +49,10 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 
     // Update the last_report time point.
     bucket->quota_usage.last_report = now;
+    // Reset the number of request allowed/denied. The RLQS server expects the client to report
+    // those two usage numbers only for last report period.
+    bucket->quota_usage.num_requests_allowed = 0;
+    bucket->quota_usage.num_requests_denied = 0;
   }
 
   // Set the domain name.
@@ -57,11 +81,13 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
     // Get the hash id value from BucketId in the response.
     const size_t bucket_id = MessageUtil::hash(action.bucket_id());
+    ENVOY_LOG(trace,
+              "Received a response for bucket id proto :\n {}, and generated "
+              "the associated hashed bucket id: {}",
+              action.bucket_id().DebugString(), bucket_id);
     if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
       // The response should be matched to the report we sent.
-      ENVOY_LOG(error,
-                "Received a response, but but it is not matched any quota "
-                "cache entry: ",
+      ENVOY_LOG(error, "The received response is not matched to any quota cache entry: ",
                 response->ShortDebugString());
     } else {
       quota_buckets_[bucket_id]->bucket_action = action;
@@ -79,9 +105,14 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
           double fill_rate_per_sec =
               static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
               fill_interval_sec;
-
-          quota_buckets_[bucket_id]->token_bucket_limiter = std::make_unique<TokenBucketImpl>(
-              rate_limit_strategy.token_bucket().max_tokens(), time_source_, fill_rate_per_sec);
+          uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
+          ENVOY_LOG(
+              trace,
+              "Created the token bucket limiter for hashed bucket id: {}, with max_tokens: {}; "
+              "fill_interval_sec: {}; fill_rate_per_sec: {}.",
+              bucket_id, max_tokens, fill_interval_sec, fill_rate_per_sec);
+          quota_buckets_[bucket_id]->token_bucket_limiter =
+              std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate_per_sec);
         }
       }
     }

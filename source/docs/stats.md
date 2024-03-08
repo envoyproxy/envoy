@@ -77,6 +77,10 @@ followed.
    accumulates in to *interval* histograms.
  * Finally the main *interval* histogram is merged to *cumulative* histogram.
 
+Pictorially this looks like:
+
+![Histogram Stat Flush](histogram.png)
+
 `ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
 they keep an embedded reference count and are removed from the set and destroyed
 when the last strong reference disappears. Consequently, we must hold a lock for

@@ -344,6 +344,7 @@ envoy_cc_library(
         "//envoy/event:file_event_interface",
         "//envoy/network:exception_interface",
         "//envoy/network:listener_interface",
+        "//envoy/network:parent_drained_callback_registrar_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",

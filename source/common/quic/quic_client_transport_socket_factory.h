@@ -45,14 +45,22 @@ protected:
   // fallback_factory_ will update the context.
   void onSecretUpdated() override {}
 
+  // The cache in the QuicCryptoClientConfig is not thread-safe, so crypto_config_ needs to
+  // be a thread local object. client_context lets the thread local object determine if the crypto
+  // config needs to be updated.
+  struct ThreadLocalQuicConfig : public ThreadLocal::ThreadLocalObject {
+    // Latch the latest client context, to determine if it has updated since last
+    // checked.
+    Envoy::Ssl::ClientContextSharedPtr client_context_;
+    // If client_context_ changes, client config will be updated as well.
+    std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  };
+
 private:
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.
   std::unique_ptr<Extensions::TransportSockets::Tls::ClientSslSocketFactory> fallback_factory_;
-  // Latch the latest client context, to determine if it has updated since last
-  // checked.
-  Envoy::Ssl::ClientContextSharedPtr client_context_;
-  // If client_context_ changes, client config will be updated as well.
-  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  // The storage for thread local quic config.
+  ThreadLocal::TypedSlot<ThreadLocalQuicConfig> tls_slot_;
 };
 
 class QuicClientTransportSocketConfigFactory

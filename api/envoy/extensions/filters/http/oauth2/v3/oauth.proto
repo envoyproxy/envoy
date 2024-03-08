@@ -74,7 +74,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -137,6 +137,11 @@ message OAuth2Config {
   // If this value is not set, it will default to ``0s``. In this case, the expiry must be set by
   // the authorization server or the OAuth flow will fail.
   google.protobuf.Duration default_expires_in = 13;
+
+  // Any request that matches any of the provided matchers won't be redirected to OAuth server when tokens are not valid.
+  // Automatic access token refresh will be performed for these requests, if enabled.
+  // This behavior can be useful for AJAX requests.
+  repeated config.route.v3.HeaderMatcher deny_redirect_matcher = 14;
 }
 
 // Filter config.

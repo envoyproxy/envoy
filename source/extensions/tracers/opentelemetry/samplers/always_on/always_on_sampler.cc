@@ -18,7 +18,7 @@ SamplingResult AlwaysOnSampler::shouldSample(const absl::optional<SpanContext> p
                                              OptRef<const Tracing::TraceContext> /*trace_context*/,
                                              const std::vector<SpanContext>& /*links*/) {
   SamplingResult result;
-  result.decision = Decision::RECORD_AND_SAMPLE;
+  result.decision = Decision::RecordAndSample;
   if (parent_context.has_value()) {
     result.tracestate = parent_context.value().tracestate();
   }

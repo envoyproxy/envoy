@@ -1,4 +1,5 @@
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/thread/mocks.h"
 
 #include "contrib/kafka/filters/network/source/mesh/config.h"
 #include "gmock/gmock.h"
@@ -9,12 +10,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
-
-class MockThreadFactory : public Thread::ThreadFactory {
-public:
-  MOCK_METHOD(Thread::ThreadPtr, createThread, (std::function<void()>, Thread::OptionsOptConstRef));
-  MOCK_METHOD(Thread::ThreadId, currentThreadId, ());
-};
 
 TEST(KafkaMeshConfigFactoryUnitTest, shouldCreateFilter) {
   // given
@@ -47,7 +42,7 @@ forwarding_rules:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  testing::NiceMock<MockThreadFactory> thread_factory;
+  testing::NiceMock<Thread::MockThreadFactory> thread_factory;
   ON_CALL(context.server_factory_context_.api_, threadFactory())
       .WillByDefault(ReturnRef(thread_factory));
   KafkaMeshConfigFactory factory;

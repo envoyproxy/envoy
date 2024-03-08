@@ -250,7 +250,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     for (const auto& ip : iplist) {
       incrementExternalQueryTypeAnswerCount(query->type_);
       const std::chrono::seconds ttl = getDomainTTL(query->name_);
-      message_parser_.storeDnsAnswerRecord(context, *query, ttl, std::move(ip));
+      message_parser_.storeDnsAnswerRecord(context, *query, ttl, ip);
     }
     sendDnsResponse(std::move(context));
   };

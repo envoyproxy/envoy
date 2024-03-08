@@ -33,18 +33,18 @@ OLD_LICENSES_REGEX = re.compile(r'^licenses\(.*\n+', re.MULTILINE)
 ENVOY_RULE_REGEX = re.compile(r'envoy[_\w]+\(')
 
 # Match a load() statement for the envoy_package macros.
-PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_package".*?\)\n)', re.DOTALL)
-EXTENSION_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_extension_package".*?\)\n)', re.DOTALL)
-CONTRIB_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_contrib_package".*?\)\n)', re.DOTALL)
-MOBILE_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_mobile_package".*?\)\n)', re.DOTALL)
+PACKAGE_LOAD_BLOCK_REGEX = re.compile(r'("envoy_package".*?\)\n)', re.DOTALL)
+EXTENSION_PACKAGE_LOAD_BLOCK_REGEX = re.compile(r'("envoy_extension_package".*?\)\n)', re.DOTALL)
+CONTRIB_PACKAGE_LOAD_BLOCK_REGEX = re.compile(r'("envoy_contrib_package".*?\)\n)', re.DOTALL)
+MOBILE_PACKAGE_LOAD_BLOCK_REGEX = re.compile(r'("envoy_mobile_package".*?\)\n)', re.DOTALL)
 
 # Match Buildozer 'print' output. Example of Buildozer print output:
 # cc_library json_transcoder_filter_lib [json_transcoder_filter.cc] (missing) (missing)
 BUILDOZER_PRINT_REGEX = re.compile(
-    '\s*([\w_]+)\s+([\w_]+)\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]')
+    r'\s*([\w_]+)\s+([\w_]+)\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]')
 
 # Match API header include in Envoy source file?
-API_INCLUDE_REGEX = re.compile('#include "(contrib/envoy/.*|envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+API_INCLUDE_REGEX = re.compile(r'#include "(contrib/envoy/.*|envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
 
 
 class EnvoyBuildFixerError(Exception):

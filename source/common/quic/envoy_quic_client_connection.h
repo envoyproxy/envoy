@@ -80,7 +80,9 @@ public:
     // TODO(mattklein123): Emit a stat for this.
   }
   size_t numPacketsExpectedPerEventLoop() const override {
-    if (delegate_.has_value()) {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_upstream_reads_fixed_number_packets") &&
+        delegate_.has_value()) {
       return delegate_->numPacketsExpectedPerEventLoop();
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
@@ -147,6 +149,7 @@ private:
   Event::Dispatcher& dispatcher_;
   bool migrate_port_on_path_degrading_{false};
   uint8_t num_socket_switches_{0};
+  size_t num_packets_with_unknown_dst_address_{0};
 };
 
 } // namespace Quic

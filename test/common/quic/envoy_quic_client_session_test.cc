@@ -428,6 +428,28 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnFlushWriteBuffer) {
                "unexpectedly reached");
 }
 
+TEST_P(EnvoyQuicClientSessionTest, HandlePacketsWithoutDestinationAddress) {
+  // Build a STATELESS_RESET packet.
+  std::unique_ptr<quic::QuicEncryptedPacket> stateless_reset_packet =
+      quic::QuicFramer::BuildIetfStatelessResetPacket(
+          quic::test::TestConnectionId(), /*received_packet_length*/ 1200,
+          quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+      .Times(0);
+  for (size_t i = 0; i < 9; ++i) {
+    auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
+                                                      stateless_reset_packet->length());
+    quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
+                                    time_system_.monotonicTime());
+  }
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+      .Times(0);
+  auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
+                                                    stateless_reset_packet->length());
+  quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
+                                  time_system_.monotonicTime());
+}
+
 // Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.
 TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   quic::QuicNewConnectionIdFrame frame;

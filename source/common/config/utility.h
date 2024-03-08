@@ -12,11 +12,6 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/stats/stats_matcher.h"
-#include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
@@ -24,7 +19,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
-#include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -178,9 +172,10 @@ public:
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
    * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
-   * @return RateLimitSettings.
+   * @return absl::StatusOr<RateLimitSettings> - returns an error when an
+   *         invalid RateLimit config settings are provided.
    */
-  static RateLimitSettings
+  static absl::StatusOr<RateLimitSettings>
   parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
@@ -392,17 +387,6 @@ public:
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
   /**
-   * Create TagProducer instance. Check all tag names for conflicts to avoid
-   * unexpected tag name overwriting.
-   * @param bootstrap bootstrap proto.
-   * @param cli_tags tags that are provided by the cli
-   * @throws EnvoyException when the conflict of tag names is found.
-   */
-  static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                    const Stats::TagVector& cli_tags);
-
-  /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
@@ -490,7 +474,6 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
       absl::optional<const uint32_t> default_max_interval_ms) {
-
     auto& grpc_services = api_config_source.grpc_services();
     if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
       return prepareJitteredExponentialBackOffStrategy(

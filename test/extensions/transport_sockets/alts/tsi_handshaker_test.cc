@@ -48,7 +48,6 @@ using ::grpc::gcp::HandshakerResult;
 using ::grpc::gcp::HandshakerService;
 using ::testing::IsNull;
 using ::testing::NotNull;
-using ::testing::Test;
 
 constexpr absl::string_view ClientInit = "CLIENT_INIT";
 constexpr absl::string_view ServerInit = "SERVER_INIT";
@@ -141,7 +140,7 @@ public:
       response.mutable_status()->set_details("Internal error.");
       EXPECT_TRUE(stream->Write(response));
     }
-    return grpc::Status(grpc::StatusCode::INTERNAL, "DoHandshake internal error.");
+    return {grpc::StatusCode::INTERNAL, "DoHandshake internal error."};
   }
 };
 

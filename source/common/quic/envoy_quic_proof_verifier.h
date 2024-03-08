@@ -4,7 +4,7 @@
 
 #include "source/common/quic/envoy_quic_proof_verifier_base.h"
 #include "source/common/quic/quic_ssl_connection_info.h"
-#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/common/tls/context_impl.h"
 
 namespace Envoy {
 namespace Quic {

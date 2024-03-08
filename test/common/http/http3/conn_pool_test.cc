@@ -39,6 +39,7 @@ public:
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   Http3ConnPoolImplTest() {
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
@@ -86,6 +87,7 @@ public:
   std::unique_ptr<Http3ConnPoolImpl> pool_;
   MockPoolConnectResultCallback connect_result_callback_;
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 class MockQuicClientTransportSocketFactory : public Quic::QuicClientTransportSocketFactory {

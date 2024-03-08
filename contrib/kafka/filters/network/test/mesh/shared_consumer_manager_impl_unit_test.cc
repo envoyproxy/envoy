@@ -3,6 +3,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/thread/thread.h"
 
+#include "test/mocks/thread/mocks.h"
+
 #include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -17,12 +19,6 @@ namespace {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
-
-class MockThreadFactory : public Thread::ThreadFactory {
-public:
-  MOCK_METHOD(Thread::ThreadPtr, createThread, (std::function<void()>, Thread::OptionsOptConstRef));
-  MOCK_METHOD(Thread::ThreadId, currentThreadId, ());
-};
 
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
@@ -41,7 +37,7 @@ public:
 
 class SharedConsumerManagerTest : public testing::Test {
 protected:
-  MockThreadFactory thread_factory_;
+  Thread::MockThreadFactory thread_factory_;
   MockUpstreamKafkaConfiguration configuration_;
   MockKafkaConsumerFactory consumer_factory_;
 

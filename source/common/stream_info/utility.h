@@ -103,6 +103,7 @@ public:
   constexpr static absl::string_view OVERLOAD_MANAGER = "OM";
   constexpr static absl::string_view DNS_FAIL = "DF";
   constexpr static absl::string_view DROP_OVERLOAD = "DO";
+  constexpr static absl::string_view DOWNSTREAM_REMOTE_RESET = "DR";
 
   constexpr static absl::string_view DOWNSTREAM_CONNECTION_TERMINATION_LONG =
       "DownstreamConnectionTermination";
@@ -138,6 +139,7 @@ public:
   constexpr static absl::string_view OVERLOAD_MANAGER_LONG = "OverloadManagerTerminated";
   constexpr static absl::string_view DNS_FAIL_LONG = "DnsResolutionFailed";
   constexpr static absl::string_view DROP_OVERLOAD_LONG = "DropOverload";
+  constexpr static absl::string_view DOWNSTREAM_REMOTE_RESET_LONG = "DownstreamRemoteReset";
 
   static constexpr std::array CORE_RESPONSE_FLAGS{
       FlagStrings{FAILED_LOCAL_HEALTH_CHECK, FAILED_LOCAL_HEALTH_CHECK_LONG,
@@ -185,6 +187,8 @@ public:
       FlagStrings{OVERLOAD_MANAGER, OVERLOAD_MANAGER_LONG, CoreResponseFlag::OverloadManager},
       FlagStrings{DNS_FAIL, DNS_FAIL_LONG, CoreResponseFlag::DnsResolutionFailed},
       FlagStrings{DROP_OVERLOAD, DROP_OVERLOAD_LONG, CoreResponseFlag::DropOverLoad},
+      FlagStrings{DOWNSTREAM_REMOTE_RESET, DOWNSTREAM_REMOTE_RESET_LONG,
+                  CoreResponseFlag::DownstreamRemoteReset},
   };
 
 private:

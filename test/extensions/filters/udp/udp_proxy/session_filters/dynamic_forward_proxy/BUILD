@@ -20,7 +20,7 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "dfp_setter_filter_config_lib",
-    srcs = ["dfp_setter.h"],
+    hdrs = ["dfp_setter.h"],
     deps = [
         ":dfp_setter_filter_proto_cc_proto",
         "//envoy/registry",

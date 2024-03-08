@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
@@ -30,7 +31,9 @@ public:
     LocalStream(OpenTelemetryGrpcTraceExporterClient& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
+      metadata.setReferenceUserAgent(OtlpUtils::getOtlpUserAgentHeader());
+    }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
     void onReceiveMessage(
         std::unique_ptr<opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse>&&)

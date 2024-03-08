@@ -583,16 +583,17 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                             Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
-  RELEASE_ASSERT(
-      peer_addess != nullptr,
-      fmt::format("Unable to get remote address on the socket bount to local address: {} ",
-                  local_address->asString()));
+  ENVOY_BUG(peer_addess != nullptr,
+            fmt::format("Unable to get remote address on the socket bound to local address: {}.",
+                        (local_address == nullptr ? "unknown" : local_address->asString())));
 
   // Unix domain sockets are not supported
-  RELEASE_ASSERT(peer_addess->type() == Address::Type::Ip,
-                 fmt::format("Unsupported remote address: {} local address: {}, receive size: "
-                             "{}",
-                             peer_addess->asString(), local_address->asString(), bytes_read));
+  ENVOY_BUG(peer_addess != nullptr && peer_addess->type() == Address::Type::Ip,
+            fmt::format("Unsupported remote address: {} local address: {}, receive size: "
+                        "{}",
+                        peer_addess->asString(),
+                        (local_address == nullptr ? "unknown" : local_address->asString()),
+                        bytes_read));
   udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
                                      std::move(buffer), receive_time);
 }

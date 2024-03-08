@@ -20,6 +20,7 @@ envoy_cc_test(
     deps = [
         "//contrib/kafka/filters/network/source/mesh:config_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/thread:thread_mocks",
     ],
 )
 
@@ -58,6 +59,7 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:upstream_kafka_facade_lib",
+        "//test/mocks/thread:thread_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:thread_factory_for_test_lib",
     ],
@@ -81,6 +83,7 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:shared_consumer_manager_impl_lib",
+        "//test/mocks/thread:thread_mocks",
     ],
 )
 

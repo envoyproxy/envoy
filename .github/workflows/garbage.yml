@@ -1,0 +1,40 @@
+name: Garbage collection
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+  - cron: '0 0 * * *'
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  azp-agents:
+    runs-on: ubuntu-22.04
+    if: github.repository == 'envoyproxy/envoy'
+    strategy:
+      matrix:
+        include:
+        - target: envoy-arm-large
+          pool-id: 21
+        - target: envoy-arm-small
+          pool-id: 24
+        - target: envoy-x64-large
+          pool-id: 20
+        - target: envoy-x64-small
+          pool-id: 23
+        - target: salvo-control
+          pool-id: 22
+        - target: x64-nano
+          pool-id: 17
+    steps:
+    - name: Remove dead AZP agents (${{ matrix.target }})
+      uses: envoyproxy/toolshed/gh-actions/azp/agent-cleanup@actions-v0.2.27
+      with:
+        azp-org: cncf
+        azp-token: ${{ secrets.AZP_TOKEN }}
+        pool-id: ${{ matrix.pool-id }}

@@ -311,6 +311,7 @@ message JwtProvider {
   // Add JWT claim to HTTP Header
   // Specify the claim name you want to copy in which HTTP header. For examples, following config:
   // The claim must be of type; string, int, double, bool. Array type claims are not supported
+  //
   // .. code-block:: yaml
   //
   //   claim_to_headers:

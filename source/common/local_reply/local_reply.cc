@@ -61,7 +61,9 @@ public:
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
     if (config.has_body()) {
-      body_ = Config::DataSource::read(config.body(), true, context.serverFactoryContext().api());
+      body_ = THROW_OR_RETURN_VALUE(
+          Config::DataSource::read(config.body(), true, context.serverFactoryContext().api()),
+          std::string);
     }
 
     if (config.has_body_format_override()) {

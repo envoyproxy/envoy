@@ -93,8 +93,10 @@ enum CoreResponseFlag : uint16_t {
   DnsResolutionFailed,
   // Drop certain percentage of overloaded traffic.
   DropOverLoad,
+  // Downstream remote codec level reset was received on the stream.
+  DownstreamRemoteReset,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DropOverLoad,
+  LastFlag = DownstreamRemoteReset,
 };
 
 class ResponseFlagUtils;

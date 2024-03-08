@@ -31,7 +31,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     if (runtime_.threadsafeSnapshot()->get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
       ENVOY_LOG_ONCE_MISC(
           warn,
-          "Global downstream connections limits is configured via runtime key {} and in "
+          "Global downstream connections limits is configured via deprecated runtime key {} and in "
           "{}. Using overload manager config.",
           Runtime::Keys::GlobalMaxCxRuntimeKey,
           Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections);
@@ -164,7 +164,7 @@ void TcpListenerImpl::setRejectFraction(const UnitFloat reject_fraction) {
 void TcpListenerImpl::configureLoadShedPoints(
     Server::LoadShedPointProvider& load_shed_point_provider) {
   listener_accept_ =
-      load_shed_point_provider.getLoadShedPoint("envoy.load_shed_points.tcp_listener_accept");
+      load_shed_point_provider.getLoadShedPoint(Server::LoadShedPointName::get().TcpListenerAccept);
   ENVOY_LOG_ONCE_MISC_IF(
       trace, listener_accept_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.tcp_listener_accept is not found. Is it configured?");

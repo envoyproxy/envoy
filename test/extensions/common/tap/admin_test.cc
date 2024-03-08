@@ -170,7 +170,6 @@ public:
 };
 
 TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
-
   const std::string tap_config_yaml =
       R"EOF(
   match:
@@ -204,7 +203,6 @@ TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
 }
 
 TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
-
   const std::string tap_config_yaml =
       R"EOF(
   match:
@@ -235,6 +233,62 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   TestConfigImpl(tap_config, nullptr, factory_context);
+}
+
+// Validates that a BufferedAdmin tap config that is passed without an admin
+// streamer is rejected.
+TEST(TypedExtensionConfigTest, BufferedAdminNoAdminStreamerRejected) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - buffered_admin: {}
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return std::make_unique<ProtobufWkt::StringValue>();
+      }));
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(tap_config, nullptr, factory_context), EnvoyException,
+      "Output sink type BufferedAdmin requires that the admin output will be configured via admin");
+}
+
+// Validates that a StreamingAdmin tap config that is passed without an admin
+// streamer is rejected.
+TEST(TypedExtensionConfigTest, StreamingAdminNoAdminStreamerRejected) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - streaming_admin: {}
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return std::make_unique<ProtobufWkt::StringValue>();
+      }));
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(TestConfigImpl(tap_config, nullptr, factory_context), EnvoyException,
+                            "Output sink type StreamingAdmin requires that the admin output will "
+                            "be configured via admin");
 }
 
 // Make sure warn if using a pipe address for the admin handler.

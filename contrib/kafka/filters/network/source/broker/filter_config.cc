@@ -48,7 +48,7 @@ BrokerFilterConfig::findBrokerAddressOverride(const uint32_t broker_id) const {
   return absl::nullopt;
 }
 
-const std::string& BrokerFilterConfig::stat_prefix() const { return stat_prefix_; }
+const std::string& BrokerFilterConfig::statPrefix() const { return stat_prefix_; }
 
 } // namespace Broker
 } // namespace Kafka

@@ -96,16 +96,16 @@ WASM_EXPORT(void, proxy_on_log, (uint32_t /* context_zero */)) {
   auto simple_h = complete_h->resolve("test_tag", true);
   logError(std::string("h_id = ") + complete_h->nameFromIdSlow(simple_h.metric_id));
 
-  Counter<std::string, int, bool> stack_c("test_counter", "string_tag", "int_tag", "bool_tag");
+  Counter<std::string, int, bool> stack_c("test_counter", MetricTagDescriptor<std::string>("string_tag"), MetricTagDescriptor<int>("int_tag"), MetricTagDescriptor<bool>("bool_tag"));
   stack_c.increment(1, "test_tag_stack", 7, true);
   logError(std::string("stack_c = ") + std::to_string(stack_c.get("test_tag_stack", 7, true)));
 
-  Gauge<std::string, std::string> stack_g("test_gauge", "string_tag1", "string_tag2");
+  Gauge<std::string, std::string> stack_g("test_gauge", MetricTagDescriptor<std::string>("string_tag1"), MetricTagDescriptor<std::string>("string_tag2"));
   stack_g.record(2, "stack_test_tag1", "test_tag2");
   logError(std::string("stack_g = ") + std::to_string(stack_g.get("stack_test_tag1", "test_tag2")));
 
   std::string_view int_tag = "int_tag";
-  Histogram<int, std::string, bool> stack_h("test_histogram", int_tag, "string_tag", "bool_tag");
+  Histogram<int, std::string, bool> stack_h("test_histogram", MetricTagDescriptor<int>(int_tag), MetricTagDescriptor<std::string>("string_tag"), MetricTagDescriptor<bool>("bool_tag"));
   std::string_view stack_test_tag = "stack_test_tag";
   stack_h.record(3, 7, stack_test_tag, true);
 }

@@ -137,8 +137,11 @@ absl::StatusOr<absl::optional<OpCodes>> DecoderImpl::decodeOnData(Buffer::Instan
         status, fmt::format("parseGetDataRequest: {}", status.message()));
     break;
   case OpCodes::Create:
+    ABSL_FALLTHROUGH_INTENDED;
   case OpCodes::Create2:
+    ABSL_FALLTHROUGH_INTENDED;
   case OpCodes::CreateContainer:
+    ABSL_FALLTHROUGH_INTENDED;
   case OpCodes::CreateTtl:
     status = parseCreateRequest(data, offset, len.value(), opcode);
     RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(
@@ -470,6 +473,13 @@ absl::Status DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& o
                                                                flag_data.status().message());
 
   const CreateFlags flags = static_cast<CreateFlags>(flag_data.value());
+
+  if (opcode == OpCodes::CreateTtl) {
+    absl::StatusOr<int64_t> ttl = helper_.peekInt64(data, offset);
+    EMIT_DECODER_ERR_AND_RETURN_INVALID_ARG_ERR_IF_STATUS_NOT_OK(ttl, opcode,
+                                                                 ttl.status().message());
+  }
+
   status = callbacks_.onCreateRequest(path.value(), flags, opcode);
   EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, opcode);
 
@@ -642,22 +652,37 @@ absl::Status DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& of
       break;
     }
 
-    switch (static_cast<OpCodes>(opcode.value())) {
+    const auto op = static_cast<OpCodes>(opcode.value());
+    switch (op) {
     case OpCodes::Create:
-      status = parseCreateRequest(data, offset, len, OpCodes::Create);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::Create);
+      ABSL_FALLTHROUGH_INTENDED;
+    case OpCodes::Create2:
+      ABSL_FALLTHROUGH_INTENDED;
+    case OpCodes::CreateContainer:
+      ABSL_FALLTHROUGH_INTENDED;
+    case OpCodes::CreateTtl:
+      status = parseCreateRequest(data, offset, len, op);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     case OpCodes::SetData:
       status = parseSetRequest(data, offset, len);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::SetData);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     case OpCodes::Check:
       status = parseCheckRequest(data, offset, len);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::Check);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     case OpCodes::Delete:
       status = parseDeleteRequest(data, offset, len);
-      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, OpCodes::Delete);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
+      break;
+    case OpCodes::GetChildren:
+      status = parseGetChildrenRequest(data, offset, len, false);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
+      break;
+    case OpCodes::GetData:
+      status = parseGetDataRequest(data, offset, len);
+      EMIT_DECODER_ERR_AND_RETURN_IF_STATUS_NOT_OK(status, op);
       break;
     default:
       callbacks_.onDecodeError(absl::nullopt);

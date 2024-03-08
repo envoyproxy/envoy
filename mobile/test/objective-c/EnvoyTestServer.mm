@@ -11,6 +11,14 @@
   start_server(Envoy::TestServerType::HTTP1_WITHOUT_TLS);
 }
 
++ (void)startHttpProxyServer {
+  start_server(Envoy::TestServerType::HTTP_PROXY);
+}
+
++ (void)startHttpsProxyServer {
+  start_server(Envoy::TestServerType::HTTPS_PROXY);
+}
+
 + (void)shutdownTestServer {
   shutdown_server();
 }

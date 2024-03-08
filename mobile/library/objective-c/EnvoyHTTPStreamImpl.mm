@@ -21,8 +21,8 @@ typedef struct {
 
 #pragma mark - C callbacks
 
-static void *ios_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel stream_intel,
-                            void *context) {
+static void ios_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel stream_intel,
+                           void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
@@ -30,11 +30,10 @@ static void *ios_on_headers(envoy_headers headers, bool end_stream, envoy_stream
       callbacks.onHeaders(to_ios_headers(headers), end_stream, stream_intel);
     }
   });
-  return NULL;
 }
 
-static void *ios_on_data(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
-                         void *context) {
+static void ios_on_data(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
+                        void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
@@ -42,16 +41,13 @@ static void *ios_on_data(envoy_data data, bool end_stream, envoy_stream_intel st
       callbacks.onData(to_ios_data(data), end_stream, stream_intel);
     }
   });
-  return NULL;
 }
 
-static void *ios_on_metadata(envoy_headers metadata, envoy_stream_intel stream_intel,
-                             void *context) {
-  return NULL;
-}
+static void ios_on_metadata(envoy_headers metadata, envoy_stream_intel stream_intel,
+                            void *context) {}
 
-static void *ios_on_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
-                             void *context) {
+static void ios_on_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
+                            void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
@@ -59,10 +55,9 @@ static void *ios_on_trailers(envoy_headers trailers, envoy_stream_intel stream_i
       callbacks.onTrailers(to_ios_headers(trailers), stream_intel);
     }
   });
-  return NULL;
 }
 
-static void *ios_on_send_window_available(envoy_stream_intel stream_intel, void *context) {
+static void ios_on_send_window_available(envoy_stream_intel stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
@@ -70,11 +65,10 @@ static void *ios_on_send_window_available(envoy_stream_intel stream_intel, void 
       callbacks.onSendWindowAvailable(stream_intel);
     }
   });
-  return NULL;
 }
 
-static void *ios_on_complete(envoy_stream_intel stream_intel,
-                             envoy_final_stream_intel final_stream_intel, void *context) {
+static void ios_on_complete(envoy_stream_intel stream_intel,
+                            envoy_final_stream_intel final_stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
@@ -86,11 +80,10 @@ static void *ios_on_complete(envoy_stream_intel stream_intel,
     assert(stream);
     [stream cleanUp];
   });
-  return NULL;
 }
 
-static void *ios_on_cancel(envoy_stream_intel stream_intel,
-                           envoy_final_stream_intel final_stream_intel, void *context) {
+static void ios_on_cancel(envoy_stream_intel stream_intel,
+                          envoy_final_stream_intel final_stream_intel, void *context) {
   // This call is atomically gated at the call-site and will only happen once. It may still fire
   // after a complete response or error callback, but no other callbacks for the stream will ever
   // fire AFTER the cancellation callback.
@@ -106,11 +99,10 @@ static void *ios_on_cancel(envoy_stream_intel stream_intel,
     assert(stream);
     [stream cleanUp];
   });
-  return NULL;
 }
 
-static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
-                          envoy_final_stream_intel final_stream_intel, void *context) {
+static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
+                         envoy_final_stream_intel final_stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
@@ -128,7 +120,6 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
     assert(stream);
     [stream cleanUp];
   });
-  return NULL;
 }
 
 #pragma mark - EnvoyHTTPStreamImpl

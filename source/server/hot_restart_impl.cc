@@ -124,6 +124,10 @@ void HotRestartImpl::registerUdpForwardingListener(
   as_child_.registerUdpForwardingListener(address, listener_config);
 }
 
+OptRef<Network::ParentDrainedCallbackRegistrar> HotRestartImpl::parentDrainedCallbackRegistrar() {
+  return as_child_;
+}
+
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   as_parent_.initialize(dispatcher, server);
   as_child_.initialize(dispatcher);

@@ -228,7 +228,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
       use_alpn_(options.has_auto_config()) {
-  ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options).status().ok());
+  ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
 }
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(

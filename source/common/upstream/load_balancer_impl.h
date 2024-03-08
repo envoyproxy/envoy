@@ -525,7 +525,7 @@ protected:
     // EdfScheduler for weighted LB. The edf_ is only created when the original
     // host weights of 2 or more hosts differ. When not present, the
     // implementation of chooseHostOnce falls back to unweightedHostPick.
-    std::unique_ptr<EdfScheduler<const Host>> edf_;
+    std::unique_ptr<EdfScheduler<Host>> edf_;
   };
 
   void initialize();

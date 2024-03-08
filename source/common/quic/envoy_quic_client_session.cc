@@ -91,7 +91,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
       quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope),
       transport_socket_options_(transport_socket_options),
       transport_socket_factory_(makeOptRefFromPtr(
-          dynamic_cast<QuicClientTransportSocketFactory*>(transport_socket_factory.ptr()))) {
+          dynamic_cast<QuicTransportSocketFactoryBase*>(transport_socket_factory.ptr()))) {
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   if (transport_socket_options_ != nullptr &&
       !transport_socket_options_->applicationProtocolListOverride().empty()) {

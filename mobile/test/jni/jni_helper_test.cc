@@ -224,3 +224,13 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_callStaticObjectMethod(JNIEnv* 
   jmethodID method_id = jni_helper.getStaticMethodId(clazz, name_ptr.get(), sig_ptr.get());
   return jni_helper.callStaticObjectMethod(clazz, method_id).release();
 }
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_newDirectByteBuffer(JNIEnv* env, jclass) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  char* bytes = new char[3];
+  bytes[0] = 1;
+  bytes[1] = 2;
+  bytes[2] = 3;
+  return jni_helper.newDirectByteBuffer(reinterpret_cast<void*>(bytes), sizeof(char) * 3).release();
+}

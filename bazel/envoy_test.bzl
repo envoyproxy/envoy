@@ -154,6 +154,7 @@ def envoy_cc_test(
         tags = [],
         args = [],
         copts = [],
+        linkopts = [],
         condition = None,
         shard_count = None,
         coverage = True,
@@ -170,7 +171,7 @@ def envoy_cc_test(
         data = data,
         copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         additional_linker_inputs = envoy_exported_symbols_input(),
-        linkopts = _envoy_test_linkopts(),
+        linkopts = _envoy_test_linkopts() + linkopts,
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [

@@ -2,7 +2,9 @@ package org.chromium.net;
 
 import static org.chromium.net.testing.CronetTestRule.getContext;
 import static org.chromium.net.testing.CronetTestRule.getTestStorage;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -81,7 +83,7 @@ public class DiskStorageTest {
       byte[] buffer = new byte[] {0, 0, 0, 0};
       int bytesRead = newVersionFile.read(buffer, 0, 4);
       assertEquals(4, bytesRead);
-      assertTrue(Arrays.equals(new byte[] {1, 0, 0, 0}, buffer));
+      assertArrayEquals(new byte[] {1, 0, 0, 0}, buffer);
     } finally {
       if (newVersionFile != null) {
         newVersionFile.close();
@@ -141,14 +143,14 @@ public class DiskStorageTest {
       byte[] buffer = new byte[] {0, 0, 0, 0};
       int bytesRead = newVersionFile.read(buffer, 0, 4);
       assertEquals(4, bytesRead);
-      assertTrue(Arrays.equals(new byte[] {1, 0, 0, 0}, buffer));
+      assertArrayEquals(new byte[] {1, 0, 0, 0}, buffer);
     } finally {
       if (newVersionFile != null) {
         newVersionFile.close();
       }
     }
     oldPrefsFile = new File(testStorage + "/local_prefs.json");
-    assertTrue(!oldPrefsFile.exists());
+    assertFalse(oldPrefsFile.exists());
     File diskCacheDir = new File(testStorage + "/disk_cache");
     assertTrue(diskCacheDir.exists());
     File prefsDir = new File(testStorage + "/prefs");

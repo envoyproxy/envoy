@@ -8,17 +8,17 @@ public interface EnvoyStreamIntel {
   /**
    * An internal identifier for the stream.
    */
-  public long getStreamId();
+  long getStreamId();
 
   /**
    * An internal identifier for the connection carrying the stream.
    */
-  public long getConnectionId();
+  long getConnectionId();
 
   /**
    * The number of internal attempts to carry out a request/operation.
    */
-  public long getAttemptCount();
+  long getAttemptCount();
 
   /**
    * The number of bytes consumed by the non terminal callbacks, from the response.
@@ -28,5 +28,5 @@ public interface EnvoyStreamIntel {
    * number of bytes received before decompression. getConsumedBytesFromResponse() omits the number
    * number of bytes related to the Status Line, and is after decompression.
    */
-  public long getConsumedBytesFromResponse();
+  long getConsumedBytesFromResponse();
 }

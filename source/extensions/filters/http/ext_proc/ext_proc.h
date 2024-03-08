@@ -247,6 +247,9 @@ public:
   const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
+  const std::vector<envoy::config::core::v3::HeaderValue>& grpcInitialMetadata() const {
+    return grpc_initial_metadata_;
+  }
 
   const absl::optional<const std::vector<std::string>>&
   untypedForwardingMetadataNamespaces() const {
@@ -260,31 +263,11 @@ public:
   }
 
 private:
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::config::core::v3::GrpcService>
-  initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns);
-
-  absl::optional<std::vector<std::string>> initUntypedForwardingNamespaces(
-      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<std::vector<std::string>> initTypedForwardingNamespaces(
-      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<std::vector<std::string>> initUntypedReceivingNamespaces(
-      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  mergeProcessingMode(const FilterConfigPerRoute& less_specific,
-                      const FilterConfigPerRoute& more_specific);
-
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  std::vector<envoy::config::core::v3::HeaderValue> grpc_initial_metadata_;
 
   const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
@@ -321,6 +304,9 @@ public:
                         config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
+  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+    return config_with_hash_key_.config();
+  }
 
   ExtProcFilterStats& stats() { return stats_; }
   ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
@@ -373,8 +359,7 @@ private:
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      ProtobufWkt::Struct* proto);
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
@@ -386,6 +371,7 @@ private:
   void setDecoderDynamicMetadata(const envoy::service::ext_proc::v3::ProcessingResponse& response);
   void addDynamicMetadata(const ProcessorState& state,
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;

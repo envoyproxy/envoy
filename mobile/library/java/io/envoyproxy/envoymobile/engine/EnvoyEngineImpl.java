@@ -163,7 +163,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
       return;
     default:
       JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_GENERIC);
-      return;
     }
   }
 

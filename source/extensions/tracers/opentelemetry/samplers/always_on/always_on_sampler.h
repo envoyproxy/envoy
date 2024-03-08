@@ -14,7 +14,7 @@ namespace OpenTelemetry {
 /**
  * @brief A sampler which samples every span.
  * https://opentelemetry.io/docs/specs/otel/trace/sdk/#alwayson
- * - Returns RECORD_AND_SAMPLE always.
+ * - Returns RecordAndSample always.
  * - Description MUST be AlwaysOnSampler.
  *
  */

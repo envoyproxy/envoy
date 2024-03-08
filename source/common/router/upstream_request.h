@@ -61,12 +61,15 @@ class UpstreamCodecFilter;
  * There is some required communication between the UpstreamRequest and
  * UpstreamCodecFilter. This is accomplished via the UpstreamStreamFilterCallbacks
  * interface, with the UpstreamFilterManager acting as intermediary.
+ *
+ * UpstreamRequest is marked as final because no subclasses are expected.
+ * This class is intended to be used as-is without any specialized inheritance.
  */
-class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
-                        public UpstreamToDownstream,
-                        public LinkedObject<UpstreamRequest>,
-                        public GenericConnectionPoolCallbacks,
-                        public Event::DeferredDeletable {
+class UpstreamRequest final : public Logger::Loggable<Logger::Id::router>,
+                              public UpstreamToDownstream,
+                              public LinkedObject<UpstreamRequest>,
+                              public GenericConnectionPoolCallbacks,
+                              public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
                   bool can_send_early_data, bool can_use_http3);

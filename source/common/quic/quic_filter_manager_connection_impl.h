@@ -171,7 +171,7 @@ public:
     max_headers_count_ = max_headers_count;
   }
 
-  bool fix_quic_lifetime_issues() const { return fix_quic_lifetime_issues_; }
+  bool fixQuicLifetimeIssues() const { return fix_quic_lifetime_issues_; }
 
 protected:
   // Propagate connection close to network_connection_callbacks_.

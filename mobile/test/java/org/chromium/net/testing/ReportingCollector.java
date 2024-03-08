@@ -14,8 +14,8 @@ import java.util.concurrent.TimeUnit;
  * whether expected reports were actually received.
  */
 final class ReportingCollector {
-  private ArrayList<JSONObject> mReceivedReports = new ArrayList<JSONObject>();
-  private Semaphore mReceivedReportsSemaphore = new Semaphore(0);
+  private final ArrayList<JSONObject> mReceivedReports = new ArrayList<JSONObject>();
+  private final Semaphore mReceivedReportsSemaphore = new Semaphore(0);
 
   /**
    * Stores a batch of uploaded reports.
@@ -102,4 +102,4 @@ final class ReportingCollector {
     }
     return true;
   }
-};
+}

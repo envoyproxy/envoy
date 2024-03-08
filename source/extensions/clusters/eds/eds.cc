@@ -9,6 +9,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/grpc/common.h"
 
 namespace Envoy {
 namespace Upstream {

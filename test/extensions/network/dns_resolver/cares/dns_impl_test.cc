@@ -794,7 +794,7 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=, this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
@@ -827,7 +827,7 @@ public:
                                                   const DnsLookupFamily lookup_family) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=, this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
           EXPECT_EQ(0, address_as_string_list.size());

@@ -8,11 +8,11 @@
 
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/event/real_time_system.h"
+#include "source/common/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
-#include "source/extensions/transport_sockets/tls/stats.h"
 
-#include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
-#include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/common/tls/cert_validator/test_common.h"
+#include "test/common/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -122,10 +122,10 @@ typed_config:
   trust_domains:
     - name: hello.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"
     - name: hello.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"
   )EOF")),
                             EnvoyException,
                             "Multiple trust bundles are given for one trust domain for hello.com");
@@ -138,7 +138,7 @@ typed_config:
   trust_domains:
     - name: hello.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"
   )EOF"));
 
   EXPECT_EQ(1, validator().trustBundleStores().size());
@@ -153,10 +153,10 @@ typed_config:
   trust_domains:
     - name: hello.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
     - name: k8s-west.example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/keyusage_crl_sign_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/keyusage_crl_sign_cert.pem"
   )EOF"));
 
   EXPECT_EQ(2, validator().trustBundleStores().size());
@@ -177,25 +177,25 @@ TEST(SPIFFEValidator, TestExtractTrustDomain) {
 TEST(SPIFFEValidator, TestCertificatePrecheck) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints: CA:True,
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+      "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
   EXPECT_FALSE(SPIFFEValidator::certificatePrecheck(cert.get()));
 
   cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints CA:False, keyUsage has keyCertSign
       "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/keyusage_cert_sign_cert.pem"));
+      "}}/test/common/tls/test_data/keyusage_cert_sign_cert.pem"));
   EXPECT_FALSE(SPIFFEValidator::certificatePrecheck(cert.get()));
 
   cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints CA:False, keyUsage has cRLSign
       "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/keyusage_crl_sign_cert.pem"));
+      "}}/test/common/tls/test_data/keyusage_crl_sign_cert.pem"));
   EXPECT_FALSE(SPIFFEValidator::certificatePrecheck(cert.get()));
 
   cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints CA:False, keyUsage does not have keyCertSign and cRLSign
       // should be considered valid (i.e. return 1).
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
+      "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
   EXPECT_TRUE(SPIFFEValidator::certificatePrecheck(cert.get()));
 }
 
@@ -210,18 +210,18 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
 
   // No SAN
   auto cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
+      "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // Non-SPIFFE SAN
-  cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/non_spiffe_san_cert.pem"));
+  cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/common/tls/test_data/non_spiffe_san_cert.pem"));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // SPIFFE SAN
   cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
+      "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
 
   // Trust bundle not provided.
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
@@ -248,7 +248,7 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
   initialize();
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints: CA:True
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+      "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
   TestSslExtendedSocketInfo info;
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -269,7 +269,7 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
   X509StorePtr store = X509_STORE_new();
@@ -278,7 +278,7 @@ typed_config:
   {
     // Trust domain matches so should be accepted.
     auto cert = readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
     sk_X509_push(cert_chain.get(), cert.release());
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
@@ -291,7 +291,7 @@ typed_config:
   {
     // Different trust domain so should be rejected.
     auto cert = readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
+        "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
     sk_X509_push(cert_chain.get(), cert.release());
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
@@ -303,7 +303,7 @@ typed_config:
   {
     // Does not have san.
     auto cert = readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
+        "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
     sk_X509_push(cert_chain.get(), cert.release());
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
@@ -324,10 +324,10 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
   X509StorePtr store = X509_STORE_new();
@@ -337,7 +337,7 @@ typed_config:
   {
     // Trust domain matches so should be accepted.
     auto cert = readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
     sk_X509_push(cert_chain.get(), cert.release());
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
@@ -349,7 +349,7 @@ typed_config:
 
   {
     auto cert = readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
+        "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
     sk_X509_push(cert_chain.get(), cert.release());
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
@@ -361,9 +361,9 @@ typed_config:
 
   {
     // Trust domain matches but it has expired.
-    auto cert = readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir "
-        "}}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem"));
+    auto cert = readCertFromFile(
+        TestEnvironment::substitute("{{ test_rundir "
+                                    "}}/test/common/tls/test_data/expired_spiffe_san_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
     sk_X509_push(cert_chain.get(), cert.release());
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
@@ -376,7 +376,7 @@ typed_config:
   {
     // Does not have san.
     auto cert = readCertFromFile(TestEnvironment::substitute(
-        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
+        "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
     sk_X509_push(cert_chain.get(), cert.release());
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
@@ -398,7 +398,7 @@ typed_config:
   trust_domains:
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
   X509StorePtr store = X509_STORE_new();
@@ -406,9 +406,9 @@ typed_config:
   TestSslExtendedSocketInfo info;
   // Trust domain matches and it has expired but allow_expired_certificate is true, so this
   // should be accepted.
-  auto cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem"));
+  auto cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/common/tls/test_data/expired_spiffe_san_cert.pem"));
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   sk_X509_push(cert_chain.get(), cert.release());
   EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
@@ -428,14 +428,14 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF");
 
   X509StorePtr store = X509_STORE_new();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   // URI SAN = spiffe://lyft.com/test-team
-  auto cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
+  auto cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), store.get(), cert.get(), nullptr));
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -476,17 +476,17 @@ typed_config:
   trust_domains:
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
   TestSslExtendedSocketInfo info;
   // Chain contains workload, intermediate, and ca cert, so it should be accepted.
-  auto cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/"
-      "spiffe_san_signed_by_intermediate_cert.pem"));
-  auto intermediate_ca_cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/"
-      "intermediate_ca_cert.pem"));
+  auto cert =
+      readCertFromFile(TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                                   "spiffe_san_signed_by_intermediate_cert.pem"));
+  auto intermediate_ca_cert =
+      readCertFromFile(TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                                   "intermediate_ca_cert.pem"));
 
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -523,7 +523,7 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
   {
@@ -566,7 +566,7 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
   {
@@ -599,10 +599,10 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
   auto actual = validator().getCaCertInformation();
@@ -623,10 +623,10 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"
   )EOF"),
              time_system);
   EXPECT_EQ(19956, validator().daysUntilFirstCertExpires().value());
@@ -647,7 +647,7 @@ typed_config:
   trust_domains:
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
   )EOF"),
              time_system);
 
@@ -663,13 +663,13 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
     - name: foo.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"),
              time_system);
 
@@ -706,10 +706,10 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"),
              time_system);
   uint8_t hash_buffer[EVP_MAX_MD_SIZE];

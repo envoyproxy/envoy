@@ -26,11 +26,13 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
   case SinkConfig::ProtocolSpecifierCase::kGrpcService: {
     const auto& grpc_service = sink_config.grpc_service();
 
+    auto client_or_error =
+        server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+            grpc_service, server.scope(), false);
+    THROW_IF_STATUS_NOT_OK(client_or_error, throw);
     std::shared_ptr<OpenTelemetryGrpcMetricsExporter> grpc_metrics_exporter =
-        std::make_shared<OpenTelemetryGrpcMetricsExporterImpl>(
-            otlp_options,
-            server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-                grpc_service, server.scope(), false));
+        std::make_shared<OpenTelemetryGrpcMetricsExporterImpl>(otlp_options,
+                                                               client_or_error.value());
 
     return std::make_unique<OpenTelemetryGrpcSink>(otlp_metrics_flusher, grpc_metrics_exporter);
   }

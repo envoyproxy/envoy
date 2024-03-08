@@ -22,7 +22,7 @@ envoy_cc_test(
         "//bazel:windows_x86_64": [],
         "//conditions:default": ["-Wno-unused-parameter"],
     }),
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    data = ["//test/common/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
@@ -30,7 +30,7 @@ envoy_cc_test(
         "//source/common/quic/platform:quiche_flags_impl_lib",
         "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
-        "//test/extensions/transport_sockets/tls:ssl_test_utils",
+        "//test/common/tls:ssl_test_utils",
         "//test/mocks/api:api_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",

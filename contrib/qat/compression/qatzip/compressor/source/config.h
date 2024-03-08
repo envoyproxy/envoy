@@ -53,7 +53,7 @@ private:
 
     QzSessionParams_T params_;
     QzSession_T session_;
-    bool initialized_;
+    bool initialized_{false};
   };
 
   const uint32_t chunk_size_;

@@ -152,3 +152,21 @@ envoy_cc_test(
         "@proxy_wasm_cpp_host//:base_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "remote_async_datasource_test",
+    srcs = ["remote_async_datasource_test.cc"],
+    deps = [
+        "//source/common/common:empty_string",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:message_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)

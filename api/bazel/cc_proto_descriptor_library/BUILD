@@ -12,10 +12,12 @@ cc_library(
 cc_library(
     name = "text_format_transcoder",
     srcs = [
-        "create_dynamic_message.h",
         "text_format_transcoder.cc",
     ],
-    hdrs = ["text_format_transcoder.h"],
+    hdrs = [
+        "create_dynamic_message.h",
+        "text_format_transcoder.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":file_descriptor_info",

@@ -151,7 +151,7 @@ public:
         break;
       }
     }
-    return grpc::Status(grpc::StatusCode::INTERNAL, "DoHandshake internal error.");
+    return {grpc::StatusCode::INTERNAL, "DoHandshake internal error."};
   }
 
   const bool keep_stream_alive_;

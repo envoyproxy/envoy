@@ -25,7 +25,7 @@ TEST(AlwaysOnSamplerTest, TestWithInvalidParentContext) {
   auto sampling_result =
       sampler->shouldSample(absl::nullopt, "operation_name", "12345",
                             ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
-  EXPECT_EQ(sampling_result.decision, Decision::RECORD_AND_SAMPLE);
+  EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes, nullptr);
   EXPECT_STREQ(sampling_result.tracestate.c_str(), "");
   EXPECT_TRUE(sampling_result.isRecording());
@@ -43,7 +43,7 @@ TEST(AlwaysOnSamplerTest, TestWithValidParentContext) {
   auto sampling_result =
       sampler->shouldSample(span_context, "operation_name", "12345",
                             ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
-  EXPECT_EQ(sampling_result.decision, Decision::RECORD_AND_SAMPLE);
+  EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes, nullptr);
   EXPECT_STREQ(sampling_result.tracestate.c_str(), "some_tracestate");
   EXPECT_TRUE(sampling_result.isRecording());

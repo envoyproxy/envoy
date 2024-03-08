@@ -235,6 +235,7 @@ public:
     return nullptr;
 #endif
   }
+  bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
 

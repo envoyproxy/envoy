@@ -398,6 +398,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                      config.proxy_status_config())
                                : nullptr),
       header_validator_factory_(createHeaderValidatorFactory(config, context)),
+      append_local_overload_(config.append_local_overload()),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {

@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.engine.types;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.Executor;
 import java.util.List;
 import java.util.Map;
 
@@ -123,7 +122,7 @@ public interface EnvoyHTTPFilter {
    * @param finalStreamIntel, contains final internal HTTP stream metrics, context, and other
    *     details.
    */
-  void onCancel(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalSteamIntel);
+  void onCancel(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
   /**
    * Called when the async HTTP stream is complete.
@@ -132,5 +131,5 @@ public interface EnvoyHTTPFilter {
    * @param finalStreamIntel, contains final internal HTTP stream metrics, context, and other
    *     details.
    */
-  void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalSteamIntel);
+  void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 }

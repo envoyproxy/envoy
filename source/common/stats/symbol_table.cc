@@ -620,12 +620,16 @@ StatNameStorage::~StatNameStorage() {
 }
 
 void StatNameStorage::free(SymbolTable& table) {
+  // nolint: https://github.com/llvm/llvm-project/issues/81597
+  // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
   table.free(statName());
   clear();
 }
 
 void StatNamePool::clear() {
   for (StatNameStorage& storage : storage_vector_) {
+    // nolint: https://github.com/llvm/llvm-project/issues/81597
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     storage.free(symbol_table_);
   }
   storage_vector_.clear();
@@ -733,6 +737,8 @@ void StatNameList::iterate(const std::function<bool(StatName)>& f) const {
 
 void StatNameList::clear(SymbolTable& symbol_table) {
   iterate([&symbol_table](StatName stat_name) -> bool {
+    // nolint: https://github.com/llvm/llvm-project/issues/81597
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     symbol_table.free(stat_name);
     return true;
   });

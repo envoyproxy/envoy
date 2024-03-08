@@ -1069,6 +1069,7 @@ filter:
       - OM
       - DF
       - DO
+      - DR
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null

@@ -1071,8 +1071,8 @@ ServerConnectionImpl::ServerConnectionImpl(
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
       headers_with_underscores_action_(headers_with_underscores_action),
-      abort_dispatch_(
-          overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
+      abort_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H1ServerAbortDispatch)) {
   ENVOY_LOG_ONCE_IF(trace, abort_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http1_server_abort_dispatch is not "
                     "found. Is it configured?");

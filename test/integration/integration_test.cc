@@ -1077,6 +1077,24 @@ TEST_P(IntegrationTest, MissingDelimiter) {
   EXPECT_THAT(log, Not(HasSubstr("DC")));
 }
 
+TEST_P(IntegrationTest, ConnectionTermination) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  initialize();
+  std::string response;
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\n\r\n"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  tcp_client->close();
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("DC"));
+  EXPECT_THAT(log, HasSubstr("downstream_remote_disconnect"));
+}
+
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
   initialize();
   std::string response;

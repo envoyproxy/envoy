@@ -170,7 +170,9 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           replaceInvalidHostCharacters(
               stream_info.address().envoy_internal_address().server_listener_name()));
     } else {
-      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address()).value();
+      auto address_or_error = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      address = address_or_error.value();
     }
   } else {
     address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");

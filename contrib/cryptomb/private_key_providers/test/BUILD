@@ -52,7 +52,7 @@ envoy_cc_test(
     deps = [
         ":test_fake_factory",
         "//source/common/common:random_generator_lib",
-        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "//source/common/tls/private_key:private_key_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -75,7 +75,7 @@ envoy_cc_test(
     ],
     deps = [
         ":test_fake_factory",
-        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "//source/common/tls/private_key:private_key_manager_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",

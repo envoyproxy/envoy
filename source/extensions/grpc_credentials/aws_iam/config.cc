@@ -105,9 +105,7 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
                                     absl::string_view(method_name.data(), method_name.length()));
 
   TRY_NEEDS_AUDIT { signer_->sign(message, false); }
-  END_TRY catch (const EnvoyException& e) {
-    return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
-  }
+  END_TRY catch (const EnvoyException& e) { return {grpc::StatusCode::INTERNAL, e.what()}; }
 
   signedHeadersToMetadata(message.headers(), *metadata);
 

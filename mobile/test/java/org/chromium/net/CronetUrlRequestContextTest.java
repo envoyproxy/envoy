@@ -7,6 +7,7 @@ import static org.chromium.net.testing.CronetTestRule.getTestStorage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -224,7 +225,7 @@ public class CronetUrlRequestContextTest {
       }
     };
     // Ensure that test is not running on the main thread.
-    assertTrue(Looper.getMainLooper() != Looper.myLooper());
+    assertNotSame(Looper.getMainLooper(), Looper.myLooper());
     new Handler(Looper.getMainLooper()).post(blockingTask);
 
     // Create new request context, but its initialization on the main thread
@@ -350,7 +351,7 @@ public class CronetUrlRequestContextTest {
     assertTrue(hasDebugInNetLog(file));
     assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
-    assertTrue(!file.exists());
+    assertFalse(file.exists());
   }
 
   @Test
@@ -407,7 +408,7 @@ public class CronetUrlRequestContextTest {
     assertTrue(hasDebugInNetLog(file));
     assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
-    assertTrue(!file.exists());
+    assertFalse(file.exists());
   }
 
   @Test

@@ -30,6 +30,7 @@ android_library(
 java_library(
     name = "envoy_base_engine_lib",
     srcs = [
+        "ByteBuffers.java",
         "EnvoyConfiguration.java",
         "EnvoyEngine.java",
         "EnvoyEngineImpl.java",

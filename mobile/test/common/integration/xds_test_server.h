@@ -3,7 +3,7 @@
 #include "envoy/api/api.h"
 
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"

@@ -40,7 +40,7 @@ routing PRs, questions, etc. to the right place.
   * Stats, abseil, scalability, and performance.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
   * xDS APIs, configuration, control plane, fuzzing.
-* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
   * Data plane, overload management, flow control.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
   * Bazel, CI, compilers, linkers, general build issues, etc.
@@ -59,6 +59,8 @@ The following Envoy maintainers have final say over any changes only affecting /
 
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
+* Fredy Wijaya ([fredyw](https://github.com/fredyw)) (fredyw@google.com)
+  * Android, Java, Kotlin, JNI.
 
 # Senior extension maintainers
 
@@ -80,7 +82,7 @@ without further review.
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
-* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (kbaichoo@google.com)
+* Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
 
 # Emeritus maintainers

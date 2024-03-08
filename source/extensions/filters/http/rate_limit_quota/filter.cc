@@ -38,6 +38,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 
   BucketId bucket_id_proto = ret.value();
   const size_t bucket_id = MessageUtil::hash(bucket_id_proto);
+  ENVOY_LOG(trace, "Generated the associated hashed bucket id: {} for bucket id proto:\n {}",
+            bucket_id, bucket_id_proto.DebugString());
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // For first matched request, create a new bucket in the cache and sent the report to RLQS
     // server immediately.
@@ -190,9 +192,13 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
       if (limiter->consume(1, /*allow_partial=*/false)) {
         // Request is allowed.
         quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+        ENVOY_LOG(trace, "Request with hashed bucket_id {} is allowed by token bucket limiter.",
+                  bucket_id);
       } else {
         // Request is throttled.
         quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
+        ENVOY_LOG(trace, "Request with hashed bucket_id {} is throttled by token bucket limiter",
+                  bucket_id);
         // TODO(tyxia) Build the customized response based on `DenyResponseSettings` if it is
         // configured.
         callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt,

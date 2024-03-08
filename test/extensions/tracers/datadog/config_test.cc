@@ -251,8 +251,8 @@ TEST_F(DatadogConfigTest, CollectorHostname) {
 
   timer_->invokeCallback();
 
-  msg.reset(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  msg = std::make_unique<Http::ResponseMessageImpl>(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
   msg->body().add("{}");
   callbacks->onSuccess(request, std::move(msg));
 

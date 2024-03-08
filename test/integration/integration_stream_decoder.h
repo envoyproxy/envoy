@@ -24,7 +24,7 @@ namespace Envoy {
 class IntegrationStreamDecoder : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   IntegrationStreamDecoder(Event::Dispatcher& dispatcher);
-  ~IntegrationStreamDecoder();
+  ~IntegrationStreamDecoder() override;
 
   const std::string& body() { return body_; }
   bool complete() { return saw_end_stream_; }

@@ -79,6 +79,11 @@ LocalRefUniquePtr<jbyteArray> envoyDataToJavaByteArray(JniHelper& jni_helper, en
   return j_data;
 }
 
+LocalRefUniquePtr<jobject> envoyDataToJavaByteBuffer(JniHelper& jni_helper, envoy_data data) {
+  return jni_helper.newDirectByteBuffer(
+      const_cast<void*>(reinterpret_cast<const void*>(data.bytes)), data.length);
+}
+
 LocalRefUniquePtr<jlongArray> envoyStreamIntelToJavaLongArray(JniHelper& jni_helper,
                                                               envoy_stream_intel stream_intel) {
   LocalRefUniquePtr<jlongArray> j_array = jni_helper.newLongArray(4);
@@ -151,10 +156,10 @@ envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data) {
     return native_data;
   }
 
-  return javaByteBufferToEnvoyData(jni_helper, j_data, static_cast<size_t>(data_length));
+  return javaByteBufferToEnvoyData(jni_helper, j_data, data_length);
 }
 
-envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data, size_t data_length) {
+envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data, jlong data_length) {
   // Returns nullptr if the buffer is not a direct buffer.
   uint8_t* direct_address = jni_helper.getDirectBufferAddress<uint8_t*>(j_data);
 

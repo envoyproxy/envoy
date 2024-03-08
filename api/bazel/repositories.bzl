@@ -29,13 +29,6 @@ def api_dependencies():
         name = "com_github_cncf_xds",
     )
 
-    # Needed until @com_github_grpc_grpc renames @com_github_cncf_udpa
-    # to @com_github_cncf_xds as well.
-    external_http_archive(
-        name = "com_github_cncf_udpa",
-        location_name = "com_github_cncf_xds",
-    )
-
     external_http_archive(
         name = "prometheus_metrics_model",
         build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
@@ -61,6 +54,9 @@ def api_dependencies():
 
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
+    )
+    external_http_archive(
+        name = "rules_proto_grpc",
     )
 
     external_http_archive(

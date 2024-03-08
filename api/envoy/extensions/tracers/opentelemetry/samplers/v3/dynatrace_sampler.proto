@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package envoy.extensions.tracers.opentelemetry.samplers.v3;
+
+import "envoy/config/core/v3/http_uri.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.samplers.v3";
+option java_outer_classname = "DynatraceSamplerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tracers/opentelemetry/samplers/v3;samplersv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynatrace Sampler config]
+// Configuration for the Dynatrace Sampler extension.
+// [#extension: envoy.tracers.opentelemetry.samplers.dynatrace]
+
+// [#next-free-field: 6]
+message DynatraceSamplerConfig {
+  // The Dynatrace tenant.
+  //
+  // The value can be obtained from the Envoy deployment page in Dynatrace.
+  string tenant = 1;
+
+  // The id of the Dynatrace cluster id.
+  //
+  // The value can be obtained from the Envoy deployment page in Dynatrace.
+  int32 cluster_id = 2;
+
+  // The HTTP URI to fetch the sampler configuration (root spans per minute). For example:
+  //
+  // .. code-block:: yaml
+  //
+  //    http_uri:
+  //      uri: <tenant>.dev.dynatracelabs.com/api/v2/otlp/v1/traces
+  //      cluster: dynatrace
+  //      timeout: 10s
+  //
+  config.core.v3.HttpUri http_uri = 3;
+
+  // The access token to fetch the sampling configuration from the Dynatrace API
+  string token = 4;
+
+  // Default number of root spans per minute, used when the value can't be obtained from the Dynatrace API.
+  //
+  // A default value of ``1000`` is used when:
+  //
+  // - ``root_spans_per_minute`` is unset
+  // - ``root_spans_per_minute`` is set to 0
+  //
+  uint32 root_spans_per_minute = 5;
+}

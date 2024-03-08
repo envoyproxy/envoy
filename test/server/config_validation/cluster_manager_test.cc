@@ -6,7 +6,7 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/server/config_validation/cluster_manager.h"
 
 #include "test/mocks/access_log/mocks.h"

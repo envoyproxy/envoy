@@ -867,8 +867,6 @@ HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   if (mutable_cross_priority_host_map_ != nullptr) {
     const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);
     ASSERT(mutable_cross_priority_host_map_ == nullptr);
-    ENVOY_LOG(debug, "cross_priority host map, moving mutable to const, len: {}",
-              const_cross_priority_host_map_->size());
   }
   return const_cross_priority_host_map_;
 }
@@ -885,18 +883,14 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   if (mutable_cross_priority_host_map_ == nullptr) {
     // Copy old read only host map to mutable host map.
     mutable_cross_priority_host_map_ = std::make_shared<HostMap>(*const_cross_priority_host_map_);
-    ENVOY_LOG(debug, "cross_priority host map, copying from const, len: {}",
-              const_cross_priority_host_map_->size());
   }
 
   for (const auto& host : hosts_removed) {
     mutable_cross_priority_host_map_->erase(addressToString(host->address()));
-    ENVOY_LOG(debug, "cross_priority host map, removing: {}", addressToString(host->address()));
   }
 
   for (const auto& host : hosts_added) {
     mutable_cross_priority_host_map_->insert({addressToString(host->address()), host});
-    ENVOY_LOG(debug, "cross_priority host map, adding: {}", addressToString(host->address()));
   }
 }
 
@@ -1167,7 +1161,8 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
   // configured they will interfere with each other and both get incorrect values.
-  if (perEndpointStatsEnabled() &&
+  // TODO(ggreenway): Verify that bypassing virtual dispatch here was intentional
+  if (ClusterInfoImpl::perEndpointStatsEnabled() &&
       server_context.bootstrap().cluster_manager().has_load_stats_config()) {
     throwEnvoyExceptionOrPanic("Only one of cluster per_endpoint_stats and cluster manager "
                                "load_stats_config can be specified");
@@ -1728,7 +1723,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
     return absl::OkStatus();
   }
   const auto& policy = cluster_load_assignment.policy();
-  if (policy.drop_overloads().size() == 0) {
+  if (policy.drop_overloads().empty()) {
     return absl::OkStatus();
   }
   if (policy.drop_overloads().size() > kDropOverloadSize) {

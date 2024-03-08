@@ -90,7 +90,7 @@ private:
  */
 class ReadFilter : public virtual FilterBase {
 public:
-  virtual ~ReadFilter() = default;
+  ~ReadFilter() override = default;
 
   /**
    * Called when a new UDP session is first established. Filters should do one time long term
@@ -136,7 +136,7 @@ enum class WriteFilterStatus {
  */
 class WriteFilter : public virtual FilterBase {
 public:
-  virtual ~WriteFilter() = default;
+  ~WriteFilter() override = default;
 
   /**
    * Called when data is to be written on the UDP session.

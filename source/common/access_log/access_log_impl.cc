@@ -15,6 +15,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"

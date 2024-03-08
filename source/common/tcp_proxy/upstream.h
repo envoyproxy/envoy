@@ -8,6 +8,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/router/header_parser.h"
@@ -196,6 +197,12 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers")) {
+        Buffer::OwnedImpl data;
+        parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      }
+
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}

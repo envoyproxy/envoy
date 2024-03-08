@@ -1,1 +1,1 @@
-FROM confluentinc/cp-kafka:latest@sha256:7e332fd046a1b3ef292dcd063d6e7bee4f487ac4d235da1692b15a44daf2c080
+FROM confluentinc/cp-kafka:latest@sha256:24cdd3a7fa89d2bed150560ebea81ff1943badfa61e51d66bb541a6b0d7fb047

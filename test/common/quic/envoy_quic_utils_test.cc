@@ -191,6 +191,8 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   EXPECT_EQ(25165824, quic_config.GetInitialSessionFlowControlWindowToSend());
   EXPECT_TRUE(quic_config.SendConnectionOptions().empty());
   EXPECT_TRUE(quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT).empty());
+  EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(quic::kMaximumIdleTimeoutSecs),
+            quic_config.IdleNetworkTimeout());
 
   // Test converting values.
   config.mutable_max_concurrent_streams()->set_value(2);
@@ -198,10 +200,12 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   config.mutable_initial_connection_window_size()->set_value(50);
   config.set_connection_options("5RTO,ACKD");
   config.set_client_connection_options("6RTO,AKD4");
+  config.mutable_idle_network_timeout()->set_seconds(30);
   convertQuicConfig(config, quic_config);
   EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
   EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
   EXPECT_EQ(3, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(30), quic_config.IdleNetworkTimeout());
   EXPECT_EQ(2, quic_config.SendConnectionOptions().size());
   EXPECT_EQ(2, quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT).size());
   std::string quic_copts = "";

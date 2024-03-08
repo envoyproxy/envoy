@@ -138,6 +138,15 @@ Stderr
   response headers.
 * Writes to the standard error of the process. It works in all platforms.
 
+Fluentd
+********
+
+* Flush access logs over a TCP connection to an upstream that is accepting the Fluentd Forward Protocol as described in:
+  `Fluentd Forward Protocol Specification <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
+* The data sent over the wire is a stream of
+  `Fluentd Forward Mode events <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode>`_
+  which may contain one or more access log entries (depending on the flushing interval and other configuration parameters).
+
 Further reading
 ---------------
 
@@ -148,3 +157,4 @@ Further reading
 * OpenTelemetry (gRPC) :ref:`LogsService <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig>`
 * Stdout :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>`
 * Stderr :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`
+* Fluentd :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`

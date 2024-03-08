@@ -35,10 +35,19 @@ Resource DynatraceResourceDetector::detect() {
         addAttributes(content, resource);
       }
     }
-    END_TRY catch (const EnvoyException&) { failure_count++; }
+    END_TRY catch (const EnvoyException& e) {
+      failure_count++;
+      ENVOY_LOG(
+          warn,
+          "Failed to detect resource attributes from the Dynatrace enrichment file: {}, error: {}.",
+          file_name, e.what());
+    }
   }
 
-  if (failure_count > 0) {
+  // Only log if it failed to detect attributes from all enrichment files
+  // This means Dynatrace is not correctly deployed.
+  if (static_cast<std::vector<int>::size_type>(failure_count) ==
+      DynatraceResourceDetector::dynatraceMetadataFiles().size()) {
     ENVOY_LOG(
         warn,
         "Dynatrace OpenTelemetry resource detector is configured but could not detect attributes. "

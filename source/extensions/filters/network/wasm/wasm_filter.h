@@ -7,6 +7,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -53,7 +54,7 @@ public:
 
 private:
   ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

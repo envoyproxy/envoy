@@ -1,0 +1,37 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: "upgrade"
+        value: "connect-udp"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 128
+    response {
+      continue_headers {
+      }
+    }
+  }
+}

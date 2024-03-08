@@ -36,8 +36,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
  * @param responseFlags The response flags for the stream.
  */
 @Suppress("LongParameterList")
-class FinalStreamIntel
-constructor(
+class FinalStreamIntel(
   streamId: Long,
   connectionId: Long,
   attemptCount: Long,

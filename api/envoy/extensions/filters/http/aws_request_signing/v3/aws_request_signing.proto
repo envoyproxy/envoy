@@ -4,6 +4,8 @@ package envoy.extensions.filters.http.aws_request_signing.v3;
 
 import "envoy/type/matcher/v3/string.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -19,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_request_signing]
 
 // Top level configuration for the AWS request signing filter.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message AwsRequestSigning {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning";
@@ -30,6 +32,16 @@ message AwsRequestSigning {
 
     // Use SigV4A for signing
     AWS_SIGV4A = 1;
+  }
+
+  message QueryString {
+    // Optional expiration time for the query string parameters. As query string parameter based requests are replayable, in effect representing
+    // an API call that has already been authenticated, it is recommended to keep this expiration time as short as feasible.
+    // This value will default to 5 seconds and has a maximum value of 3600 seconds (1 hour).
+    google.protobuf.Duration expiration_time = 1 [(validate.rules).duration = {
+      lte {seconds: 3600}
+      gte {seconds: 1}
+    }];
   }
 
   // The `service namespace
@@ -54,7 +66,7 @@ message AwsRequestSigning {
   //
   // Example: '*'
   //
-  // By configuring a region set, a sigv4a signed request can be sent to multiple regions, rather than being
+  // By configuring a region set, a SigV4A signed request can be sent to multiple regions, rather than being
   // valid for only a single region destination.
   string region = 2;
 
@@ -87,6 +99,14 @@ message AwsRequestSigning {
 
   // Optional Signing algorithm specifier, either ``AWS_SIGV4`` or ``AWS_SIGV4A``, defaulting to ``AWS_SIGV4``.
   SigningAlgorithm signing_algorithm = 6;
+
+  // If set, use the query string to store output of SigV4 or SigV4A calculation, rather than HTTP headers. The ``Authorization`` header will not be modified if ``query_string``
+  // is configured.
+  //
+  // Example:
+  // query_string: {}
+  //
+  QueryString query_string = 7;
 }
 
 message AwsRequestSigningPerRoute {

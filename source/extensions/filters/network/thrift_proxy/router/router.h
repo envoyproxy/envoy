@@ -129,9 +129,10 @@ class RouterStats {
 public:
   RouterStats(const std::string& stat_prefix, Stats::Scope& scope,
               const LocalInfo::LocalInfo& local_info)
-      : named_(RouterNamedStats::generateStats(stat_prefix, scope)),
-        stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
-        symbol_table_(scope.symbolTable()),
+      : stats_scope_(scope.createScope("")),
+        named_(RouterNamedStats::generateStats(stat_prefix, *stats_scope_)),
+        stat_name_set_(stats_scope_->symbolTable().makeSet("thrift_proxy")),
+        symbol_table_(stats_scope_->symbolTable()),
         upstream_rq_call_(stat_name_set_->add("thrift.upstream_rq_call")),
         upstream_rq_oneway_(stat_name_set_->add("thrift.upstream_rq_oneway")),
         upstream_rq_invalid_type_(stat_name_set_->add("thrift.upstream_rq_invalid_type")),
@@ -340,7 +341,7 @@ public:
                                 Stats::Histogram::Unit::Milliseconds, value);
   }
 
-  const RouterNamedStats named_;
+  const RouterNamedStats& routerStats() const { return named_; }
 
 private:
   void incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
@@ -385,6 +386,8 @@ private:
     return symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
   }
 
+  Stats::ScopeSharedPtr stats_scope_;
+  const RouterNamedStats named_;
   Stats::StatNameSetPtr stat_name_set_;
   Stats::SymbolTable& symbol_table_;
   const Stats::StatName upstream_rq_call_;
@@ -506,7 +509,7 @@ protected:
     Upstream::ThreadLocalCluster* cluster = clusterManager().getThreadLocalCluster(cluster_name);
     if (!cluster) {
       ENVOY_LOG(debug, "unknown cluster '{}'", cluster_name);
-      stats().named_.unknown_cluster_.inc();
+      stats().routerStats().unknown_cluster_.inc();
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("unknown cluster '{}'", cluster_name)),
               absl::nullopt};
@@ -530,7 +533,7 @@ protected:
     }
 
     if (cluster_->maintenanceMode()) {
-      stats().named_.upstream_rq_maintenance_mode_.inc();
+      stats().routerStats().upstream_rq_maintenance_mode_.inc();
       if (metadata->messageType() == MessageType::Call) {
         stats().incResponseLocalException(*cluster_);
       }
@@ -551,7 +554,7 @@ protected:
 
     auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, lb_context);
     if (!conn_pool_data) {
-      stats().named_.no_healthy_upstream_.inc();
+      stats().routerStats().no_healthy_upstream_.inc();
       if (metadata->messageType() == MessageType::Call) {
         stats().incResponseLocalException(*cluster_);
       }

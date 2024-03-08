@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
     "envoy_package",
 )
 load(
@@ -36,6 +37,12 @@ envoy_package()
 
 # TODO: add build target for quic_platform_impl_lib
 
+envoy_cc_library(
+    name = "quiche_flags_constants",
+    hdrs = ["quiche_flags_constants.h"],
+    deps = ["//source/common/http:utility_lib"],
+)
+
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_flags_impl_lib",
     srcs = ["quiche_flags_impl.cc"],
@@ -45,6 +52,7 @@ envoy_quiche_platform_impl_cc_library(
         "abseil_synchronization",
     ],
     deps = [
+        ":quiche_flags_constants",
         "//source/common/common:assert_lib",
         "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",

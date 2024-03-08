@@ -42,23 +42,20 @@ bool FilterManagerImpl::initializeReadFilters() {
   if (upstream_filters_.empty()) {
     return false;
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.initialize_upstream_filters")) {
-    // Initialize read filters without calling onData() afterwards.
-    // This is called just after an connection has been established and nothing may have been read
-    // yet. onData() will be called separately as data is read from the connection.
-    for (auto& entry : upstream_filters_) {
-      if (entry->filter_ && !entry->initialized_) {
-        entry->initialized_ = true;
-        FilterStatus status = entry->filter_->onNewConnection();
-        if (status == FilterStatus::StopIteration ||
-            connection_.state() != Connection::State::Open) {
-          break;
-        }
+
+  // Initialize read filters without calling onData() afterwards.
+  // This is called just after an connection has been established and nothing may have been read
+  // yet. onData() will be called separately as data is read from the connection.
+  for (auto& entry : upstream_filters_) {
+    if (entry->filter_ && !entry->initialized_) {
+      entry->initialized_ = true;
+      FilterStatus status = entry->filter_->onNewConnection();
+      if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
+        break;
       }
     }
-  } else {
-    onContinueReading(nullptr, connection_);
   }
+
   return true;
 }
 

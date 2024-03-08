@@ -30,9 +30,9 @@ class PulseClientImplTest {
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
     verify(envoyEngine)
       .recordCounterInc(elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture())
-    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
-    assertThat(countCaptor.getValue()).isEqualTo(1)
-    assertThat(tagsCaptor.getValue().size).isEqualTo(0)
+    assertThat(elementsCaptor.value).isEqualTo("test.stat")
+    assertThat(countCaptor.value).isEqualTo(1)
+    assertThat(tagsCaptor.value.size).isEqualTo(0)
   }
 
   @Test
@@ -48,10 +48,10 @@ class PulseClientImplTest {
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
     verify(envoyEngine)
       .recordCounterInc(elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture())
-    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
-    assertThat(countCaptor.getValue()).isEqualTo(5)
+    assertThat(elementsCaptor.value).isEqualTo("test.stat")
+    assertThat(countCaptor.value).isEqualTo(5)
 
-    val tagCaptorValue = tagsCaptor.getValue()
+    val tagCaptorValue = tagsCaptor.value
     assertThat(tagCaptorValue.get("testKey1")).isEqualTo("testValue1")
     assertThat(tagCaptorValue.get("testKey2")).isEqualTo("testValue2")
   }
