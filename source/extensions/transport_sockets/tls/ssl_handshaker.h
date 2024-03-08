@@ -60,7 +60,7 @@ public:
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertSelectionResult(Ssl::OnDemandSslCtxSharedPtr ctx) override;
+  void onCertSelectionResult(SSL_CTX* ctx) override;
 
   void onSslHandshakeCancelled();
 

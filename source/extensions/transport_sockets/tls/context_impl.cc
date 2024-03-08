@@ -82,9 +82,7 @@ int ContextImpl::sslExtendedSocketInfoIndex() {
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
                          TimeSource& time_source)
     : scope_(scope), stats_(generateSslStats(scope)), time_source_(time_source),
-      tls_min_version_(config.minProtocolVersion()), tls_max_version_(config.maxProtocolVersion()),
-      cipher_suites_(config.cipherSuites()), ecdh_curves_(config.ecdhCurves()),
-      signature_algorithms_(config.signatureAlgorithms()), sslctx_cb_(config.sslctxCb()),
+      tls_max_version_(config.maxProtocolVersion()),
       stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
       unknown_ssl_cipher_(stat_name_set_->add("unknown_ssl_cipher")),
       unknown_ssl_curve_(stat_name_set_->add("unknown_ssl_curve")),
@@ -116,14 +114,78 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     auto& ctx = tls_contexts_[i];
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
     ssl_contexts[i] = ctx.ssl_ctx_.get();
-    initSslContextHelper(ctx.ssl_ctx_.get());
+
+    int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    rc = SSL_CTX_set_min_proto_version(ctx.ssl_ctx_.get(), config.minProtocolVersion());
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    rc = SSL_CTX_set_max_proto_version(ctx.ssl_ctx_.get(), config.maxProtocolVersion());
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    if (!capabilities_.provides_ciphers_and_curves &&
+        !SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
+      // Break up a set of ciphers into each individual cipher and try them each individually in
+      // order to attempt to log which specific one failed. Example of config.cipherSuites():
+      // "-ALL:[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:ECDHE-ECDSA-AES128-SHA".
+      //
+      // "-" is both an operator when in the leading position of a token (-ALL: don't allow this
+      // cipher), and the common separator in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split on
+      // it because it will separate pieces of the same cipher. When it is a leading character, it
+      // is removed below.
+      std::vector<absl::string_view> ciphers =
+          StringUtil::splitToken(config.cipherSuites(), ":+![|]", false);
+      std::vector<std::string> bad_ciphers;
+      for (const auto& cipher : ciphers) {
+        std::string cipher_str(cipher);
+
+        if (absl::StartsWith(cipher_str, "-")) {
+          cipher_str.erase(cipher_str.begin());
+        }
+
+        if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), cipher_str.c_str())) {
+          bad_ciphers.push_back(cipher_str);
+        }
+      }
+      throwEnvoyExceptionOrPanic(fmt::format("Failed to initialize cipher suites {}. The following "
+                                             "ciphers were rejected when tried individually: {}",
+                                             config.cipherSuites(),
+                                             absl::StrJoin(bad_ciphers, ", ")));
+    }
+
+    if (!capabilities_.provides_ciphers_and_curves &&
+        !SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
+      throwEnvoyExceptionOrPanic(
+          absl::StrCat("Failed to initialize ECDH curves ", config.ecdhCurves()));
+    }
+
+    // Set signature algorithms if given, otherwise fall back to BoringSSL defaults.
+    if (!capabilities_.provides_sigalgs && !config.signatureAlgorithms().empty()) {
+      if (!SSL_CTX_set1_sigalgs_list(ctx.ssl_ctx_.get(), config.signatureAlgorithms().c_str())) {
+        throwEnvoyExceptionOrPanic(absl::StrCat("Failed to initialize TLS signature algorithms ",
+                                                config.signatureAlgorithms()));
+      }
+    }
   }
 
   auto verify_mode = cert_validator_->initializeSslContexts(
       ssl_contexts, config.capabilities().provides_certificates);
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
-      sslCtxSetCustomVerify(ctx, verify_mode);
+      if (verify_mode != SSL_VERIFY_NONE) {
+        // TODO(danzh) Envoy's use of SSL_VERIFY_NONE does not quite match the actual semantics as
+        // a client. As a client, SSL_VERIFY_NONE means to verify the certificate (which will fail
+        // without trust anchors), save the result in the session ticket, but otherwise continue
+        // with the handshake. But Envoy actually wants it to accept all certificates. The
+        // disadvantage of using SSL_VERIFY_NONE is that it records the verify_result, which Envoy
+        // never queries but gets saved in session tickets, and tries to find an anchor that isn't
+        // there. And also it differs from server side behavior of SSL_VERIFY_NONE which won't
+        // even request client certs. So, instead, we should configure a callback to skip
+        // validation and always supply the callback to boring SSL.
+        SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
+        SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
+      }
     }
   }
 
@@ -309,9 +371,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   // As late as possible, run the custom SSL_CTX configuration callback on each
   // SSL_CTX, if set.
-  if (sslctx_cb_) {
+  if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
     for (TlsContext& ctx : tls_contexts_) {
-      sslctx_cb_(ctx.ssl_ctx_.get());
+      sslctx_cb(ctx.ssl_ctx_.get());
     }
   }
 
@@ -344,101 +406,6 @@ void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
        ctx->tls_keylog_remote_.contains(
            *(callbacks->connection().connectionInfoProvider().remoteAddress())))) {
     ctx->tls_keylog_file_->write(absl::StrCat(line, "\n"));
-  }
-}
-
-void ContextImpl::initSslContext(SSL_CTX* ctx) const {
-  initSslContextHelper(ctx);
-
-  std::vector<SSL_CTX*> ssl_contexts(1);
-  ssl_contexts[0] = ctx;
-  // TODO(doujiang24): initializeSslContexts is designed to be invoke once per Context,
-  // otherwise, there might be unexpected behaviour, i.e. memory leaking in DefaultCertValidator:
-  // subject_alt_name_matchers_, verify_certificate_hash_list_ and verify_certificate_spki_list_.
-  // Maybe, we should introduce a new initializeSslContextConst method for this case?
-  auto verify_mode =
-      cert_validator_->initializeSslContexts(ssl_contexts, capabilities_.provides_certificates);
-  if (!capabilities_.verifies_peer_certificates) {
-    sslCtxSetCustomVerify(ctx, verify_mode);
-  }
-
-  SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
-
-  if (sslctx_cb_) {
-    sslctx_cb_(ctx);
-  }
-
-  if (tls_keylog_file_ != nullptr) {
-    SSL_CTX_set_keylog_callback(ctx, keylogCallback);
-  }
-}
-
-void ContextImpl::initSslContextHelper(SSL_CTX* ctx) const {
-  int rc = SSL_CTX_set_app_data(ctx, this);
-  RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-
-  rc = SSL_CTX_set_min_proto_version(ctx, tls_min_version_);
-  RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-
-  rc = SSL_CTX_set_max_proto_version(ctx, tls_max_version_);
-  RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-
-  if (!capabilities_.provides_ciphers_and_curves &&
-      !SSL_CTX_set_strict_cipher_list(ctx, cipher_suites_.c_str())) {
-    // Break up a set of ciphers into each individual cipher and try them each individually in
-    // order to attempt to log which specific one failed. Example of config.cipherSuites():
-    // "-ALL:[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:ECDHE-ECDSA-AES128-SHA".
-    //
-    // "-" is both an operator when in the leading position of a token (-ALL: don't allow this
-    // cipher), and the common separator in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split
-    // on it because it will separate pieces of the same cipher. When it is a leading
-    // character, it is removed below.
-    std::vector<absl::string_view> ciphers =
-        StringUtil::splitToken(cipher_suites_, ":+![|]", false);
-    std::vector<std::string> bad_ciphers;
-    for (const auto& cipher : ciphers) {
-      std::string cipher_str(cipher);
-
-      if (absl::StartsWith(cipher_str, "-")) {
-        cipher_str.erase(cipher_str.begin());
-      }
-
-      if (!SSL_CTX_set_strict_cipher_list(ctx, cipher_str.c_str())) {
-        bad_ciphers.push_back(cipher_str);
-      }
-    }
-    throwEnvoyExceptionOrPanic(fmt::format("Failed to initialize cipher suites {}. The following "
-                                           "ciphers were rejected when tried individually: {}",
-                                           cipher_suites_, absl::StrJoin(bad_ciphers, ", ")));
-  }
-
-  if (!capabilities_.provides_ciphers_and_curves &&
-      !SSL_CTX_set1_curves_list(ctx, ecdh_curves_.c_str())) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("Failed to initialize ECDH curves ", ecdh_curves_));
-  }
-
-  // Set signature algorithms if given, otherwise fall back to BoringSSL defaults.
-  if (!capabilities_.provides_sigalgs && !signature_algorithms_.empty()) {
-    if (!SSL_CTX_set1_sigalgs_list(ctx, signature_algorithms_.c_str())) {
-      throwEnvoyExceptionOrPanic(
-          absl::StrCat("Failed to initialize TLS signature algorithms ", signature_algorithms_));
-    }
-  }
-}
-
-void ContextImpl::sslCtxSetCustomVerify(SSL_CTX* ctx, int verify_mode) const {
-  if (verify_mode != SSL_VERIFY_NONE) {
-    // TODO(danzh) Envoy's use of SSL_VERIFY_NONE does not quite match the actual semantics as
-    // a client. As a client, SSL_VERIFY_NONE means to verify the certificate (which will fail
-    // without trust anchors), save the result in the session ticket, but otherwise continue
-    // with the handshake. But Envoy actually wants it to accept all certificates. The
-    // disadvantage of using SSL_VERIFY_NONE is that it records the verify_result, which Envoy
-    // never queries but gets saved in session tickets, and tries to find an anchor that isn't
-    // there. And also it differs from server side behavior of SSL_VERIFY_NONE which won't
-    // even request client certs. So, instead, we should configure a callback to skip
-    // validation and always supply the callback to boring SSL.
-    SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
-    SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
   }
 }
 
@@ -822,11 +789,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
-
-  if (config.tlsCertificates().empty() && !config.hasCustomTlsContextProvider() &&
-      !config.capabilities().provides_certificates) {
-    throwEnvoyExceptionOrPanic(
-        "Server TlsCertificates must have a certificate or context provider specified");
+  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
+    throwEnvoyExceptionOrPanic("Server TlsCertificates must have a certificate specified");
   }
 
   for (auto& ctx : tls_contexts_) {
@@ -1006,10 +970,6 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
   // chain for resumption purposes.
   if (!capabilities_.provides_certificates) {
     for (const auto& ctx : tls_contexts_) {
-      // There is no certificates when custom TLS provider specified.
-      if (ctx.cert_chain_ == nullptr) {
-        continue;
-      }
       X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
       RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
       X509_NAME* cert_subject = X509_get_subject_name(cert);

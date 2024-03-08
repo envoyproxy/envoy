@@ -166,26 +166,6 @@ enum class SelectionResult {
 };
 
 /**
- * An SSL_CTX wrapper that created on demand.
- */
-class OnDemandSslCtx {
-public:
-  virtual ~OnDemandSslCtx() = default;
-
-  /**
-   * initialize the SSL_CTX.
-   */
-  virtual void initCtx(ContextSharedPtr ctx) PURE;
-
-  /**
-   * @return the pointer of SSL_CTX.
-   */
-  virtual SSL_CTX* getCtx() PURE;
-};
-
-using OnDemandSslCtxSharedPtr = std::shared_ptr<OnDemandSslCtx>;
-
-/**
  * Used to return the result from an synchronous/asynchronous cert selection.
  */
 class CertSelectionCallback {
@@ -197,7 +177,7 @@ public:
   /**
    * Called when the cert selection completes.
    */
-  virtual void onCertSelectionResult(OnDemandSslCtxSharedPtr ctx) PURE;
+  virtual void onCertSelectionResult(SSL_CTX* ctx) PURE;
 };
 
 using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;

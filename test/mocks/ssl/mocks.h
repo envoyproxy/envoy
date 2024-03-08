@@ -76,7 +76,6 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
-  MOCK_METHOD(void, initSslContext, (SSL_CTX*), (const));
 };
 
 class MockClientContextConfig : public ClientContextConfig {
@@ -98,7 +97,6 @@ public:
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
   MOCK_METHOD(Ssl::TlsContextProviderFactoryCb, createTlsContextProvider, (), (const, override));
-  MOCK_METHOD(bool, hasCustomTlsContextProvider, (), (const, override));
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 
@@ -139,7 +137,6 @@ public:
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
   MOCK_METHOD(Ssl::TlsContextProviderFactoryCb, createTlsContextProvider, (), (const, override));
-  MOCK_METHOD(bool, hasCustomTlsContextProvider, (), (const, override));
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 

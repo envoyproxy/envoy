@@ -94,11 +94,6 @@ public:
   virtual TlsContextProviderFactoryCb createTlsContextProvider() const PURE;
 
   /**
-   * @return true if there is custom TLS context provider.
-   */
-  virtual bool hasCustomTlsContextProvider() const PURE;
-
-  /**
    * @return the set of capabilities for handshaker instances created by this context.
    */
   virtual HandshakerCapabilities capabilities() const PURE;

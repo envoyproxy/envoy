@@ -31,16 +31,15 @@ void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
 
 void CertSelectionCallbackImpl::onSslHandshakeCancelled() { extended_socket_info_.reset(); }
 
-void CertSelectionCallbackImpl::onCertSelectionResult(Ssl::OnDemandSslCtxSharedPtr ctx) {
+void CertSelectionCallbackImpl::onCertSelectionResult(SSL_CTX* ctx) {
   ENVOY_LOG(debug, "onCertSelectionResult");
   if (!extended_socket_info_.has_value()) {
     ENVOY_LOG(debug, "extended socket info is gone, maybe connection terminated");
     return;
   }
   if (ctx != nullptr) {
-    ctx->initCtx(ctx_);
     // Apply the selected context.
-    RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_, ctx->getCtx()) != nullptr, "");
+    RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_, ctx) != nullptr, "");
   }
   extended_socket_info_->onCertSelectionCompleted(ctx != nullptr);
 }

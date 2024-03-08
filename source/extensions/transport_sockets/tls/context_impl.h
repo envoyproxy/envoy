@@ -88,10 +88,6 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
-  void initSslContext(SSL_CTX* ctx) const override;
-
-  void initSslContextHelper(SSL_CTX* ctx) const;
-  void sslCtxSetCustomVerify(SSL_CTX* ctx, int verify_mode) const;
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
@@ -144,12 +140,7 @@ protected:
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
-  const unsigned tls_min_version_;
   const unsigned tls_max_version_;
-  const std::string cipher_suites_;
-  const std::string ecdh_curves_;
-  const std::string signature_algorithms_;
-  const Ssl::SslCtxCb sslctx_cb_;
   mutable Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_ssl_cipher_;
   const Stats::StatName unknown_ssl_curve_;
