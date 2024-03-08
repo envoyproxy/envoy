@@ -224,7 +224,7 @@ message ExtAuthz {
   // compliant bytes will be replaced with '!'.
   //
   // When this is set to true, header values are not sanitized. Headers will be added to
-  // :ref:`headers_bytes<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers_bytes>`
+  // :ref:`headers_bytes<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>`
   // instead of :ref:`headers<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`.
   //
   // When this is set to true, headers with the same key will also not be combined into a single

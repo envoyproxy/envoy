@@ -264,7 +264,7 @@ new_features:
     The proto field :ref:`headers <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`'s
     value type is string.  Thus, it is unable to support non-utf8 characters in header values.
     To support header values with non-utf8 characters, a new boolean field was added to the
-    ext_authz config :ref:`encode_raw_headers <envoy_v3_api_field_config.filter.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`.
+    ext_authz config :ref:`encode_raw_headers <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz.encode_raw_headers>`.
     When this is set to true, the new field in HttpRequest
     :ref:`header_map <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>` (specifically
     ``header_map.headers.raw_value``) gets populated with the raw values instead of ``headers``,

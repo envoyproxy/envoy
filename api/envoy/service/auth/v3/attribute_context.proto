@@ -126,8 +126,8 @@ message AttributeContext {
     // :ref:`encode_raw_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.encode_raw_headers>`
     // is set to true.
     //
-    // Note that :ref:`HeaderMap <envoy_v3_api_field_config.core.v3.HeaderMap>` is not actually a map type. It
-    // only consists of a repeated :ref:`HeaderValue <envoy_v3_api_field_config.core.v3.HeaderValue>` field.
+    // Note that this is not actually a map type. ``header_map`` contains a single repeated field
+    // ``headers``.
     //
     // Here, only the ``key`` and ``raw_value`` fields will be populated for each HeaderValue, and
     // that is only when
