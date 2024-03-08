@@ -145,18 +145,26 @@ bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) con
     return request_allow_empty_content_type_;
   }
 
+  if (request_allow_content_types_.contains(content_type)) {
+    return true;
+  }
+
   for (const auto& regex : request_allow_content_types_regex_) {
     if (regex->match(content_type)) {
       return true;
     }
   }
 
-  return request_allow_content_types_.contains(content_type);
+  return false;
 }
 
 bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) const {
   if (content_type.empty()) {
     return response_allow_empty_content_type_;
+  }
+
+  if (response_allow_content_types_.contains(content_type)) {
+    return true;
   }
 
   for (const auto& regex : response_allow_content_types_regex_) {
@@ -165,7 +173,7 @@ bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) co
     }
   }
 
-  return response_allow_content_types_.contains(content_type);
+  return false;
 }
 
 void Filter::applyKeyValue(const std::string& value, const KeyValuePair& keyval,
