@@ -178,7 +178,9 @@ new_features:
     Added :ref:`Geoip country mapping path option
     <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_mapping_path>` to allow override of country code when
     needed. The country mapping file is JSON containing the ISO code to be mapped from:to so it is possible to override the result
-    read from the Maxmind database. If the path is incorrect an exception will be thrown and ``country_mapping.file_not_found`` will be incremented. If the JSON is invalid an exception will be thrown and ``country_mapping.file_not_found`` will be incremented. The JSON format for this file allows comments with // or /* */.
+    read from the Maxmind database. If the path is incorrect an exception will be thrown and ``country_mapping.file_not_found`` will be
+    incremented. If the JSON is invalid an exception will be thrown and ``country_mapping.parse_error`` will be incremented. The JSON
+    format for this file allows comments with // or /* */.
 - area: ext_proc
   change: |
     Added
