@@ -517,8 +517,6 @@ public:
 
 // Ensures that the Network::Utility::readFromSocket function uses GRO.
 // Only Linux platforms support GRO.
-// Windows doesn't have the GRO socket options.
-#if !defined(WIN32)
 TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   if (!Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     GTEST_SKIP() << "Platform doesn't support GRO.";
@@ -536,12 +534,15 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   slice.len_ = write_data.length();
 
   // Make sure the option for GRO is set on the socket.
+// Windows doesn't have the GRO socket options.
+#if !defined(WIN32)
   int sock_opt;
   socklen_t sock_len = sizeof(int);
   EXPECT_EQ(0, quic_connection_->connectionSocket()
                    ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
                    .return_value_);
   EXPECT_EQ(1, sock_opt);
+#endif
 
   // GRO uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(true));
@@ -618,8 +619,6 @@ private:
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionNoMmsgTests, EnvoyQuicClientSessionNoMmsgTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
-// Windows doesn't have the GRO socket options.
-#if !defined(WIN32)
 TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) {
   // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
   envoy_quic_session_->connect();
@@ -629,6 +628,8 @@ TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) 
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
+// Windows doesn't have the GRO socket options.
+#if !defined(WIN32)
   // Make sure the option for GRO is *not* set on the socket.
   int sock_opt;
   socklen_t sock_len = sizeof(int);
@@ -636,6 +637,7 @@ TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) 
                    ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
                    .return_value_);
   EXPECT_EQ(0, sock_opt);
+#endif
 
   // Uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
@@ -654,7 +656,6 @@ TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) 
   EXPECT_LOG_CONTAINS("trace", "starting recvmsg with max",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
-#endif
 
 } // namespace Quic
 } // namespace Envoy
