@@ -517,6 +517,8 @@ public:
 
 // Ensures that the Network::Utility::readFromSocket function uses GRO.
 // Only Linux platforms support GRO.
+// Windows doesn't have the GRO socket options.
+#if !defined(WIN32)
 TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   if (!Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     GTEST_SKIP() << "Platform doesn't support GRO.";
@@ -559,6 +561,7 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   EXPECT_LOG_CONTAINS("trace", "starting gro recvmsg with max",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
+#endif
 
 // Ensures that the Network::Utility::readFromSocket function does uses recvmmsg for client
 // QUIC connections when GRO is not supported.
@@ -615,6 +618,8 @@ private:
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionNoMmsgTests, EnvoyQuicClientSessionNoMmsgTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
+// Windows doesn't have the GRO socket options.
+#if !defined(WIN32)
 TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) {
   // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
   envoy_quic_session_->connect();
@@ -649,6 +654,7 @@ TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) 
   EXPECT_LOG_CONTAINS("trace", "starting recvmsg with max",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
+#endif
 
 } // namespace Quic
 } // namespace Envoy
