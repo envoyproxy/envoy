@@ -152,6 +152,7 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/retry/host/previous_hosts:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
@@ -162,6 +163,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+        "@ocp//ocpdiag/core/testing:status_matchers",
     ],
 )
 

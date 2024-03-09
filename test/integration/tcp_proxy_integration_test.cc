@@ -12,8 +12,8 @@
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/utility.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
