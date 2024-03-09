@@ -820,7 +820,7 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
 
   // Add header with non-UTF-8 value.
   absl::string_view header_key = "header-with-non-utf-8-value";
-  const uint8_t non_utf_8_bytes[2] = {0xc0, 0xc0};
+  const uint8_t non_utf_8_bytes[3] = {0xc0, 0xc0, 0};
   absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
   request_headers_.addCopy(Http::LowerCaseString(header_key), header_value);
 
