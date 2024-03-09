@@ -208,10 +208,10 @@ public:
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
 
-using ContextSelectionCallbackSharedPtr = std::shared_ptr<ContextSelectionCallback>;
+using ContextSelectionCallbackWeakPtr = std::weak_ptr<ContextSelectionCallback>;
 
 using TlsContextProviderFactoryCb =
-    std::function<TlsContextProviderSharedPtr(ContextSelectionCallbackSharedPtr)>;
+    std::function<TlsContextProviderSharedPtr(ContextSelectionCallbackWeakPtr)>;
 
 class TlsContextProviderFactoryContext {
 public:

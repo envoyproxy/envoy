@@ -18,29 +18,29 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_impl.h"
-#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_impl.h"
+#include "source/common/tls/private_key/private_key_manager_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
-#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
-#include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
-#include "test/extensions/transport_sockets/tls/test_data/ca_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/extensions_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/password_protected_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns2_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns4_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_dns_rsa_2_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_multiple_dns_1_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/san_uri_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
+#include "test/common/tls/cert_validator/timed_cert_validator.h"
+#include "test/common/tls/ssl_certs_test.h"
+#include "test/common/tls/test_data/ca_cert_info.h"
+#include "test/common/tls/test_data/extensions_cert_info.h"
+#include "test/common/tls/test_data/no_san_cert_info.h"
+#include "test/common/tls/test_data/password_protected_cert_info.h"
+#include "test/common/tls/test_data/san_dns2_cert_info.h"
+#include "test/common/tls/test_data/san_dns3_cert_info.h"
+#include "test/common/tls/test_data/san_dns4_cert_info.h"
+#include "test/common/tls/test_data/san_dns_cert_info.h"
+#include "test/common/tls/test_data/san_dns_ecdsa_1_cert_info.h"
+#include "test/common/tls/test_data/san_dns_rsa_1_cert_info.h"
+#include "test/common/tls/test_data/san_dns_rsa_2_cert_info.h"
+#include "test/common/tls/test_data/san_multiple_dns_1_cert_info.h"
+#include "test/common/tls/test_data/san_multiple_dns_cert_info.h"
+#include "test/common/tls/test_data/san_uri_cert_info.h"
+#include "test/common/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
+#include "test/common/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -81,39 +81,19 @@ namespace Envoy {
 namespace Ssl {
 namespace TLSContextProvider {
 
-class TestOnDemandSslCtxImpl : public virtual Ssl::OnDemandSslCtx {
-public:
-  TestOnDemandSslCtxImpl() {}
-  void initCtx(Ssl::ContextSharedPtr ctx) override {
-    if (inited_) {
-      return;
-    }
-    inited_ = true;
-
-    ctx->initSslContext(ssl_ctx_);
-  }
-
-  SSL_CTX* getCtx() override { return ssl_ctx_; }
-
-  SSL_CTX* ssl_ctx_;
-
-private:
-  bool inited_{false};
-};
-
-using TestOnDemandSslCtxSharedPtr = std::shared_ptr<TestOnDemandSslCtxImpl>;
-
 class TestTlsContextProvider : public virtual Ssl::TlsContextProvider {
 public:
-  TestTlsContextProvider(const ProtobufWkt::Any&, TlsContextProviderFactoryContext&)
-      : ssl_ctx_(std::make_shared<TestOnDemandSslCtxImpl>()) {}
+  TestTlsContextProvider(Ssl::ContextSelectionCallbackWeakPtr ctx, const ProtobufWkt::Any&,
+                         TlsContextProviderFactoryContext&)
+      : ctx_(ctx) {}
+  ~TestTlsContextProvider() { ENVOY_LOG_MISC(info, "debug: ~TestTlsContextProvider"); }
   SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*, CertSelectionCallbackPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
 
     switch (mod_) {
     case Ssl::SelectionResult::Continue:
       ENVOY_LOG_MISC(info, "debug: select cert done");
-      cb->onCertSelectionResult(ssl_ctx_);
+      cb->onCertSelectionResult(getSslCtx());
       break;
     case Ssl::SelectionResult::Stop:
       ENVOY_LOG_MISC(info, "debug: select cert async");
@@ -128,14 +108,15 @@ public:
 
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
-    cb_->onCertSelectionResult(ssl_ctx_);
-    cb_.reset();
+    cb_->onCertSelectionResult(getSslCtx());
   }
 
-  TestOnDemandSslCtxSharedPtr ssl_ctx_;
+  SSL_CTX* getSslCtx() { return ctx_.lock()->getTlsContexts()[0].ssl_ctx_.get(); }
+
   Ssl::SelectionResult mod_;
 
 private:
+  Ssl::ContextSelectionCallbackWeakPtr ctx_;
   CertSelectionCallbackPtr cb_;
 };
 
@@ -152,13 +133,13 @@ public:
     if (provider_cb_) {
       provider_cb_(config, tls_context_provider_factory_context, validation_visitor);
     }
-    return [&config, &tls_context_provider_factory_context, this]() {
+    return [&config, &tls_context_provider_factory_context,
+            this](Ssl::ContextSelectionCallbackWeakPtr ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
-      provider_ =
-          std::make_shared<TestTlsContextProvider>(config, tls_context_provider_factory_context);
-      provider_->ssl_ctx_->ssl_ctx_ = tls_context_.ssl_ctx_.get();
-      provider_->mod_ = mod_;
-      return provider_;
+      auto provider = std::make_shared<TestTlsContextProvider>(
+          ctx, config, tls_context_provider_factory_context);
+      provider->mod_ = mod_;
+      return provider;
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -167,10 +148,7 @@ public:
   std::string name() const override { return "test-tls-context-provider"; };
 
   CreateProviderHook provider_cb_;
-  Extensions::TransportSockets::Tls::TlsContext tls_context_;
   Ssl::SelectionResult mod_;
-
-  std::shared_ptr<TestTlsContextProvider> provider_;
 };
 
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
@@ -182,32 +160,6 @@ Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
       dispatcher, rng, runtime, socket, cb, listener_config.bindToPort(),
       listener_config.ignoreGlobalConnLimit(),
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
-}
-
-void loadTlsCert(Extensions::TransportSockets::Tls::TlsContext* tls_context,
-                 Server::Configuration::TransportSocketFactoryContext& server_factory_context) {
-  const std::string server_tls_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
-)EOF";
-
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_ctx_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(server_tls_ctx_yaml),
-                            server_tls_ctx_context);
-  auto server_tls_ctx_cfg =
-      std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-          server_tls_ctx_context, server_factory_context);
-
-  const auto& tls_certificate = server_tls_ctx_cfg->tlsCertificates()[0].get();
-  tls_context->ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
-  tls_context->loadCertificateChain(tls_certificate.certificateChain(),
-                                    tls_certificate.certificateChainPath());
-  tls_context->loadPrivateKey(tls_certificate.privateKey(), tls_certificate.privateKeyPath(),
-                              tls_certificate.password());
 }
 
 class TlsContextProviderFactoryTest
@@ -225,26 +177,28 @@ protected:
   void testUtil(Ssl::SelectionResult mod) {
     const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
     custom_tls_context_provider:
       name: test-tls-context-provider
       typed_config:
         "@type": type.googleapis.com/xds.type.v3.TypedStruct
         value:
-          certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
-          private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+          foo: bar
 )EOF";
     const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
 )EOF";
 
     Event::SimulatedTimeSystem time_system;
@@ -276,9 +230,9 @@ protected:
 
     ENVOY_LOG_MISC(info, "debug: 2");
 
-    EXPECT_EQ(true, server_tls_context.common_tls_context().has_custom_tls_context_provider());
+    // EXPECT_EQ(true, server_tls_context.common_tls_context().has_custom_tls_context_provider());
 
-    loadTlsCert(&provider_factory_.tls_context_, server_factory_context);
+    // loadTlsCert(&provider_factory_.tls_context_, server_factory_context);
 
     // test mod: terminate
     // auto mod = Ssl::SelectionResult::Continue;

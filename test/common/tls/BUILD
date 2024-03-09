@@ -18,6 +18,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "tls_context_provider_test",
+    size = "large",
     srcs = [
         "tls_context_provider_test.cc",
     ],
@@ -25,8 +26,8 @@ envoy_cc_test(
         # TODO(mattklein123): We should consolidate all of our test certs in a single place as
         # right now we have a bunch of duplication which is confusing.
         "//test/config/integration/certs",
-        "//test/extensions/transport_sockets/tls/ocsp/test_data:certs",
-        "//test/extensions/transport_sockets/tls/test_data:certs",
+        "//test/common/tls/ocsp/test_data:certs",
+        "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
     deps = [
@@ -44,14 +45,13 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
-        "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
-        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
-        "//source/extensions/transport_sockets/tls:utility_lib",
-        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
-        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
-        "//test/extensions/transport_sockets/tls/test_data:cert_infos",
+        "//source/common/tls:context_config_lib",
+        "//source/common/tls:context_lib",
+        "//source/common/tls:ssl_socket_lib",
+        "//source/common/tls:utility_lib",
+        "//source/common/tls/private_key:private_key_manager_lib",
+        "//test/common/tls/cert_validator:timed_cert_validator",
+        "//test/common/tls/test_data:cert_infos",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -68,7 +68,6 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],

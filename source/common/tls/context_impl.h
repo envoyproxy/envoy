@@ -242,6 +242,7 @@ private:
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
+  Ssl::TlsContextProviderFactoryCb tls_context_provider_factory_cb_;
   Ssl::TlsContextProviderSharedPtr tls_context_provider_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;

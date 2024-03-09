@@ -87,6 +87,8 @@ void SslExtendedSocketInfoImpl::onCertSelectionCompleted(bool succeeded) {
                      cert_selection_result_ != Ssl::CertSelectionStatus::Failed,
                  "onCertSelectionCompleted twice");
   bool async = cert_selection_result_ == Ssl::CertSelectionStatus::Pending;
+  cert_selection_result_ =
+      succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
   if (cert_selection_callback_.has_value()) {
     cert_selection_callback_.reset();
     // Resume handshake.
@@ -94,8 +96,6 @@ void SslExtendedSocketInfoImpl::onCertSelectionCompleted(bool succeeded) {
       ssl_handshaker_.handshakeCallbacks()->onAsynchronousCertSelectionComplete();
     }
   }
-  cert_selection_result_ =
-      succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
 }
 
 void SslExtendedSocketInfoImpl::setCertSelectionAsync() {
