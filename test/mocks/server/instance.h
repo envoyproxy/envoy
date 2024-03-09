@@ -52,6 +52,7 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Configuration::StatsConfig&, statsConfig, (), ());
+  MOCK_METHOD(Regex::Engine&, regexEngine, ());
   MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
