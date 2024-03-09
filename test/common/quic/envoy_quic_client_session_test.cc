@@ -562,7 +562,6 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   EXPECT_LOG_CONTAINS("trace", "starting gro recvmsg with max",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
-#endif
 
 // Ensures that the Network::Utility::readFromSocket function does uses recvmmsg for client
 // QUIC connections when GRO is not supported.
