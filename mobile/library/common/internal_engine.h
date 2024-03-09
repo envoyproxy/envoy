@@ -64,18 +64,31 @@ public:
   // (thread context switch)
   envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
                              bool explicit_flow_control) {
+    std::cerr << "==> AAB InternalEngine::startStream, thread=" << std::this_thread::get_id()
+              << std::endl;
     return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
+      std::cerr << "==> AAB Http::Client::startStream (called from InternalEngine), thread="
+                << std::this_thread::get_id() << std::endl;
       http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
     });
   }
   envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
+    std::cerr << "==> AAB InternalEngine::sendHeaders, thread=" << std::this_thread::get_id()
+              << std::endl;
     return dispatcher_->post([&, stream, headers, end_stream]() {
+      std::cerr << "==> AAB Http::Client::sendHeaders, thread=" << std::this_thread::get_id()
+                << std::endl;
       http_client_->sendHeaders(stream, headers, end_stream);
     });
   }
   envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read) {
-    return dispatcher_->post(
-        [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
+    std::cerr << "==> AAB InternalEngine::readData, thread=" << std::this_thread::get_id()
+              << std::endl;
+    return dispatcher_->post([&, stream, bytes_to_read]() {
+      std::cerr << "==> AAB Http::Client::readData (called from InternalEngine), thread="
+                << std::this_thread::get_id() << std::endl;
+      http_client_->readData(stream, bytes_to_read);
+    });
   }
   envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
     return dispatcher_->post(

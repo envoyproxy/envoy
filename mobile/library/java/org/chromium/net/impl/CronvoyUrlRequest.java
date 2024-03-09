@@ -538,6 +538,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
     Map<String, List<String>> envoyRequestHeaders = buildEnvoyRequestHeaders(
         mInitialMethod, mRequestHeaders, mUploadDataStream, mUserAgent, mCurrentUrl);
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
+    System.err.println("===>> AAB CronvoyUrlRequest fireOpenConnection");
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
                                                              /* explicitFlowControl= */ true));
     mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null);
@@ -854,6 +855,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
 
     @Override
     public void onData(ByteBuffer data, boolean endStream, EnvoyStreamIntel streamIntel) {
+      System.err.println("===>> AAB CronvoyUrlRequest, data=" + data.capacity());
       if (isAbandoned()) {
         return;
       }

@@ -1,5 +1,6 @@
 package org.chromium.net.impl;
 
+import static android.os.Process.THREAD_PRIORITY_FOREGROUND;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 import static android.os.Process.THREAD_PRIORITY_MORE_FAVORABLE;
 
@@ -82,7 +83,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
     // background applications for a slice of CPU doesn't make much sense.
     // We want to hurry up and get idle.
     final int threadPriority =
-        builder.threadPriority(THREAD_PRIORITY_BACKGROUND + THREAD_PRIORITY_MORE_FAVORABLE);
+        builder.threadPriority(THREAD_PRIORITY_FOREGROUND);
     mUserAgent = builder.getUserAgent();
     mLogLevel = builder.getLogLevel();
     mCronvoyLogger = builder.getLogger();

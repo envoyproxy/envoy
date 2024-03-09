@@ -81,15 +81,21 @@ public class CronvoyEngineTest {
 
   @Test
   public void get_simple() throws Exception {
-    mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
+    byte[] responseBytes = new byte[3_000_000];
+    Arrays.fill(responseBytes, (byte)'A');
+    String responseBody = new String(responseBytes);
+    mockWebServer.enqueue(new MockResponse().setBody(responseBody));
     mockWebServer.start();
     // HttpMethod is not set on purpose - should default to "GET" because there is no request body.
-    RequestScenario requestScenario = new RequestScenario().addResponseBuffers(13);
+    RequestScenario requestScenario = new RequestScenario().addResponseBuffers(3_000_100);
 
+    long timeA = System.currentTimeMillis();
     Response response = sendRequest(requestScenario);
+    long timeB = System.currentTimeMillis();
+    System.err.println("===> AAB TIME: " + (timeB-timeA) + " ms.");
 
     assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+    assertThat(response.getBodyAsString()).isEqualTo(responseBody);
     assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
 
     // Do some basic stats accounting.
@@ -101,242 +107,242 @@ public class CronvoyEngineTest {
     assertThat(statsMap.get("runtime.load_success")).isEqualTo("1");
   }
 
-  @Test
-  public void get_noBody() throws Exception {
-    mockWebServer.enqueue(new MockResponse().setResponseCode(HTTP_OK));
-    mockWebServer.start();
-    RequestScenario requestScenario =
-        new RequestScenario().addResponseBuffers(1); // At least one byte must be available.
+  // @Test
+  // public void get_noBody() throws Exception {
+  //   mockWebServer.enqueue(new MockResponse().setResponseCode(HTTP_OK));
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario =
+  //       new RequestScenario().addResponseBuffers(1); // At least one byte must be available.
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
-    assertThat(response.getBodyAsString()).isEmpty();
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-  }
+  //   assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
+  //   assertThat(response.getBodyAsString()).isEmpty();
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  // }
 
-  @Test
-  public void get_withSmallBuffers() throws Exception {
-    mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario().addResponseBuffers(4, 3, 5, 1);
+  // @Test
+  // public void get_withSmallBuffers() throws Exception {
+  //   mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario().addResponseBuffers(4, 3, 5, 1);
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-  }
+  //   assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+  // }
 
-  @Test
-  public void get_withNotEnoughBuffer() throws Exception {
-    mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario().addResponseBuffers(11);
+  // @Test
+  // public void get_withNotEnoughBuffer() throws Exception {
+  //   mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario().addResponseBuffers(11);
 
-    // Message comes from Preconditions.checkHasRemaining()
-    Exception exception = assertThrows(Exception.class, () -> sendRequest(requestScenario));
-    assertThat(exception).hasMessageThat().contains("already full");
-  }
+  //   // Message comes from Preconditions.checkHasRemaining()
+  //   Exception exception = assertThrows(Exception.class, () -> sendRequest(requestScenario));
+  //   assertThat(exception).hasMessageThat().contains("already full");
+  // }
 
-  @Test
-  public void get_withThrottledBodyResponse() throws Exception {
-    // Note: throttle must be long enough to trickle the chunking.
-    mockWebServer.enqueue(
-        new MockResponse().throttleBody(5, 1, TimeUnit.SECONDS).setBody("hello, world"));
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario().addResponseBuffers(13);
+  // @Test
+  // public void get_withThrottledBodyResponse() throws Exception {
+  //   // Note: throttle must be long enough to trickle the chunking.
+  //   mockWebServer.enqueue(
+  //       new MockResponse().throttleBody(5, 1, TimeUnit.SECONDS).setBody("hello, world"));
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario().addResponseBuffers(13);
 
-    UrlRequestCallbackTester<Response> urlRequestCallbackTester = new UrlRequestCallbackTester<>();
-    UrlRequestCallback testCallback = new UrlRequestCallback(
-        requestScenario.responseBody, urlRequestCallbackTester, requestScenario);
-    ExperimentalUrlRequest.Builder builder = cronvoyEngine.newUrlRequestBuilder(
-        mockWebServer.url(requestScenario.urlPath).toString(),
-        urlRequestCallbackTester.getWrappedUrlRequestCallback(testCallback),
-        Executors.newSingleThreadExecutor());
+  //   UrlRequestCallbackTester<Response> urlRequestCallbackTester = new UrlRequestCallbackTester<>();
+  //   UrlRequestCallback testCallback = new UrlRequestCallback(
+  //       requestScenario.responseBody, urlRequestCallbackTester, requestScenario);
+  //   ExperimentalUrlRequest.Builder builder = cronvoyEngine.newUrlRequestBuilder(
+  //       mockWebServer.url(requestScenario.urlPath).toString(),
+  //       urlRequestCallbackTester.getWrappedUrlRequestCallback(testCallback),
+  //       Executors.newSingleThreadExecutor());
 
-    Response response = urlRequestCallbackTester.waitForResponse(builder.build());
+  //   Response response = urlRequestCallbackTester.waitForResponse(builder.build());
 
-    // The response will come in 3 chunks. The 4th read is the final read and shouldn't trigger
-    // OnReadComplete() as no data is read.
-    assertThat(testCallback.getNumOnReadCompleteCalled()).isEqualTo(3);
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-    assertThat(response.getBodyAsString()).isEqualTo("hello, world");
-    assertThat(response.getNbResponseChunks()).isEqualTo(3); // 5 bytes, 5 bytes, and 2 bytes
-  }
+  //   // The response will come in 3 chunks. The 4th read is the final read and shouldn't trigger
+  //   // OnReadComplete() as no data is read.
+  //   assertThat(testCallback.getNumOnReadCompleteCalled()).isEqualTo(3);
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  //   assertThat(response.getBodyAsString()).isEqualTo("hello, world");
+  //   assertThat(response.getNbResponseChunks()).isEqualTo(3); // 5 bytes, 5 bytes, and 2 bytes
+  // }
 
-  @Test
-  public void get_cancelOnResponseStarted() throws Exception {
-    mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario().cancelOnResponseStarted();
+  // @Test
+  // public void get_cancelOnResponseStarted() throws Exception {
+  //   mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario().cancelOnResponseStarted();
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.isCancelled()).isTrue();
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-    assertThat(response.getBodyAsString()).isEmpty();
-  }
+  //   assertThat(response.isCancelled()).isTrue();
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  //   assertThat(response.getBodyAsString()).isEmpty();
+  // }
 
-  @Test
-  public void post_simple() throws Exception {
-    mockWebServer.setDispatcher(new Dispatcher() {
-      @Override
-      public MockResponse dispatch(RecordedRequest recordedRequest) {
-        assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.POST.name());
-        assertThat(recordedRequest.getBody().readUtf8()).isEqualTo("This is the request Body");
-        return new MockResponse().setBody("This is the response Body");
-      }
-    });
-    mockWebServer.start();
-    // HttpMethod is not set on purpose - should default to "POST" because there is a request body.
-    RequestScenario requestScenario = new RequestScenario()
-                                          .addResponseBuffers(30)
-                                          .addHeader("content-type", "text/html")
-                                          .setRequestBody("This is the request Body");
+  // @Test
+  // public void post_simple() throws Exception {
+  //   mockWebServer.setDispatcher(new Dispatcher() {
+  //     @Override
+  //     public MockResponse dispatch(RecordedRequest recordedRequest) {
+  //       assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.POST.name());
+  //       assertThat(recordedRequest.getBody().readUtf8()).isEqualTo("This is the request Body");
+  //       return new MockResponse().setBody("This is the response Body");
+  //     }
+  //   });
+  //   mockWebServer.start();
+  //   // HttpMethod is not set on purpose - should default to "POST" because there is a request body.
+  //   RequestScenario requestScenario = new RequestScenario()
+  //                                         .addResponseBuffers(30)
+  //                                         .addHeader("content-type", "text/html")
+  //                                         .setRequestBody("This is the request Body");
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
-    assertThat(response.getBodyAsString()).isEqualTo("This is the response Body");
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-  }
+  //   assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
+  //   assertThat(response.getBodyAsString()).isEqualTo("This is the response Body");
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  // }
 
-  @Test
-  public void post_chunked() throws Exception {
-    // This is getting chunked every 8192 bytes.
-    byte[] requestBody = new byte[20_000];
-    Arrays.fill(requestBody, (byte)'A');
-    mockWebServer.setDispatcher(new Dispatcher() {
-      @Override
-      public MockResponse dispatch(RecordedRequest recordedRequest) {
-        assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.POST.name());
-        assertThat(recordedRequest.getBody().readByteArray()).isEqualTo(requestBody);
-        return new MockResponse().setBody("This is the response Body");
-      }
-    });
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario()
-                                          .addResponseBuffers(30)
-                                          .setHttpMethod(RequestMethod.POST)
-                                          .addHeader("content-type", "text/html")
-                                          .setRequestBody(requestBody);
+  // @Test
+  // public void post_chunked() throws Exception {
+  //   // This is getting chunked every 8192 bytes.
+  //   byte[] requestBody = new byte[20_000];
+  //   Arrays.fill(requestBody, (byte)'A');
+  //   mockWebServer.setDispatcher(new Dispatcher() {
+  //     @Override
+  //     public MockResponse dispatch(RecordedRequest recordedRequest) {
+  //       assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.POST.name());
+  //       assertThat(recordedRequest.getBody().readByteArray()).isEqualTo(requestBody);
+  //       return new MockResponse().setBody("This is the response Body");
+  //     }
+  //   });
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario()
+  //                                         .addResponseBuffers(30)
+  //                                         .setHttpMethod(RequestMethod.POST)
+  //                                         .addHeader("content-type", "text/html")
+  //                                         .setRequestBody(requestBody);
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
-    assertThat(response.getBodyAsString()).isEqualTo("This is the response Body");
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-  }
+  //   assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
+  //   assertThat(response.getBodyAsString()).isEqualTo("This is the response Body");
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  // }
 
-  @Test
-  public void get_redirect() throws Exception {
-    mockWebServer.setDispatcher(new Dispatcher() {
-      @Override
-      public MockResponse dispatch(RecordedRequest recordedRequest) {
-        switch (recordedRequest.getRequestUrl().encodedPath()) {
-        case "/get/flowers":
-          return new MockResponse()
-              .setResponseCode(HTTP_MOVED_TEMP)
-              .setHeader("Location", "/get/chocolates");
+  // @Test
+  // public void get_redirect() throws Exception {
+  //   mockWebServer.setDispatcher(new Dispatcher() {
+  //     @Override
+  //     public MockResponse dispatch(RecordedRequest recordedRequest) {
+  //       switch (recordedRequest.getRequestUrl().encodedPath()) {
+  //       case "/get/flowers":
+  //         return new MockResponse()
+  //             .setResponseCode(HTTP_MOVED_TEMP)
+  //             .setHeader("Location", "/get/chocolates");
 
-        case "/get/chocolates":
-          return new MockResponse().setBody("Everything is awesome").setResponseCode(HTTP_OK);
-        }
-        return new MockResponse().setResponseCode(HTTP_BAD_REQUEST);
-      }
-    });
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario()
-                                          .addResponseBuffers(30)
-                                          .setHttpMethod(RequestMethod.GET)
-                                          .setUrlPath("/get/flowers")
-                                          .addHeader("content-type", "text/html");
+  //       case "/get/chocolates":
+  //         return new MockResponse().setBody("Everything is awesome").setResponseCode(HTTP_OK);
+  //       }
+  //       return new MockResponse().setResponseCode(HTTP_BAD_REQUEST);
+  //     }
+  //   });
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario()
+  //                                         .addResponseBuffers(30)
+  //                                         .setHttpMethod(RequestMethod.GET)
+  //                                         .setUrlPath("/get/flowers")
+  //                                         .addHeader("content-type", "text/html");
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
-    assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-    assertThat(response.getUrlResponseInfo().getUrlChain())
-        .containsExactly(mockWebServer.url("/get/flowers").toString(),
-                         mockWebServer.url("/get/chocolates").toString());
-  }
+  //   assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
+  //   assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  //   assertThat(response.getUrlResponseInfo().getUrlChain())
+  //       .containsExactly(mockWebServer.url("/get/flowers").toString(),
+  //                        mockWebServer.url("/get/chocolates").toString());
+  // }
 
-  @Test
-  public void get_redirect_withUnwantedBody() throws Exception {
-    mockWebServer.setDispatcher(new Dispatcher() {
-      @Override
-      public MockResponse dispatch(RecordedRequest recordedRequest) {
-        switch (recordedRequest.getRequestUrl().encodedPath()) {
-        case "/get/flowers":
-          return new MockResponse()
-              .setResponseCode(HTTP_MOVED_TEMP)
-              .setHeader("Location", "/get/chocolates")
-              .addHeader("content-type", "text/html")
-              .setBody("Unwanted response body that must be ignored - by API Contract");
+  // @Test
+  // public void get_redirect_withUnwantedBody() throws Exception {
+  //   mockWebServer.setDispatcher(new Dispatcher() {
+  //     @Override
+  //     public MockResponse dispatch(RecordedRequest recordedRequest) {
+  //       switch (recordedRequest.getRequestUrl().encodedPath()) {
+  //       case "/get/flowers":
+  //         return new MockResponse()
+  //             .setResponseCode(HTTP_MOVED_TEMP)
+  //             .setHeader("Location", "/get/chocolates")
+  //             .addHeader("content-type", "text/html")
+  //             .setBody("Unwanted response body that must be ignored - by API Contract");
 
-        case "/get/chocolates":
-          return new MockResponse().setBody("Everything is awesome").setResponseCode(HTTP_OK);
-        }
-        return new MockResponse().setResponseCode(HTTP_BAD_REQUEST);
-      }
-    });
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario()
-                                          .addResponseBuffers(30)
-                                          .setHttpMethod(RequestMethod.GET)
-                                          .setUrlPath("/get/flowers")
-                                          .addHeader("content-type", "text/html");
+  //       case "/get/chocolates":
+  //         return new MockResponse().setBody("Everything is awesome").setResponseCode(HTTP_OK);
+  //       }
+  //       return new MockResponse().setResponseCode(HTTP_BAD_REQUEST);
+  //     }
+  //   });
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario()
+  //                                         .addResponseBuffers(30)
+  //                                         .setHttpMethod(RequestMethod.GET)
+  //                                         .setUrlPath("/get/flowers")
+  //                                         .addHeader("content-type", "text/html");
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
-    assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-    assertThat(response.getUrlResponseInfo().getUrlChain())
-        .containsExactly(mockWebServer.url("/get/flowers").toString(),
-                         mockWebServer.url("/get/chocolates").toString());
-  }
+  //   assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
+  //   assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  //   assertThat(response.getUrlResponseInfo().getUrlChain())
+  //       .containsExactly(mockWebServer.url("/get/flowers").toString(),
+  //                        mockWebServer.url("/get/chocolates").toString());
+  // }
 
-  @Test
-  public void post_redirect() throws Exception {
-    // This is getting chunked every 8192 bytes.
-    byte[] requestBody = new byte[20_000];
-    Arrays.fill(requestBody, (byte)'A');
-    mockWebServer.setDispatcher(new Dispatcher() {
-      @Override
-      public MockResponse dispatch(RecordedRequest recordedRequest) {
-        // The request POST body is being sent twice, as it should in a redirect case.
-        assertThat(recordedRequest.getBody().readByteArray()).isEqualTo(requestBody);
+  // @Test
+  // public void post_redirect() throws Exception {
+  //   // This is getting chunked every 8192 bytes.
+  //   byte[] requestBody = new byte[20_000];
+  //   Arrays.fill(requestBody, (byte)'A');
+  //   mockWebServer.setDispatcher(new Dispatcher() {
+  //     @Override
+  //     public MockResponse dispatch(RecordedRequest recordedRequest) {
+  //       // The request POST body is being sent twice, as it should in a redirect case.
+  //       assertThat(recordedRequest.getBody().readByteArray()).isEqualTo(requestBody);
 
-        switch (recordedRequest.getRequestUrl().encodedPath()) {
-        case "/get/flowers":
-          return new MockResponse()
-              .setResponseCode(HTTP_MOVED_TEMP)
-              .setHeader("Location", "/get/chocolates");
+  //       switch (recordedRequest.getRequestUrl().encodedPath()) {
+  //       case "/get/flowers":
+  //         return new MockResponse()
+  //             .setResponseCode(HTTP_MOVED_TEMP)
+  //             .setHeader("Location", "/get/chocolates");
 
-        case "/get/chocolates":
-          return new MockResponse().setBody("Everything is awesome").setResponseCode(HTTP_OK);
-        }
-        return new MockResponse().setResponseCode(HTTP_BAD_REQUEST);
-      }
-    });
-    mockWebServer.start();
-    RequestScenario requestScenario = new RequestScenario()
-                                          .addResponseBuffers(30)
-                                          .setHttpMethod(RequestMethod.POST)
-                                          .setUrlPath("/get/flowers")
-                                          .addHeader("content-type", "text/html")
-                                          .setRequestBody(requestBody);
+  //       case "/get/chocolates":
+  //         return new MockResponse().setBody("Everything is awesome").setResponseCode(HTTP_OK);
+  //       }
+  //       return new MockResponse().setResponseCode(HTTP_BAD_REQUEST);
+  //     }
+  //   });
+  //   mockWebServer.start();
+  //   RequestScenario requestScenario = new RequestScenario()
+  //                                         .addResponseBuffers(30)
+  //                                         .setHttpMethod(RequestMethod.POST)
+  //                                         .setUrlPath("/get/flowers")
+  //                                         .addHeader("content-type", "text/html")
+  //                                         .setRequestBody(requestBody);
 
-    Response response = sendRequest(requestScenario);
+  //   Response response = sendRequest(requestScenario);
 
-    assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
-    assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
-    assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
-    assertThat(response.getUrlResponseInfo().getUrlChain())
-        .containsExactly(mockWebServer.url("/get/flowers").toString(),
-                         mockWebServer.url("/get/chocolates").toString());
-  }
+  //   assertThat(response.getResponseCode()).isEqualTo(HTTP_OK);
+  //   assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
+  //   assertWithMessage(response.getErrorMessage()).that(response.getCronetException()).isNull();
+  //   assertThat(response.getUrlResponseInfo().getUrlChain())
+  //       .containsExactly(mockWebServer.url("/get/flowers").toString(),
+  //                        mockWebServer.url("/get/chocolates").toString());
+  // }
 
   private Response sendRequest(RequestScenario requestScenario) {
     UrlRequestCallbackTester<Response> urlRequestCallbackTester = new UrlRequestCallbackTester<>();

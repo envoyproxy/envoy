@@ -954,6 +954,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 }
 
 void InstanceBase::run() {
+  std::cerr << "==> AAB Server::InstanceBase::run, thread=" << std::this_thread::get_id()
+            << std::endl;
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
@@ -1065,6 +1067,8 @@ InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
+  std::cerr << "==> AAB Server::InstanceBase::notifyCallbacksForStage, thread="
+            << std::this_thread::get_id() << std::endl;
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {

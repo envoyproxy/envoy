@@ -52,6 +52,7 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
 envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
+  std::cerr << "==> AAB InternalEngine::run, thread=" << std::this_thread::get_id() << std::endl;
   main_thread_ =
       thread_factory_->createThread([this, options]() mutable -> void { main(options); },
                                     /* options= */ absl::nullopt, /* crash_on_failure= */ false);
@@ -59,6 +60,7 @@ envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> optio
 }
 
 envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> options) {
+  std::cerr << "==> AAB InternalEngine::main, thread=" << std::this_thread::get_id() << std::endl;
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {

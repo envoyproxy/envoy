@@ -104,6 +104,8 @@ uint32_t calculateBytesToSend(const Buffer::Instance& data, uint32_t max_bytes) 
 }
 
 void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_stream) {
+  std::cerr << "==> AAB Client::DirectStreamCallbacks::encodeData, thread="
+            << std::this_thread::get_id() << std::endl;
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] response data for stream (length={} end_stream={})",
             direct_stream_.stream_handle_, data.length(), end_stream);
@@ -124,7 +126,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     // Default to 1M per stream. This is fairly arbitrary and will result in
     // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
     // and having local data of 1M + kernel-buffer-limit for HTTP/1.1
-    response_data_->setWatermarks(1000000);
+    response_data_->setWatermarks(2000000);
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
@@ -221,6 +223,8 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
 }
 
 void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
+  std::cerr << "==> AAB Client::DirectStreamCallbacks::resumeData, thread="
+            << std::this_thread::get_id() << std::endl;
   ASSERT(explicit_flow_control_);
   ASSERT(bytes_to_send > 0);
 

@@ -228,6 +228,7 @@ static void passHeaders(const char* method, const Envoy::Types::ManagedEnvoyHead
 static Envoy::JNI::LocalRefUniquePtr<jobjectArray>
 jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& headers,
                bool end_stream, envoy_stream_intel stream_intel, void* context) {
+  std::cerr << "==> AAB jvm_on_headers" << std::endl;
   jni_log("[Envoy]", "jvm_on_headers");
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
   jobject j_context = static_cast<jobject>(context);
@@ -279,6 +280,7 @@ jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& head
 
 static void jvm_on_response_headers(envoy_headers headers, bool end_stream,
                                     envoy_stream_intel stream_intel, void* context) {
+  std::cerr << "==> AAB jvm_on_response_headers" << std::endl;
   const auto managed_headers = Envoy::Types::ManagedEnvoyHeaders(headers);
   jvm_on_headers("onResponseHeaders", managed_headers, end_stream, stream_intel, context);
 }
@@ -286,6 +288,7 @@ static void jvm_on_response_headers(envoy_headers headers, bool end_stream,
 static envoy_filter_headers_status
 jvm_http_filter_on_request_headers(envoy_headers input_headers, bool end_stream,
                                    envoy_stream_intel stream_intel, const void* context) {
+  std::cerr << "==> AAB jvm_on_request_headers" << std::endl;
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
   const auto headers = Envoy::Types::ManagedEnvoyHeaders(input_headers);
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> result = jvm_on_headers(
@@ -337,6 +340,7 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_data(const char* metho
                                                                bool end_stream,
                                                                envoy_stream_intel stream_intel,
                                                                void* context) {
+  std::cerr << "==> AAB jvm_on_data" << std::endl;
   jni_log("[Envoy]", "jvm_on_data");
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
   jobject j_context = static_cast<jobject>(context);
@@ -361,6 +365,7 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_data(const char* metho
 
 static void jvm_on_response_data(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
                                  void* context) {
+  std::cerr << "==> AAB jvm_on_response_data" << std::endl;
   jvm_on_data("onResponseData", data, end_stream, stream_intel, context);
 }
 
@@ -652,6 +657,7 @@ static envoy_filter_resume_status
 jvm_http_filter_on_resume_request(envoy_headers* headers, envoy_data* data, envoy_headers* trailers,
                                   bool end_stream, envoy_stream_intel stream_intel,
                                   const void* context) {
+  std::cerr << "==> AAB jvm_http_filter_on_resumse_request" << std::endl;
   return jvm_http_filter_on_resume("onResumeRequest", headers, data, trailers, end_stream,
                                    stream_intel, context);
 }
@@ -660,12 +666,14 @@ static envoy_filter_resume_status
 jvm_http_filter_on_resume_response(envoy_headers* headers, envoy_data* data,
                                    envoy_headers* trailers, bool end_stream,
                                    envoy_stream_intel stream_intel, const void* context) {
+  std::cerr << "==> AAB jvm_http_filter_on_resumse_response" << std::endl;
   return jvm_http_filter_on_resume("onResumeResponse", headers, data, trailers, end_stream,
                                    stream_intel, context);
 }
 
 static void call_jvm_on_complete(envoy_stream_intel stream_intel,
                                  envoy_final_stream_intel final_stream_intel, void* context) {
+  std::cerr << "==> AAB jvm_on_complete" << std::endl;
   jni_log("[Envoy]", "jvm_on_complete");
 
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
@@ -761,6 +769,7 @@ static void jvm_http_filter_on_cancel(envoy_stream_intel stream_intel,
 }
 
 static void jvm_on_send_window_available(envoy_stream_intel stream_intel, void* context) {
+  std::cerr << "==> AAB jvm_on_send_window_available" << std::endl;
   jni_log("[Envoy]", "jvm_on_send_window_available");
 
   Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
@@ -876,7 +885,7 @@ static envoy_data jvm_get_string(const void* context) {
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initStream(
     JNIEnv* /*env*/, jclass, jlong engine_handle) {
-
+  std::cerr << "==> AAB JniLibrary_initStream" << std::endl;
   auto engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
   return engine->initStream();
 }
@@ -884,6 +893,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject j_context,
     jboolean explicit_flow_control) {
+  std::cerr << "==> AAB JniLibrary_startStream" << std::endl;
   // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref.
   jobject retained_context = env->NewGlobalRef(j_context);
   envoy_http_callbacks native_callbacks = {jvm_on_response_headers,
@@ -1007,6 +1017,7 @@ Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callReleaseCa
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_readData(
     JNIEnv* /*env*/, jclass, jlong engine_handle, jlong stream_handle, jlong byte_count) {
+  std::cerr << "==> AAB JniLibrary_readData" << std::endl;
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
       ->readData(static_cast<envoy_stream_t>(stream_handle), byte_count);
 }
@@ -1016,6 +1027,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject data, jint length,
     jboolean end_stream) {
+  std::cerr << "==> AAB JniLibrary_sendData" << std::endl;
   Envoy::JNI::JniHelper jni_helper(env);
   if (end_stream) {
     jni_log("[Envoy]", "jvm_send_data_end_stream");
@@ -1035,6 +1047,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, 
                                                                    jlong stream_handle,
                                                                    jbyteArray data, jint length,
                                                                    jboolean end_stream) {
+  std::cerr << "==> AAB JniLibrary_sendDataByteArray" << std::endl;
   Envoy::JNI::JniHelper jni_helper(env);
   if (end_stream) {
     jni_log("[Envoy]", "jvm_send_data_end_stream");
@@ -1047,6 +1060,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendDataByteArray(JNIEnv* env, 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobjectArray headers,
     jboolean end_stream) {
+  std::cerr << "==> AAB JniLibrary_sendHeaders" << std::endl;
   Envoy::JNI::JniHelper jni_helper(env);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
       ->sendHeaders(static_cast<envoy_stream_t>(stream_handle),

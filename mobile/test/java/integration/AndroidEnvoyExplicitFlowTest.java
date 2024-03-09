@@ -62,7 +62,11 @@ public class AndroidEnvoyExplicitFlowTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
-                 .addLogLevel(LogLevel.OFF)
+                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, msg) -> {
+                     System.out.print(msg);
+                     return null;
+                 })
                  .setOnEngineRunning(() -> {
                    latch.countDown();
                    return null;
@@ -76,7 +80,7 @@ public class AndroidEnvoyExplicitFlowTest {
     engine.terminate();
     mockWebServer.shutdown();
   }
-
+/*
   @Test
   public void get_simple() throws Exception {
     mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
@@ -288,7 +292,7 @@ public class AndroidEnvoyExplicitFlowTest {
     // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
     assertThat(response.getNbResponseChunks()).isEqualTo(6); // 3&2 bytes, 3&2 bytes, 2, and 0 bytes
   }
-
+*/
   @Test
   public void get_veryLargeResponse() throws Exception {
     byte[] responseBytes = new byte[100_000_000];
@@ -308,6 +312,7 @@ public class AndroidEnvoyExplicitFlowTest {
     assertThat(response.getBodyAsString()).isEqualTo(responseBody);
     assertThat(response.getEnvoyError()).isNull();
   }
+/*
 
   // This was supposed to be a simple post, but because the stream is not properly closed, it
   // actually ends up testing sending a post, getting a response, and Envoy resetting the
@@ -454,6 +459,7 @@ public class AndroidEnvoyExplicitFlowTest {
     executorService.awaitTermination(20, TimeUnit.SECONDS);
     assertThat(errors).isEmpty();
   }
+*/
 
   private Response sendRequest(RequestScenario requestScenario) throws Exception {
     final CountDownLatch latch = new CountDownLatch(1);

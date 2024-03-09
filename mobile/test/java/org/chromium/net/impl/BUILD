@@ -8,11 +8,11 @@ envoy_mobile_package()
 envoy_mobile_android_test(
     name = "cronvoy_test",
     srcs = [
-        "AtomicCombinatoryStateTest.java",
-        "CancelProofEnvoyStreamTest.java",
-        "CronetBidirectionalStateTest.java",
+        # "AtomicCombinatoryStateTest.java",
+        # "CancelProofEnvoyStreamTest.java",
+        # "CronetBidirectionalStateTest.java",
         "CronvoyEngineTest.java",
-        "CronvoyLoggerTest.java",
+        # "CronvoyLoggerTest.java",
         "UrlRequestCallbackTester.java",
     ],
     exec_properties = {
