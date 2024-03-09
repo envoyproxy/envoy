@@ -104,10 +104,9 @@ void SslExtendedSocketInfoImpl::setCertSelectionAsync() {
   cert_selection_result_ = Ssl::CertSelectionStatus::Pending;
 }
 
-Ssl::CertSelectionCallbackPtr
-SslExtendedSocketInfoImpl::createCertSelectionCallback(SSL* ssl, Ssl::ContextSharedPtr ctx) {
+Ssl::CertSelectionCallbackPtr SslExtendedSocketInfoImpl::createCertSelectionCallback(SSL* ssl) {
   auto callback = std::make_unique<CertSelectionCallbackImpl>(
-      ssl, ctx, ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
+      ssl, ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
   cert_selection_callback_ = *callback;
   return callback;
 }

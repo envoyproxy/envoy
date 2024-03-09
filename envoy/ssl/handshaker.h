@@ -13,6 +13,9 @@
 namespace Envoy {
 namespace Ssl {
 
+// Opaque type defined and used by the ``ServerContext``.
+struct TlsContext;
+
 class HandshakeCallbacks {
 public:
   virtual ~HandshakeCallbacks() = default;
@@ -194,7 +197,21 @@ public:
 };
 
 using TlsContextProviderSharedPtr = std::shared_ptr<TlsContextProvider>;
-using TlsContextProviderFactoryCb = std::function<TlsContextProviderSharedPtr()>;
+
+class ContextSelectionCallback {
+public:
+  virtual ~ContextSelectionCallback() = default;
+
+  /**
+   * @return reference to the existing Tls Contexts.
+   */
+  virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
+};
+
+using ContextSelectionCallbackSharedPtr = std::shared_ptr<ContextSelectionCallback>;
+
+using TlsContextProviderFactoryCb =
+    std::function<TlsContextProviderSharedPtr(ContextSelectionCallbackSharedPtr)>;
 
 class TlsContextProviderFactoryContext {
 public:

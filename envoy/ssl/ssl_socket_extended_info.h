@@ -93,7 +93,7 @@ public:
   /**
    * @return CertSelectionCallbackPtr a callback used to return the cert selection result.
    */
-  virtual CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl, ContextSharedPtr ctx) PURE;
+  virtual CertSelectionCallbackPtr createCertSelectionCallback(SSL* ssl) PURE;
 
   /**
    * Called after the cert selection completes.

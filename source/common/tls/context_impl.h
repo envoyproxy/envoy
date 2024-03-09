@@ -194,11 +194,15 @@ enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
+                          public Envoy::Ssl::ContextSelectionCallback,
                           public std::enable_shared_from_this<ServerContextImpl> {
 public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                     const std::vector<std::string>& server_names, TimeSource& time_source,
                     Ssl::ContextAdditionalInitFunc additional_init);
+
+  // Ssl::ContextSelectionCallback
+  const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details. This is made public for use by custom TLS extensions who want to

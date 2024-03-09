@@ -12,9 +12,6 @@
 namespace Envoy {
 namespace Ssl {
 
-// Opaque type defined and used by the ``ServerContext``.
-struct TlsContext;
-
 using ContextAdditionalInitFunc =
     std::function<void(Ssl::TlsContext& context, const Ssl::TlsCertificateConfig& cert)>;
 

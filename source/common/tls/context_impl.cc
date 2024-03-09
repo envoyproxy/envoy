@@ -813,7 +813,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
 
   auto tls_context_provider_factory_cb = config.createTlsContextProvider();
   if (tls_context_provider_factory_cb != nullptr) {
-    tls_context_provider_ = tls_context_provider_factory_cb();
+    tls_context_provider_ = tls_context_provider_factory_cb(shared_from_this());
   }
 
   // Compute the session context ID hash. We use all the certificate identities,
@@ -1279,7 +1279,7 @@ ServerContextImpl::selectTlsContextFromProvider(const SSL_CLIENT_HELLO* ssl_clie
 
   auto result = tls_context_provider_->selectTlsContext(
       ssl_client_hello,
-      extended_socket_info->createCertSelectionCallback(ssl_client_hello->ssl, shared_from_this()));
+      extended_socket_info->createCertSelectionCallback(ssl_client_hello->ssl));
 
   ENVOY_LOG(trace, "TLS context selection result: {}, after selectTlsContext",
             static_cast<int>(extended_socket_info->CertSelectionResult()));
@@ -1403,7 +1403,7 @@ ServerContextImpl::findTlsContext(absl::string_view sni, bool client_ecdsa_capab
 enum ssl_select_cert_result_t
 ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   if (tls_context_provider_ != nullptr) {
-    selectTlsContextFromProvider();
+    selectTlsContextFromProvider(ssl_client_hello);
   }
   absl::string_view sni = absl::NullSafeStringView(
       SSL_get_servername(ssl_client_hello->ssl, TLSEXT_NAMETYPE_host_name));
