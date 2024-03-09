@@ -40,9 +40,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
-constexpr const char* CookieTailHttpOnlyFormatString =
-    ";version=1;path=/;Max-Age={};secure;HttpOnly";
+constexpr const char* CookieTailFormatString = ";path=/;Max-Age={};secure";
+constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
@@ -198,6 +197,7 @@ FilterConfig::FilterConfig(
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
+      deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher())),
       cookie_names_(proto_config.credentials().cookie_names()),
       auth_type_(getAuthType(proto_config.auth_type())),
       use_refresh_token_(proto_config.use_refresh_token().value()),
@@ -376,10 +376,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
 
-    ENVOY_LOG(debug, "path {} does not match with redirect matcher. redirecting to OAuth server.",
-              path_str);
-    redirectToOAuthServer(headers);
-    return Http::FilterHeadersStatus::StopIteration;
+    if (canRedirectToOAuthServer(headers)) {
+      ENVOY_LOG(debug, "redirecting to OAuth server", path_str);
+      redirectToOAuthServer(headers);
+      return Http::FilterHeadersStatus::StopIteration;
+    } else {
+      ENVOY_LOG(debug, "unauthorized, redirecting to OAuth server is not allowed", path_str);
+      sendUnauthorizedResponse();
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   // At this point, we *are* on /_oauth. We believe this request comes from the authorization
@@ -447,6 +452,16 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   }
   ENVOY_LOG(debug, "can not skip oauth flow");
   return false;
+}
+
+bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
+  for (const auto& matcher : config_->denyRedirectMatchers()) {
+    if (matcher.matchesHeaders(headers)) {
+      ENVOY_LOG(debug, "redirect is denied for this request");
+      return false;
+    }
+  }
+  return true;
 }
 
 void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const {
@@ -644,7 +659,11 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
 void OAuth2Filter::onRefreshAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
   // We failed to get an access token via the refresh token, so send the user to the oauth endpoint.
-  redirectToOAuthServer(*request_headers_);
+  if (canRedirectToOAuthServer(*request_headers_)) {
+    redirectToOAuthServer(*request_headers_);
+  } else {
+    sendUnauthorizedResponse();
+  }
 }
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,

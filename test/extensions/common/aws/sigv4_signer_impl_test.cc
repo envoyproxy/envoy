@@ -50,7 +50,7 @@ public:
 
     SigV4SignerImpl signer(service_name, "region",
                            CredentialsProviderSharedPtr{credentials_provider}, time_system_,
-                           Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+                           Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, 5);
     if (use_unsigned_payload) {
       signer.signUnsignedPayload(headers, override_region);
     } else {
@@ -65,6 +65,27 @@ public:
               headers.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView());
     EXPECT_EQ(payload,
               headers.get(SigV4SignatureHeaders::get().ContentSha256)[0]->value().getStringView());
+  }
+
+  void expectQueryString(absl::string_view service_name,
+                         Http::TestRequestHeaderMapImpl extra_headers,
+                         absl::string_view signature_to_match, bool token_credentials,
+                         const absl::string_view override_region = "") {
+    auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
+    if (token_credentials) {
+      EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(token_credentials_));
+    } else {
+      EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
+    }
+
+    SigV4SignerImpl signer(service_name, "region",
+                           CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+                           Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, 5);
+
+    signer.signUnsignedPayload(extra_headers, override_region);
+    auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
+        extra_headers.Path()->value().getStringView());
+    EXPECT_EQ(query_parameters.getFirstValue("X-Amz-Signature"), signature_to_match);
   }
 
   NiceMock<MockCredentialsProvider>* credentials_provider_;
@@ -143,7 +164,7 @@ TEST_F(SigV4SignerImplTest, SignEmptyContentHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_, true);
-  EXPECT_EQ(SigV4SignatureConstants::get().HashedEmptyString,
+  EXPECT_EQ(SigV4SignatureConstants::HashedEmptyString,
             message_->headers()
                 .get(SigV4SignatureHeaders::get().ContentSha256)[0]
                 ->value()
@@ -233,26 +254,74 @@ TEST_F(SigV4SignerImplTest, SignHostHeader) {
                 .getStringView());
 }
 
+// Verify query string signing defaults to 5s
+TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
+
+  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
+  Http::TestRequestHeaderMapImpl headers{};
+
+  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
+
+  headers.setMethod("GET");
+  // Simple path, 1 extra header
+  headers.setPath("/example/path");
+  headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
+  headers.addCopy("testheader", "value1");
+  SigV4SignerImpl querysigner("service", "region",
+                              CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+                              Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
+
+  querysigner.signUnsignedPayload(headers);
+  EXPECT_TRUE(absl::StrContains(headers.getPathValue(), "X-Amz-Expires=5&"));
+}
+
+// Verify sigv4 and query parameters
+TEST_F(SigV4SignerImplTest, QueryParameters) {
+
+  Http::TestRequestHeaderMapImpl headers{};
+
+  headers.setMethod("GET");
+  // Simple path, 1 extra header
+  headers.setPath("/example/path");
+  headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
+  headers.addCopy("testheader", "value1");
+  expectQueryString("vpc-lattice-svcs", headers,
+                    "5ab1a13f9d9623b4060507975ae2e656c5cd9dfffcd629a0f6702b1d2114b551", false);
+  // Trivial path
+  headers.setPath("/");
+  expectQueryString("vpc-lattice-svcs", headers,
+
+                    "b262c0878e531b09e0d8ce2b451fcd6ffedcfe30bedccd8c0d057243e5e1bdf1", false);
+  // Additional query strings
+  headers.setPath("/?query1=query1&query2=ZZZZZZZZZZ");
+  expectQueryString("vpc-lattice-svcs", headers,
+                    "17b38464e04c3e5d7b4caafd47fd376209087fdc18d08c0980e299accaa5aaf1", false);
+  // Query strings and security token
+  headers.setPath("/?query1=query1&query2=ZZZZZZZZZZ");
+  expectQueryString("vpc-lattice-svcs", headers,
+                    "539c3bf87477012a85ffa129e5db0fc6efcee5b758e3cf4fac393d319977d4ea", true);
+}
+
 // Verify signing headers for services.
 TEST_F(SigV4SignerImplTest, SignHeadersByService) {
   expectSignHeaders("s3", "d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
-                    SigV4SignatureConstants::get().UnsignedPayload, true);
+                    SigV4SignatureConstants::UnsignedPayload, true);
   expectSignHeaders("service", "d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
-                    SigV4SignatureConstants::get().HashedEmptyString, false);
+                    SigV4SignatureConstants::HashedEmptyString, false);
   expectSignHeaders("es", "0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
-                    SigV4SignatureConstants::get().UnsignedPayload, true);
+                    SigV4SignatureConstants::UnsignedPayload, true);
   expectSignHeaders("glacier", "8d1f241d77c64cda57b042cd312180f16e98dbd7a96e5545681430f8dbde45a0",
-                    SigV4SignatureConstants::get().UnsignedPayload, true);
+                    SigV4SignatureConstants::UnsignedPayload, true);
 
   // with override region
   expectSignHeaders("s3", "70b80eaedfe73d9cf18a9d2f786f02a7dab013780a8cdc42a7c819a27bfd943c",
-                    SigV4SignatureConstants::get().UnsignedPayload, true, "region1");
+                    SigV4SignatureConstants::UnsignedPayload, true, "region1");
   expectSignHeaders("service", "297ca067391806a1e3cdb25723082063d0bf66a6472b902dd986d540a2058a13",
-                    SigV4SignatureConstants::get().HashedEmptyString, false, "region1");
+                    SigV4SignatureConstants::HashedEmptyString, false, "region1");
   expectSignHeaders("es", "cec43f0777c0d4cb2f3799a5c755dc4c3b893c23e268c1bd4e34f770fba3c1ca",
-                    SigV4SignatureConstants::get().UnsignedPayload, true, "region1");
+                    SigV4SignatureConstants::UnsignedPayload, true, "region1");
   expectSignHeaders("glacier", "0792940297330f2930dc1c18d0b99c0b85429865c09e836f5c086f7f182e2809",
-                    SigV4SignatureConstants::get().UnsignedPayload, true, "region1");
+                    SigV4SignatureConstants::UnsignedPayload, true, "region1");
 }
 
 } // namespace
