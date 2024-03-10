@@ -1249,10 +1249,6 @@ ServerContextImpl::selectTlsContextFromProvider(const SSL_CLIENT_HELLO* ssl_clie
       SSL_get_ex_data(ssl_client_hello->ssl, ContextImpl::sslExtendedSocketInfoIndex()));
 
   auto selection_result = extended_socket_info->CertSelectionResult();
-  if (selection_result == Ssl::CertSelectionStatus::Pending) {
-    ENVOY_LOG(trace, "already waiting certificate");
-    return ssl_select_cert_retry;
-  }
   switch (selection_result) {
   case Ssl::CertSelectionStatus::NotStarted:
     // continue

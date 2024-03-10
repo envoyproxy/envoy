@@ -230,12 +230,6 @@ protected:
 
     ENVOY_LOG_MISC(info, "debug: 2");
 
-    // EXPECT_EQ(true, server_tls_context.common_tls_context().has_custom_tls_context_provider());
-
-    // loadTlsCert(&provider_factory_.tls_context_, server_factory_context);
-
-    // test mod: terminate
-    // auto mod = Ssl::SelectionResult::Continue;
     provider_factory_.mod_ = mod;
 
     Extensions::TransportSockets::Tls::ContextManagerImpl manager(*time_system);

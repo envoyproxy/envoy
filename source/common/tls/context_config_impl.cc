@@ -444,10 +444,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
-         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0 &&
-        !config.common_tls_context().has_custom_tls_context_provider()) {
-      throwEnvoyExceptionOrPanic(
-          "No TLS certificates or TLS context provider found for server context");
+         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
+      throwEnvoyExceptionOrPanic("No TLS certificates found for server context");
     } else if (!config.common_tls_context().tls_certificates().empty() &&
                !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
       throwEnvoyExceptionOrPanic(
