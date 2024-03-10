@@ -603,6 +603,8 @@ Utility::readFromSocket(IoHandle& handle, const Address::Instance& local_address
                         UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
                         UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped) {
   if (recv_msg_method == UdpRecvMsgMethod::RecvMsgWithGro) {
+    ASSERT(Api::OsSysCallsSingleton::get().supportsUdpGro(),
+           "cannot use GRO when the platform doesn't support it.");
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -645,6 +647,8 @@ Utility::readFromSocket(IoHandle& handle, const Address::Instance& local_address
   }
 
   if (recv_msg_method == UdpRecvMsgMethod::RecvMmsg) {
+    ASSERT(Api::OsSysCallsSingleton::get().supportsMmsg(),
+           "cannot use recvmmsg when the platform doesn't support it.");
     const auto max_rx_datagram_size = udp_packet_processor.maxDatagramSize();
 
     // Buffer::ReservationSingleSlice is always passed by value, and can only be constructed
