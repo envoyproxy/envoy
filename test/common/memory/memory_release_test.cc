@@ -58,7 +58,7 @@ protected:
   std::unique_ptr<Memory::AllocatorManager> allocator_manager_;
 };
 
-TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
+TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleasedDummy) {
   size_t initial_allocated_bytes = Stats::totalCurrentlyAllocated();
   auto a = std::make_unique<unsigned char[]>(MB);
   auto b = std::make_unique<unsigned char[]>(MB);
@@ -105,7 +105,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
   EXPECT_EQ(0UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
 }
 
-TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
+TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleasedDummy) {
   size_t initial_allocated_bytes = Stats::totalCurrentlyAllocated();
   auto a = std::make_unique<uint32_t[]>(40 * MB);
   auto b = std::make_unique<uint32_t[]>(40 * MB);
