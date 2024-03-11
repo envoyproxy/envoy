@@ -1752,23 +1752,17 @@ TEST(DurationUtilTest, OutOfRange) {
     }
     // Invalid combined seconds and nanoseconds.
     {
-      ProtobufWkt::Duration duration;
-      constexpr int64_t kMaxInt64Nanoseconds =
-          std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-      duration.set_seconds(kMaxInt64Nanoseconds);
-      duration.set_nanos(999999999);
       // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-      // is deprecated, this test should only validate EXPECT_THROW.
+      // is deprecated, this test should be executed unconditionally. The test is only
+      // with the flag because without the flag set to false it will trigger a
+      // runtime error (crash) with the current ASAN test suite.
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
+        ProtobufWkt::Duration duration;
+        constexpr int64_t kMaxInt64Nanoseconds =
+            std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+        duration.set_seconds(kMaxInt64Nanoseconds);
+        duration.set_nanos(999999999);
         EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-      } else {
-        // NOTE: although this doesn't throw an exception, it does cause the
-        // following ubsan error:
-        // google/protobuf/util/time_util.cc:333:47: runtime error: signed
-        // integer overflow: 9223372036000000000 + 999999999 cannot be
-        // represented in type 'long'".
-        // That is the reason the "strict_duration_validation" changed the max duration value.
-        EXPECT_NO_THROW(DurationUtil::durationToMilliseconds(duration));
       }
     }
   }
@@ -1843,24 +1837,18 @@ TEST(DurationUtilTest, NoThrow) {
     }
     // Invalid combined seconds and nanoseconds.
     {
-      ProtobufWkt::Duration duration;
-      constexpr int64_t kMaxInt64Nanoseconds =
-          std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-      duration.set_seconds(kMaxInt64Nanoseconds);
-      duration.set_nanos(999999999);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
       // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-      // is deprecated, this test should only validate EXPECT_FALSE.
+      // is deprecated, this test should be executed unconditionally. The test is only
+      // with the flag because without the flag set to false it will trigger a
+      // runtime error (crash) with the current ASAN test suite.
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
+        ProtobufWkt::Duration duration;
+        constexpr int64_t kMaxInt64Nanoseconds =
+            std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+        duration.set_seconds(kMaxInt64Nanoseconds);
+        duration.set_nanos(999999999);
+        const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
         EXPECT_FALSE(result.ok());
-      } else {
-        // NOTE: although this doesn't throw an exception, it does cause the
-        // following ubsan error:
-        // google/protobuf/util/time_util.cc:333:47: runtime error: signed
-        // integer overflow: 9223372036000000000 + 999999999 cannot be
-        // represented in type 'long'".
-        // That is the reason the "strict_duration_validation" changed the max duration value.
-        EXPECT_TRUE(result.ok());
       }
     }
   }
