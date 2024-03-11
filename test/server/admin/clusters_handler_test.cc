@@ -256,10 +256,18 @@ TEST_P(AdminInstanceTest, TestSetHealthFlag) {
   setHealthFlag(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC, *host, health_status);
   EXPECT_TRUE(health_status.failed_active_health_check());
 
+  host->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  setHealthFlag(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC, *host, health_status);
+  EXPECT_FALSE(health_status.failed_active_health_check());
+
   // FAILED_OUTLIER_CHECK
   host->healthFlagSet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
   setHealthFlag(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK, *host, health_status);
   EXPECT_TRUE(health_status.failed_outlier_check());
+
+  host->healthFlagClear(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  setHealthFlag(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK, *host, health_status);
+  EXPECT_FALSE(health_status.failed_outlier_check());
 
   // FAILED_EDS_HEALTH
   host->healthFlagSet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH);
@@ -289,25 +297,45 @@ TEST_P(AdminInstanceTest, TestSetHealthFlag) {
   setHealthFlag(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC, *host, health_status);
   EXPECT_TRUE(health_status.failed_active_degraded_check());
 
+  host->healthFlagClear(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  setHealthFlag(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC, *host, health_status);
+  EXPECT_FALSE(health_status.failed_active_degraded_check());
+
   // PENDING_DYNAMIC_REMOVAL
   host->healthFlagSet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
   setHealthFlag(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL, *host, health_status);
   EXPECT_TRUE(health_status.pending_dynamic_removal());
+
+  host->healthFlagClear(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+  setHealthFlag(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL, *host, health_status);
+  EXPECT_FALSE(health_status.pending_dynamic_removal());
 
   // PENDING_ACTIVE_HC
   host->healthFlagSet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
   setHealthFlag(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC, *host, health_status);
   EXPECT_TRUE(health_status.pending_active_hc());
 
+  host->healthFlagClear(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+  setHealthFlag(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC, *host, health_status);
+  EXPECT_FALSE(health_status.pending_active_hc());
+
   // EXCLUDED_VIA_IMMEDIATE_HC_FAIL
   host->healthFlagSet(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
   setHealthFlag(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL, *host, health_status);
   EXPECT_TRUE(health_status.excluded_via_immediate_hc_fail());
 
+  host->healthFlagClear(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+  setHealthFlag(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL, *host, health_status);
+  EXPECT_FALSE(health_status.excluded_via_immediate_hc_fail());
+
   // ACTIVE_HC_TIMEOUT
   host->healthFlagSet(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   setHealthFlag(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT, *host, health_status);
   EXPECT_TRUE(health_status.active_hc_timeout());
+
+  host->healthFlagClear(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  setHealthFlag(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT, *host, health_status);
+  EXPECT_FALSE(health_status.active_hc_timeout());
 }
 
 } // namespace Server
