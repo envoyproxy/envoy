@@ -135,6 +135,11 @@ bug_fixes:
     to support half close semantics during TCP tunneling.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` to false.
+- area: eds-caching
+  change: |
+    Fixing an issue where EDS caching is used (protected by the ``envoy.restart_features.use_eds_cache_for_ads``
+    runtime flag that is false by default), when multiple clusters use the same EDS resource, and that cached EDS
+    resource is used.
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.

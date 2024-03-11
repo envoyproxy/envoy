@@ -2,6 +2,8 @@
 
 #include "source/common/common/logger.h"
 
+#include <algorithm>
+
 namespace Envoy {
 namespace Config {
 
@@ -49,9 +51,13 @@ void EdsResourcesCacheImpl::removeCallback(absl::string_view resource_name,
       resource_it != resources_map_.end()) {
     ENVOY_LOG_MISC(trace, "Removing callback for resource {} from the xDS resource cache",
                    resource_name);
-    resource_it->second.removal_cbs_.erase(std::remove(resource_it->second.removal_cbs_.begin(),
-                                                       resource_it->second.removal_cbs_.end(),
-                                                       removal_cb));
+    auto& callbacks = resource_it->second.removal_cbs_;
+    // Using the Erase-Remove idiom, in which all entries to be removed are
+    // moved to the end of the vector by the remove() call, and then the erase() call
+    // will erase these entries from the first element to be removed all the
+    // way to the end of the vector.
+    callbacks.erase(std::remove(callbacks.begin(), callbacks.end(), removal_cb),
+                    callbacks.end());
   }
 }
 
