@@ -879,10 +879,13 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 #ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
 #endif
-  return std::make_unique<Runtime::LoaderImpl>(
+  absl::Status creation_status;
+  auto loader = std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
-      server.messageValidationContext().dynamicValidationVisitor(), server.api());
+      server.messageValidationContext().dynamicValidationVisitor(), server.api(), creation_status);
+  THROW_IF_NOT_OK(creation_status);
+  return loader;
 }
 
 void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {

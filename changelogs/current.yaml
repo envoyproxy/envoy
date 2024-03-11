@@ -64,6 +64,10 @@ minor_behavior_changes:
   change: |
     Add more conversion in the proxy status utility. It can be disabled by the runtime guard
     ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
+- area: http2
+  change: |
+    Simplifies integration with the codec by removing translation between nghttp2 callbacks and Http2VisitorInterface events.
+    Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -144,6 +148,10 @@ bug_fixes:
 - area: tracing
   change: |
     Dynatrace resource detector: Only log warning message when no enrichment attributes are found.
+- area: oauth
+  change: |
+    When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
+    another Cookie header.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
