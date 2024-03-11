@@ -90,7 +90,7 @@ public:
    * lookup is supported here.
    */
   template <class GetKey> Handle addInlineKey(const GetKey& key) {
-    RELEASE_ASSERT(!finalized_, "Cannot create new inline key after finalize()");
+    ENVOY_BUG(!finalized_, "Cannot create new inline key after finalize()");
 
     if (auto it = inline_keys_map_.find(key); it != inline_keys_map_.end()) {
       // If the key is already added, return related inline handle directly.

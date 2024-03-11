@@ -93,7 +93,7 @@ void PosixThread::join() {
   ASSERT(!joined_);
   joined_ = true;
   const int rc = pthread_join(thread_handle_->handle(), nullptr);
-  RELEASE_ASSERT(rc == 0, "");
+  ENVOY_BUG(rc == 0, "");
 }
 
 bool PosixThread::joinable() const { return !joined_; }

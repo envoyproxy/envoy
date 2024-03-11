@@ -4,6 +4,8 @@
 #include "source/common/common/bit_array.h"
 #include "source/common/common/random_generator.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -20,7 +22,7 @@ TEST(BitArray, ShouldAssertIfInvalidBitWidth) {
 
   {
     const int bit_width = 33;
-    EXPECT_DEATH({ BitArray c(bit_width, 10); }, "");
+    EXPECT_ENVOY_BUG({ BitArray c(bit_width, 10); }, "");
   }
 }
 

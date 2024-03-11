@@ -85,8 +85,8 @@ public:
     static_assert(std::is_enum_v<ElementName>);
     static_assert(max_size > 0);
 
-    RELEASE_ASSERT(a_capacity <= max_size,
-                   absl::StrCat("capacity should be less than or equal to ", max_size, "."));
+    ENVOY_BUG(a_capacity <= max_size,
+              absl::StrCat("capacity should be less than or equal to ", max_size, "."));
 
     // Initialize indices with max_size as we start with 0 elements.
     indices_.fill(max_size);

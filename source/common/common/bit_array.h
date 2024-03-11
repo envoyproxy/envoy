@@ -46,8 +46,8 @@ public:
         // subtract one to fit in 32 bits.
         mask_(static_cast<uint32_t>((static_cast<uint64_t>(1) << width) - 1)),
         num_items_(num_items) {
-    RELEASE_ASSERT(width <= MaxBitWidth, "Using BitArray with invalid parameters.");
-    RELEASE_ASSERT(ENVOY_BIT_ARRAY_SUPPORTED, "BitArray requires 64-bit architecture.");
+    ENVOY_BUG(width <= MaxBitWidth, "Using BitArray with invalid parameters.");
+    ENVOY_BUG(ENVOY_BIT_ARRAY_SUPPORTED, "BitArray requires 64-bit architecture.");
     // Init padding to avoid sanitizer complaints if reading the last elements.
     uint8_t* padding_start = array_start_.get() + (bytesNeeded(width, num_items) - WordSize);
     storeUnsignedWord(padding_start, 0);
