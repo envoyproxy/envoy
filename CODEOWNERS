@@ -324,6 +324,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
+# String matching extensions
+/*/extensions/string_matcher/ @ggreenway @UNOWNED
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 # Health checkers
@@ -363,7 +365,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
 
 # mobile
-/mobile/ @RyanTheOptimist @alyssawilk @abeyad
+/mobile/ @RyanTheOptimist @alyssawilk @abeyad @fredyw
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

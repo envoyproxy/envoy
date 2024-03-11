@@ -9,6 +9,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
 #include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
 #include "source/common/http/path_utility.h"
 
 #include "absl/strings/match.h"
@@ -198,6 +199,11 @@ bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) c
 
 bool PathMatcher::match(const absl::string_view path) const {
   return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
+}
+
+StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config) {
+  auto factory = Config::Utility::getAndCheckFactory<StringMatcherExtensionFactory>(config, false);
+  return factory->createStringMatcher(config.typed_config());
 }
 
 } // namespace Matchers
