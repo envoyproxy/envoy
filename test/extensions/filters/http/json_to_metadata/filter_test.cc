@@ -1730,6 +1730,35 @@ request_rules:
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
 }
 
+TEST_F(FilterTest, CustomRequestAllowContentTypeNoMatch) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+  allow_content_types:
+  - "text/plain"
+  allow_content_types_regex:
+  - google_re2: {}
+    regex: "application/.*"
+)EOF");
+
+  Http::TestRequestHeaderMapImpl nomatch_incoming_headers{
+      {":path", "/ping"}, {":method", "POST"}, {"Content-Type", "image/png"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(nomatch_incoming_headers, false));
+
+  testRequestWithBody("{}");
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
 } // namespace JsonToMetadata
 } // namespace HttpFilters
 } // namespace Extensions
