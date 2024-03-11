@@ -26,11 +26,11 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
         }
 
         std::vector<Http2Impl> http2_implementations = {Http2Impl::Nghttp2};
-        std::vector<bool> defer_processing_values = {false};
+        std::vector<bool> http2_bool_values = {false};
         if (downstream_protocol == Http::CodecType::HTTP2 ||
             upstream_protocol == Http::CodecType::HTTP2) {
           http2_implementations.push_back(Http2Impl::Oghttp2);
-          defer_processing_values.push_back(true);
+          http2_bool_values.push_back(true);
         }
 
         std::vector<bool> use_header_validator_values;
@@ -41,11 +41,14 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
 #endif
         for (Http1ParserImpl http1_implementation : http1_implementations) {
           for (Http2Impl http2_implementation : http2_implementations) {
-            for (bool defer_processing : defer_processing_values) {
-              for (bool use_header_validator : use_header_validator_values) {
-                ret.push_back(HttpProtocolTestParams{
-                    ip_version, downstream_protocol, upstream_protocol, http1_implementation,
-                    http2_implementation, defer_processing, use_header_validator});
+            for (bool defer_processing : http2_bool_values) {
+              for (bool deprecate_callback_visitor : http2_bool_values) {
+                for (bool use_header_validator : use_header_validator_values) {
+                  ret.push_back(HttpProtocolTestParams{
+                      ip_version, downstream_protocol, upstream_protocol, http1_implementation,
+                      http2_implementation, defer_processing, use_header_validator,
+                      deprecate_callback_visitor});
+                }
               }
             }
           }
@@ -99,6 +102,8 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
                       http2ImplementationToString(params.param.http2_implementation),
                       params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
                                                                      : "NoDeferredProcessing",
+                      params.param.deprecate_callback_visitor ? "WithCallbackVisitor"
+                                                              : "NoCallbackVisitor",
                       params.param.use_universal_header_validator ? "Uhv" : "Legacy");
 }
 

@@ -9,6 +9,10 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: http2
+  change: |
+    Simplifies integration with the codec by removing translation between nghttp2 callbacks and Http2VisitorInterface events.
+    Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
