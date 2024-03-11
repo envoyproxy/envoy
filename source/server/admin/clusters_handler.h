@@ -14,6 +14,13 @@
 namespace Envoy {
 namespace Server {
 
+/**
+ * A utility to retrieve admin health status information from a specified host.
+ *
+ * @param healthFlag    The specific health status to be checked.
+ * @param host          The target host.
+ * @param health_status A proto object representing the admin health status.
+ */
 void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
                    envoy::admin::v3::HostHealthStatus& health_status);
 
