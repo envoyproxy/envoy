@@ -117,8 +117,8 @@ protected:
 
 /**
  * Extension of OverrideLayerImpl that maintains an in-memory set of values. These values can be
- * modified programmatically via mergeValues(). AdminLayer is so named because it can be accessed
- * and manipulated by Envoy's admin interface.
+ * modified programmatically via mergeValues(). AdminLayer is so named because it
+ * can be accessed and manipulated by Envoy's admin interface.
  */
 class AdminLayer : public OverrideLayerImpl {
 public:
@@ -135,7 +135,7 @@ public:
    * Merge the provided values into our entry map. An empty value indicates that a key should be
    * removed from our map.
    */
-  void mergeValues(const absl::node_hash_map<std::string, std::string>& values);
+  absl::Status mergeValues(const absl::node_hash_map<std::string, std::string>& values);
 
 private:
   RuntimeStats& stats_;
@@ -148,11 +148,12 @@ using AdminLayerPtr = std::unique_ptr<AdminLayer>;
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api);
+  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api,
+            absl::Status& creation_status);
 
 private:
-  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
-                     Api::Api& api);
+  absl::Status walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
+                             Api::Api& api);
 
   const std::string path_;
   const Filesystem::WatcherPtr watcher_;
@@ -163,10 +164,11 @@ private:
  */
 class ProtoLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto);
+  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
+             absl::Status& creation_status);
 
 private:
-  void walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
+  absl::Status walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
 };
 
 class LoaderImpl;
@@ -216,13 +218,14 @@ public:
              const envoy::config::bootstrap::v3::LayeredRuntime& config,
              const LocalInfo::LocalInfo& local_info, Stats::Store& store,
              Random::RandomGenerator& generator,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+             absl::Status& creation_status);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
   SnapshotConstSharedPtr threadsafeSnapshot() override;
-  void mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
+  absl::Status mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
   Stats::Scope& getRootScope() override;
   void countDeprecatedFeatureUse() const override;
@@ -231,9 +234,9 @@ private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  SnapshotImplPtr createNewSnapshot();
+  absl::StatusOr<SnapshotImplPtr> createNewSnapshot();
   // Load a new Snapshot into TLS
-  void loadNewSnapshot();
+  absl::Status loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
   void onRtdsReady();
 
