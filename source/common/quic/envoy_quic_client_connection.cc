@@ -61,8 +61,8 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_CLIENT, supported_versions, generator),
       QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher),
-      prefer_gro_(prefer_gro), allow_mmsg_(Runtime::runtimeFeatureEnabled(
-                                   "envoy.reloadable_features.allow_quic_client_udp_mmsg")) {}
+      prefer_gro_(prefer_gro), disallow_mmsg_(Runtime::runtimeFeatureEnabled(
+                                   "envoy.reloadable_features.disallow_quic_client_udp_mmsg")) {}
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
@@ -253,7 +253,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
-        *this, dispatcher_.timeSource(), prefer_gro_, allow_mmsg_, packets_dropped_);
+        *this, dispatcher_.timeSource(), prefer_gro_, !disallow_mmsg_, packets_dropped_);
     if (err == nullptr) {
       // In the case where the path validation fails, the probing socket will be closed and its IO
       // events are no longer interesting.

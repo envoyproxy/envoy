@@ -76,9 +76,9 @@ minor_behavior_changes:
     ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to ``false``.
 - area: http3
   change: |
-    Allow recvmmsg (multi-message) to be used for reading packets from a client QUIC UDP socket, if
-    GRO is not set or not supported. This behavior change can be reverted by setting
-    ``envoy.reloadable_features.allow_quic_client_udp_mmsg`` to ``false``.
+    Disables `recvmmsg` (multi-message) for reading packets from a client QUIC UDP socket, if GRO
+    is not set or not supported. `recvmsg` will be used instead. This behavior change can be
+    reverted by setting ``envoy.reloadable_features.disallow_quic_client_udp_mmsg`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

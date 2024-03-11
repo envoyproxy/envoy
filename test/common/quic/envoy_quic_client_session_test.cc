@@ -563,47 +563,10 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
 
-// Ensures that the Network::Utility::readFromSocket function does uses recvmmsg for client
-// QUIC connections when GRO is not supported.
-TEST_P(EnvoyQuicClientSessionTest, UsesRecvMmsgWhenNoGro) {
-  if (!Api::OsSysCallsSingleton::get().supportsMmsg()) {
-    GTEST_SKIP() << "Platform doesn't support recvmmsg.";
-  }
-
-  NiceMock<MockOsSysCallsImpl> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls};
-
-  // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
-  envoy_quic_session_->connect();
-
-  std::string write_data = "abc";
-  Buffer::RawSlice slice;
-  slice.mem_ = write_data.data();
-  slice.len_ = write_data.length();
-
-  // Make sure recvmmsg is used when GRO isn't supported.
-  EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(false));
-  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).Times(0);
-  EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
-                                 struct timespec*) -> Api::SysCallIntResult {
-        dispatcher_->exit();
-        return {0, SOCKET_ERROR_AGAIN};
-      }));
-
-  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
-
-  EXPECT_LOG_CONTAINS("trace", "starting recvmmsg with packets",
-                      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
-}
-
-class EnvoyQuicClientSessionNoMmsgTest : public EnvoyQuicClientSessionTest {
+class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {
 public:
   void SetUp() override {
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
-
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.allow_quic_client_udp_mmsg", "false"}});
     EnvoyQuicClientSessionTest::SetUp();
   }
 
@@ -611,14 +574,16 @@ protected:
   NiceMock<MockOsSysCallsImpl> os_sys_calls_;
 
 private:
-  TestScopedRuntime scoped_runtime_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
 };
 
-INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionNoMmsgTests, EnvoyQuicClientSessionNoMmsgTest,
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionDisallowMmsgTests,
+                         EnvoyQuicClientSessionDisallowMmsgTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
-TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) {
+// Ensures that the Network::Utility::readFromSocket function uses `recvmsg` for client QUIC
+// connections when GRO is not supported.
+TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
   // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
   envoy_quic_session_->connect();
 
@@ -653,6 +618,56 @@ TEST_P(EnvoyQuicClientSessionNoMmsgTest, UsesRecvMsgWhenNoGroAndMmsgNotAllowed) 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
   EXPECT_LOG_CONTAINS("trace", "starting recvmsg with max",
+                      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
+}
+
+class EnvoyQuicClientSessionAllowMmsgTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
+
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.disallow_quic_client_udp_mmsg", "false"}});
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+
+protected:
+  NiceMock<MockOsSysCallsImpl> os_sys_calls_;
+
+private:
+  TestScopedRuntime scoped_runtime_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionAllowMmsgTests, EnvoyQuicClientSessionAllowMmsgTest,
+                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+
+TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed) {
+  if (!Api::OsSysCallsSingleton::get().supportsMmsg()) {
+    GTEST_SKIP() << "Platform doesn't support recvmmsg.";
+  }
+
+  // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
+  envoy_quic_session_->connect();
+
+  std::string write_data = "abc";
+  Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+
+  // Make sure recvmmsg is used when GRO isn't supported.
+  EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
+  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _))
+      .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
+                                 struct timespec*) -> Api::SysCallIntResult {
+        dispatcher_->exit();
+        return {0, SOCKET_ERROR_AGAIN};
+      }));
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+
+  EXPECT_LOG_CONTAINS("trace", "starting recvmmsg with packets",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
 
