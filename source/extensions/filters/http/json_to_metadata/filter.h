@@ -88,8 +88,8 @@ private:
   const absl::flat_hash_set<std::string> response_allow_content_types_;
   const bool request_allow_empty_content_type_;
   const bool response_allow_empty_content_type_;
-  std::vector<Regex::CompiledMatcherPtr> request_allow_content_types_regex_;
-  std::vector<Regex::CompiledMatcherPtr> response_allow_content_types_regex_;
+  const std::vector<Regex::CompiledMatcherPtr> request_allow_content_types_regex_;
+  const std::vector<Regex::CompiledMatcherPtr> response_allow_content_types_regex_;
 };
 
 const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
