@@ -541,7 +541,6 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   auto body_or_error = ConfigUtility::parseDirectResponseBody(
       route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
   THROW_IF_STATUS_NOT_OK(body_or_error, throw);
-
   direct_response_body_ = body_or_error.value();
   if (envoy::config::core::v3::DataSource::SpecifierCase::kFilename ==
       route.direct_response().body().specifier_case()) {
@@ -554,6 +553,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           auto body_or_error = ConfigUtility::parseDirectResponseBody(
               route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
           THROW_IF_STATUS_NOT_OK(body_or_error, throw);
+          absl::MutexLock lock(&direct_response_mutex_);
           direct_response_body_ = body_or_error.value();
         });
   }

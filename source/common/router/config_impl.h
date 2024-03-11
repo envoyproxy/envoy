@@ -775,7 +775,10 @@ public:
   std::string newUri(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
-  const std::string& responseBody() const override { return direct_response_body_; }
+  const std::string& responseBody() const override {
+    absl::MutexLock lock(&direct_response_mutex_);
+    return direct_response_body_;
+  }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -1202,7 +1205,8 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  std::string direct_response_body_;
+  std::string direct_response_body_ ABSL_GUARDED_BY(direct_response_mutex_){};
+  mutable absl::Mutex direct_response_mutex_;
   Filesystem::WatcherPtr direct_response_file_watcher_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
