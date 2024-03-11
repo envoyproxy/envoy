@@ -806,7 +806,7 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {cla_0}, {cla_0}, {}, "2");
 
-  // Wait for ingersting the update.
+  // Wait for ingesting the update.
   test_server_->waitForCounterEq("cluster.cluster_0.update_success", 2);
 
   // A single message should be successfully sent to the upstream.
