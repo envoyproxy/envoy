@@ -464,24 +464,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {rbac_http_hcm_prefix, rbac_http_prefix});
 
   // RBAC HTTP Filter Per-Policy Prefix
-  Tag rbac_hcm;
-  rbac_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
-  rbac_hcm.value_ = "rbac_connection_manager";
-
   Tag rbac_policy_name;
   rbac_policy_name.name_ = tag_names.RBAC_POLICY_NAME;
   rbac_policy_name.value_ = "my_rbac_policy";
-  regex_tester.testRegex("http.rbac_connection_manager.rbac.policy.my_rbac_policy.allowed",
-                         "http.rbac.policy.allowed", {rbac_hcm, rbac_policy_name});
-  regex_tester.testRegex("http.rbac_connection_manager.rbac.policy.my_rbac_policy.denied",
-                         "http.rbac.policy.denied", {rbac_hcm, rbac_policy_name});
-  regex_tester.testRegex("http.rbac_connection_manager.rbac.my_rbac_shadow_prefix.policy.my_rbac_"
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.allowed",
+                         "http.rbac.policy.allowed", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.denied",
+                         "http.rbac.policy.denied", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_"
                          "policy.shadow_allowed",
-                         "http.rbac.my_rbac_shadow_prefix.policy.shadow_allowed",
-                         {rbac_hcm, rbac_policy_name});
-  regex_tester.testRegex(
-      "http.rbac_connection_manager.rbac.my_rbac_shadow_prefix.policy.my_rbac_policy.shadow_denied",
-      "http.rbac.my_rbac_shadow_prefix.policy.shadow_denied", {rbac_hcm, rbac_policy_name});
+                         "http.rbac.policy.shadow_allowed",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_policy.shadow_denied",
+                         "http.rbac.policy.shadow_denied",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
 
   // Proxy Protocol version prefix
   Tag proxy_protocol_version;

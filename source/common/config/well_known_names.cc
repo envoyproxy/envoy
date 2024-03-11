@@ -215,8 +215,8 @@ TagNameValues::TagNameValues() {
   // (<stat_prefix>.).rbac.**
   addTokenized(RBAC_PREFIX, "$.rbac.**");
 
-  // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)*
-  addTokenized(RBAC_HTTP_PREFIX, "http.*.rbac.$.**");
+  // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)* but excluding policy
+  addRe2(RBAC_HTTP_PREFIX, R"(^http\.<TAG_VALUE>\.rbac\.((<TAG_VALUE>)\.).*?)", "", "policy");
 
   // proxy_proto.(versions.v<version_number>.)**
   addRe2(PROXY_PROTOCOL_VERSION, R"(^proxy_proto\.(versions\.v(\d)\.)\w+)", "proxy_proto.versions");

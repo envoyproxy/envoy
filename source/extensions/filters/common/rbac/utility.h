@@ -34,48 +34,30 @@ struct RoleBasedAccessControlFilterStats {
   SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 
   Stats::Scope& scope_;
-  Stats::StatName per_policy_stat_;
-  Stats::StatName per_policy_shadow_stat_;
-  Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName unknown_policy_allowed_;
-  const Stats::StatName unknown_policy_denied_;
-  const Stats::StatName unknown_shadow_policy_allowed_;
-  const Stats::StatName unknown_shadow_policy_denied_;
-
-  void addPolicy(const std::string& name) {
-    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".allowed"));
-    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".denied"));
-  }
-
-  void addShadowPolicy(const std::string& name) {
-    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".shadow_allowed"));
-    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".shadow_denied"));
-  }
+  std::string per_policy_final_prefix_;
+  std::string per_policy_final_shadow_prefix_;
 
   void incPolicyAllowed(absl::string_view name) {
-    incCounter(per_policy_stat_,
-               stat_name_set_->getBuiltin(absl::StrCat(name, ".allowed"), unknown_policy_allowed_));
+    incCounter(per_policy_final_prefix_, name, ".allowed");
   }
 
   void incPolicyDenied(absl::string_view name) {
-    incCounter(per_policy_stat_,
-               stat_name_set_->getBuiltin(absl::StrCat(name, ".denied"), unknown_policy_denied_));
+    incCounter(per_policy_final_prefix_, name, ".denied");
   }
 
   void incPolicyShadowAllowed(absl::string_view name) {
-    incCounter(per_policy_shadow_stat_,
-               stat_name_set_->getBuiltin(absl::StrCat(name, ".shadow_allowed"),
-                                          unknown_shadow_policy_allowed_));
+    incCounter(per_policy_final_shadow_prefix_, name, ".shadow_allowed");
   }
 
   void incPolicyShadowDenied(absl::string_view name) {
-    incCounter(per_policy_shadow_stat_,
-               stat_name_set_->getBuiltin(absl::StrCat(name, ".shadow_denied"),
-                                          unknown_shadow_policy_denied_));
+    incCounter(per_policy_final_shadow_prefix_, name, ".shadow_denied");
   }
 
-  void incCounter(const Stats::StatName& prefix, Stats::StatName name) {
-    Stats::Utility::counterFromElements(scope_, {prefix, name}).inc();
+  void incCounter(absl::string_view prefix, absl::string_view name, absl::string_view suffix) {
+    Stats::StatNameDynamicPool pool(scope_.symbolTable());
+    Stats::StatName metric_prefix = pool.add(prefix);
+    Stats::StatName metric_name = pool.add(absl::StrCat(name, suffix));
+    Stats::Utility::counterFromElements(scope_, {metric_prefix, metric_name}).inc();
   }
 };
 

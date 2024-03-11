@@ -445,6 +445,41 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
+TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideWithPerRuleStats) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
+
+  setDestinationPort(123);
+  setMetadata();
+
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
+  route_config.mutable_rbac()->set_track_per_rule_stats(true);
+  route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
+
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+
+  (*route_config.mutable_rbac()->mutable_rules()->mutable_policies())["foobar"] = policy;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules(), factory_context};
+  NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config,
+                                                                                  context_};
+
+  EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
+
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillRepeatedly(Return(&per_route_config_));
+
+  // Filter iteration should stop since the route-specific policy is DENY.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, true));
+
+  // Expect `denied` stat to be incremented.
+  EXPECT_EQ(0U, stats_store_.counter("test.rbac.policy.foobar.allowed").value());
+  EXPECT_EQ(1U, stats_store_.counter("test.rbac.policy.foobar.denied").value());
+}
+
 TEST_F(RoleBasedAccessControlFilterTest, MatcherWithCelInputsRequestNoMatch) {
   setupMatcherWithCelInputs();
   setDestinationPort(80);
@@ -714,6 +749,8 @@ TEST_F(RoleBasedAccessControlFilterTest, RulesStatPrefix) {
 
   EXPECT_EQ("test.rbac.rules_prefix_.allowed", config_->stats().allowed_.name());
   EXPECT_EQ("test.rbac.rules_prefix_.denied", config_->stats().denied_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 }
 
 // Upstream Ip and Port matcher tests.
