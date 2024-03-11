@@ -162,7 +162,7 @@ public class CronetInputStreamTest {
     throw new AssertionError("No exception was thrown!");
   }
 
-  private static interface CronetInputStreamTestCase {
+  private interface CronetInputStreamTestCase {
     void runTestCase(CronvoyInputStream underTest) throws Exception;
   }
 }

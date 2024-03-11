@@ -36,7 +36,7 @@ public final class AndroidCertVerifyResult {
   public AndroidCertVerifyResult(int status) {
     mStatus = status;
     mIsIssuedByKnownRoot = false;
-    mCertificateChain = Collections.<X509Certificate>emptyList();
+    mCertificateChain = Collections.emptyList();
   }
 
   // TODO(stefanoduo): Hook envoy-mobile JNI.

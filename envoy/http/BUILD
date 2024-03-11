@@ -140,6 +140,7 @@ envoy_cc_library(
     deps = [
         ":header_formatter_interface",
         "//envoy/common:union_string",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
     ],

@@ -43,7 +43,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // For first matched request, create a new bucket in the cache and sent the report to RLQS
     // server immediately.
-    createNewBucket(bucket_id_proto, bucket_id);
+    createNewBucket(bucket_id_proto, match_action, bucket_id);
     return sendImmediateReport(bucket_id, match_action);
   } else {
     // Found the cached bucket entry.
@@ -99,29 +99,50 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
 }
 
 void RateLimitQuotaFilter::onQuotaResponse(RateLimitQuotaResponse&) {
-  if (!initiating_call_) {
-    callbacks_->continueDecoding();
-  }
+  // RLQS filter is currently operating in non-blocking fashion. Thus, there is no need to continue
+  // filter chain iteration.
+  // Placeholder for other post processing if needed.
 }
 
 void RateLimitQuotaFilter::onDestroy() {
   // TODO(tyxia) TLS resource are not cleaned here.
 }
 
-void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id, size_t id) {
+void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
+                                           const RateLimitOnMatchAction& match_action, size_t id) {
+  // Create new bucket and store it into quota cache.
+  std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
+
   // The first matched request doesn't have quota assignment from the RLQS server yet, so the
   // action is performed based on pre-configured strategy from no assignment behavior config.
-  // TODO(tyxia) Check no assignment logic for new bucket (i.e., first matched request). It
-  // should not wait for RLQS server response.
+  auto mutable_rate_limit_strategy =
+      new_bucket->bucket_action.mutable_quota_assignment_action()->mutable_rate_limit_strategy();
+  if (match_action.bucketSettings().has_no_assignment_behavior()) {
+    *mutable_rate_limit_strategy =
+        match_action.bucketSettings().no_assignment_behavior().fallback_rate_limit();
+  } else {
+    // When `no_assignment_behavior` is not configured, default blanket rule is set to ALLOW_ALL.
+    // (i.e., fail-open).
+    mutable_rate_limit_strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
+  }
+
+  // Set up the bucket id.
+  new_bucket->bucket_id = bucket_id;
+  // Set up the quota usage.
   QuotaUsage quota_usage;
-  quota_usage.num_requests_allowed = 1;
-  quota_usage.num_requests_denied = 0;
   quota_usage.last_report = std::chrono::duration_cast<std::chrono::nanoseconds>(
       time_source_.monotonicTime().time_since_epoch());
 
-  // Create new bucket and store it into quota cache.
-  std::unique_ptr<Bucket> new_bucket = std::make_unique<Bucket>();
-  new_bucket->bucket_id = bucket_id;
+  switch (mutable_rate_limit_strategy->blanket_rule()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::type::v3::RateLimitStrategy::ALLOW_ALL:
+    quota_usage.num_requests_allowed++;
+    break;
+  case envoy::type::v3::RateLimitStrategy::DENY_ALL:
+    quota_usage.num_requests_denied++;
+    break;
+  }
+
   new_bucket->quota_usage = quota_usage;
   quota_buckets_[id] = std::move(new_bucket);
 }
@@ -155,8 +176,6 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
     ENVOY_LOG(debug, "The gRPC stream is established and active");
   }
 
-  initiating_call_ = true;
-
   // Send the usage report to RLQS server immediately on the first time when the request is
   // matched.
   client_.rate_limit_client->sendUsageReport(bucket_id);
@@ -167,11 +186,29 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   client_.report_interval_ms = std::chrono::milliseconds(reporting_interval);
   client_.send_reports_timer->enableTimer(client_.report_interval_ms);
 
-  initiating_call_ = false;
-  // TODO(tyxia) Revisit later.
-  // Stop the iteration for headers as well as data and trailers for the current filter and the
-  // filters following.
-  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  // The rate limit strategy for the first matched request(i.e., its request header is matched with
+  // bucket_matchers for the first time) should be already set based on no assignment behavior in
+  // `createNewBucket` when the bucket is initially created.
+  ASSERT(quota_buckets_.find(bucket_id) != quota_buckets_.end());
+  if (quota_buckets_[bucket_id]
+          ->bucket_action.quota_assignment_action()
+          .rate_limit_strategy()
+          .blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
+    ENVOY_LOG(
+        trace,
+        "For first matched request with hashed bucket_id {}, it is allowed by ALLOW_ALL strategy.",
+        bucket_id);
+    return Http::FilterHeadersStatus::Continue;
+  } else {
+    // For the request that is rejected due to DENY_ALL no_assignment_behavior, immediate report is
+    // still sent to RLQS server above, and here the local reply with deny response is sent.
+    ENVOY_LOG(
+        trace,
+        "For first matched request with hashed bucket_id {}, it is throttled by DENY_ALL strategy.",
+        bucket_id);
+    sendDenyResponse();
+    return Envoy::Http::FilterHeadersStatus::StopIteration;
+  }
 }
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucket_id) {
@@ -180,11 +217,23 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
     auto rate_limit_strategy =
         quota_buckets_[bucket_id]->bucket_action.quota_assignment_action().rate_limit_strategy();
 
-    // TODO(tyxia) Currently only ALLOW_ALL and token bucket strategies are implemented.
-    // Change to switch case when more strategies are implemented.
-    if (rate_limit_strategy.has_blanket_rule() &&
-        rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
-      quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+    // TODO(tyxia) Currently, blanket rule and token bucket strategies are implemented.
+    // Change to switch case when `RequestsPerTimeUnit` strategy is implemented.
+    if (rate_limit_strategy.has_blanket_rule()) {
+      if (rate_limit_strategy.blanket_rule() == envoy::type::v3::RateLimitStrategy::ALLOW_ALL) {
+        quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+        ENVOY_LOG(trace,
+                  "Request with hashed bucket_id {} is allowed by cached ALLOW_ALL strategy.",
+                  bucket_id);
+      } else if (rate_limit_strategy.blanket_rule() ==
+                 envoy::type::v3::RateLimitStrategy::DENY_ALL) {
+        quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
+        ENVOY_LOG(trace,
+                  "Request with hashed bucket_id {} is throttled by cached DENY_ALL strategy.",
+                  bucket_id);
+        sendDenyResponse();
+        return Envoy::Http::FilterHeadersStatus::StopIteration;
+      }
     } else if (rate_limit_strategy.has_token_bucket()) {
       ASSERT(quota_buckets_[bucket_id]->token_bucket_limiter != nullptr);
       TokenBucket* limiter = quota_buckets_[bucket_id]->token_bucket_limiter.get();
@@ -199,11 +248,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucke
         quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
         ENVOY_LOG(trace, "Request with hashed bucket_id {} is throttled by token bucket limiter",
                   bucket_id);
-        // TODO(tyxia) Build the customized response based on `DenyResponseSettings` if it is
-        // configured.
-        callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt,
-                                   "");
-        callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
+        sendDenyResponse();
         return Envoy::Http::FilterHeadersStatus::StopIteration;
       }
     }
