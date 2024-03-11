@@ -741,7 +741,7 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
   cluster0.mutable_eds_cluster_config()->set_service_name("same_eds");
   cluster1.mutable_eds_cluster_config()->set_service_name("same_eds");
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster,{cluster0, cluster1}, {cluster0, cluster1}, {}, "1");
+      Config::TypeUrl::get().Cluster, {cluster0, cluster1}, {cluster0, cluster1}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
                                       {"same_eds"}, {"same_eds"}, {}));
@@ -769,11 +769,12 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
 
-  // Update a field of the clusters (connect_timeout) so the clusters in Envoy will be explicitly updated.
+  // Update a field of the clusters (connect_timeout) so the clusters in Envoy will be explicitly
+  // updated.
   cluster0.mutable_connect_timeout()->set_seconds(7);
   cluster1.mutable_connect_timeout()->set_seconds(7);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster,{cluster0, cluster1}, {cluster0, cluster1}, {}, "2");
+      Config::TypeUrl::get().Cluster, {cluster0, cluster1}, {cluster0, cluster1}, {}, "2");
   // Inconsistent SotW and delta behaviors for warming, see
   // https://github.com/envoyproxy/envoy/issues/11477#issuecomment-657855029.
   // TODO (dmitri-d) this should be remove when legacy mux implementations have been removed.

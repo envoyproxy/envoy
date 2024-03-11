@@ -1,8 +1,8 @@
 #include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
 
-#include "source/common/common/logger.h"
-
 #include <algorithm>
+
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Config {
@@ -56,8 +56,7 @@ void EdsResourcesCacheImpl::removeCallback(absl::string_view resource_name,
     // moved to the end of the vector by the remove() call, and then the erase() call
     // will erase these entries from the first element to be removed all the
     // way to the end of the vector.
-    callbacks.erase(std::remove(callbacks.begin(), callbacks.end(), removal_cb),
-                    callbacks.end());
+    callbacks.erase(std::remove(callbacks.begin(), callbacks.end(), removal_cb), callbacks.end());
   }
 }
 
