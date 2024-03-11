@@ -43,6 +43,7 @@ public:
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
       Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
       Server::Configuration::FactoryContext& context);
+  ~ProxyFilterConfig() override;
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreSharedPtr clusterStore() {
     return cluster_store_;
@@ -58,6 +59,7 @@ public:
                     LoadClusterEntryCallbacks& callback);
   // run in each worker thread.
   Upstream::ClusterUpdateCallbacksHandlePtr addThreadLocalClusterUpdateCallbacks();
+  void onRemoveThreadLocalClusterUpdateCallbacks();
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -96,6 +98,16 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalClusterInfo> tls_slot_;
   const std::chrono::milliseconds cluster_init_timeout_;
   const bool save_upstream_address_;
+
+  // Atomic counter, mutex and conditional variable are
+  // used to track number of threads where "this" pointer has been registered
+  // as ClusterUpdateCallbacks. This is used in the destructor to make sure that
+  // callbacks are de-registered on each thread before "this" pointer is released.
+  // TODO(cpakulski) in C++20 conditional variable is not necessary and
+  // atomic's wait method can be used.
+  std::atomic<uint32_t> thread_counter_{0};
+  Thread::MutexBasicLockable thread_counter_m_;
+  Thread::CondVar thread_counter_cv_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
