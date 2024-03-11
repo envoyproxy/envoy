@@ -477,6 +477,23 @@ std::string Utility::getConfigProfileName() {
   }
 }
 
+absl::optional<std::string>
+Utility::getAuthorizationTokenFromEnvFile(const char* environment_variable) {
+
+  const auto token_file = absl::NullSafeStringView(std::getenv(environment_variable));
+  if (!token_file.empty()) {
+    std::ifstream file(token_file);
+    if (file.is_open()) {
+      std::string token;
+      std::getline(file, token);
+      if (!token.empty()) {
+        return token;
+      }
+    }
+  }
+  return absl::nullopt;
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

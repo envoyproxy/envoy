@@ -199,15 +199,15 @@ private:
  *
  * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#enable_task_iam_roles
  */
-class TaskRoleCredentialsProvider : public MetadataCredentialsProviderBase,
-                                    public MetadataFetcher::MetadataReceiver {
+class ContainerRoleCredentialsProvider : public MetadataCredentialsProviderBase,
+                                         public MetadataFetcher::MetadataReceiver {
 public:
-  TaskRoleCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
-                              const CurlMetadataFetcher& fetch_metadata_using_curl,
-                              CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                              absl::string_view credential_uri,
-                              absl::string_view authorization_token,
-                              absl::string_view cluster_name);
+  ContainerRoleCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                   const CurlMetadataFetcher& fetch_metadata_using_curl,
+                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                   absl::string_view credential_uri,
+                                   absl::string_view authorization_token,
+                                   absl::string_view cluster_name);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
@@ -216,7 +216,7 @@ public:
 private:
   SystemTime expiration_time_;
   const std::string credential_uri_;
-  const std::string authorization_token_;
+  std::string authorization_token_;
 
   bool needsRefresh() override;
   void refresh() override;
@@ -287,7 +287,7 @@ public:
       absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
       absl::string_view role_session_name) const PURE;
 
-  virtual CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
+  virtual CredentialsProviderSharedPtr createContainerRoleCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
@@ -329,14 +329,14 @@ private:
     return std::make_shared<CredentialsFileCredentialsProvider>(api);
   }
 
-  CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
+  CredentialsProviderSharedPtr createContainerRoleCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri, absl::string_view authorization_token = {}) const override {
-    return std::make_shared<TaskRoleCredentialsProvider>(api, context, fetch_metadata_using_curl,
-                                                         create_metadata_fetcher_cb, credential_uri,
-                                                         authorization_token, cluster_name);
+    return std::make_shared<ContainerRoleCredentialsProvider>(
+        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
+        authorization_token, cluster_name);
   }
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
@@ -361,7 +361,7 @@ private:
 };
 
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;
-using TaskRoleCredentialsProviderPtr = std::shared_ptr<TaskRoleCredentialsProvider>;
+using ContainerRoleCredentialsProviderPtr = std::shared_ptr<ContainerRoleCredentialsProvider>;
 using WebIdentityCredentialsProviderPtr = std::shared_ptr<WebIdentityCredentialsProvider>;
 
 } // namespace Aws
