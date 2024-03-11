@@ -179,13 +179,10 @@ public:
         {Http::Headers::get().Path.get(), "/anypath"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Cookie.get(),
-         fmt::format("{}={};version=test", cookie_names.oauth_expires_, expires_at_s)},
+         fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
+        {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "=xyztoken")},
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
-        {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.oauth_hmac_, "="
-                                                "dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI="
-                                                ";version=test")},
+         absl::StrCat(cookie_names.oauth_hmac_, "=dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI=")},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
@@ -842,13 +839,10 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Path.get(), "/anypath"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Cookie.get(),
-         fmt::format("{}={};version=test", cookie_names.oauth_expires_, expires_at_s)},
+         fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
+        {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "=xyztoken")},
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
-        {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.oauth_hmac_, "="
-                                                "MSq8mkNQGdXx2LKGlLHMwSIj8rLZRnrHE6EWvvTUFx0="
-                                                ";version=test")},
+         absl::StrCat(cookie_names.oauth_hmac_, "=MSq8mkNQGdXx2LKGlLHMwSIj8rLZRnrHE6EWvvTUFx0=")},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
@@ -875,13 +869,10 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Path.get(), "/anypath"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Cookie.get(),
-         fmt::format("{}={};version=test", cookie_names.oauth_expires_, new_expires_at_s)},
+         fmt::format("{}={}", cookie_names.oauth_expires_, new_expires_at_s)},
+        {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "=xyztoken")},
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
-        {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.oauth_hmac_, "="
-                                                "dbl04CSr6eWF52wdNDCRt/Uw6A4y41wbpmtUWRyD2Fo="
-                                                ";version=test")},
+         absl::StrCat(cookie_names.oauth_hmac_, "=dbl04CSr6eWF52wdNDCRt/Uw6A4y41wbpmtUWRyD2Fo=")},
     };
 
     cookie_validator->setParams(request_headers_second, "mock-secret");
@@ -912,15 +903,13 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Path.get(), "/anypath"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Cookie.get(),
-         fmt::format("{}={};version=test", cookie_names.oauth_expires_, expires_at_s)},
-        {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
+         fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
+        {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "=xyztoken")},
         {Http::Headers::get().Cookie.get(),
 
          absl::StrCat(cookie_names.oauth_hmac_, "="
                                                 "MzEyYWJjOWE0MzUwMTlkNWYxZDhiMjg2OTRiMWNjYzEyMjIzZj"
-                                                "JiMmQ5NDY3YWM3MTNhMTE2YmVmNGQ0MTcxZA=="
-                                                ";version=test")},
+                                                "JiMmQ5NDY3YWM3MTNhMTE2YmVmNGQ0MTcxZA==")},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
@@ -947,14 +936,12 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
         {Http::Headers::get().Path.get(), "/anypath"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
         {Http::Headers::get().Cookie.get(),
-         fmt::format("{}={};version=test", cookie_names.oauth_expires_, new_expires_at_s)},
-        {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
+         fmt::format("{}={}", cookie_names.oauth_expires_, new_expires_at_s)},
+        {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "=xyztoken")},
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.oauth_hmac_, "="
                                                 "NzViOTc0ZTAyNGFiZTllNTg1ZTc2YzFkMzQzMDkxYjdmNTMwZT"
-                                                "gwZTMyZTM1YzFiYTY2YjU0NTkxYzgzZDg1YQ=="
-                                                ";version=test")},
+                                                "gwZTMyZTM1YzFiYTY2YjU0NTkxYzgzZDg1YQ==")},
     };
 
     cookie_validator->setParams(request_headers_second, "mock-secret");
@@ -982,11 +969,10 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
         {Http::Headers::get().Host.get(), "traffic.example.com"},
         {Http::Headers::get().Path.get(), "/anypath"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-        {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber;version=test"},
-        {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
+        {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber"},
+        {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken"},
         {Http::Headers::get().Cookie.get(), "OauthHMAC="
-                                            "c+1qzyrMmqG8+O4dn7b28OvNNDWcb04yJfNbZCE1zYE="
-                                            ";version=test"},
+                                            "c+1qzyrMmqG8+O4dn7b28OvNNDWcb04yJfNbZCE1zYE="},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
@@ -1007,12 +993,11 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
         {Http::Headers::get().Host.get(), "traffic.example.com"},
         {Http::Headers::get().Path.get(), "/anypath"},
         {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-        {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber;version=test"},
-        {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
-        {Http::Headers::get().Cookie.get(),
-         "OauthHMAC="
-         "NzNlZDZhY2YyYWNjOWFhMWJjZjhlZTFkOWZiNmY2ZjBlYmNkMzQzNTljNmY0ZTMyMjVmMzViNjQyMTM1Y2Q4MQ=="
-         ";version=test"},
+        {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber"},
+        {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken"},
+        {Http::Headers::get().Cookie.get(), "OauthHMAC="
+                                            "NzNlZDZhY2YyYWNjOWFhMWJjZjhlZTFkOWZiNmY2ZjBlYmNkMzQzNT"
+                                            "ljNmY0ZTMyMjVmMzViNjQyMTM1Y2Q4MQ=="},
     };
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
@@ -1032,9 +1017,8 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber;version=test"},
-      {Http::Headers::get().Cookie.get(),
-       "BearerToken=xyztoken;version=test;RefreshToken=dsdtoken;"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;RefreshToken=dsdtoken;"},
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
@@ -1052,12 +1036,12 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES + "&state=blah"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
   };
 
   Http::TestRequestHeaderMapImpl expected_headers{
@@ -1088,12 +1072,12 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
 
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1120,12 +1104,12 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1151,12 +1135,12 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccessLegacyEncoding) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1182,12 +1166,12 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccessLegacyEncoding) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1206,12 +1190,12 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=https://traffic.example.com/original_path?var1=1%26var2=2"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1238,12 +1222,12 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=https://traffic.example.com/original_path?var1=1%26var2=2"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1332,11 +1316,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
         {Http::Headers::get().Status.get(), "302"},
         {Http::Headers::get().SetCookie.get(), "OauthHMAC="
                                                "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-                                               "version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
+                                               "path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().Location.get(),
          "https://traffic.example.com/test?name=admin&level=trace"},
     };
@@ -1423,11 +1405,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
         {Http::Headers::get().SetCookie.get(),
          "OauthHMAC="
          "N2Q1ZWI2M2EwMmUyYTQyODUzNDEwMGI3NTA1ODAzYTdlOTc5YjAyODkyNmY3Y2VkZWU3MGE4MjYyNTYyYmQ2Yw==;"
-         "version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
+         "path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().Location.get(),
          "https://traffic.example.com/test?name=admin&level=trace"},
     };
@@ -1511,15 +1491,13 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(), "OauthHMAC="
                                              "OYnODPsSGabEpZ2LAiPxyjAFgN/7/5Xg24G7jUoUbyI=;"
-                                             "version=1;path=/;Max-Age=10;secure;HttpOnly"},
+                                             "path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=10;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=10;version=1;path=/;Max-Age=10;secure;HttpOnly"},
+       "BearerToken=accessToken;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "IdToken=idToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=accessToken;version=1;path=/;Max-Age=10;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "IdToken=idToken;version=1;path=/;Max-Age=10;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=refreshToken;version=1;path=/;Max-Age=10;secure;HttpOnly"},
+       "RefreshToken=refreshToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
   };
@@ -1612,11 +1590,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
         {Http::Headers::get().Status.get(), "302"},
         {Http::Headers::get().SetCookie.get(), "OauthHMAC="
                                                "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-                                               "version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
+                                               "path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().Location.get(),
          "https://traffic.example.com/test/utf8%C3%83?name=admin&level=trace"},
     };
@@ -1706,11 +1682,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
         {Http::Headers::get().SetCookie.get(),
          "OauthHMAC="
          "N2Q1ZWI2M2EwMmUyYTQyODUzNDEwMGI3NTA1ODAzYTdlOTc5YjAyODkyNmY3Y2VkZWU3MGE4MjYyNTYyYmQ2Yw==;"
-         "version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(),
-         "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
+         "path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().Location.get(),
          "https://traffic.example.com/test/utf8%C3%83?name=admin&level=trace"},
     };
@@ -1759,15 +1733,15 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
   Http::TestRequestHeaderMapImpl expected_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=" + oauthHMAC + "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "RefreshToken=some-refresh-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
   };
 
@@ -1813,15 +1787,14 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_v
   Http::TestRequestHeaderMapImpl expected_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=" + oauthHMAC + "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=600;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "RefreshToken=some-refresh-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
   };
 
@@ -1864,15 +1837,13 @@ TEST_P(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_make_token_cookie_http
   Http::TestRequestHeaderMapImpl expected_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=" + oauthHMAC + "version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=1600;version=1;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "BearerToken=access_code;path=/;Max-Age=600;secure"},
+      {Http::Headers::get().SetCookie.get(), "IdToken=some-id-token;path=/;Max-Age=600;secure"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=access_code;version=1;path=/;Max-Age=600;secure"},
-      {Http::Headers::get().SetCookie.get(),
-       "IdToken=some-id-token;version=1;path=/;Max-Age=600;secure"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token;version=1;path=/;Max-Age=600;secure"},
+       "RefreshToken=some-refresh-token;path=/;Max-Age=600;secure"},
       {Http::Headers::get().Location.get(), ""},
   };
 
@@ -1931,13 +1902,12 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=1600;version=1"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=access_code;version=1"},
-      {Http::Headers::get().Cookie.get(), "IdToken=some-id-token;version=1"},
-      {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token;version=1"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=1600"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=access_code"},
+      {Http::Headers::get().Cookie.get(), "IdToken=some-id-token"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token"},
       {Http::Headers::get().Cookie.get(), "OauthHMAC="
-                                          "Y9gCpVnhyaY+ecSxt/ZLZc/OMb8ZNivrVH1RByJxEbs="
-                                          ";version=test"},
+                                          "Y9gCpVnhyaY+ecSxt/ZLZc/OMb8ZNivrVH1RByJxEbs="},
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
@@ -1952,14 +1922,13 @@ TEST_P(OAuth2Test, CookieValidatorInTransition) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=1600;version=1"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=access_code;version=1"},
-      {Http::Headers::get().Cookie.get(), "IdToken=some-id-token;version=1"},
-      {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token;version=1"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=1600"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=access_code"},
+      {Http::Headers::get().Cookie.get(), "IdToken=some-id-token"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
-       "NjNkODAyYTU1OWUxYzlhNjNlNzljNGIxYjdmNjRiNjVjZmNlMzFiZjE5MzYyYmViNTQ3ZDUxMDcyMjcxMTFiYg=="
-       ";version=test"},
+       "NjNkODAyYTU1OWUxYzlhNjNlNzljNGIxYjdmNjRiNjVjZmNlMzFiZjE5MzYyYmViNTQ3ZDUxMDcyMjcxMTFiYg=="},
   };
   cookie_validator->setParams(request_headers_hexbase64, "mock-secret");
 
@@ -2046,11 +2015,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(), "OauthHMAC="
                                              "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-                                             "version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
+                                             "path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
   };
@@ -2283,11 +2250,9 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   Http::TestResponseHeaderMapImpl expected_response_headers{
       {Http::Headers::get().SetCookie.get(), "OauthHMAC="
                                              "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-                                             "version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
+                                             "path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
   };
 
   EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
@@ -2332,11 +2297,9 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   Http::TestResponseHeaderMapImpl expected_response_headers{
       {Http::Headers::get().SetCookie.get(), "OauthHMAC="
                                              "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-                                             "version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken=;version=1;path=/;Max-Age=;secure;HttpOnly"},
+                                             "path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
   };
 
   EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));

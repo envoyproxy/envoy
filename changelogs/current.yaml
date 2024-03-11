@@ -264,6 +264,10 @@ new_features:
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
     Envoy is under pressure, typically memory.
+- area: string matcher
+  change: |
+    Added an :ref:`extension point for custom string matcher implementations <envoy_v3_api_field_type.matcher.v3.StringMatcher.custom>`.
+    An implementation for :ref:`running a Lua script <envoy_v3_api_msg_extensions.string_matcher.lua.v3.Lua>` is included.
 - area: overload
   change: |
     added a :ref:`configuration option
@@ -275,6 +279,9 @@ new_features:
 - area: tracing
   change: |
     Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
+- area: http
+  change: |
+    Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
 - area: tracing
   change: |
     Added support for variant span attribute type for the OpenTelemetry tracer.
@@ -282,6 +289,11 @@ new_features:
   change: |
     :ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>`
     to support disabling authorization redirects for specific requests, e.g. AJAX requests.
+- area: aws_request_signing
+  change: |
+    Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
+    by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
+    configuration section.
 - area: aws
   change: |
     Update credential_provider common AWS component to support EKS Pod Identity provided via token file.
