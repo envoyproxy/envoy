@@ -493,7 +493,7 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>& address_list,
     Network::UpstreamTransportSocketFactory& socket_factory,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -513,7 +513,7 @@ Host::CreateConnectionData HostImpl::createConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
-  } else if (address_list.size() > 1) {
+  } else if (address_list && address_list->size() > 1) {
     absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {

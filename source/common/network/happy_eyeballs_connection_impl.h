@@ -18,7 +18,7 @@ class HappyEyeballsConnectionProvider : public ConnectionProvider,
 public:
   HappyEyeballsConnectionProvider(
       Event::Dispatcher& dispatcher,
-      const std::vector<Address::InstanceConstSharedPtr>& address_list,
+      const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& address_list,
       const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
           upstream_local_address_selector,
       UpstreamTransportSocketFactory& socket_factory,
@@ -38,9 +38,9 @@ public:
   // Section 6 of RFC6724, which happens in the DNS implementations (ares_getaddrinfo()
   // and Apple DNS).
   static std::vector<Address::InstanceConstSharedPtr>
-  sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& address_list);
+  sortAddresses(const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& address_list);
   static std::vector<Address::InstanceConstSharedPtr> sortAddressesWithConfig(
-      const std::vector<Address::InstanceConstSharedPtr>& address_list,
+      const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& address_list,
       const absl::optional<
           envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config);
@@ -48,7 +48,7 @@ public:
 private:
   Event::Dispatcher& dispatcher_;
   // List of addresses to attempt to connect to.
-  const std::vector<Address::InstanceConstSharedPtr> address_list_;
+  std::vector<Address::InstanceConstSharedPtr> address_list_;
   const Upstream::UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
   UpstreamTransportSocketFactory& socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
@@ -80,7 +80,7 @@ class HappyEyeballsConnectionImpl : public MultiConnectionBaseImpl,
 public:
   HappyEyeballsConnectionImpl(
       Event::Dispatcher& dispatcher,
-      const std::vector<Address::InstanceConstSharedPtr>& address_list,
+      const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& address_list,
       const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
           upstream_local_address_selector,
       UpstreamTransportSocketFactory& socket_factory,

@@ -6,9 +6,7 @@ namespace Upstream {
 Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  const auto current_address = address();
-  const std::vector<Network::Address::InstanceConstSharedPtr>& address_list = addressList();
-
+  const auto [current_address, address_list] = copyAddressAndList();
   return HostImpl::createConnection(
       dispatcher, cluster(), current_address, address_list, transportSocketFactory(), options,
       override_transport_socket_options_ != nullptr ? override_transport_socket_options_
