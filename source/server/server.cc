@@ -749,7 +749,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
+  ssl_context_manager_ = createContextManager("ssl_context_manager", server_contexts_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,

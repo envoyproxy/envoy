@@ -15,7 +15,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-ContextManagerImpl::ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
+ContextManagerImpl::ContextManagerImpl(Server::Configuration::CommonFactoryContext& factory_context)
+    : factory_context_(factory_context) {}
 
 Envoy::Ssl::ClientContextSharedPtr
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
@@ -26,7 +27,7 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   }
 
   Envoy::Ssl::ClientContextSharedPtr context =
-      std::make_shared<ClientContextImpl>(scope, config, time_source_);
+      std::make_shared<ClientContextImpl>(scope, config, factory_context_);
   contexts_.insert(context);
   return context;
 }
@@ -40,7 +41,7 @@ Envoy::Ssl::ServerContextSharedPtr ContextManagerImpl::createSslServerContext(
   }
 
   Envoy::Ssl::ServerContextSharedPtr context = std::make_shared<ServerContextImpl>(
-      scope, config, server_names, time_source_, std::move(additional_init));
+      scope, config, server_names, factory_context_, std::move(additional_init));
   contexts_.insert(context);
   return context;
 }

@@ -79,7 +79,7 @@ public:
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
-  Regex::Engine& regexEngine() override { PANIC("not implemented"); }
+  Regex::Engine& regexEngine() override { return regex_engine_; }
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
@@ -108,6 +108,7 @@ public:
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
+  Regex::GoogleReEngine regex_engine_;
 };
 
 class MockGenericFactoryContext : public GenericFactoryContext {

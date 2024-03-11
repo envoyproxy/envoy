@@ -79,7 +79,6 @@ public:
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -102,6 +101,7 @@ public:
       server_factory_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>
       transport_socket_factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
 };
 
 } // namespace Server

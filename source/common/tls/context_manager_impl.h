@@ -5,6 +5,7 @@
 #include <list>
 
 #include "envoy/common/time.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/stats/scope.h"
@@ -24,7 +25,7 @@ namespace Tls {
  */
 class ContextManagerImpl final : public Envoy::Ssl::ContextManager {
 public:
-  explicit ContextManagerImpl(TimeSource& time_source);
+  explicit ContextManagerImpl(Server::Configuration::CommonFactoryContext& factory_context);
   ~ContextManagerImpl() override = default;
 
   // Ssl::ContextManager
@@ -44,7 +45,7 @@ public:
   void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) override;
 
 private:
-  TimeSource& time_source_;
+  Server::Configuration::CommonFactoryContext& factory_context_;
   absl::flat_hash_set<Envoy::Ssl::ContextSharedPtr> contexts_;
   PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };

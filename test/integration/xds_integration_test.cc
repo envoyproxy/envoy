@@ -193,7 +193,7 @@ public:
     BaseIntegrationTest::initialize();
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-        BaseIntegrationTest::timeSystem());
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
@@ -462,8 +462,8 @@ public:
 
     BaseIntegrationTest::initialize();
 
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
     address_ = Ssl::getSslAddress(version_, lookupPort("http"));
   }
