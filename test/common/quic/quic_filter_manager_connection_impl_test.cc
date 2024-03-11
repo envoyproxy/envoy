@@ -121,7 +121,7 @@ TEST_F(QuicFilterManagerConnectionImplTest, GetWriteBuffer) {
 
 TEST_F(QuicFilterManagerConnectionImplTest, EnableHalfClose) {
   impl_.enableHalfClose(false); // No-op
-  EXPECT_DEATH(impl_.enableHalfClose(true), "Quic connection doesn't support half close.");
+  EXPECT_ENVOY_BUG(impl_.enableHalfClose(true), "Quic connection doesn't support half close.");
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, IsHalfCloseEnabled) {

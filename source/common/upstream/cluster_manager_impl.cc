@@ -62,17 +62,8 @@ void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
   }
 }
 
-// Helper function to make sure each protocol in expected_protocols is present
-// in protocols (only used for an ASSERT in debug builds)
-bool contains(const std::vector<Http::Protocol>& protocols,
-              const std::vector<Http::Protocol>& expected_protocols) {
-  for (auto protocol : expected_protocols) {
-    if (std::find(protocols.begin(), protocols.end(), protocol) == protocols.end()) {
-      return false;
-    }
-  }
-  return true;
-}
+const static std::vector<Http::Protocol> all_protocols{Http::Protocol::Http3, Http::Protocol::Http2,
+                                                       Http::Protocol::Http11};
 
 absl::optional<Http::HttpServerPropertiesCache::Origin>
 getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
@@ -925,7 +916,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   bool cluster_provided_lb = cluster_info->lbType() == LoadBalancerType::ClusterProvided;
   if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
     TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
-    RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
+    if (!typed_lb_factory) {
+      return absl::InvalidArgumentError("ClusterInfo should contain a valid factory");
+    }
     cluster_provided_lb =
         typed_lb_factory->name() == "envoy.load_balancing_policies.cluster_provided";
   }
@@ -999,7 +992,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     cluster_entry_it->second->thread_aware_lb_ = std::move(lb);
   } else if (cluster_info->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
     TypedLoadBalancerFactory* typed_lb_factory = cluster_info->loadBalancerFactory();
-    RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
+    if (!typed_lb_factory) {
+      return absl::InvalidArgumentError("ClusterInfo should contain a valid factory");
+    }
     cluster_entry_it->second->thread_aware_lb_ =
         typed_lb_factory->create(cluster_info->loadBalancerConfig(), *cluster_info,
                                  cluster_reference.prioritySet(), runtime_, random_, time_source_);
@@ -2260,8 +2255,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100) &&
       !transport_socket_options->http11ProxyInfo()) {
-    ASSERT(contains(protocols,
-                    {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
+    ASSERT(protocols == all_protocols);
     ASSERT(alternate_protocol_options.has_value());
     ASSERT(alternate_protocols_cache);
 #ifdef ENVOY_ENABLE_QUIC
@@ -2287,7 +2281,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
           alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
     }
 
-    ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
+    ASSERT(std::find(protocols.begin(), protocols.end(), Http::Protocol::Http11) !=
+           protocols.end());
+    ASSERT(std::find(protocols.begin(), protocols.end(), Http::Protocol::Http2) != protocols.end());
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, origin, alternate_protocols_cache);

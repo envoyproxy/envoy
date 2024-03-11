@@ -224,7 +224,7 @@ RawSlice OwnedImpl::frontSlice() const {
 }
 
 SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
-  RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
+  ENVOY_BUG(length_ > 0, "Extract called on empty buffer");
   // Remove zero byte fragments from the front of the queue to ensure
   // that the extracted slice has data.
   while (!slices_.empty() && slices_.front().dataSize() == 0) {
@@ -265,8 +265,8 @@ uint64_t OwnedImpl::length() const {
 }
 
 void* OwnedImpl::linearize(uint32_t size) {
-  RELEASE_ASSERT(size <= length(), "Linearize size exceeds buffer size");
-  if (slices_.empty()) {
+  if (slices_.empty() || size > length()) {
+    ENVOY_BUG(size <= length(), "Linearize size exceeds buffer size");
     return nullptr;
   }
   if (slices_[0].dataSize() < size) {

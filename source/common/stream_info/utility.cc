@@ -54,15 +54,14 @@ ResponseFlagUtils::ResponseFlagsMapType& ResponseFlagUtils::mutableResponseFlags
     ResponseFlagsMapType map;
     // Initialize the map with the all core flags first to ensure no custom flags
     // conflict with them.
-    RELEASE_ASSERT(CORE_RESPONSE_FLAGS.size() == CoreResponseFlag::LastFlag + 1,
-                   "Not all inlined flags are contained by CORE_RESPONSE_FLAGS.");
+    ENVOY_BUG(CORE_RESPONSE_FLAGS.size() == CoreResponseFlag::LastFlag + 1,
+              "Not all inlined flags are contained by CORE_RESPONSE_FLAGS.");
 
     map.reserve(CORE_RESPONSE_FLAGS.size());
     for (const auto& flag : CORE_RESPONSE_FLAGS) {
       map.emplace(flag.short_string_, FlagLongString{flag.flag_, std::string(flag.long_string_)});
     }
-    RELEASE_ASSERT(map.size() == CORE_RESPONSE_FLAGS.size(),
-                   "Duplicate flags in CORE_RESPONSE_FLAGS");
+    ENVOY_BUG(map.size() == CORE_RESPONSE_FLAGS.size(), "Duplicate flags in CORE_RESPONSE_FLAGS");
     return map;
   }());
 }
@@ -71,11 +70,10 @@ ResponseFlag ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag
                                                    absl::string_view custom_flag_long) {
   auto& mutable_flags = mutableResponseFlagsMap();
 
-  RELEASE_ASSERT(!responseFlagsVecInitialized(),
-                 "Cannot register custom flags after initialization");
+  ENVOY_BUG(!responseFlagsVecInitialized(), "Cannot register custom flags after initialization");
 
-  RELEASE_ASSERT(!mutable_flags.contains(custom_flag),
-                 fmt::format("Flag: {}/{} already registered", custom_flag, custom_flag_long));
+  ENVOY_BUG(!mutable_flags.contains(custom_flag),
+            fmt::format("Flag: {}/{} already registered", custom_flag, custom_flag_long));
 
   const uint16_t next_flag = mutable_flags.size();
 

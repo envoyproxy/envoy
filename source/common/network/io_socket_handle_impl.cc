@@ -190,8 +190,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     message.msg_control = cbuf.begin();
     message.msg_controllen = cmsg_space;
     cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
-    RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
-                                                sizeof(cbuf), sizeof(cmsghdr)));
+    ENVOY_BUG(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
+                                           sizeof(cbuf), sizeof(cmsghdr)));
     if (self_ip->version() == Address::IpVersion::v4) {
       cmsg->cmsg_level = IPPROTO_IP;
 #ifndef IP_SENDSRCADDR
@@ -304,10 +304,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     return sysCallResultToIoCallResult(result);
   }
 
-  RELEASE_ASSERT((hdr.msg_flags & MSG_CTRUNC) == 0,
-                 fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
-  RELEASE_ASSERT(hdr.msg_namelen > 0,
-                 fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
+  if ((hdr.msg_flags & MSG_CTRUNC) != 0 || hdr.msg_namelen <= 0) {
+    ENVOY_BUG((hdr.msg_flags & MSG_CTRUNC) == 0,
+              fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
+    ENVOY_BUG(hdr.msg_namelen > 0,
+              fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
+    return sysCallResultToIoCallResult(result);
+  }
   output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(
       peer_addr, hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
   output.msg_[0].gso_size_ = 0;
@@ -400,11 +403,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       output.msg_[i].truncated_and_dropped_ = true;
       continue;
     }
-
-    RELEASE_ASSERT((hdr.msg_flags & MSG_CTRUNC) == 0,
-                   fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
-    RELEASE_ASSERT(hdr.msg_namelen > 0,
-                   fmt::format("Unable to get remote address from recvmmsg() for fd: {}", fd_));
+    if ((hdr.msg_flags & MSG_CTRUNC) != 0 || hdr.msg_namelen <= 0) {
+      ENVOY_BUG((hdr.msg_flags & MSG_CTRUNC) == 0,
+                fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
+      ENVOY_BUG(hdr.msg_namelen > 0,
+                fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
+      continue;
+    }
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.

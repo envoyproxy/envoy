@@ -53,15 +53,15 @@ template <class T> T* ThreadSafeSingleton<T>::instance_ = nullptr;
 template <class T> class InjectableSingleton {
 public:
   static T& get() {
-    RELEASE_ASSERT(loader_ != nullptr, "InjectableSingleton used prior to initialization");
+    ENVOY_BUG(loader_ != nullptr, "InjectableSingleton used prior to initialization");
     return *loader_;
   }
 
   static T* getExisting() { return loader_; }
 
   static void initialize(T* value) {
-    RELEASE_ASSERT(value != nullptr, "InjectableSingleton initialized with null value.");
-    RELEASE_ASSERT(loader_ == nullptr, "InjectableSingleton initialized multiple times.");
+    ENVOY_BUG(value != nullptr, "InjectableSingleton initialized with null value.");
+    ENVOY_BUG(loader_ == nullptr, "InjectableSingleton initialized multiple times.");
     loader_ = value;
   }
   static void clear() { loader_ = nullptr; }

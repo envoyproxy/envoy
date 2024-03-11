@@ -400,7 +400,7 @@ void DispatcherImpl::pushTrackedObject(const ScopeTrackedObject* object) {
 void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object) {
   ASSERT(isThreadSafe());
   ASSERT(expected_object != nullptr);
-  RELEASE_ASSERT(!tracked_object_stack_.empty(), "Tracked Object Stack is empty, nothing to pop!");
+  ENVOY_BUG(!tracked_object_stack_.empty(), "Tracked Object Stack is empty, nothing to pop!");
 
   const ScopeTrackedObject* top = tracked_object_stack_.back();
   tracked_object_stack_.pop_back();
