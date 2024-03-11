@@ -141,12 +141,13 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
   decoded_frames_.clear();
-  if (decoder_.decode(data, decoded_frames_).code() == absl::StatusCode::kInternal) {
+  auto status = decoder_.decode(data, decoded_frames_).code();
+  if (status == absl::StatusCode::kInternal) {
     streamError(Status::WellKnownGrpcStatus::Internal);
     return;
   }
 
-  if (decoder_.decode(data, decoded_frames_).code() == absl::StatusCode::kResourceExhausted) {
+  if (status == absl::StatusCode::kResourceExhausted) {
     streamError(Status::WellKnownGrpcStatus::ResourceExhausted);
     return;
   }
