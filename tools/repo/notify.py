@@ -44,7 +44,7 @@ OPSGENIE_TO_SLACK = {
     'kuat': 'kuat',
     'Lizan': 'Lizan Zhou',
     'Matt': 'mklein',
-    'Kateryna': 'nexdolik',
+    'Kateryna': 'nezdolik',
     'phlax': 'phlax',
     'Raven': 'ravenblackx',
     'Ryan': 'Ryan Hamilton',
@@ -287,7 +287,7 @@ class RepoNotifier(runner.Runner):
                 await self.send_message(channel='#envoy-maintainer-oncall', text=(f"{oncall}"))
                 await self.send_message(channel='#general', text=(f"{oncall}"))
             await self.send_message(
-                channel='#envoy-maintainer-oncall', text=(f"Oncall now @", oncall_handle))
+                channel='#envoy-maintainer-oncall', text=(f"Oncall now @{oncall_handle}"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
