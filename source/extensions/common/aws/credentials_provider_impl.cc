@@ -763,16 +763,6 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   } else if (!full_uri.empty()) {
     auto authorization_token =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
-
-    if (authorization_token.empty()) {
-      // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
-      auto token =
-          Utility::getAuthorizationTokenFromEnvFile(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE);
-      if (token.has_value()) {
-        ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
-        authorization_token = absl::string_view(token.value());
-      }
-    }
     if (!authorization_token.empty()) {
       ENVOY_LOG(debug,
                 "Using container role credentials provider with URI: "

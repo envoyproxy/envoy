@@ -2008,6 +2008,127 @@ TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, TimestampCredentialExpi
 }
 // End unit test for deprecated option using Libcurl client.
 
+// Specific test case for EKS Pod Identity, as Pod Identity auth token is only loaded at credential
+// refresh time
+class ContainerEKSPodIdentityCredentialsProviderTest : public testing::Test {
+public:
+  ContainerEKSPodIdentityCredentialsProviderTest()
+      : api_(Api::createApiForTest(time_system_)), raw_metadata_fetcher_(new MockMetadataFetcher) {
+    // Tue Jan  2 03:04:05 UTC 2018
+    time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+  }
+
+  void setupProvider() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
+    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    provider_ = std::make_shared<ContainerRoleCredentialsProvider>(
+        *api_, context_,
+        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
+          return this->fetch_metadata_.fetch(message);
+        },
+        [this](Upstream::ClusterManager&, absl::string_view) {
+          metadata_fetcher_.reset(raw_metadata_fetcher_);
+          return std::move(metadata_fetcher_);
+        },
+        "169.254.170.2:80/path/to/doc", "", "credentials_provider_cluster");
+  }
+
+  void setupProviderWithContext() {
+    EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+      init_target_handle_ = target.createHandle("test");
+    }));
+    setupProvider();
+    expected_duration_ = provider_->getCacheDuration();
+    init_target_handle_->initialize(init_watcher_);
+  }
+
+  void expectDocument(const uint64_t status_code, const std::string&& document,
+                      const std::string auth_token) {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
+                                           {":authority", "169.254.170.2:80"},
+                                           {":scheme", "http"},
+                                           {":method", "GET"},
+                                           {"authorization", auth_token}};
+    EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
+        .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
+                                   Http::RequestMessage&, Tracing::Span&,
+                                   MetadataFetcher::MetadataReceiver& receiver) {
+          if (status_code == enumToInt(Http::Code::OK)) {
+            if (!document.empty()) {
+              receiver.onMetadataSuccess(std::move(document));
+            } else {
+              EXPECT_CALL(
+                  *raw_metadata_fetcher_,
+                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
+                  .WillRepeatedly(testing::Return("InvalidMetadata"));
+              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
+            }
+          } else {
+            EXPECT_CALL(*raw_metadata_fetcher_,
+                        failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
+                .WillRepeatedly(testing::Return("Network"));
+            receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
+          }
+        }));
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
+  NiceMock<MockFetchMetadata> fetch_metadata_;
+  MockMetadataFetcher* raw_metadata_fetcher_;
+  MetadataFetcherPtr metadata_fetcher_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  ContainerRoleCredentialsProviderPtr provider_;
+  Init::TargetHandlePtr init_target_handle_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
+  Event::MockTimer* timer_{};
+  std::chrono::milliseconds expected_duration_;
+};
+
+TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  const char TOKEN_FILE_CONTENTS[] = R"(eyTESTtestTESTtest=)";
+  auto temp = TestEnvironment::temporaryDirectory();
+  std::string token_file(temp + "/tokenfile");
+
+  auto token_file_path =
+      TestEnvironment::writeStringToFileForTest(token_file, TOKEN_FILE_CONTENTS, true, false);
+
+  TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", token_file_path, 1);
+
+  expectDocument(200, std::move(R"EOF(
+{
+  "AccessKeyId": "akid",
+  "SecretAccessKey": "secret",
+  "Token": "token",
+  "Expiration": "2018-01-02T03:04:05Z"
+}
+)EOF"),
+                 TOKEN_FILE_CONTENTS);
+  // init_watcher ready is called.
+  init_watcher_.expectReady();
+  // Expect refresh timer to be started.
+  EXPECT_CALL(*timer_, enableTimer(_, nullptr));
+  setupProviderWithContext();
+
+  // Cancel is called for fetching once again as previous attempt wasn't a success with updating
+  // expiration time.
+  EXPECT_CALL(*raw_metadata_fetcher_, cancel());
+  // Expect refresh timer to be stopped and started.
+  EXPECT_CALL(*timer_, disableTimer());
+  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_EQ(credentials.accessKeyId().value(), "akid");
+  EXPECT_EQ(credentials.secretAccessKey().value(), "secret");
+  EXPECT_EQ(credentials.sessionToken().value(), "token");
+}
+
 class WebIdentityCredentialsProviderTest : public testing::Test {
 public:
   WebIdentityCredentialsProviderTest()
@@ -2826,25 +2947,6 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createContainerRoleCredentialsProvider(
                               Ref(*api_), _, _, _, _, "http://host/path/to/creds", "auth_token"));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
-}
-
-TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationTokenFile) {
-  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
-  auto temp = TestEnvironment::temporaryDirectory();
-  std::string token_file(temp + "/tokenfile");
-
-  const char TOKEN_FILE_CONTENTS[] = R"(eyTESTtestTESTtest=)";
-
-  auto token_file_path =
-      TestEnvironment::writeStringToFileForTest(token_file, TOKEN_FILE_CONTENTS, true, false);
-
-  TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", token_file_path, 1);
-  EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerRoleCredentialsProvider(Ref(*api_), _, _, _, _,
-                                                                 "http://host/path/to/creds",
-                                                                 "eyTESTtestTESTtest="));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
