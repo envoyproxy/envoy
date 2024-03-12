@@ -8,10 +8,13 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/utility.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "jwt_verify_lib/check_audience.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
@@ -36,7 +39,8 @@ public:
       // remote_jwks.retry_policy has an invalid case that could not be validated by the
       // proto validation annotation. It has to be validated by the code.
       if (jwt_provider_.remote_jwks().has_retry_policy()) {
-        Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy());
+        THROW_IF_NOT_OK(
+            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()));
       }
       if (jwt_provider_.remote_jwks().has_cache_duration()) {
         // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
@@ -56,6 +60,11 @@ public:
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
+
+    if (jwt_provider_.has_subjects()) {
+      sub_matcher_.emplace(jwt_provider_.subjects());
+    }
+
     bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
     const auto& config = jwt_provider_.jwt_cache_config();
     tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
@@ -89,6 +98,14 @@ public:
 
   bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
     return audiences_->areAudiencesAllowed(jwt_audiences);
+  }
+
+  bool isSubjectAllowed(const absl::string_view jwt_subject) const override {
+    if (!sub_matcher_.has_value()) {
+      return true;
+    }
+
+    return sub_matcher_->match(jwt_subject);
   }
 
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
@@ -140,6 +157,7 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
+  absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> sub_matcher_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;

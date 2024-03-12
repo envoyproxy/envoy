@@ -21,7 +21,13 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
       metadata_parser_(Router::HeaderParser::configure(
           config.initial_metadata(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {}
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)),
+      retry_policy_(
+          config.has_retry_policy()
+              ? absl::optional<envoy::config::route::v3::
+                                   RetryPolicy>{Http::Utility::convertCoreToRouteRetryPolicy(
+                    config.retry_policy(), "")}
+              : absl::nullopt) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   ASSERT(isThreadSafe());
@@ -70,7 +76,12 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
-      callbacks_(callbacks), options_(options) {}
+      callbacks_(callbacks), options_(options) {
+  // Apply parent retry policy if no per-stream override.
+  if (!options.retry_policy.has_value() && parent_.retryPolicy().has_value()) {
+    options_.setRetryPolicy(*parent_.retryPolicy());
+  }
+}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);

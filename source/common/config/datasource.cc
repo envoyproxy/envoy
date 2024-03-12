@@ -10,11 +10,6 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
-// Default Parameters of the jittered backoff strategy.
-static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
-static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
-static constexpr uint32_t RetryCount = 1;
-
 absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& source,
                                  bool allow_empty, Api::Api& api, uint64_t max_size) {
   std::string data;
@@ -70,27 +65,6 @@ absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& s
   return source.specifier_case() == envoy::config::core::v3::DataSource::SpecifierCase::kFilename
              ? absl::make_optional(source.filename())
              : absl::nullopt;
-}
-
-RemoteAsyncDataProvider::RemoteAsyncDataProvider(
-    Upstream::ClusterManager& cm, Init::Manager& manager,
-    const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
-    Random::RandomGenerator& random, bool allow_empty, AsyncDataSourceCb&& callback)
-    : allow_empty_(allow_empty), callback_(std::move(callback)),
-      fetcher_(std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
-                                                                        source.sha256(), *this)),
-      init_target_("RemoteAsyncDataProvider", [this]() { start(); }),
-      retries_remaining_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
-
-  auto strategy_or_error = Utility::prepareJitteredExponentialBackOffStrategy(
-      source, random, RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds);
-  THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
-  backoff_strategy_ = std::move(strategy_or_error.value());
-
-  retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
-
-  manager.add(init_target_);
 }
 
 } // namespace DataSource

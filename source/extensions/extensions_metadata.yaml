@@ -1140,6 +1140,13 @@ envoy.stat_sinks.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.stat_sinks.wasm.v3.Wasm
+envoy.string_matcher.lua:
+  categories:
+  - envoy.string_matcher
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.string_matcher.lua.v3.Lua
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
@@ -1180,6 +1187,13 @@ envoy.tracers.opentelemetry.samplers.always_on:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+envoy.tracers.opentelemetry.samplers.dynatrace:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers
