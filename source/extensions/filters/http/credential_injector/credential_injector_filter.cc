@@ -47,43 +47,91 @@ CredentialInjectorFilter::CredentialInjectorFilter(FilterConfigSharedPtr config)
 
 Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                                   bool) {
-  request_headers_ = &headers;
-  in_flight_credential_request_ = config_->requestCredential(*this);
+  // Initiate the credential provider if not already done.
+  if (!credential_init_) {
+    // Save the pointer to the request headers for header manipulation based on credential provider
+    // response later.
+    request_headers_ = &headers;
 
-  // pause while we await the next step from the credential source, for example, an OAuth server
-  return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
-}
+    in_flight_credential_request_ = config_->requestCredential(*this);
 
-void CredentialInjectorFilter::onSuccess() {
-  decoder_callbacks_->dispatcher().post([this]() {
-    in_flight_credential_request_ = nullptr;
-    bool succeed = config_->injectCredential(*request_headers_);
-    if (!succeed && !config_->allowRequestWithoutCredential()) {
-      decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
-                                         nullptr, absl::nullopt, "failed_to_inject_credential");
-      return;
+    // If the callback is called immediately, continue decoding.
+    // We don't need to inject credential here because the credential has been injected in the
+    // onSuccess callback.
+    if (credential_init_) {
+      return Http::FilterHeadersStatus::Continue;
     }
 
-    decoder_callbacks_->continueDecoding();
-  });
-}
+    // pause while we await the credential provider to retrieve the credential, for example, an
+    // oauth2 credential provider may need to make a remote call to retrieve the credential.
+    stop_iteration_ = true;
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
 
-void CredentialInjectorFilter::onFailure(const std::string& reason) {
-  decoder_callbacks_->dispatcher().post([this, reason]() {
-    in_flight_credential_request_ = nullptr;
-
-    // Credential provider has failed to retrieve the credential
-    ENVOY_LOG(trace, "Failed to get credential: {}", reason);
+  // The credential provider has failed to retrieve the credential
+  if (!credential_success_) {
     config_->stats().failed_.inc();
 
     if (!config_->allowRequestWithoutCredential()) {
       decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
                                          nullptr, absl::nullopt, "failed_to_inject_credential");
-      return;
+      return Http::FilterHeadersStatus::StopIteration;
     }
 
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // The credential provider has successfully retrieved the credential, inject it to the header
+  bool succeed = config_->injectCredential(*request_headers_);
+  if (!succeed && !config_->allowRequestWithoutCredential()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                       nullptr, absl::nullopt, "failed_to_inject_credential");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  return Http::FilterHeadersStatus::Continue;
+}
+
+void CredentialInjectorFilter::onSuccess() {
+  credential_init_ = true;
+  credential_success_ = true;
+  in_flight_credential_request_ = nullptr;
+
+  assert(request_headers_ != nullptr);
+  bool succeed = config_->injectCredential(*request_headers_);
+  if (!succeed && !config_->allowRequestWithoutCredential()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                       nullptr, absl::nullopt, "failed_to_inject_credential");
+    return;
+  }
+
+  // Only continue decoding if the callback is called from another thread.
+  if (stop_iteration_) {
+    stop_iteration_ = false;
     decoder_callbacks_->continueDecoding();
-  });
+  }
+}
+
+void CredentialInjectorFilter::onFailure(const std::string& reason) {
+  credential_init_ = true; // TODO: retry after a certain period of time
+  credential_success_ = false;
+  in_flight_credential_request_ = nullptr;
+
+  // Credential provider has failed to retrieve the credential
+  ENVOY_LOG(warn, "Failed to get credential: {}", reason);
+  config_->stats().failed_.inc();
+
+  if (!config_->allowRequestWithoutCredential()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
+                                       nullptr, absl::nullopt, "failed_to_inject_credential");
+    return;
+  }
+
+  // Only continue decoding if the callback is called from another thread.
+  if (stop_iteration_) {
+    stop_iteration_ = false;
+    decoder_callbacks_->continueDecoding();
+  }
 }
 
 void CredentialInjectorFilter::setDecoderFilterCallbacks(
