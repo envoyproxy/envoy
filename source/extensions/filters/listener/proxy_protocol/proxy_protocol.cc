@@ -28,6 +28,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
@@ -43,7 +44,6 @@ using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_TRANSPORT_DGRAM;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_TRANSPORT_STREAM;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_VERSION;
-using envoy::config::core::v3::ProxyProtocolConfig;
 
 namespace Envoy {
 namespace Extensions {
@@ -52,32 +52,38 @@ namespace ProxyProtocol {
 
 constexpr absl::string_view kVersionedStatsPrefix = "downstream_cx_proxy_proto.";
 
-ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope &scope) {
+ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope) {
   return {
       /*general_stats_=*/{GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
-      /*unknown_=*/{VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "unknown.")))},
-      /*v1_=*/{VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "v1.")))},
-      /*v2_=*/{VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "v2.")))},
+      /*unknown_=*/
+      {VERSIONED_PROXY_PROTOCOL_STATS(
+          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "unknown.")))},
+      /*v1_=*/
+      {VERSIONED_PROXY_PROTOCOL_STATS(
+          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "v1.")))},
+      /*v2_=*/
+      {VERSIONED_PROXY_PROTOCOL_STATS(
+          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "v2.")))},
   };
 }
 
 void VersionedProxyProtocolStats::increment(ReadOrParseState decision) {
   switch (decision) {
-    case ReadOrParseState::Done:
-      allowed_.inc();
-      break;
-    case ReadOrParseState::TryAgainLater:
-      // Do nothing.
-      break;
-    case ReadOrParseState::Error:
-      error_.inc();
-      break;
-    case ReadOrParseState::SkipFilter:
-      allowed_.inc();
-      break;
-    case ReadOrParseState::Denied:
-      denied_.inc();
-      break;
+  case ReadOrParseState::Done:
+    allowed_.inc();
+    break;
+  case ReadOrParseState::TryAgainLater:
+    // Do nothing.
+    break;
+  case ReadOrParseState::Error:
+    error_.inc();
+    break;
+  case ReadOrParseState::SkipFilter:
+    allowed_.inc();
+    break;
+  case ReadOrParseState::Denied:
+    denied_.inc();
+    break;
   }
 }
 
@@ -115,8 +121,9 @@ Config::Config(
         allow_v2_ = true;
         break;
       default:
-        throw EnvoyException(absl::StrCat("Unknown proxy protocol version (enum int cast): ", version));
-        }
+        throw EnvoyException(
+            absl::StrCat("Unknown proxy protocol version (enum int cast): ", version));
+      }
     }
   }
 }
@@ -152,12 +159,12 @@ bool Config::isVersionAllowed(ProxyProtocolVersion version) const {
 
 VersionedProxyProtocolStats& Config::versionToStatsStruct(ProxyProtocolVersion version) {
   switch (version) {
-    case Unknown:
-        return stats_.unknown_;
-    case ProxyProtocolVersion::V1:
-        return stats_.v1_;
-    case ProxyProtocolVersion::V2:
-        return stats_.v2_;
+  case Unknown:
+    return stats_.unknown_;
+  case ProxyProtocolVersion::V1:
+    return stats_.v1_;
+  case ProxyProtocolVersion::V2:
+    return stats_.v2_;
   }
   return stats_.unknown_; // Should never happen.
 }
@@ -170,7 +177,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
-  const ReadOrParseState read_state = parseBuffer(buffer); // Implicitly updates proxy_protocol_version_
+  const ReadOrParseState read_state =
+      parseBuffer(buffer); // Implicitly updates proxy_protocol_version_
 
   VersionedProxyProtocolStats& versioned_stats = config_->versionToStatsStruct(header_version_);
   versioned_stats.increment(read_state);
@@ -180,7 +188,8 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::Error:
-    config_->stats_.general_stats_.downstream_cx_proxy_proto_error_.inc(); // Keep for backwards-compatibility
+    config_->stats_.general_stats_.downstream_cx_proxy_proto_error_
+        .inc(); // Keep for backwards-compatibility
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::TryAgainLater:
@@ -576,11 +585,11 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   const char* buf = static_cast<const char*>(raw_slice.mem_);
 
   if (config_->isVersionAllowed(ProxyProtocolVersion::Unknown)) {
-    auto matchv2 = config_->isVersionAllowed(ProxyProtocolVersion::V2)
-        && !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
+    auto matchv2 = config_->isVersionAllowed(ProxyProtocolVersion::V2) &&
+                   !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
                            std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
-    auto matchv1 = config_->isVersionAllowed(ProxyProtocolVersion::V1)
-        && !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
+    auto matchv1 = config_->isVersionAllowed(ProxyProtocolVersion::V1) &&
+                   !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
                            std::min<size_t>(PROXY_PROTO_V1_SIGNATURE_LEN, raw_slice.len_));
     if (!matchv2 && !matchv1) {
       // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
