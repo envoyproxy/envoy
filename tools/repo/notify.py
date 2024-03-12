@@ -44,7 +44,7 @@ OPSGENIE_TO_SLACK = {
     'kuat': 'kuat',
     'Lizan': 'Lizan Zhou',
     'Matt': 'mklein',
-    'Kateryna': 'nexdolik',
+    'Kateryna': 'nezdolik',
     'phlax': 'phlax',
     'Raven': 'ravenblackx',
     'Ryan': 'Ryan Hamilton',
