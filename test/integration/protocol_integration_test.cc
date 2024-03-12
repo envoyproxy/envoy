@@ -4952,7 +4952,7 @@ TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({"::1", ("127.0.0." + std::to_string(i)),
                                                        ("127.0.0." + std::to_string(i + 1))}));
-            i = (i+1) % 128;
+            i = (i + 1) % 128;
             return nullptr;
           }));
   if (use_universal_header_validator_) {

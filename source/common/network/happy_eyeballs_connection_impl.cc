@@ -8,7 +8,8 @@ namespace Envoy {
 namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
-    Event::Dispatcher& dispatcher, const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& address_list,
+    Event::Dispatcher& dispatcher,
+    const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& address_list,
     const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
         upstream_local_address_selector,
     UpstreamTransportSocketFactory& socket_factory,
@@ -77,13 +78,15 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
   while (first != in->end() || other != in->end()) {
     if (first != in->end()) {
       address_list.push_back(*first);
-      first = std::find_if(first + 1, in->end(),
-                           [&](const auto& val) { return hasMatchingAddressFamily((*in)[0], val); });
+      first = std::find_if(first + 1, in->end(), [&](const auto& val) {
+        return hasMatchingAddressFamily((*in)[0], val);
+      });
     }
 
     if (other != in->end()) {
-      other = std::find_if(other + 1, in->end(),
-                           [&](const auto& val) { return !hasMatchingAddressFamily((*in)[0], val); });
+      other = std::find_if(other + 1, in->end(), [&](const auto& val) {
+        return !hasMatchingAddressFamily((*in)[0], val);
+      });
 
       if (other != in->end()) {
         address_list.push_back(*other);
@@ -97,7 +100,8 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionProvider::sortAddressesWithConfig(
     const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& in,
-    const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig> happy_eyeballs_config) {
+    const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+        happy_eyeballs_config) {
   if (!happy_eyeballs_config.has_value()) {
     return sortAddresses(in);
   }

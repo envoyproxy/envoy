@@ -254,7 +254,8 @@ public:
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>& addressList() const override {
+  const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>&
+  addressList() const override {
     return address_list_;
   }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
@@ -442,14 +443,14 @@ public:
   }
 
 protected:
-  static CreateConnectionData
-  createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                   const Network::Address::InstanceConstSharedPtr& address,
-                   const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>& address_list,
-                   Network::UpstreamTransportSocketFactory& socket_factory,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                   HostDescriptionConstSharedPtr host);
+  static CreateConnectionData createConnection(
+      Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+      const Network::Address::InstanceConstSharedPtr& address,
+      const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>& address_list,
+      Network::UpstreamTransportSocketFactory& socket_factory,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      HostDescriptionConstSharedPtr host);
 
 private:
   // Helper function to check multiple health flags at once.
