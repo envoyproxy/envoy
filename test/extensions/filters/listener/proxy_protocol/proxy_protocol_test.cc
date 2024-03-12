@@ -2180,7 +2180,7 @@ TEST_P(ProxyProtocolTest, DrainError) {
 class ProxyProtocolAllowedVersionsTest : public ProxyProtocolTest {
 public:
   virtual envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol
-  createConfig(std::vector<ProxyProtocolConfig::Version> allowed_versions) const {
+  createConfig(const std::vector<ProxyProtocolConfig::Version>& allowed_versions) const {
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
     for (const auto& version : allowed_versions) {
       proto_config.mutable_allowed_versions()->Add(version);
@@ -2352,7 +2352,7 @@ TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV1BadPortError) {
 class ProxyProtocolAllowedVersionsWithNoProxyProtoTest : public ProxyProtocolAllowedVersionsTest {
 public:
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol
-  createConfig(std::vector<ProxyProtocolConfig::Version> allowed_versions) const override {
+  createConfig(const std::vector<ProxyProtocolConfig::Version>& allowed_versions) const override {
     auto proto_config = ProxyProtocolAllowedVersionsTest::createConfig(allowed_versions);
     proto_config.set_allow_requests_without_proxy_protocol(true);
     return proto_config;
