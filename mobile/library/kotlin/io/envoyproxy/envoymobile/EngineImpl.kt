@@ -5,8 +5,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus
 
 /** An implementation of {@link Engine}. */
-class EngineImpl
-constructor(
+class EngineImpl(
   internal val envoyEngine: EnvoyEngine,
   internal val envoyConfiguration: EnvoyConfiguration,
   internal val configurationYAML: String?,

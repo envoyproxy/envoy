@@ -786,7 +786,11 @@ def _io_opentracing_cpp():
     )
 
 def _io_opentelemetry_api_cpp():
-    external_http_archive("io_opentelemetry_cpp")
+    external_http_archive(
+        name = "io_opentelemetry_cpp",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
+    )
     native.bind(
         name = "opentelemetry_api",
         actual = "@io_opentelemetry_cpp//api:api",
@@ -1178,6 +1182,8 @@ def _com_github_grpc_grpc():
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
+        # Needed until grpc updates its naming (v1.62.0)
+        repo_mapping = {"@com_github_cncf_udpa": "@com_github_cncf_xds"},
     )
     external_http_archive("build_bazel_rules_apple")
 
@@ -1283,7 +1289,13 @@ def _upb():
     )
 
 def _proxy_wasm_cpp_sdk():
-    external_http_archive(name = "proxy_wasm_cpp_sdk")
+    external_http_archive(
+        name = "proxy_wasm_cpp_sdk",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
+        ],
+    )
 
 def _proxy_wasm_cpp_host():
     external_http_archive(

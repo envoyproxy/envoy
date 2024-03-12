@@ -116,6 +116,11 @@ EXTENSIONS = {
     "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
 
     #
+    # StringMatchers
+    #
+    "envoy.string_matcher.lua":                         "//source/extensions/string_matcher/lua:config",
+
+    #
     # HTTP filters
     #
 
@@ -279,6 +284,7 @@ EXTENSIONS = {
     #
 
     "envoy.tracers.opentelemetry.samplers.always_on":         "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
+    "envoy.tracers.opentelemetry.samplers.dynatrace":         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
 
     #
     # Transport sockets

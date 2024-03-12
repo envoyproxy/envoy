@@ -119,7 +119,6 @@ paths:
     - source/common/stats/tag_extractor_impl.cc
     - source/common/stats/tag_producer_impl.cc
     - source/common/http/http2/codec_impl.cc
-    - source/common/http/utility.cc
     - source/common/http/hash_policy.cc
     - source/common/http/conn_manager_utility.cc
     - source/common/http/match_delegate/config.cc
@@ -133,14 +132,12 @@ paths:
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/config/subscription_factory_impl.cc
     - source/common/config/xds_resource.cc
-    - source/common/config/datasource.cc
     - source/common/runtime/runtime_impl.cc
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
-    - source/common/router/router_ratelimit.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
@@ -155,6 +152,7 @@ paths:
     - source/server/overload_manager_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
+    - source/server/admin/runtime_handler.cc
     - source/server/server.cc
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
@@ -163,6 +161,7 @@ paths:
     - source/common/upstream/health_discovery_service.cc
     - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
+    - source/common/secret/secret_provider_impl.cc
     - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
     - source/common/common/logger_delegates.cc
@@ -171,6 +170,8 @@ paths:
     - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
+    - source/common/tls/context_impl.cc
+    - source/common/tls/context_config_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
@@ -392,6 +393,7 @@ visibility_excludes:
 - source/extensions/filters/network/common/BUILD
 - source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
+- source/extensions/transport_sockets/tap/BUILD
 - source/extensions/udp_packet_writer/default/BUILD
 - source/extensions/udp_packet_writer/gso/BUILD
 - source/extensions/path/uri_template_lib/BUILD

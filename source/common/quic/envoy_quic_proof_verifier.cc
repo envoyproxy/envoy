@@ -7,7 +7,7 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/transport_sockets/tls/utility.h"
+#include "source/common/tls/utility.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
 
@@ -90,7 +90,10 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(certs[0]);
-  ASSERT(cert_view != nullptr);
+  if (cert_view == nullptr) {
+    *error_details = "unable to parse certificate";
+    return quic::QUIC_FAILURE;
+  }
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), error_details);
   if (sign_alg == 0) {
     return quic::QUIC_FAILURE;

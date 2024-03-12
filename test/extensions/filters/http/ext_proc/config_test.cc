@@ -106,6 +106,23 @@ TEST(HttpExtProcConfigTest, CorrectConfigServerContext) {
   cb(filter_callback);
 }
 
+TEST(HttpExtProcConfigTest, CorrectRouteMetadataOnlyConfig) {
+  std::string yaml = R"EOF(
+  overrides:
+    grpc_initial_metadata:
+      - key: "a"
+        value: "a"
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Router::RouteSpecificFilterConfigConstSharedPtr cb = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, context.messageValidationVisitor());
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

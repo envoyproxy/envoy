@@ -86,6 +86,8 @@ public:
   bool match(absl::string_view) const override { return true; }
 };
 
+StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config);
+
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
@@ -100,32 +102,14 @@ public:
         // Cache the lowercase conversion of the Contains matcher for future use
         lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
       }
+    } else {
+      initialize(matcher);
     }
   }
 
   // StringMatcher
-  bool match(const absl::string_view value) const override {
-    switch (matcher_.match_pattern_case()) {
-    case StringMatcherType::MatchPatternCase::kExact:
-      return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
-                                    : value == matcher_.exact();
-    case StringMatcherType::MatchPatternCase::kPrefix:
-      return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
-                                    : absl::StartsWith(value, matcher_.prefix());
-    case StringMatcherType::MatchPatternCase::kSuffix:
-      return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
-                                    : absl::EndsWith(value, matcher_.suffix());
-    case StringMatcherType::MatchPatternCase::kContains:
-      return matcher_.ignore_case()
-                 ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
-                 : absl::StrContains(value, matcher_.contains());
-    case StringMatcherType::MatchPatternCase::kSafeRegex:
-      return regex_->match(value);
-    case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
-      break;
-    }
-    PANIC("unexpected");
-  }
+  bool match(const absl::string_view value) const override { return match(value, matcher_); }
+
   bool match(const ProtobufWkt::Value& value) const override {
 
     if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
@@ -155,9 +139,65 @@ public:
   }
 
 private:
+  // Type `xds::type::matcher::v3::StringMatcher` doesn't have an extension type, so use function
+  // overloading to only handle that case for type `envoy::type::matcher::v3::StringMatcher` to
+  // prevent compilation errors on use of `kCustom`.
+
+  void initialize(const xds::type::matcher::v3::StringMatcher&) {}
+
+  void initialize(const envoy::type::matcher::v3::StringMatcher& matcher) {
+    if (matcher.has_custom()) {
+      custom_ = getExtensionStringMatcher(matcher.custom());
+    }
+  }
+
+  bool match(const absl::string_view value, const xds::type::matcher::v3::StringMatcher&) const {
+    return matchCommon(value);
+  }
+
+  bool match(const absl::string_view value,
+             const envoy::type::matcher::v3::StringMatcher& matcher) const {
+    if (matcher.match_pattern_case() ==
+        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kCustom) {
+      return custom_->match(value);
+    }
+    return matchCommon(value);
+  }
+
+  // StringMatcher
+  bool matchCommon(const absl::string_view value) const {
+    switch (matcher_.match_pattern_case()) {
+    case StringMatcherType::MatchPatternCase::kExact:
+      return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
+                                    : value == matcher_.exact();
+    case StringMatcherType::MatchPatternCase::kPrefix:
+      return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
+                                    : absl::StartsWith(value, matcher_.prefix());
+    case StringMatcherType::MatchPatternCase::kSuffix:
+      return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
+                                    : absl::EndsWith(value, matcher_.suffix());
+    case StringMatcherType::MatchPatternCase::kContains:
+      return matcher_.ignore_case()
+                 ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
+                 : absl::StrContains(value, matcher_.contains());
+    case StringMatcherType::MatchPatternCase::kSafeRegex:
+      return regex_->match(value);
+    default:
+      PANIC("unexpected");
+    }
+  }
+
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
+  StringMatcherPtr custom_;
+};
+
+class StringMatcherExtensionFactory : public Config::TypedFactory {
+public:
+  virtual StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& config) PURE;
+
+  std::string category() const override { return "envoy.string_matcher"; }
 };
 
 class ListMatcher : public ValueMatcher {
