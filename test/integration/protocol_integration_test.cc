@@ -4929,6 +4929,7 @@ public:
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+  uint32_t address = 0;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -4940,6 +4941,7 @@ TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
   if (version_ == Network::Address::IpVersion::v4) {
     return;
   }
+
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillRepeatedly(testing::Return(dns_resolver));
@@ -4947,12 +4949,13 @@ TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
       .WillRepeatedly(
           Invoke([&](const std::string&, Network::DnsLookupFamily,
                      Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
-            // Keep changing the DNS response address list.
-            static int i = 1;
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
-                         TestUtility::makeDnsResponse({"::1", absl::StrCat("127.0.0.", i),
-                             absl::StrCat("127.0.0.", i + 1)}));
-            i = (i + 1) % 128;
+                         TestUtility::makeDnsResponse({"::1", absl::StrCat("127.0.0.", address),
+                                                       absl::StrCat("127.0.0.", address + 1),
+                                                       absl::StrCat("127.0.0.", address + 2),
+                                                       absl::StrCat("127.0.0.", address + 3),
+                                                       absl::StrCat("127.0.0.", address + 4)}));
+            address = (address + 1) % 128;
             return nullptr;
           }));
   if (use_universal_header_validator_) {
