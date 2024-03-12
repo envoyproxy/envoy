@@ -177,8 +177,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
-  const ReadOrParseState read_state =
-      parseBuffer(buffer); // Implicitly updates header_version_
+  const ReadOrParseState read_state = parseBuffer(buffer); // Implicitly updates header_version_
 
   VersionedProxyProtocolStats& versioned_stats = config_->versionToStatsStruct(header_version_);
   versioned_stats.increment(read_state);
