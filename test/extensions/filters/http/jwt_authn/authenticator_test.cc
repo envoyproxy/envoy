@@ -61,7 +61,8 @@ public:
   void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers,
                           bool expect_clear_route = false) {
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
-      ASSERT_EQ(status, expected_status);
+      ASSERT_STREQ(google::jwt_verify::getStatusString(status).c_str(),
+                   google::jwt_verify::getStatusString(expected_status).c_str());
     };
     auto set_extracted_jwt_data_cb = [this](const std::string& name,
                                             const ProtobufWkt::Struct& extracted_data) {
@@ -100,6 +101,32 @@ public:
   ProtobufWkt::Struct out_extracted_data_;
   NiceMock<Tracing::MockSpan> parent_span_;
 };
+
+// Test authenticator constraints for subjects
+TEST_F(AuthenticatorTest, TestSubject) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+  TestUtility::loadFromYaml(SubjectConfig, proto_config_);
+
+  {
+    // Test that GoodToken works. sub is test@example.com and the example_provider
+    // is constrained to *@example.com
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+        .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+          receiver.onJwksSuccess(std::move(jwks_));
+        }));
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    expectVerifyStatus(Status::Ok, headers);
+  }
+
+  {
+    // spiffe_provider is constrained to prefixes spiffe://spiffe.example.com/ so test@eample.com
+    // should fail.
+    createAuthenticator(nullptr, "spiffe_provider");
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    expectVerifyStatus(Status::JwtVerificationFail, headers);
+  }
+}
 
 // This test validates a good JWT authentication with a remote Jwks.
 // It also verifies Jwks cache with 10 JWT authentications, but only one Jwks fetch.

@@ -189,6 +189,13 @@ void JniHelper::callStaticVoidMethod(jclass clazz, jmethodID method_id, ...) {
   rethrowException();
 }
 
+LocalRefUniquePtr<jobject> JniHelper::newDirectByteBuffer(void* address, jlong capacity) {
+  LocalRefUniquePtr<jobject> result(env_->NewDirectByteBuffer(address, capacity),
+                                    LocalRefDeleter(env_));
+  rethrowException();
+  return result;
+}
+
 jlong JniHelper::getDirectBufferCapacity(jobject buffer) {
   return env_->GetDirectBufferCapacity(buffer);
 }

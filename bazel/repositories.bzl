@@ -1280,7 +1280,13 @@ def _upb():
     )
 
 def _proxy_wasm_cpp_sdk():
-    external_http_archive(name = "proxy_wasm_cpp_sdk")
+    external_http_archive(
+        name = "proxy_wasm_cpp_sdk",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
+        ],
+    )
 
 def _proxy_wasm_cpp_host():
     external_http_archive(
