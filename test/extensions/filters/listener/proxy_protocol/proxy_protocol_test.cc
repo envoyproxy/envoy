@@ -35,6 +35,7 @@
 #include "gtest/gtest.h"
 
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
+using envoy::config::core::v3::ProxyProtocolConfig;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
 using testing::_;
@@ -242,6 +243,7 @@ TEST_P(ProxyProtocolTest, V1UnsupportedIPv4) {
   Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
@@ -249,6 +251,7 @@ TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
   Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1Basic) {
@@ -262,6 +265,7 @@ TEST_P(ProxyProtocolTest, V1Basic) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
@@ -279,6 +283,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
@@ -298,6 +303,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
@@ -317,6 +323,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
@@ -334,6 +341,7 @@ TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1Minimal) {
@@ -352,6 +360,7 @@ TEST_P(ProxyProtocolTest, V1Minimal) {
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Basic) {
@@ -370,6 +379,7 @@ TEST_P(ProxyProtocolTest, V2Basic) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, BasicV6) {
@@ -383,6 +393,7 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2BasicV6) {
@@ -403,6 +414,7 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
@@ -416,6 +428,7 @@ TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
   Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
@@ -431,6 +444,7 @@ TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
   Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
@@ -443,6 +457,7 @@ TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, ErrorRecv_2) {
@@ -625,6 +640,7 @@ TEST_P(ProxyProtocolTest, V2NotLocalOrOnBehalf) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnection) {
@@ -646,6 +662,7 @@ TEST_P(ProxyProtocolTest, V2LocalConnection) {
   }
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
@@ -667,6 +684,7 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
   }
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
@@ -695,6 +713,7 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
   }
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV4) {
@@ -706,6 +725,7 @@ TEST_P(ProxyProtocolTest, V2ShortV4) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
@@ -719,6 +739,7 @@ TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
@@ -731,6 +752,7 @@ TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV6) {
@@ -743,6 +765,7 @@ TEST_P(ProxyProtocolTest, V2ShortV6) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortAddrV6) {
@@ -757,6 +780,7 @@ TEST_P(ProxyProtocolTest, V2ShortAddrV6) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2AF_UNIX) {
@@ -769,6 +793,7 @@ TEST_P(ProxyProtocolTest, V2AF_UNIX) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2BadCommand) {
@@ -781,6 +806,7 @@ TEST_P(ProxyProtocolTest, V2BadCommand) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2WrongVersion) {
@@ -792,6 +818,7 @@ TEST_P(ProxyProtocolTest, V2WrongVersion) {
   connect(false);
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1TooLong) {
@@ -802,6 +829,8 @@ TEST_P(ProxyProtocolTest, V1TooLong) {
     write(buffer, sizeof(buffer));
   }
   expectProxyProtoError();
+  // Not tracked as v1 due to missing /r/n at end
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
@@ -814,6 +843,11 @@ TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
     write(buffer, sizeof(buffer));
   }
   expectProxyProtoError();
+  // Not allowed as unknown because of PROXY v1 signature match.
+  // Not tracked as v1 due to missing /r/n at end.
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 0);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 0);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensions) {
@@ -834,6 +868,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensions) {
   write(data, sizeof(data));
   expectData("DATA");
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
@@ -961,6 +996,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsFrag) {
   write(data, sizeof(data));
   expectData("DATA");
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, Fragmented) {
@@ -982,6 +1018,7 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented1) {
@@ -1004,6 +1041,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented1) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented2) {
@@ -1026,6 +1064,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented2) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented3) {
@@ -1050,6 +1089,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented3) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
@@ -1291,6 +1331,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
@@ -1312,6 +1353,7 @@ TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
             "254.254.254.254");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
@@ -1337,6 +1379,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
             "254.254.254.254");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2PartialRead) {
@@ -1362,6 +1405,7 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
@@ -1391,6 +1435,7 @@ TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
@@ -1420,6 +1465,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
@@ -1463,6 +1509,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
   EXPECT_EQ(tlv_data, value_s);
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
@@ -1502,6 +1549,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   auto value_s = fields.at("PP2 type authority").string_value();
   ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataNamespace) {
@@ -1542,6 +1590,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
   auto value_s = fields.at("PP2 type authority").string_value();
   ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
@@ -1601,6 +1650,7 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
               ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
                           0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
@@ -1665,6 +1715,7 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
               ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35, 0x74, 0x65, 0x73,
                           0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, replacement, 0x37));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
@@ -1714,6 +1765,7 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
   ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
@@ -1736,6 +1788,7 @@ TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
   write(tlv, sizeof(tlv));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
@@ -1765,6 +1818,7 @@ TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
   write(tlv2, sizeof(tlv2));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
@@ -1812,6 +1866,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
                                    proxy_proto_data.tlv_vector_[1].value.end()));
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeEmpty) {
@@ -1848,6 +1903,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeEmpty) {
 
   EXPECT_EQ(0, proxy_proto_data.tlv_vector_.size());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
@@ -1888,6 +1944,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
   EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[0].value.begin(),
                                    proxy_proto_data.tlv_vector_[0].value.end()));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
@@ -1898,6 +1955,22 @@ TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   write("\n");
 
   expectProxyProtoError();
+  // Tracked as v1 because of trailing \r\n
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, MalformedProxyLineWithAllowNoProxyProtocol) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(true, &proto_config);
+
+  std::string msg = "BOGUS\r\n";
+  write(msg);
+  expectData(msg);
+  disconnect();
+  // Tracked as unknown because `set_allow_requests_without_proxy_protocol` matches v1 signature
+  // differently that previous test case.
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
@@ -1905,66 +1978,77 @@ TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
   write("012345678901234567890123456789012345678901234567890123456789"
         "012345678901234567890123456789012345678901234567890123456789");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, NotEnoughFields) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, UnsupportedProto) {
   connect(false);
   write("PROXY UDP6 1:2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, InvalidSrcAddress) {
   connect(false);
   write("PROXY TCP4 230.0.0.1 10.1.1.3 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, InvalidDstAddress) {
   connect(false);
   write("PROXY TCP4 10.1.1.2 0.0.0.0 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, BadPort) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, NegativePort) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 -1 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, PortOutOfRange) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, BadAddress) {
   connect(false);
   write("PROXY TCP6 1::2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
   connect(false);
   write("PROXY TCP4 [1:2:3::4] 1.2.3.4 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
   connect(false);
   write("PROXY TCP4 1.2.3.4 [1:2:3: 1234 4]:5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, Truncated) {
@@ -2089,8 +2173,301 @@ TEST_P(ProxyProtocolTest, DrainError) {
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 #endif
+
+class ProxyProtocolAllowedVersionsTest : public ProxyProtocolTest {
+ public:
+  virtual envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol createConfig(std::vector<ProxyProtocolConfig::Version> allowed_versions) const {
+    envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+    for (const auto& version : allowed_versions) {
+      proto_config.mutable_allowed_versions()->Add(version);
+    }
+    return proto_config;
+  }
+};
+
+// Parameterize the listener socket address version.
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolAllowedVersionsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV2BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV2BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2, ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV2BasicRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.denied").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV2ShortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV2ShortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  proto_config.mutable_allowed_versions()->Add(ProxyProtocolConfig::V2);
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV2ShortRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.denied").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV1BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV1BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  proto_config.mutable_allowed_versions()->Add(ProxyProtocolConfig::V2);
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV1BasicRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.denied").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  proto_config.mutable_allowed_versions()->Add(ProxyProtocolConfig::V2);
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.denied").value(), 1);
+}
+
+// Tests a combination of `allowed_versions` and `allow_requests_without_proxy_protocol`.
+class ProxyProtocolAllowedVersionsWithNoProxyProtoTest : public ProxyProtocolAllowedVersionsTest {
+ public:
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol createConfig(std::vector<ProxyProtocolConfig::Version> allowed_versions) const override {
+    auto proto_config = ProxyProtocolAllowedVersionsTest::createConfig(allowed_versions);
+    proto_config.set_allow_requests_without_proxy_protocol(true);
+    return proto_config;
+  }
+};
+
+// Parameterize the listener socket address version.
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolAllowedVersionsWithNoProxyProtoTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV2BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV2ShortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2ShortAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectData("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BadPortAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectData("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+}
+
+// In direct comparison to V1TooLongWithAllowNoProxyProtocol.
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAllowNoProxyProtocolAndV1NotMatched) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100 RANDOM ENDING");
+  expectData("PROXY TCP4 1.2.3.4 2.3.4.5 100 100 RANDOM ENDING");
+  disconnect();
+  // Not tracked as v1 due to missing /r/n at end.
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndAllowTinyNoProxyProtocol) {
+  // Allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
+  // proxy protocol
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config = createConfig({ProxyProtocolConfig::V1}); // Essentially NOOP.
+  connect(true, &proto_config);
+
+  std::string msg = "data";
+  write(msg);
+  expectData(msg);
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+}
 
 class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
@@ -2220,7 +2597,7 @@ public:
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   BasicResourceLimitImpl open_connections_;
@@ -2260,6 +2637,7 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST_P(WildcardProxyProtocolTest, BasicV6) {
@@ -2275,6 +2653,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
 TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {

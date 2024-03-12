@@ -23,19 +23,54 @@ namespace ProxyProtocol {
 using KeyValuePair =
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
 
+enum ProxyProtocolVersion { Unknown = 0, V1 = 1, V2 = 2 };
+
+enum class ReadOrParseState { Done, TryAgainLater, Error, SkipFilter, Denied };
+
 /**
- * All stats for the proxy protocol. @see stats_macros.h
+ * Non-versioned general stats for the filter.
+ * Kept for backwards compatibility.
+ * @see stats_macros.h
  */
 // clang-format off
-#define ALL_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
+#define GENERAL_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
   COUNTER(downstream_cx_proxy_proto_error)
 // clang-format on
+
+struct GeneralProxyProtocolStats {
+  GENERAL_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Stats reported for each version of the proxy protocol.
+ * @see stats_macros.h
+ */
+// clang-format off
+#define VERSIONED_PROXY_PROTOCOL_STATS(COUNTER)  \
+  COUNTER(allowed)                               \
+  COUNTER(denied)                                \
+  COUNTER(error)
+// clang-format on
+
+struct VersionedProxyProtocolStats {
+  VERSIONED_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+
+  /**
+   * Increment the stats for the given filter decision.
+   */
+  void increment(ReadOrParseState decision);
+};
 
 /**
  * Definition of all stats for the proxy protocol. @see stats_macros.h
  */
 struct ProxyProtocolStats {
-  ALL_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+  GeneralProxyProtocolStats general_stats_;
+  VersionedProxyProtocolStats unknown_;
+  VersionedProxyProtocolStats v1_;
+  VersionedProxyProtocolStats v2_;
+
+  static ProxyProtocolStats create(Stats::Scope& scope);
 };
 
 /**
@@ -66,23 +101,25 @@ public:
   bool isPassThroughTlvTypeNeeded(uint8_t type) const;
 
   /**
-   * Filter configuration that determines if we should pass-through requests without
-   * proxy protocol. Should only be configured to true for trusted downstreams.
+   * Return true if the given PROXY protocol version should be parsed by the filter.
    */
-  bool allowRequestsWithoutProxyProtocol() const;
+  bool isVersionAllowed(ProxyProtocolVersion version) const;
+
+  /**
+   * Return the stats for the given PROXY protocol version.
+   */
+  VersionedProxyProtocolStats& versionToStatsStruct(ProxyProtocolVersion version);
 
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
   const bool allow_requests_without_proxy_protocol_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
+  bool allow_v1_{false};
+  bool allow_v2_{false};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
-
-enum ProxyProtocolVersion { Unknown = 0, V1 = 1, V2 = 2 };
-
-enum class ReadOrParseState { Done, TryAgainLater, Error, SkipFilter };
 
 /**
  * Implementation the PROXY Protocol listener filter
