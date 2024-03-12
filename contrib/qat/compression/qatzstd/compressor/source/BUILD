@@ -15,9 +15,11 @@ make(
     build_data = ["@com_github_qat_zstd//:all"],
     env = select({
         "//bazel:clang_build": {
-            "CFLAGS": "-Wno-error=unused-parameter",
+            "CFLAGS": "-Wno-error=unused-parameter -Wno-error=unused-command-line-argument -I$$EXT_BUILD_DEPS/qatlib/include -I$$EXT_BUILD_DEPS/zstd/include",
         },
-        "//conditions:default": {},
+        "//conditions:default": {
+            "CFLAGS": "-I$$EXT_BUILD_DEPS/qatlib/include -I$$EXT_BUILD_DEPS/zstd/include",
+        },
     }),
     includes = [],
     lib_source = "@com_github_qat_zstd//:all",
@@ -28,7 +30,7 @@ make(
         "@platforms//cpu:x86_64",
     ],
     targets = [
-        "",
+        "ENABLE_USDM_DRV=1",
         "install",
     ],
     deps = [
