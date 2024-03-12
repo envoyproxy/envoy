@@ -107,6 +107,7 @@ envoy_cc_fuzz_test(
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
+        "//test/integration:fake_upstream_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
