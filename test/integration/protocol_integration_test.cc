@@ -4940,7 +4940,7 @@ TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
   if (version_ == Network::Address::IpVersion::v4) {
     return;
   }
-  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillRepeatedly(testing::Return(dns_resolver));
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
@@ -4950,8 +4950,8 @@ TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
             // Keep changing the DNS response address list.
             static int i = 1;
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
-                         TestUtility::makeDnsResponse({"::1", ("127.0.0." + std::to_string(i)),
-                                                       ("127.0.0." + std::to_string(i + 1))}));
+                         TestUtility::makeDnsResponse({"::1", absl::StrCat("127.0.0.", i),
+                             absl::StrCat("127.0.0.", i + 1)}));
             i = (i + 1) % 128;
             return nullptr;
           }));

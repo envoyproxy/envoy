@@ -68,6 +68,9 @@ bool hasMatchingIpVersion(const Address::IpVersion& ip_version,
 
 std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::sortAddresses(
     const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& in) {
+  if (in == nullptr) {
+    return {};
+  }
   std::vector<Address::InstanceConstSharedPtr> address_list;
   address_list.reserve(in->size());
   // Iterator which will advance through all addresses matching the first family.
@@ -105,6 +108,10 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
   if (!happy_eyeballs_config.has_value()) {
     return sortAddresses(in);
   }
+  if (in == nullptr) {
+    return {};
+  }
+
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_sort_address", "sort address with happy_eyeballs config.");
   std::vector<Address::InstanceConstSharedPtr> address_list;
   address_list.reserve(in->size());
