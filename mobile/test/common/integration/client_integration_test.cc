@@ -240,6 +240,56 @@ TEST_P(ClientIntegrationTest, Basic) {
   }
 }
 
+TEST_P(ClientIntegrationTest, LargeStreamExplicitFlowControl) {
+  Http::Client::setPerStreamBufferForTests(1000);
+  builder_.addLogLevel(Platform::LogLevel::trace);
+  autonomous_upstream_ = false;
+  explicit_flow_control_ = true;
+  initialize();
+
+  Platform::StreamPrototypeSharedPtr stream_prototype;
+  {
+    absl::MutexLock l(&engine_lock_);
+    stream_prototype = engine_->streamClient()->newStreamPrototype();
+  }
+  stream_prototype->setOnError(
+      [this](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
+        cc_.terminal_callback->setReady();
+      });
+  Platform::StreamSharedPtr stream = (*stream_prototype).start(explicit_flow_control_);
+  stream_prototype->setOnData([stream](envoy_data c_data, bool) {
+    // Allow reading up to 10 bytes.
+    stream->readData(1024);
+    release_envoy_data(c_data);
+  });
+  stream->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  // Send a large response and then a reset.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+  // Send an incomplete response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(50 * 1024, false);
+  upstream_request_->encodeResetStream();
+
+  // Wait for flow control to back up.
+  ENVOY_LOG_MISC(debug, "Waiting for flow control");
+  while (1) {
+    absl::MutexLock l(&engine_lock_);
+    std::string stats = engine_->dumpStats();
+    if (absl::StrContains(stats, "cluster.base.upstream_flow_control_paused_reading_total: 1")) {
+      break;
+    }
+  }
+  ENVOY_LOG_MISC(debug, "Done waiting for flow control");
+  // Resume reading data.
+  stream->readData(1024);
+  ENVOY_LOG_MISC(debug, "Waiting for terminal callback");
+  terminal_callback_.waitReady();
+}
+
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();
   std::string data(1024 * 32, 'a');

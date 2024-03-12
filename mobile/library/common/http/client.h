@@ -51,6 +51,8 @@ struct HttpClientStats {
  */
 class Client : public Logger::Loggable<Logger::Id::http> {
 public:
+  static void setPerStreamBufferForTests(uint32_t value);
+
   Client(ApiListenerPtr&& api_listener, Event::ProvisionalDispatcher& dispatcher,
          Stats::Scope& scope, Random::RandomGenerator& random)
       : api_listener_(std::move(api_listener)), dispatcher_(dispatcher),

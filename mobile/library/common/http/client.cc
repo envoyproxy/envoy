@@ -29,7 +29,14 @@ namespace {
 
 constexpr auto SlowCallbackWarningThreshold = std::chrono::seconds(1);
 
+// Default to 2M per stream. This is fairly arbitrary and will result in
+// Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
+// and having local data of 2M + kernel-buffer-limit for HTTP/1.1
+static uint32_t PerStreamBuffer = 2 * 1024 * 1024;
+
 } // namespace
+
+void Client::setPerStreamBufferForTests(uint32_t value) { PerStreamBuffer = value; }
 
 Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream,
                                                      envoy_http_callbacks bridge_callbacks,
@@ -121,10 +128,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
         [this]() -> void { onBufferedDataDrained(); }, [this]() -> void { onHasBufferedData(); },
         []() -> void {});
-    // Default to 2M per stream. This is fairly arbitrary and will result in
-    // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
-    // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
-    response_data_->setWatermarks(2 * 1024 * 1024);
+    response_data_->setWatermarks(PerStreamBuffer);
   }
 
   // Send data if in default flow control mode, or if resumeData has been called in explicit
@@ -244,6 +248,12 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
     sendTrailersToBridge(*response_trailers_);
     response_trailers_.reset();
     bytes_to_send_ = 0;
+  }
+
+  if (!hasBufferedData() && !response_trailers_.get() && error_.has_value()) {
+    http_client_.removeStream(direct_stream_.stream_handle_);
+    direct_stream_.request_decoder_ = nullptr;
+    sendErrorToBridge();
   }
 }
 
