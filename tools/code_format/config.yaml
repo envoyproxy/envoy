@@ -138,7 +138,6 @@ paths:
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
-    - source/common/router/router_ratelimit.cc
     - source/common/router/header_parser.cc
     - source/common/filesystem/inotify/watcher_impl.cc
     - source/common/filesystem/posix/directory_iterator_impl.cc
@@ -153,6 +152,7 @@ paths:
     - source/server/overload_manager_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
+    - source/server/admin/runtime_handler.cc
     - source/server/server.cc
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc

@@ -325,10 +325,10 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  // This does most of the work of initialization, but can throw errors caught
+  // This does most of the work of initialization, but can throw or return errors caught
   // by initialize().
-  void initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
-                         ComponentFactory& component_factory);
+  absl::Status initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                                 ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();

@@ -135,10 +135,10 @@ private class GRPCMessageProcessor {
    */
   fun processData(
     bufferedStream: ByteArrayOutputStream,
-    processState: GRPCMessageProcessor.ProcessState,
+    processState: ProcessState,
     streamIntel: StreamIntel,
     onMessage: (byteBuffer: ByteBuffer, streamIntel: StreamIntel) -> Unit
-  ): GRPCMessageProcessor.ProcessState {
+  ): ProcessState {
     var nextState = processState
 
     when (processState) {

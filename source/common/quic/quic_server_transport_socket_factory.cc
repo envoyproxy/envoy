@@ -50,7 +50,7 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
     std::istringstream pem_stream(cert_str);
     auto pem_result = quic::ReadNextPemMessage(&pem_stream);
     if (pem_result.status != quic::PemReadResult::Status::kOk) {
-      throwEnvoyExceptionOrPanic(
+      throw EnvoyException(
           "Error loading certificate in QUIC context: error from ReadNextPemMessage");
     }
     chain.push_back(std::move(pem_result.contents));
@@ -72,7 +72,7 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
   bssl::UniquePtr<EVP_PKEY> pub_key(X509_get_pubkey(context.cert_chain_.get()));
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(pub_key.get(), &error_details);
   if (sign_alg == 0) {
-    throwEnvoyExceptionOrPanic(
+    throw EnvoyException(
         absl::StrCat("Failed to deduce signature algorithm from public key: ", error_details));
   }
 
@@ -83,7 +83,7 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
   std::unique_ptr<quic::CertificatePrivateKey> pem_key =
       std::make_unique<quic::CertificatePrivateKey>(std::move(privateKey));
   if (pem_key == nullptr) {
-    throwEnvoyExceptionOrPanic("Failed to load QUIC private key.");
+    throw EnvoyException("Failed to load QUIC private key.");
   }
 
   context.quic_private_key_ = std::move(pem_key);
