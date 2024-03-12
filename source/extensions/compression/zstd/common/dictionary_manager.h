@@ -44,9 +44,9 @@ public:
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
         is_watch_added = true;
         const auto& filename = source.filename();
-        watcher_->addWatch(
+        THROW_IF_NOT_OK(watcher_->addWatch(
             filename, Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
-            [this, id, filename](uint32_t) { onDictionaryUpdate(id, filename); });
+            [this, id, filename](uint32_t) { onDictionaryUpdate(id, filename); }));
       }
     }
 

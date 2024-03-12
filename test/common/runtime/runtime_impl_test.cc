@@ -55,6 +55,7 @@ protected:
               Invoke([this](absl::string_view path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 EXPECT_EQ(path, expected_watch_root_);
                 on_changed_cbs_.emplace_back(cb);
+                return absl::OkStatus();
               }));
       return mock_watcher;
     }));
@@ -97,6 +98,7 @@ public:
     absl::Status creation_status;
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
                                            generator_, validation_visitor_, *api_, creation_status);
+    THROW_IF_NOT_OK(creation_status);
   }
 
   void write(const std::string& path, const std::string& value) {
@@ -327,6 +329,19 @@ TEST_F(DiskLoaderImplTest, OverrideFolderDoesNotExist) {
   EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(0, store_.counter("runtime.override_dir_exists").value());
   EXPECT_EQ(1, store_.counter("runtime.override_dir_not_exists").value());
+}
+
+TEST_F(DiskLoaderImplTest, FileDoesNotExist) {
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([] {
+    Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+    EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+        .WillRepeatedly(Return(absl::InvalidArgumentError("file does not exist")));
+    return mock_watcher;
+  }));
+
+  EXPECT_THROW_WITH_MESSAGE(
+      run("test/common/runtime/test_data/current", "envoy_override_does_not_exist"), EnvoyException,
+      "file does not exist");
 }
 
 TEST_F(DiskLoaderImplTest, PercentHandling) {
