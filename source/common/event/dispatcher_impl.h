@@ -141,6 +141,8 @@ private:
     return run_tid_.isEmpty() || run_tid_ == thread_factory_.currentThreadId();
   }
 
+  bool isRunning() const override { return !run_tid_.isEmpty(); }
+
   const std::string name_;
   Thread::ThreadFactory& thread_factory_;
   TimeSource& time_source_;

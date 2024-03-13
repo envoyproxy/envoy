@@ -36,6 +36,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(*this, isThreadSafe()).WillByDefault(Return(true));
+  ON_CALL(*this, isRunning()).WillByDefault(Return(true));
 }
 
 MockDispatcher::~MockDispatcher() = default;

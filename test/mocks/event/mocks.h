@@ -142,6 +142,7 @@ public:
   MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
   MOCK_METHOD(bool, trackedObjectStackIsEmpty, (), (const));
   MOCK_METHOD(bool, isThreadSafe, (), (const));
+  MOCK_METHOD(bool, isRunning, (), (const));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
   MOCK_METHOD(Thread::ThreadId, getCurrentThreadId, ());
   MOCK_METHOD(MonotonicTime, approximateMonotonicTime, (), (const));

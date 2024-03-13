@@ -83,6 +83,7 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   InSequence s;
 
   // Free a slot without ever calling set.
+  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   TypedSlotPtr<> slot1 = TypedSlot<>::makeUnique(tls_);
   slot1.reset();
@@ -94,6 +95,7 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   TestThreadLocalObject& object_ref2 = setObject(*slot2);
   EXPECT_EQ(freeSlotIndexesListSize(), 0);
 
+  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref2, onDestroy());
   EXPECT_EQ(freeSlotIndexesListSize(), 0);
@@ -128,6 +130,7 @@ struct ThreadStatus {
 class CallbackNotInvokedAfterDeletionTest : public ThreadLocalInstanceImplTest {
 protected:
   CallbackNotInvokedAfterDeletionTest() : slot_(TypedSlot<>::makeUnique(tls_)) {
+    EXPECT_CALL(thread_dispatcher_, isRunning());
     EXPECT_CALL(thread_dispatcher_, post(_))
         .WillOnce(Invoke([&](Event::PostCb cb) {
           // Hold callback #1.

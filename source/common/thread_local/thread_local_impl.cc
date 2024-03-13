@@ -138,7 +138,18 @@ void InstanceImpl::removeSlot(uint32_t slot) {
              free_slot_indexes_.end(),
          fmt::format("slot index {} already in free slot set!", slot));
   free_slot_indexes_.push_back(slot);
-  absl::BlockingCounter counter(registered_threads_.size() + 1);
+
+  // Include main thread.
+  auto running_workers = 1;
+  // Add only dispatchers which have associated thread and are able to process events.
+  std::for_each(registered_threads_.begin(), registered_threads_.end(),
+                [&running_workers](std::reference_wrapper<Event::Dispatcher>& dispatcher) {
+                  if (dispatcher.get().isRunning()) {
+                    running_workers++;
+                  }
+                });
+
+  absl::BlockingCounter counter(running_workers);
   runOnAllThreads([slot, &counter]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
