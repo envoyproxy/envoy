@@ -85,7 +85,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
                            Filesystem::Instance& file_system,
                            std::unique_ptr<ProcessContext> process_context,
                            Buffer::WatermarkFactorySharedPtr watermark_factory)
-    : init_manager_(init_manager), live_(false), options_(options),
+    : init_manager_(init_manager), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields(),
                           options.ignoreUnknownDynamicFields()),

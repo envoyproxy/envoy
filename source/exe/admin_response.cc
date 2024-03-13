@@ -12,11 +12,37 @@ AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
     : server_(server), opt_admin_(server.admin()), shared_response_set_(response_set) {
   request_headers_->setMethod(method);
   request_headers_->setPath(path);
+  lifecycle_notifier_ = std::make_shared<Server::ServerLifecycleNotifier::HandlePtr>(
+      server.lifecycleNotifier().registerCallback(
+          Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() { terminate(); }));
+  if (server_.isShutdown()) {
+    lifecycle_notifier_.reset();
+    {
+      absl::MutexLock lock(&mutex_);
+      if (!terminated_) {
+        terminated_ = true;
+        sendErrorLockHeld();
+      }
+    }
+    //server_.dispatcher().post([this]() { terminate(); });
+  }
 }
 
 AdminResponse::~AdminResponse() {
+  clearLifecycleTerminator();
   cancel();
-  shared_response_set_->detachResponse(this);
+
+  //shared_response_set_->detachResponse(this);
+}
+
+void AdminResponse::clearLifecycleTerminator() {
+  absl::MutexLock lock(&mutex_);
+  if (!terminated_ && lifecycle_notifier_ != nullptr) {
+    std::shared_ptr<Server::ServerLifecycleNotifier::HandlePtr> lifecycle_notifier =
+        lifecycle_notifier_;
+    lifecycle_notifier_.reset();
+    server_.dispatcher().post([lifecycle_notifier]() {});
+  }
 }
 
 void AdminResponse::getHeaders(HeadersFn fn) {
@@ -91,6 +117,7 @@ void AdminResponse::terminate() {
   absl::MutexLock lock(&mutex_);
   if (!terminated_) {
     terminated_ = true;
+    lifecycle_notifier_.reset();
     sendErrorLockHeld();
     sendAbortChunkLockHeld();
   }

@@ -351,8 +351,8 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   bool workers_started_{false};
-  std::atomic<bool> live_;
-  bool shutdown_{false};
+  std::atomic<bool> live_{false};
+  std::atomic<bool> shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
