@@ -81,8 +81,8 @@ message ProxyProtocol {
   //
   //   When used in conjunction with the :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`,
   //   the filter will only attempt to match signatures for the allowed versions.
-  //   For example, when `allowed_versions=V1`, `allow_requests_without_proxy_protocol=true`, and an incoming request matches
-  //   the V2 signature, the filter will allow the request through as if it did not contain
+  //   For example, when ``allowed_versions=V1``, ``allow_requests_without_proxy_protocol=true``,
+  //   and an incoming request matches the V2 signature, the filter will allow the request through as if it did not contain
   //   PROXY protocol information.
   repeated config.core.v3.ProxyProtocolConfig.Version allowed_versions = 4;
 }

@@ -42,7 +42,7 @@ This filter emits the following general statistics:
   downstream_cx_proxy_proto_error, Counter, Total number of connections with proxy protocol errors
 
 The filter also emits the statistics rooted at *downstream_cx_proxy_proto.<version>.* for each matched proxy protocol version.
-Proxy protocol versions include `v1`, `v2`, and `not_found`.
+Proxy protocol versions include ``v1``, ``v2``, and ``not_found``.
 
 .. csv-table::
   :header: Name, Type, Description
