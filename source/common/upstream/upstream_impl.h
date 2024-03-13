@@ -454,7 +454,8 @@ protected:
   static CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
       const Network::Address::InstanceConstSharedPtr& address,
-      const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>& address_list,
+      const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>&
+          address_list,
       Network::UpstreamTransportSocketFactory& socket_factory,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,

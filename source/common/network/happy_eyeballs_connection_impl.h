@@ -37,8 +37,8 @@ public:
   // Eyeballs v2. It is assumed that the list must already be sorted as per
   // Section 6 of RFC6724, which happens in the DNS implementations (ares_getaddrinfo()
   // and Apple DNS).
-  static std::vector<Address::InstanceConstSharedPtr>
-  sortAddresses(const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list);
+  static std::vector<Address::InstanceConstSharedPtr> sortAddresses(
+      const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list);
   static std::vector<Address::InstanceConstSharedPtr> sortAddressesWithConfig(
       const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list,
       const absl::optional<
