@@ -4937,6 +4937,10 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+// Reproduces a race from https://github.com/envoyproxy/envoy/issues/32850
+// that is fixed in https://github.com/envoyproxy/envoy/pull/32830. The test is
+// by mocking the DNS resolver to return multiple different addresses, also config
+// dns_refresh_rate to be extremely fast.
 TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
   if (version_ == Network::Address::IpVersion::v4) {
     return;
