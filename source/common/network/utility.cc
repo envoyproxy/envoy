@@ -583,27 +583,28 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                             Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
-  RELEASE_ASSERT(
-      peer_addess != nullptr,
-      fmt::format("Unable to get remote address on the socket bount to local address: {} ",
-                  local_address->asString()));
+  ENVOY_BUG(peer_addess != nullptr,
+            fmt::format("Unable to get remote address on the socket bound to local address: {}.",
+                        (local_address == nullptr ? "unknown" : local_address->asString())));
 
   // Unix domain sockets are not supported
-  RELEASE_ASSERT(peer_addess->type() == Address::Type::Ip,
-                 fmt::format("Unsupported remote address: {} local address: {}, receive size: "
-                             "{}",
-                             peer_addess->asString(), local_address->asString(), bytes_read));
+  ENVOY_BUG(peer_addess != nullptr && peer_addess->type() == Address::Type::Ip,
+            fmt::format("Unsupported remote address: {} local address: {}, receive size: "
+                        "{}",
+                        peer_addess->asString(),
+                        (local_address == nullptr ? "unknown" : local_address->asString()),
+                        bytes_read));
   udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
                                      std::move(buffer), receive_time);
 }
 
-Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
-                                                const Address::Instance& local_address,
-                                                UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time, bool use_gro,
-                                                uint32_t* packets_dropped) {
-
-  if (use_gro) {
+Api::IoCallUint64Result
+Utility::readFromSocket(IoHandle& handle, const Address::Instance& local_address,
+                        UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
+                        UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped) {
+  if (recv_msg_method == UdpRecvMsgMethod::RecvMsgWithGro) {
+    ASSERT(Api::OsSysCallsSingleton::get().supportsUdpGro(),
+           "cannot use GRO when the platform doesn't support it.");
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -645,7 +646,9 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     return result;
   }
 
-  if (handle.supportsMmsg()) {
+  if (recv_msg_method == UdpRecvMsgMethod::RecvMmsg) {
+    ASSERT(Api::OsSysCallsSingleton::get().supportsMmsg(),
+           "cannot use recvmmsg when the platform doesn't support it.");
     const auto max_rx_datagram_size = udp_packet_processor.maxDatagramSize();
 
     // Buffer::ReservationSingleSlice is always passed by value, and can only be constructed
@@ -719,24 +722,40 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, bool prefer_gro,
-                                               uint32_t& packets_dropped) {
+                                               TimeSource& time_source, bool allow_gro,
+                                               bool allow_mmsg, uint32_t& packets_dropped) {
+  UdpRecvMsgMethod recv_msg_method = UdpRecvMsgMethod::RecvMsg;
+  if (allow_gro && handle.supportsUdpGro()) {
+    recv_msg_method = UdpRecvMsgMethod::RecvMsgWithGro;
+  } else if (allow_mmsg && handle.supportsMmsg()) {
+    recv_msg_method = UdpRecvMsgMethod::RecvMmsg;
+  }
+
   // Read at least one time, and attempt to read numPacketsExpectedPerEventLoop() packets unless
   // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
   size_t num_packets_to_read = std::min<size_t>(
       MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
-  const bool use_gro = prefer_gro && handle.supportsUdpGro();
-  size_t num_reads =
-      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
-              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
-                                       : num_packets_to_read);
+  size_t num_reads;
+  switch (recv_msg_method) {
+  case UdpRecvMsgMethod::RecvMsgWithGro:
+    num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
+    break;
+  case UdpRecvMsgMethod::RecvMmsg:
+    num_reads = (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE);
+    break;
+  case UdpRecvMsgMethod::RecvMsg:
+    num_reads = num_packets_to_read;
+    break;
+  }
   // Make sure to read at least once.
   num_reads = std::max<size_t>(1, num_reads);
+
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
-    Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
+    Api::IoCallUint64Result result =
+        Utility::readFromSocket(handle, local_address, udp_packet_processor, receive_time,
+                                recv_msg_method, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
