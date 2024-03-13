@@ -4929,7 +4929,7 @@ public:
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
-  uint32_t address = 0;
+  uint32_t address_ = 0;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -4954,12 +4954,12 @@ TEST_P(LogicalDnsReadWriteRaceTest, FastChangingDnsResult) {
           Invoke([&](const std::string&, Network::DnsLookupFamily,
                      Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
-                         TestUtility::makeDnsResponse({"::1", absl::StrCat("127.0.0.", address),
-                                                       absl::StrCat("127.0.0.", address + 1),
-                                                       absl::StrCat("127.0.0.", address + 2),
-                                                       absl::StrCat("127.0.0.", address + 3),
-                                                       absl::StrCat("127.0.0.", address + 4)}));
-            address = (address + 1) % 128;
+                         TestUtility::makeDnsResponse({"::1", absl::StrCat("127.0.0.", address_),
+                                                       absl::StrCat("127.0.0.", address_ + 1),
+                                                       absl::StrCat("127.0.0.", address_ + 2),
+                                                       absl::StrCat("127.0.0.", address_ + 3),
+                                                       absl::StrCat("127.0.0.", address_ + 4)}));
+            address_ = (address_ + 1) % 128;
             return nullptr;
           }));
   if (use_universal_header_validator_) {
