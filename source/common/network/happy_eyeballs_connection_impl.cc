@@ -9,7 +9,7 @@ namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     Event::Dispatcher& dispatcher,
-    const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& address_list,
+    const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list,
     const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
         upstream_local_address_selector,
     UpstreamTransportSocketFactory& socket_factory,
@@ -67,7 +67,7 @@ bool hasMatchingIpVersion(const Address::IpVersion& ip_version,
 } // namespace
 
 std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::sortAddresses(
-    const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& in) {
+    const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& in) {
   if (in == nullptr) {
     return {};
   }
@@ -102,7 +102,7 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
 
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionProvider::sortAddressesWithConfig(
-    const std::shared_ptr<std::vector<Address::InstanceConstSharedPtr>>& in,
+    const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& in,
     const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config) {
   if (!happy_eyeballs_config.has_value()) {

@@ -83,7 +83,7 @@ public:
   ~MockHostDescription() override;
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
-  MOCK_METHOD(const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>&,
+  MOCK_METHOD(const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>&,
               addressList, (), (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
@@ -167,7 +167,7 @@ public:
   }
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
-  MOCK_METHOD(const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>&,
+  MOCK_METHOD(const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>&,
               addressList, (), (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));

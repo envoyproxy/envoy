@@ -67,7 +67,7 @@ public:
   }
 
   const std::pair<Network::Address::InstanceConstSharedPtr,
-                  const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>>
+                  const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>>
   copyAddressAndList() const {
     absl::ReaderMutexLock lock(&address_lock_);
     return {HostImpl::address(), HostImpl::addressList()};
@@ -118,7 +118,7 @@ public:
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>&
+  const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>&
   addressList() const override {
     return logical_host_->addressList();
   }
