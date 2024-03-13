@@ -41,37 +41,8 @@ jobs:
   strategy:
     maxParallel: ${{ parameters.concurrencyChecks }}
     matrix:
-      # These are ordered by most time-consuming first.
-      coverage:
-        CI_TARGET: "coverage"
-      fuzz_coverage:
-        CI_TARGET: "fuzz_coverage"
-      compile_time_options:
-        CI_TARGET: "compile_time_options"
-        ENVOY_FILTER_EXAMPLE: true
-      tsan:
-        CI_TARGET: "tsan"
-      asan:
-        CI_TARGET: "asan"
-        ENVOY_FILTER_EXAMPLE: true
-      # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
-      # api_compat:
-      #  CI_TARGET: "api_compat"
-      gcc:
-        CI_TARGET: "gcc"
-      msan:
-        CI_TARGET: "msan"
-        ENVOY_FILTER_EXAMPLE: true
-      #
-      # Temporarily disabled to facilitate release CI, should be resolved
-      #    as part of https://github.com/envoyproxy/envoy/issues/28566
-      #
-      # clang_tidy:
-      #   CI_TARGET: "clang_tidy"
-      #   REPO_FETCH_DEPTH: 0
-      #   REPO_FETCH_TAGS: true
-      #   PUBLISH_TEST_RESULTS: false
-      #   PUBLISH_ENVOY: false
+      api:
+        CI_TARGET: "api"
   timeoutInMinutes: 180
   pool: envoy-x64-small
   steps:
