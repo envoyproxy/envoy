@@ -66,7 +66,7 @@ void FluentdAccessLoggerImpl::log(EntryPtr&& entry) {
   entries_.push_back(std::move(entry));
   fluentd_stats_.entries_buffered_.inc();
   if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
-    // If we exceeded the buffer limit, immedietely flush the logs instead of waiting for
+    // If we exceeded the buffer limit, immediately flush the logs instead of waiting for
     // the next flush interval, to allow new logs to be buffered.
     flush();
   }
