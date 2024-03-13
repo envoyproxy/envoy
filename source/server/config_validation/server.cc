@@ -98,7 +98,7 @@ void ValidationInstance::initialize(const Options& options,
   }
 
   // Inject regex engine to singleton.
-  Regex::EnginePtr regex_engine = createRegexEngine(
+  regex_engine_ = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
   Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags());
