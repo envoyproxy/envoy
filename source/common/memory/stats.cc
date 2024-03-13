@@ -116,9 +116,7 @@ AllocatorManager::AllocatorManager(
       allocator_manager_stats_(MemoryAllocatorManagerStats{
           MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}) {
 #if defined(GPERFTOOLS_TCMALLOC)
-  RELEASE_ASSERT(
-      (bytes_to_release_ > 0 || memory_release_interval_msec_ > std::chrono::milliseconds(0)),
-      "Memory releasing is not supported for gperf tcmalloc.");
+  RELEASE_ASSERT((bytes_to_release_ == 0), "Memory releasing is not supported for gperf tcmalloc.");
 #endif
   configureBackgroundMemoryRelease(api);
 };

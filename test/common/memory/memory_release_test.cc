@@ -101,10 +101,6 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
 
 TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
   auto a = std::make_unique<unsigned char[]>(MB);
-#if defined(GPERFTOOLS_TCMALLOC)
-  EXPECT_DEATH(initialiseAllocatorManager(MB /*bytes per second*/, 0),
-               "Memory releasing is not supported for gperf tcmalloc.");
-#else
   EXPECT_LOG_NOT_CONTAINS(
       "info", "Configured tcmalloc with background release rate: 0 bytes 1000 milliseconds",
       initialiseAllocatorManager(0 /*bytes per second*/, 0));
@@ -112,7 +108,6 @@ TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
   // Release interval was configured to default value (1 second).
   step(std::chrono::milliseconds(3000));
   EXPECT_EQ(0UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
-#endif
 }
 
 TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {

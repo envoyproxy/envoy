@@ -415,7 +415,7 @@ private:
   bool enable_reuse_port_default_{false};
   Regex::EnginePtr regex_engine_;
   bool stats_flush_in_progress_ : 1;
-  std::unique_ptr<Memory::AllocatorManager> memory_allocator_;
+  std::unique_ptr<Memory::AllocatorManager> memory_allocator_manager_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

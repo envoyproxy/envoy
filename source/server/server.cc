@@ -521,7 +521,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
 
-  memory_allocator_ = std::make_unique<Memory::AllocatorManager>(
+  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
       *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
