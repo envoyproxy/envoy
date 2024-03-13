@@ -56,7 +56,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tls/private_key:88.9"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
-"source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/listener_managers:70.5"
 "source/extensions/listener_managers/validation_listener_manager:70.5"

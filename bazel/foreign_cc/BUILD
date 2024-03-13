@@ -523,36 +523,6 @@ envoy_cmake(
 )
 
 envoy_cmake(
-    name = "wavm",
-    cache_entries = {
-        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
-        "WAVM_ENABLE_STATIC_LINKING": "on",
-        "WAVM_ENABLE_RELEASE_ASSERTS": "on",
-        "WAVM_ENABLE_UNWIND": "on",
-        # Workaround for the issue with statically linked libstdc++
-        # using -l:libstdc++.a.
-        "CMAKE_CXX_FLAGS": "-lstdc++ -Wno-unused-command-line-argument",
-    },
-    env = {
-        # Workaround for the -DDEBUG flag added in fastbuild on macOS,
-        # which conflicts with DEBUG macro used in LLVM.
-        "CFLAGS": "-UDEBUG",
-        "CXXFLAGS": "-UDEBUG -Wno-error=unused-but-set-variable",
-        "ASMFLAGS": "-UDEBUG",
-    },
-    lib_source = "@com_github_wavm_wavm//:all",
-    out_binaries = ["wavm"],
-    out_static_libs = select({
-        "//conditions:default": [
-            "libWAVM.a",
-            "libWAVMUnwind.a",
-        ],
-    }),
-    tags = ["skip_on_windows"],
-    deps = [":llvm"],
-)
-
-envoy_cmake(
     name = "zlib",
     cache_entries = {
         "CMAKE_CXX_COMPILER_FORCED": "on",
