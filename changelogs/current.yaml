@@ -152,8 +152,9 @@ bug_fixes:
 - area: jwt_authn
   change: |
     Added
-    :ref:`max_lifetime <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.max_lifetime>` to limit
-    the maximum remaining lifetime of a token from a ``JwtProvider``.
+    :ref:`max_lifetime <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.max_lifetime>` and
+    :ref:`require_expiration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.require_expiration>`
+    to limit the maximum remaining lifetime of a token from a ``JwtProvider`` and implement restrictions for JWT-SVIDs.
 - area: router
   change: |
     Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happens. This is
