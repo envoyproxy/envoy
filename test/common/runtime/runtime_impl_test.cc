@@ -551,7 +551,7 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
 
-  SetQuicheReloadableFlag(spdy, quic_testonly_default_true, false);
+  SetQuicheReloadableFlag(quic_testonly_default_true, false);
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
