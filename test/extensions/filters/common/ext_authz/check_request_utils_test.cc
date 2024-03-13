@@ -229,6 +229,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
       /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
             request_.attributes().request().http().headers().find(
                 Headers::get().EnvoyAuthPartialBody.get()));
@@ -257,6 +258,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
       /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
   EXPECT_EQ(",foo,bar", request_.attributes().request().http().headers().at("x-duplicate-header"));
   EXPECT_EQ("foo", request_.attributes().request().http().headers().at("x-normal-header"));
   EXPECT_EQ("", request_.attributes().request().http().headers().at("x-empty-header"));
@@ -287,6 +289,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderMatchers) {
       createRequestHeaderMatchers());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
   EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("duplicate"));
   EXPECT_EQ("bar", request_.attributes().request().http().headers().at("foo"));
   EXPECT_EQ("there", request_.attributes().request().http().headers().at("hello"));
@@ -310,6 +313,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
       /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
                         Headers::get().EnvoyAuthPartialBody.get()));
 }
@@ -332,6 +336,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
   EXPECT_EQ("false", request_.attributes().request().http().headers().at(
                          Headers::get().EnvoyAuthPartialBody.get()));
 }
@@ -376,6 +381,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
 
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().raw_body());
+  EXPECT_FALSE(request_.attributes().request().http().has_header_map());
   EXPECT_EQ("false", request_.attributes().request().http().headers().at(
                          Headers::get().EnvoyAuthPartialBody.get()));
 }
@@ -407,6 +413,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithHeadersAsBytes) {
 
   // Headers field should be empty since ext_authz should populate header_map INSTEAD.
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
+  ASSERT_TRUE(request.attributes().request().http().has_header_map());
 
   expectHeadersInHeaderMap(
       request.attributes().request().http().header_map(),
@@ -439,6 +446,7 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesNoConcatentation) {
       Protobuf::Map<std::string, std::string>(), nullptr);
 
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
+  ASSERT_TRUE(request.attributes().request().http().has_header_map());
 
   // Check headers were not concatenated.
   expectHeadersInHeaderMap(request.attributes().request().http().header_map(),
@@ -469,6 +477,7 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesExistingPartialBodyHeader) {
       Protobuf::Map<std::string, std::string>(), nullptr);
 
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
+  ASSERT_TRUE(request.attributes().request().http().has_header_map());
 
   // Check preexisting partial body header was not included in the authz request.
   expectHeadersNotInHeaderMap(request.attributes().request().http().header_map(),

@@ -142,7 +142,8 @@ void CheckRequestUtils::setHttpRequest(
 
   // Fill in the headers.
   auto* mutable_headers = httpreq.mutable_headers();
-  auto* mutable_header_map = httpreq.mutable_header_map();
+  // Calling mutable_header_map() creates the field in the request; only do so when necessary.
+  auto* mutable_header_map = encode_raw_headers ? httpreq.mutable_header_map() : nullptr;
 
   headers.iterate([encode_raw_headers, request_header_matchers, mutable_headers,
                    mutable_header_map](const Envoy::Http::HeaderEntry& e) {
