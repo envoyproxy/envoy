@@ -33,7 +33,7 @@ public:
   void init(const std::string cluster_name = default_cluster_name,
             bool flush_access_log_on_connected = false,
             absl::optional<uint32_t> buffer_size_bytes = absl::nullopt,
-            absl::optional<uint32_t> max_connect_attempts = absl::nullopt) {
+            absl::optional<uint32_t> max_connect_attempts = 1) {
     setUpstreamCount(2);
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier(
@@ -143,6 +143,13 @@ TEST_F(FluentdAccessLogIntegrationTest, UnknownCluster) {
   EXPECT_DEATH(init("unknown_cluster"), "");
 }
 
+TEST_F(FluentdAccessLogIntegrationTest, LogLostOnBufferFull) {
+  init(default_cluster_name, false, /* max_buffer_size = */ 0);
+  sendBidirectionalData();
+
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_lost", 1);
+}
+
 TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
   init();
   sendBidirectionalData();
@@ -183,7 +190,7 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntryTwoRecords) {
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, TwoEntries) {
-  init(default_cluster_name, /*flush_access_log_on_connected = */ true, /*buffer_size_bytes = */ 0);
+  init(default_cluster_name, /*flush_access_log_on_connected = */ true, /*buffer_size_bytes = */ 1);
   sendBidirectionalData();
 
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 2);

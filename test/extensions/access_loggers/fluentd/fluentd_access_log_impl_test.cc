@@ -31,19 +31,26 @@ class FluentdAccessLoggerImplTest : public testing::Test {
 public:
   FluentdAccessLoggerImplTest()
       : async_client_(new Tcp::AsyncClient::MockAsyncTcpClient()),
-        timer_(new Event::MockTimer(&dispatcher_)) {}
+        backoff_strategy_(new MockBackOffStrategy()),
+        flush_timer_(new Event::MockTimer(&dispatcher_)),
+        retry_timer_(new Event::MockTimer(&dispatcher_)) {}
 
-  void init(int buffer_size_bytes = 0, int max_connect_attempts = 1) {
+  void init(int buffer_size_bytes = 1, absl::optional<int> max_connect_attempts = absl::nullopt) {
     EXPECT_CALL(*async_client_, setAsyncTcpClientCallbacks(_));
-    EXPECT_CALL(*timer_, enableTimer(_, _));
+    EXPECT_CALL(*flush_timer_, enableTimer(_, _));
 
     config_.set_tag(tag_);
-    config_.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
-        max_connect_attempts);
+
+    if (max_connect_attempts.has_value()) {
+      config_.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
+          max_connect_attempts.value());
+    }
+
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     logger_ =
         std::make_unique<FluentdAccessLoggerImpl>(cluster_, Tcp::AsyncTcpClientPtr{async_client_},
-                                                  dispatcher_, config_, *stats_store_.rootScope());
+                                                  dispatcher_, config_, BackOffStrategyPtr{backoff_strategy_},
+                                                  *stats_store_.rootScope());
   }
 
   std::string getExpectedMsgpackPayload(int entries_count) {
@@ -67,9 +74,11 @@ public:
   std::vector<uint8_t> data_ = {10, 20};
   NiceMock<Upstream::MockThreadLocalCluster> cluster_;
   Tcp::AsyncClient::MockAsyncTcpClient* async_client_;
+  MockBackOffStrategy* backoff_strategy_;
   Stats::IsolatedStoreImpl stats_store_;
   Event::MockDispatcher dispatcher_;
-  Event::MockTimer* timer_;
+  Event::MockTimer* flush_timer_;
+  Event::MockTimer* retry_timer_;
   std::unique_ptr<FluentdAccessLoggerImpl> logger_;
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config_;
 };
@@ -91,8 +100,8 @@ TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfBufferLimitNotPassed) {
 }
 
 TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfDisconnectedByRemote) {
-  init();
-  EXPECT_CALL(*timer_, disableTimer());
+  init(1, 1);
+  EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
@@ -104,8 +113,8 @@ TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfDisconnectedByRemote) {
 }
 
 TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfDisconnectedByLocal) {
-  init();
-  EXPECT_CALL(*timer_, disableTimer());
+  init(1, 1);
+  EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
@@ -118,6 +127,8 @@ TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfDisconnectedByLocal) {
 
 TEST_F(FluentdAccessLoggerImplTest, LogSingleEntry) {
   init(); // Default buffer limit is 0 so single entry should be flushed immediately.
+  EXPECT_CALL(*backoff_strategy_, reset());
+  EXPECT_CALL(*retry_timer_, disableTimer());
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
     logger_->onEvent(Network::ConnectionEvent::Connected);
@@ -137,6 +148,8 @@ TEST_F(FluentdAccessLoggerImplTest, LogTwoEntries) {
   init(12); // First entry is 10 bytes, so first entry should not cause the logger to flush.
 
   // First log should not be flushed.
+  EXPECT_CALL(*backoff_strategy_, reset());
+  EXPECT_CALL(*retry_timer_, disableTimer());
   EXPECT_CALL(*async_client_, connected()).Times(0);
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
@@ -169,15 +182,22 @@ TEST_F(FluentdAccessLoggerImplTest, CallbacksTest) {
 }
 
 TEST_F(FluentdAccessLoggerImplTest, SuccessfulReconnect) {
-  init(0, 2);
+  init(1, 2);
+  EXPECT_CALL(*backoff_strategy_, nextBackOffMs()).WillOnce(Return(1));
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connect())
       .WillOnce(Invoke([this]() -> bool {
+        EXPECT_CALL(*backoff_strategy_, reset()).Times(0);
+        EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1), _));
+        EXPECT_CALL(*retry_timer_, disableTimer()).Times(0);
         logger_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
       }))
       .WillOnce(Invoke([this]() -> bool {
+        EXPECT_CALL(*backoff_strategy_, reset());
+        EXPECT_CALL(*retry_timer_, enableTimer(_, _)).Times(0);
+        EXPECT_CALL(*retry_timer_, disableTimer());
         logger_->onEvent(Network::ConnectionEvent::Connected);
         return true;
       }));
@@ -189,11 +209,18 @@ TEST_F(FluentdAccessLoggerImplTest, SuccessfulReconnect) {
       }));
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+  retry_timer_->invokeCallback();
 }
 
 TEST_F(FluentdAccessLoggerImplTest, ReconnectFailure) {
-  init(0, 2);
-  EXPECT_CALL(*timer_, disableTimer());
+  init(1, 2);
+
+  EXPECT_CALL(*backoff_strategy_, nextBackOffMs()).WillOnce(Return(1));
+  EXPECT_CALL(*backoff_strategy_, reset()).Times(0);
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1), _));
+  EXPECT_CALL(*retry_timer_, disableTimer()).Times(0);
+
+  EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect())
@@ -207,11 +234,18 @@ TEST_F(FluentdAccessLoggerImplTest, ReconnectFailure) {
       }));
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+  retry_timer_->invokeCallback();
 }
 
 TEST_F(FluentdAccessLoggerImplTest, TwoReconnects) {
-  init(0, 3);
-  EXPECT_CALL(*timer_, disableTimer());
+  init(1, 3);
+
+  EXPECT_CALL(*backoff_strategy_, nextBackOffMs()).WillOnce(Return(1)).WillOnce(Return(1));
+  EXPECT_CALL(*backoff_strategy_, reset()).Times(0);
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1), _)).Times(2);
+  EXPECT_CALL(*retry_timer_, disableTimer()).Times(0);
+
+  EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect())
@@ -229,22 +263,41 @@ TEST_F(FluentdAccessLoggerImplTest, TwoReconnects) {
       }));
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+  retry_timer_->invokeCallback();
+  retry_timer_->invokeCallback();
 }
 
-TEST_F(FluentdAccessLoggerImplTest, DisconnectOnNoHealthyUpstream) {
+TEST_F(FluentdAccessLoggerImplTest, RetryOnNoHealthyUpstream) {
   init();
-  EXPECT_CALL(*timer_, disableTimer());
+
+  EXPECT_CALL(*backoff_strategy_, nextBackOffMs()).WillOnce(Return(1));
+  EXPECT_CALL(*backoff_strategy_, reset()).Times(0);
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1), _));
+  EXPECT_CALL(*retry_timer_, disableTimer()).Times(0);
+
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect()).WillOnce(Return(false));
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
 
+TEST_F(FluentdAccessLoggerImplTest, NoWriteOnBufferFull) {
+  // Setting the buffer to 0 so new log will be thrown.
+  init(0);
+  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
+  EXPECT_CALL(*async_client_, connect()).Times(0);
+  EXPECT_CALL(*async_client_, connected()).Times(0);
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
+}
+
 class FluentdAccessLoggerCacheImplTest : public testing::Test {
 public:
-  FluentdAccessLoggerCacheImplTest() : logger_cache_(cluster_manager_, scope_, tls_) {}
-
   void init(bool second_logger = false) {
+    tls_.setDispatcher(&dispatcher_);
+    flush_timer_ = new Event::MockTimer(&dispatcher_);
+    retry_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*flush_timer_, enableTimer(_, _));
+
     async_client1_ = new Tcp::AsyncClient::MockAsyncTcpClient();
     EXPECT_CALL(*async_client1_, setAsyncTcpClientCallbacks(_));
 
@@ -252,9 +305,16 @@ public:
       async_client2_ = new Tcp::AsyncClient::MockAsyncTcpClient();
       EXPECT_CALL(*async_client2_, setAsyncTcpClientCallbacks(_));
     }
+
+    logger_cache_ = std::make_unique<FluentdAccessLoggerCacheImpl>(cluster_manager_, scope_, tls_);
   }
 
   std::string cluster_name_ = "test_cluster";
+  uint64_t time_ = 123;
+  std::vector<uint8_t> data_ = {10, 20};
+  Event::MockTimer* flush_timer_;
+  Event::MockTimer* retry_timer_;
+  Event::MockDispatcher dispatcher_;
   NiceMock<Upstream::MockThreadLocalCluster> cluster_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Tcp::AsyncClient::MockAsyncTcpClient* async_client1_;
@@ -262,7 +322,8 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Stats::Scope& scope_{*store_.rootScope()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  FluentdAccessLoggerCacheImpl logger_cache_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  std::unique_ptr<FluentdAccessLoggerCacheImpl> logger_cache_;
 };
 
 TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
@@ -276,7 +337,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
   config.set_cluster(cluster_name_);
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto logger = logger_cache_.getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config));
+  auto logger = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config),
+                                                 random_);
   EXPECT_TRUE(logger != nullptr);
 }
 
@@ -291,14 +353,16 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersSameHash) {
   config1.set_cluster(cluster_name_);
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
-  auto logger1 = logger_cache_.getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config1));
+  auto logger1 = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config1),
+                                                  random_);
   EXPECT_TRUE(logger1 != nullptr);
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config2;
   config2.set_cluster(cluster_name_); // config hash will be different than config1
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
-  auto logger2 = logger_cache_.getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config2));
+  auto logger2 = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config2),
+                                                  random_);
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got the same logger
@@ -319,18 +383,113 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   config1.set_cluster(cluster_name_);
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
-  auto logger1 = logger_cache_.getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config1));
+  auto logger1 = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config1),
+                                                  random_);
   EXPECT_TRUE(logger1 != nullptr);
+
+  Event::MockTimer* flush_timer2 = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* retry_timer2 = new Event::MockTimer(&dispatcher_);
+  UNREFERENCED_PARAMETER(retry_timer2);
+  EXPECT_CALL(*flush_timer2, enableTimer(_, _));
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config2;
   config2.set_cluster("different_cluster"); // config hash will be different than config1
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
-  auto logger2 = logger_cache_.getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config2));
+  auto logger2 = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config2),
+                                                  random_);
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got two different loggers
   EXPECT_NE(logger1, logger2);
+}
+
+TEST_F(FluentdAccessLoggerCacheImplTest, FixedBackOffStrategyConfig) {
+  init();
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
+  EXPECT_CALL(*async_client1_, connected()).WillOnce(Return(false));
+  EXPECT_CALL(*async_client1_, connect()).WillOnce(Return(false)).WillOnce(Return(false));
+  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
+    return Tcp::AsyncTcpClientPtr{async_client1_};
+  }));
+
+  envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
+  config.set_cluster(cluster_name_);
+  config.set_tag("test.tag");
+  config.mutable_buffer_size_bytes()->set_value(1);
+  config.mutable_retry_options()->set_backoff_strategy(FluentdAccessLogConfig::Fixed);
+  config.mutable_retry_options()->mutable_base_backoff_interval()->set_nanos(2000000);
+
+  auto logger = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config),
+                                                random_);
+  ASSERT_TRUE(logger != nullptr);
+
+  // Since the strategy is fixed, we expect the timer to be enabled twice with the same duration.
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2), _)).Times(2);
+  logger->log(std::make_unique<Entry>(time_, std::move(data_)));
+  retry_timer_->invokeCallback();
+}
+
+TEST_F(FluentdAccessLoggerCacheImplTest, JitteredLowerBoundBackOffStrategyConfig) {
+  init();
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
+  EXPECT_CALL(*async_client1_, connected()).WillOnce(Return(false));
+  EXPECT_CALL(*async_client1_, connect()).WillOnce(Return(false)).WillOnce(Return(false));
+  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
+    return Tcp::AsyncTcpClientPtr{async_client1_};
+  }));
+
+  envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
+  config.set_cluster(cluster_name_);
+  config.set_tag("test.tag");
+  config.mutable_buffer_size_bytes()->set_value(1);
+  config.mutable_retry_options()->set_backoff_strategy(FluentdAccessLogConfig::JitteredLowerBound);
+  config.mutable_retry_options()->mutable_base_backoff_interval()->set_nanos(4000000);
+
+  auto logger = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config),
+                                                random_);
+  ASSERT_TRUE(logger != nullptr);
+
+  // Since the strategy is JitteredLowerBound, we expect the timer to be enabled twice with a duration
+  // that is in the range of [4, 6).
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(123)); // Will add jitter of 1
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(5), _)).Times(2);
+  logger->log(std::make_unique<Entry>(time_, std::move(data_)));
+  retry_timer_->invokeCallback();
+}
+
+TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfig) {
+  init();
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
+  EXPECT_CALL(*async_client1_, connected()).WillOnce(Return(false));
+  EXPECT_CALL(*async_client1_, connect()).WillRepeatedly(Return(false));
+  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
+    return Tcp::AsyncTcpClientPtr{async_client1_};
+  }));
+
+  envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
+  config.set_cluster(cluster_name_);
+  config.set_tag("test.tag");
+  config.mutable_buffer_size_bytes()->set_value(1);
+  config.mutable_retry_options()->set_backoff_strategy(FluentdAccessLogConfig::JitteredExponential);
+  config.mutable_retry_options()->mutable_base_backoff_interval()->set_nanos(7000000);
+  config.mutable_retry_options()->mutable_max_backoff_interval()->set_nanos(20000000);
+
+  auto logger = logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config),
+                                                random_);
+  ASSERT_TRUE(logger != nullptr);
+
+  // Setting random so it doesn't add jitter
+  EXPECT_CALL(random_, random()).WillOnce(Return(6)).WillOnce(Return(13)).WillOnce(Return(19));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(6), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(13), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(19), _));
+  logger->log(std::make_unique<Entry>(time_, std::move(data_)));
+  retry_timer_->invokeCallback();
+  retry_timer_->invokeCallback();
 }
 
 class MockFluentdAccessLogger : public FluentdAccessLogger {
@@ -341,7 +500,7 @@ public:
 class MockFluentdAccessLoggerCache : public FluentdAccessLoggerCache {
 public:
   MOCK_METHOD(FluentdAccessLoggerSharedPtr, getOrCreateLogger,
-              (const FluentdAccessLogConfigSharedPtr));
+              (const FluentdAccessLogConfigSharedPtr, Random::RandomGenerator&));
 };
 
 class MockFluentdFormatter : public FluentdFormatter {
@@ -358,11 +517,12 @@ class FluentdAccessLogTest : public testing::Test {
 public:
   FluentdAccessLogTest() {
     ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_)).WillOnce(Return(logger_));
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _)).WillOnce(Return(logger_));
   }
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Random::MockRandomGenerator> random_;
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config_;
   MockFluentdFormatter* formatter_{new NiceMock<MockFluentdFormatter>()};
   std::shared_ptr<MockFluentdAccessLogger> logger_{new MockFluentdAccessLogger()};
@@ -372,7 +532,8 @@ public:
 TEST_F(FluentdAccessLogTest, CreateAndLog) {
   auto access_log =
       FluentdAccessLog(AccessLog::FilterPtr{filter_}, FluentdFormatterPtr{formatter_},
-                       std::make_shared<FluentdAccessLogConfig>(config_), tls_, logger_cache_);
+                       std::make_shared<FluentdAccessLogConfig>(config_), tls_, random_,
+                       logger_cache_);
 
   MockTimeSystem time_system;
   EXPECT_CALL(time_system, systemTime).WillOnce(Return(SystemTime(std::chrono::seconds(200))));

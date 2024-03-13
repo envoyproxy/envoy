@@ -24,16 +24,39 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.access_loggers.fluentd]
 // [#next-free-field: 8]
 message FluentdAccessLogConfig {
+  enum BackOffStrategy {
+    // Constructs fully jittered exponential backoff strategy.
+    // The backoff interval value will be in the range of [base_backoff_interval, max_backoff_interval).
+    JitteredExponential = 0;
+
+    // Constructs fully jittered backoff strategy based on the base_backoff_interval value.
+    // The backoff interval value will be in the range of [base_backoff_interval, 1.5 * base_backoff_interval).
+    JitteredLowerBound = 1;
+
+    // Constructs fixed backoff strategy based on the base_backoff_interval value.
+    Fixed = 2;
+  }
+
   message RetryOptions {
-    // The number of times the logger will attempt to connect to the upstream.
-    // The default value is 1, i.e. only a single connection attempt will be made and no reconnection
-    // attempts will be made if the initial connection had failed.
-    // Note: Reconnection attempts will also be made if the initial connection was established, and
-    // disconnected after some time.
-    // [#comment:TODO(ohadvano): add option to reconnect only if the initial handshake failed.]
-    // Caution: while attempting to reconnect, the log buffer may continue to fill. It is recommended
-    // to set this field to a reasonable number to avoid too many log records buffered.
+    // The number of times the logger will attempt to connect to the upstream during reconnects.
+    // By default, there is no limit. The logger will attempt to reconnect to the upstream each time
+    // connecting to the upstream failed or the upstream connection had been closed for any reason.
     google.protobuf.UInt32Value max_connect_attempts = 1;
+
+    // Sets the backoff strategy. Default value is JitteredExponential.
+    BackOffStrategy backoff_strategy = 2;
+
+    // The base interval to be used for the next back off computation. It should be greater than
+    // 1 millisecond and less than or equal to max_backoff_interval. The default value is 1 millisecond.
+    google.protobuf.Duration base_backoff_interval = 3 [(validate.rules).duration = {
+      gte {nanos: 1000000}
+    }];
+
+    // Specifies the maximum interval between retries. This parameter is optional,
+    // but must be greater than or equal to the base_backoff_interval if set. The default
+    // is 10 times the base_backoff_interval. This field only has effect if JitteredExponential backoff
+    // strategy is configured.
+    google.protobuf.Duration max_backoff_interval = 4 [(validate.rules).duration = {gt {}}];
   }
 
   // The upstream cluster to connect to for streaming the Fluentd messages.
@@ -80,6 +103,8 @@ message FluentdAccessLogConfig {
   //  }
   google.protobuf.Struct record = 6 [(validate.rules).message = {required: true}];
 
-  // Optional retry, in case upstream connection has failed.
+  // Optional retry, in case upstream connection has failed. If this field is not set, the default values will be applied,
+  // as specified in the :ref:`RetryOptions <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>`
+  // configuration.
   RetryOptions retry_options = 7;
 }

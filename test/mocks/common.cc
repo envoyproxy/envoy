@@ -10,6 +10,7 @@ MockCancellable::MockCancellable() = default;
 MockCancellable::~MockCancellable() = default;
 } // namespace ConnectionPool
 
+
 namespace Random {
 
 MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefault(Return(uuid_)); }
