@@ -240,7 +240,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
 
   List<String> quicCanonicalSuffixes() { return mQuicCanonicalSuffixes; }
 
-  public CronvoyEngineBuilderImpl enablePortMigration(bool enablePortMigration) {
+  public CronvoyEngineBuilderImpl enablePortMigration(boolean enablePortMigration) {
     mPortMigrationEnabled = enablePortMigration;
     return this;
   }
