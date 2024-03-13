@@ -57,7 +57,7 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
 
     if (max_interval_ms < base_interval_ms) {
       throw EnvoyException(
-         "max_backoff_interval must be greater or equal to base_backoff_interval");
+          "max_backoff_interval must be greater or equal to base_backoff_interval");
     }
   }
 

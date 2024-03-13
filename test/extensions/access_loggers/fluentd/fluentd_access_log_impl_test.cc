@@ -451,8 +451,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredLowerBoundBackOffStrategyConfig
       logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config), random_);
   ASSERT_TRUE(logger != nullptr);
 
-  // Since the strategy is JitteredLowerBound, we expect the timer to be enabled twice with a duration
-  // that is in the range of [4, 6).
+  // Since the strategy is JitteredLowerBound, we expect the timer to be enabled twice with a
+  // duration that is in the range of [4, 6).
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(123)); // Will add jitter of 1
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(5), _)).Times(2);
   logger->log(std::make_unique<Entry>(time_, std::move(data_)));

@@ -192,8 +192,8 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
     backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, random);
   } else if (strategy_type == FluentdAccessLogConfig::JitteredLowerBound) {
-    backoff_strategy = std::make_unique<JitteredLowerBoundBackOffStrategy>(
-        base_interval_ms, random);
+    backoff_strategy =
+        std::make_unique<JitteredLowerBoundBackOffStrategy>(base_interval_ms, random);
   } else if (strategy_type == FluentdAccessLogConfig::Fixed) {
     backoff_strategy = std::make_unique<FixedBackOffStrategy>(base_interval_ms);
   }
