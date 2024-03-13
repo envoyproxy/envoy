@@ -66,21 +66,14 @@ public:
       sub_matcher_.emplace(jwt_provider_.subjects());
     }
 
-    switch (jwt_provider_.lifetime_constraint_case()) {
-    case JwtProvider::kMaxLifetime: {
+    if (jwt_provider_.require_expiration()) {
+      max_exp_ = absl::InfiniteDuration();
+    }
+
+    if (jwt_provider_.has_max_lifetime()) {
+      // Intentionally overwrite previous max_exp_. max_lifetime takes precedence.
       max_exp_ = absl::Seconds(jwt_provider_.max_lifetime().seconds()) +
                  absl::Nanoseconds(jwt_provider_.max_lifetime().nanos());
-      break;
-    }
-    case JwtProvider::kRequireExpiration: {
-      if (jwt_provider_.require_expiration()) {
-        max_exp_ = absl::InfiniteDuration();
-      }
-      break;
-    }
-    case JwtProvider::LIFETIME_CONSTRAINT_NOT_SET:
-      // Do nothing if not set.
-      break;
     }
 
     bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
