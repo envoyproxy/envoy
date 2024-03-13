@@ -125,9 +125,8 @@ public:
   FluentdAccessLoggerCacheImpl(Upstream::ClusterManager& cluster_manager,
                                Stats::Scope& parent_scope, ThreadLocal::SlotAllocator& tls);
 
-  FluentdAccessLoggerSharedPtr
-  getOrCreateLogger(const FluentdAccessLogConfigSharedPtr config,
-                    Random::RandomGenerator& random) override;
+  FluentdAccessLoggerSharedPtr getOrCreateLogger(const FluentdAccessLogConfigSharedPtr config,
+                                                 Random::RandomGenerator& random) override;
 
 private:
   /**

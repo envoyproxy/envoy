@@ -21,13 +21,16 @@ FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& c
     : tag_(config.tag()), id_(dispatcher.name()),
       max_connect_attempts_(
           config.has_retry_options() && config.retry_options().has_max_connect_attempts()
-          ? absl::optional<uint32_t>(config.retry_options().max_connect_attempts().value()) : absl::nullopt),
+              ? absl::optional<uint32_t>(config.retry_options().max_connect_attempts().value())
+              : absl::nullopt),
       stats_scope_(parent_scope.createScope(config.stat_prefix())),
       fluentd_stats_(
           {ACCESS_LOG_FLUENTD_STATS(POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_))}),
       cluster_(cluster), backoff_strategy_(std::move(backoff_strategy)), client_(std::move(client)),
-      buffer_flush_interval_msec_(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs)),
-      max_buffer_size_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, DefaultMaxBufferSize)),
+      buffer_flush_interval_msec_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs)),
+      max_buffer_size_bytes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, DefaultMaxBufferSize)),
       retry_timer_(dispatcher.createTimer([this]() -> void { onBackoffCallback(); })),
       flush_timer_(dispatcher.createTimer([this]() {
         flush();
@@ -179,8 +182,9 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
   if (config->has_retry_options()) {
     base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options(), base_backoff_interval,
                                                   DefaultBaseBackoffIntervalMs);
-    max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options(), max_backoff_interval,
-                                                 base_interval_ms * DefaultMaxBackoffIntervalFactor);
+    max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options(), max_backoff_interval,
+                                   base_interval_ms * DefaultMaxBackoffIntervalFactor);
   }
 
   BackOffStrategyPtr backoff_strategy;
@@ -188,7 +192,8 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
     backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, random);
   } else if (strategy_type == FluentdAccessLogConfig::JitteredLowerBound) {
-    backoff_strategy = std::make_unique<JitteredLowerBoundBackOffStrategy>(base_interval_ms, random);
+    backoff_strategy = std::make_unique<JitteredLowerBoundBackOffStrategy>(
+        base_interval_ms, random);
   } else if (strategy_type == FluentdAccessLogConfig::Fixed) {
     backoff_strategy = std::make_unique<FixedBackOffStrategy>(base_interval_ms);
   }
@@ -208,7 +213,8 @@ FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatt
       config_(config), access_logger_cache_(access_logger_cache) {
   tls_slot_->set(
       [config = config_, &random, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
-        return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(config, random));
+        return std::make_shared<ThreadLocalLogger>(
+            access_logger_cache->getOrCreateLogger(config, random));
       });
 }
 

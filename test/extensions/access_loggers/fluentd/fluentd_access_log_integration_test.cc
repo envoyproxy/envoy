@@ -33,7 +33,9 @@ public:
   void init(const std::string cluster_name = default_cluster_name,
             bool flush_access_log_on_connected = false,
             absl::optional<uint32_t> buffer_size_bytes = absl::nullopt,
-            absl::optional<uint32_t> max_connect_attempts = 1) {
+            absl::optional<uint32_t> max_connect_attempts = 1,
+            absl::optional<uint64_t> base_backoff_interval = absl::nullopt,
+            absl::optional<uint64_t> max_backoff_interval = absl::nullopt) {
     setUpstreamCount(2);
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier(
@@ -68,6 +70,16 @@ public:
           if (max_connect_attempts.has_value()) {
             access_log_config.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
                 max_connect_attempts.value());
+          }
+
+          if (base_backoff_interval.has_value()) {
+            access_log_config.mutable_retry_options()->mutable_base_backoff_interval()->set_nanos(
+                base_backoff_interval.value() * 1000000);
+          }
+
+          if (max_backoff_interval.has_value()) {
+            access_log_config.mutable_retry_options()->mutable_max_backoff_interval()->set_nanos(
+                max_backoff_interval.value() * 1000000);
           }
 
           auto* record = access_log_config.mutable_record();
@@ -141,6 +153,12 @@ public:
 
 TEST_F(FluentdAccessLogIntegrationTest, UnknownCluster) {
   EXPECT_DEATH(init("unknown_cluster"), "");
+}
+
+TEST_F(FluentdAccessLogIntegrationTest, InvalidBackoffConfig) {
+  // Invalid config: min interval set to 30, max interval is set to 20.
+  EXPECT_DEATH(init(default_cluster_name, false, 1, 1, 30, 20),
+               "max_backoff_interval must be greater or equal to base_backoff_interval");
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, LogLostOnBufferFull) {

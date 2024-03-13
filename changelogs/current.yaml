@@ -259,7 +259,7 @@ new_features:
 - area: access_loggers
   change: |
     Added :ref:`retry options
-    <envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>` to Fluentd Access Logger to
+    <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>` to Fluentd Access Logger to
     support upstream reconnect options, backoff intervals.
 - area: tracing
   change: |
