@@ -124,8 +124,9 @@ private:
   template <class FactoryCtx, class FilterCfgFactory>
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactory(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-      const std::string&, FactoryCtx& context,
-      OptRef<Server::Configuration::FactoryContext> context_opt, FilterCfgFactory& factory);
+      const std::string&, ProtobufMessage::ValidationVisitor& validation,
+      OptRef<Server::Configuration::FactoryContext> context_opt, FactoryCtx& context,
+      FilterCfgFactory& factory);
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,

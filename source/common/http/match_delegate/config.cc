@@ -275,7 +275,8 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config.extension_config());
-  return createFilterFactory(proto_config, prefix, context, OptRef(context), factory);
+  return createFilterFactory(proto_config, prefix, context.messageValidationVisitor(),
+                             OptRef(context), context, factory);
 }
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFactoryFromProtoTyped(
@@ -285,17 +286,19 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::UpstreamHttpFilterConfigFactory>(
           proto_config.extension_config());
-  return createFilterFactory(proto_config, prefix, context, absl::nullopt, factory);
+  return createFilterFactory(proto_config, prefix,
+                             context.serverFactoryContext().messageValidationVisitor(),
+                             absl::nullopt, context, factory);
 }
 
 template <class FactoryCtx, class FilterCfgFactory>
 absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFactory(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-    const std::string& prefix, FactoryCtx& context,
-    OptRef<Server::Configuration::FactoryContext> context_opt, FilterCfgFactory& factory) {
+    const std::string& prefix, ProtobufMessage::ValidationVisitor& validation,
+    OptRef<Server::Configuration::FactoryContext> context_opt, FactoryCtx& context,
+    FilterCfgFactory& factory) {
   auto message = Config::Utility::translateAnyToFactoryConfig(
-      proto_config.extension_config().typed_config(),
-      context.serverFactoryContext().messageValidationVisitor(), factory);
+      proto_config.extension_config().typed_config(), validation, factory);
   auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, prefix, context);
   if (!filter_factory_or_error.ok()) {
     throwEnvoyExceptionOrPanic(std::string(filter_factory_or_error.status().message()));
