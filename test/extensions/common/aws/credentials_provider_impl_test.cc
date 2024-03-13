@@ -2100,6 +2100,8 @@ TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
       TestEnvironment::writeStringToFileForTest(token_file, TOKEN_FILE_CONTENTS, true, false);
 
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", token_file_path, 1);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(token_file_path))
+      .WillRepeatedly(Return(TOKEN_FILE_CONTENTS));
 
   expectDocument(200, std::move(R"EOF(
 {

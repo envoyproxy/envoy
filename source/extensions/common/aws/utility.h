@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
@@ -184,7 +185,8 @@ public:
    * @return The authorization token
    */
   static absl::optional<std::string>
-  getAuthorizationTokenFromEnvFile(const char* environment_variable);
+  getAuthorizationTokenFromEnvFile(const char* environment_variable,
+                                   Filesystem::Instance& filesystem);
 };
 
 } // namespace Aws

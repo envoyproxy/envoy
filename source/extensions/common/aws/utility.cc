@@ -478,16 +478,14 @@ std::string Utility::getConfigProfileName() {
 }
 
 absl::optional<std::string>
-Utility::getAuthorizationTokenFromEnvFile(const char* environment_variable) {
+Utility::getAuthorizationTokenFromEnvFile(const char* environment_variable,
+                                          Filesystem::Instance& filesystem) {
 
-  const auto token_file = absl::NullSafeStringView(std::getenv(environment_variable));
-  if (!token_file.empty()) {
-    std::ifstream file(token_file);
-    if (file.is_open()) {
-      std::string token;
-      std::getline(file, token);
-      if (!token.empty()) {
-        return token;
+  if (const auto token_file = std::getenv(environment_variable)) {
+    const auto token = filesystem.fileReadToEnd(std::string(token_file));
+    {
+      if (token.ok()) {
+        return token.value();
       }
     }
   }

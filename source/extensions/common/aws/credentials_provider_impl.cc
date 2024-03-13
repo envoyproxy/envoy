@@ -446,10 +446,13 @@ void ContainerRoleCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}", credential_uri_);
 
   // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
-  auto token = Utility::getAuthorizationTokenFromEnvFile(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE);
-  if (token.has_value()) {
-    ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
-    authorization_token_ = token.value();
+  if (context_.has_value()) {
+    auto token = Utility::getAuthorizationTokenFromEnvFile(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE,
+                                                           context_->api().fileSystem());
+    if (token.has_value()) {
+      ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
+      authorization_token_ = token.value();
+    }
   }
 
   absl::string_view host;
