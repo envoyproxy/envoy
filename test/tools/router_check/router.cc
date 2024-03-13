@@ -36,6 +36,8 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
     return "safe_regex";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
     return "contains";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kCustom:
+    return "custom";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
     return "match_pattern_not_set";
   }

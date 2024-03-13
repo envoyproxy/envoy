@@ -12,9 +12,9 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -435,6 +435,11 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
     *bootstrap.mutable_static_resources()->add_listeners() = listener;
   });
   initialize();
+
+  // Make sure worker threads are established (#32237).
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
+  EXPECT_TRUE(response->complete());
 
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
 

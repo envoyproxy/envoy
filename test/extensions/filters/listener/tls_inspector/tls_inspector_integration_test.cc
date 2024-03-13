@@ -8,9 +8,9 @@
 #include "source/common/config/api_version.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
+#include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"

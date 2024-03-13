@@ -151,6 +151,7 @@ protected:
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
   absl::optional<std::reference_wrapper<DecoderFilterWatermarkCallbacks>> watermark_callbacks_;
+  bool complete_{};
 
 private:
   void cleanup();

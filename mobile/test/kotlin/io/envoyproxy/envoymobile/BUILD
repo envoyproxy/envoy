@@ -43,8 +43,9 @@ envoy_mobile_kt_test(
     srcs = [
         "GRPCStreamTest.kt",
     ],
+    associates = ["//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib"],
     deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/kotlin/io/envoyproxy/envoymobile/mocks:mocks_lib",
     ],
 )
 

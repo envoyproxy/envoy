@@ -25,8 +25,6 @@ public:
   void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
   // Http::StreamEncoder
-  void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
@@ -89,10 +87,6 @@ private:
 
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  // Setting |http_datagram_handler_| enables HTTP Datagram support.
-  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
-#endif
 
   // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
   // It will be empty, when no such request is active.

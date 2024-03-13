@@ -102,6 +102,7 @@ bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
 }
 
 FilterStatus TrieMatchHandler::messageEnd() {
+  ASSERT(steps_ == 0);
   ENVOY_LOG(trace, "TrieMatchHandler messageEnd");
   parent_.handleOnMissing();
   complete_ = true;
@@ -109,13 +110,13 @@ FilterStatus TrieMatchHandler::messageEnd() {
 }
 
 FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
-  ENVOY_LOG(trace, "TrieMatchHandler structBegin id:{}",
-            last_field_id_.has_value() ? std::to_string(last_field_id_.value())
-                                       : "top_level_struct");
-  ASSERT(node_);
-  if (last_field_id_.has_value()) {
-    if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end()) {
-      node_ = node_->children_[last_field_id_.value()];
+  ENVOY_LOG(trace, "TrieMatchHandler structBegin id: {}, steps: {}",
+            field_ids_.empty() ? "top_level_struct" : std::to_string(field_ids_.back()), steps_);
+  ASSERT(steps_ >= 0);
+  assertNode();
+  if (!field_ids_.empty()) {
+    if (steps_ == 0 && node_->children_.find(field_ids_.back()) != node_->children_.end()) {
+      node_ = node_->children_[field_ids_.back()];
       ENVOY_LOG(trace, "name: {}", node_->name_);
     } else {
       steps_++;
@@ -125,8 +126,8 @@ FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
 }
 
 FilterStatus TrieMatchHandler::structEnd() {
-  ENVOY_LOG(trace, "TrieMatchHandler structEnd");
-  ASSERT(node_);
+  ENVOY_LOG(trace, "TrieMatchHandler structEnd, steps: {}", steps_);
+  assertNode();
   if (steps_ > 0) {
     steps_--;
   } else if (node_->parent_.lock()) {
@@ -135,41 +136,57 @@ FilterStatus TrieMatchHandler::structEnd() {
     // last decoder event
     node_ = nullptr;
   }
+  ASSERT(steps_ >= 0);
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::fieldBegin(absl::string_view, FieldType&, int16_t& field_id) {
-  last_field_id_ = field_id;
+  ENVOY_LOG(trace, "TrieMatchHandler fieldBegin id: {}", field_id);
+  field_ids_.push_back(field_id);
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::fieldEnd() {
-  last_field_id_.reset();
+  ENVOY_LOG(trace, "TrieMatchHandler fieldEnd");
+  field_ids_.pop_back();
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::stringValue(absl::string_view value) {
-  ASSERT(last_field_id_.has_value());
-  ENVOY_LOG(trace, "TrieMatchHandler stringValue id:{} value:{}", last_field_id_.value(), value);
+  assertLastFieldId();
+  ENVOY_LOG(trace, "TrieMatchHandler stringValue id:{} value:{}", field_ids_.back(), value);
   return handleString(static_cast<std::string>(value));
 }
 
 template <typename NumberType> FilterStatus TrieMatchHandler::numberValue(NumberType value) {
-  ASSERT(last_field_id_.has_value());
-  ENVOY_LOG(trace, "TrieMatchHandler numberValue id:{} value:{}", last_field_id_.value(), value);
+  assertLastFieldId();
+  ENVOY_LOG(trace, "TrieMatchHandler numberValue id:{} value:{}", field_ids_.back(), value);
   return handleString(std::to_string(value));
 }
 
 FilterStatus TrieMatchHandler::handleString(std::string value) {
-  ASSERT(node_);
-  ASSERT(last_field_id_.has_value());
-  if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end() &&
-      !node_->children_[last_field_id_.value()]->rule_ids_.empty()) {
-    auto on_present_node = node_->children_[last_field_id_.value()];
+  ASSERT(steps_ >= 0);
+  assertNode();
+  assertLastFieldId();
+  if (steps_ == 0 && node_->children_.find(field_ids_.back()) != node_->children_.end() &&
+      !node_->children_[field_ids_.back()]->rule_ids_.empty()) {
+    auto on_present_node = node_->children_[field_ids_.back()];
     ENVOY_LOG(trace, "name: {}", on_present_node->name_);
     parent_.handleOnPresent(std::move(value), on_present_node->rule_ids_);
   }
   return FilterStatus::Continue;
+}
+
+void TrieMatchHandler::assertNode() {
+  if (node_ == nullptr) {
+    throw EnvoyException("payload to metadata filter: invalid trie state, node is null");
+  }
+}
+
+void TrieMatchHandler::assertLastFieldId() {
+  if (field_ids_.empty()) {
+    throw EnvoyException("payload to metadata filter: invalid trie state, field_ids_ is null");
+  }
 }
 
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
@@ -301,6 +318,25 @@ FilterStatus PayloadToMetadataFilter::messageBegin(MessageMetadataSharedPtr meta
   return FilterStatus::Continue;
 }
 
+static std::string getHexRepresentation(Buffer::Instance& data) {
+  void* buf = data.linearize(static_cast<uint32_t>(data.length()));
+  const unsigned char* linearized_data = static_cast<const unsigned char*>(buf);
+  std::stringstream hex_stream;
+  for (uint32_t i = 0; i < data.length(); ++i) {
+    // Convert each byte to a two-digit hexadecimal representation
+    hex_stream << std::setfill('0') << std::setw(2) << std::hex
+               << static_cast<int>(linearized_data[i]);
+    if (i != data.length() - 1) {
+      // Append a space after each character except the last one
+      hex_stream << ' ';
+    }
+  }
+  std::string hex_representation = hex_stream.str();
+  std::transform(hex_representation.begin(), hex_representation.end(), hex_representation.begin(),
+                 ::toupper);
+  return hex_representation;
+}
+
 FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
   if (!matched_rule_ids_.empty()) {
     TrieMatchHandler handler(*this, config_->trieRoot());
@@ -312,8 +348,15 @@ FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
 
     DecoderStateMachinePtr state_machine =
         std::make_unique<DecoderStateMachine>(*protocol, metadata_, handler, handler);
-    state_machine->runPassthroughData(data_copy);
-
+    TRY_NEEDS_AUDIT { state_machine->runPassthroughData(data_copy); }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      IS_ENVOY_BUG(fmt::format("decoding error, error_message: {}, payload: {}", e.what(),
+                               getHexRepresentation(data)));
+      if (!handler.isComplete()) {
+        handleOnMissing();
+      }
+    });
     finalizeDynamicMetadata();
   }
 

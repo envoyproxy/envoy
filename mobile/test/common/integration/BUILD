@@ -18,6 +18,14 @@ envoy_cc_test(
         # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            # For the TestProxyResolutionApi test.
+            "-Wl,-framework,CoreFoundation",
+            "-Wl,-framework,CFNetwork",
+        ],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     shard_count = 6,
     deps = [
@@ -104,9 +112,9 @@ envoy_cc_test(
     deps = [
         ":xds_integration_test_lib",
         "@envoy//source/common/config:protobuf_link_hacks",
+        "@envoy//source/common/tls:context_config_lib",
+        "@envoy//source/common/tls:context_lib",
         "@envoy//source/extensions/transport_sockets/tls:config",
-        "@envoy//source/extensions/transport_sockets/tls:context_config_lib",
-        "@envoy//source/extensions/transport_sockets/tls:context_lib",
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -199,10 +207,10 @@ envoy_cc_test_library(
     deps = [
         ":base_client_integration_test_lib",
         "@envoy//source/common/event:libevent_lib",
+        "@envoy//source/common/tls:context_config_lib",
+        "@envoy//source/common/tls:context_lib",
+        "@envoy//source/common/tls:ssl_socket_lib",
         "@envoy//source/exe:process_wide_lib",
-        "@envoy//source/extensions/transport_sockets/tls:context_config_lib",
-        "@envoy//source/extensions/transport_sockets/tls:context_lib",
-        "@envoy//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",

@@ -1,5 +1,9 @@
 #include "engine_builder.h"
 
+#include <stdint.h>
+#include <sys/socket.h>
+
+#include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
@@ -31,8 +35,20 @@
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
 
+#if defined(__APPLE__)
+#include "library/common/network/apple_proxy_resolution.h"
+#endif
+
 namespace Envoy {
 namespace Platform {
+
+namespace {
+
+// This is the same value Cronet uses for QUIC:
+// https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
+constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
+
+} // namespace
 
 #ifdef ENVOY_MOBILE_XDS
 XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
@@ -130,6 +146,11 @@ EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>())
 
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   log_level_ = log_level;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setLogger(envoy_logger envoy_logger) {
+  envoy_logger_.emplace(envoy_logger);
   return *this;
 }
 
@@ -361,6 +382,13 @@ EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.emplace_back(std::move(guard), value);
   return *this;
 }
+
+#if defined(__APPLE__)
+EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
+  respect_system_proxy_settings_ = value;
+  return *this;
+}
+#endif
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
   // The yaml utilities have non-relevant thread asserts.
@@ -750,10 +778,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           ->set_value(4);
     }
 
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_idle_network_timeout()
+        ->set_seconds(30);
+
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
             .PackFrom(alpn_options);
+
+    // Set the upstream connections socket receive buffer size. The operating system defaults are
+    // usually too small for QUIC.
+    // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
+    // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
+    // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
+    // we've tested, IPPROTO_UDP cannot be used as a level for the SO_RCVBUF option.
+    envoy::config::core::v3::SocketOption* sock_opt =
+        base_cluster->mutable_upstream_bind_config()->add_socket_options();
+    sock_opt->set_name(SO_RCVBUF);
+    sock_opt->set_level(SOL_SOCKET);
+    sock_opt->set_int_value(SocketReceiveBufferSize);
+    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", SocketReceiveBufferSize, " bytes"));
   }
 
   // Set up stats.
@@ -771,6 +818,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
+  list->add_patterns()->set_contains("quic_connection_close_error_code");
+  list->add_patterns()->set_contains("quic_reset_stream_error_code");
   bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
 
   // Set up watchdog
@@ -803,12 +852,20 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   ProtobufWkt::Struct envoy_layer;
   ProtobufWkt::Struct& runtime_values =
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
-  ProtobufWkt::Struct& flags =
+  ProtobufWkt::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
   for (auto& guard_and_value : runtime_guards_) {
-    (*flags.mutable_fields())[guard_and_value.first].set_bool_value(guard_and_value.second);
+    (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
+        guard_and_value.second);
   }
-  (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  ProtobufWkt::Struct& restart_features =
+      *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
+  // TODO(abeyad): This runtime flag is set because https://github.com/envoyproxy/envoy/pull/32370
+  // needed to be merged with the default off due to unresolved test issues. Once those are fixed,
+  // and the default for `allow_client_socket_creation_failure` is true, we can remove this.
+  (*restart_features.mutable_fields())["allow_client_socket_creation_failure"].set_bool_value(true);
+
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
@@ -842,8 +899,9 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  Envoy::InternalEngine* envoy_engine =
-      new Envoy::InternalEngine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
+  Envoy::InternalEngine* envoy_engine = new Envoy::InternalEngine(
+      callbacks_->asEnvoyEngineCallbacks(),
+      (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -863,16 +921,22 @@ EngineSharedPtr EngineBuilder::build() {
     }
   }
 
+#if defined(__APPLE__)
+  if (respect_system_proxy_settings_) {
+    registerAppleProxyResolver();
+  }
+#endif
+
   Engine* engine = new Engine(envoy_engine);
 
-  auto options = std::make_unique<Envoy::OptionsImplBase>();
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
   if (bootstrap) {
     options->setConfigProto(std::move(bootstrap));
   }
   ENVOY_BUG(options->setLogLevel(logLevelToString(log_level_)).ok(), "invalid log level");
   options->setConcurrency(1);
-  envoy_engine->run(std::move(options));
+  envoy_engine->run(options);
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

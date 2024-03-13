@@ -52,6 +52,7 @@ expect_ok -c "${TEST_SRCDIR}/envoy/test/config/integration/empty.yaml" --mode va
 
 start_test "Launching envoy with empty config."
 run_in_background_saving_pid "${ENVOY_BIN}" -c "${TEST_SRCDIR}/envoy/test/config/integration/empty.yaml" --use-dynamic-base-id
+# binary instrumented with coverage is linked dynamically and takes a long time to start.
 sleep 120
 kill "${BACKGROUND_PID}"
 wait "${BACKGROUND_PID}"

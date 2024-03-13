@@ -9,6 +9,7 @@ import "envoy/type/v3/http_status.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -56,7 +57,7 @@ service ExternalProcessor {
 
 // This represents the different types of messages that Envoy can send
 // to an external processing server.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ProcessingRequest {
   // Specify whether the filter that sent this request is running in synchronous
   // or asynchronous mode. The choice of synchronous or asynchronous mode
@@ -112,6 +113,12 @@ message ProcessingRequest {
 
   // Dynamic metadata associated with the request.
   config.core.v3.Metadata metadata_context = 8;
+
+  // The values of properties selected by the ``request_attributes``
+  // or ``response_attributes`` list in the configuration. Each entry
+  // in the list is populated from the standard
+  // :ref:`attributes <arch_overview_attributes>` supported across Envoy.
+  map<string, google.protobuf.Struct> attributes = 9;
 }
 
 // For every ProcessingRequest received by the server with the ``async_mode`` field
@@ -204,12 +211,11 @@ message HttpHeaders {
   config.core.v3.HeaderMap headers = 1;
 
   // [#not-implemented-hide:]
-  // The values of properties selected by the ``request_attributes``
-  // or ``response_attributes`` list in the configuration. Each entry
-  // in the list is populated
-  // from the standard :ref:`attributes <arch_overview_attributes>`
-  // supported across Envoy.
-  map<string, google.protobuf.Struct> attributes = 2;
+  // This field is deprecated and not implemented. Attributes will be sent in
+  // the  top-level :ref:`attributes <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.attributes`
+  // field.
+  map<string, google.protobuf.Struct> attributes = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // If true, then there is no message body associated with this
   // request or response.

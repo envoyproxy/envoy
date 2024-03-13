@@ -122,6 +122,60 @@ public:
   addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
                            const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
                            absl::string_view uri);
+
+  /**
+   * @brief Retrieve an environment variable if set, otherwise return default_value
+   *
+   * @param variable_name Environment variable.
+   * @param default_value Value to be returned if environment variable is not set.
+   * @return The evaluation result.
+   */
+  static std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                                     const std::string& default_value);
+
+  /**
+   * @brief Given a profile name and a file containing profile elements, such as config or
+   * credentials, retrieve all elements in the elements map
+   *
+   * @param profile_file path to the file to search for elements.
+   * @param profile_name the profile section to search.
+   * @param elements a hash map of elements to search for. values will be replaced if found.
+   * @return true if profile file could be read and searched.
+   * @return false if profile file could not be read.
+   */
+  static bool resolveProfileElements(const std::string& profile_file,
+                                     const std::string& profile_name,
+                                     absl::flat_hash_map<std::string, std::string>& elements);
+
+  /**
+   * @brief Return the path of AWS credential file, following environment variable expansions
+   *
+   * @return File path of the AWS credential file.
+   */
+  static std::string getCredentialFilePath();
+
+  /**
+   * @brief Return the path of AWS config file, following environment variable expansions
+   *
+   * @return File path of the AWS config file.
+   */
+  static std::string getConfigFilePath();
+
+  /**
+   * @brief Return the AWS profile string within a config file, following environment variable
+   * expansions
+   *
+   * @return Name of the profile string.
+   */
+  static std::string getConfigProfileName();
+
+  /**
+   * @brief Return the AWS profile string within a credentials file, following environment variable
+   * expansions
+   *
+   * @return Name of the profile string.
+   */
+  static std::string getCredentialProfileName();
 };
 
 } // namespace Aws

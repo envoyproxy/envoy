@@ -31,9 +31,11 @@ public:
     // TODO(botengyao): Remove the file_ creation here into the file based health check
     // event sink. In this way you can remove the file_ based code from the createHealthCheckEvent
     if (!health_check_config.event_log_path().empty() /* deprecated */) {
-      file_ = context.serverFactoryContext().accessLogManager().createAccessLog(
+      auto file_or_error = context.serverFactoryContext().accessLogManager().createAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File,
                                       health_check_config.event_log_path()});
+      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      file_ = file_or_error.value();
     }
     for (const auto& config : health_check_config.event_logger()) {
       auto& factory = Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);

@@ -63,6 +63,11 @@ The following lists the filter state object keys used by the Envoy extensions:
   A special generic string object factory, to be used as a :ref:`factory lookup key
   <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
 
+``envoy.tcp_proxy.per_connection_idle_timeout_ms``
+  :ref:`TCP proxy idle timeout duration
+  <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>` override on a per-connection
+  basis. Accepts a count of milliseconds number string as a constructor.
+
 Filter state object fields
 --------------------------
 

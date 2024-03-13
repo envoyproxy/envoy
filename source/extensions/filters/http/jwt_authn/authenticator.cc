@@ -241,6 +241,13 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
+  const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);
+
+  if (!sub_allowed) {
+    doneWithStatus(Status::JwtVerificationFail);
+    return;
+  }
+
   if (use_jwt_cache) {
     handleGoodJwt(/*cache_hit=*/true);
     return;
@@ -405,7 +412,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
 void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload) {
   const auto& provider = jwks_data_->getJwtProvider();
   const auto& normalize = provider.normalize_payload_in_metadata();
-  if (normalize.space_delimited_claims().size() == 0) {
+  if (normalize.space_delimited_claims().empty()) {
     set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_payload);
   }
   // Make a temporary copy to normalize the JWT struct.

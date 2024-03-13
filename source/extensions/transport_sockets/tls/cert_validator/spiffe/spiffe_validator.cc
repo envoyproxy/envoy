@@ -15,10 +15,10 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
-#include "source/extensions/transport_sockets/tls/stats.h"
-#include "source/extensions/transport_sockets/tls/utility.h"
+#include "source/common/tls/cert_validator/factory.h"
+#include "source/common/tls/cert_validator/utility.h"
+#include "source/common/tls/stats.h"
+#include "source/common/tls/utility.h"
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -61,7 +61,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
           "Multiple trust bundles are given for one trust domain for ", domain.name()));
     }
 
-    auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
+    auto cert = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(domain.trust_bundle(), true, config->api()), std::string);
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(

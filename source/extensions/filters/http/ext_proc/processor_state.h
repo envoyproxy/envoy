@@ -15,6 +15,7 @@
 #include "source/common/common/logger.h"
 
 #include "absl/status/status.h"
+#include "matching_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -134,8 +135,12 @@ public:
     return body_mode_;
   }
 
+  void setRequestHeaders(Http::RequestHeaderMap* headers) { request_headers_ = headers; }
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
+  const Http::RequestHeaderMap* requestHeaders() const { return request_headers_; };
+  virtual const Http::RequestOrResponseHeaderMap* responseHeaders() const PURE;
+  const Http::HeaderMap* responseTrailers() const { return trailers_; }
 
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
@@ -202,6 +207,14 @@ public:
 
   virtual Http::StreamFilterCallbacks* callbacks() const PURE;
 
+  virtual bool sendAttributes(const ExpressionManager& mgr) const PURE;
+
+  void setSentAttributes(bool sent) { attributes_sent_ = sent; }
+
+  virtual ProtobufWkt::Struct
+  evaluateAttributes(const ExpressionManager& mgr,
+                     const Filters::Common::Expr::Activation& activation) const PURE;
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
@@ -236,6 +249,10 @@ protected:
   // The specific mode for body handling
   envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode_;
 
+  // The request_headers_ field is guaranteed to hold the pointer to the request
+  // headers as set in decodeHeaders. This allows both decoding and encoding states
+  // to have access to the request headers map.
+  Http::RequestHeaderMap* request_headers_ = nullptr;
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
@@ -249,6 +266,9 @@ protected:
   const std::vector<std::string>* untyped_forwarding_namespaces_{};
   const std::vector<std::string>* typed_forwarding_namespaces_{};
   const std::vector<std::string>* untyped_receiving_namespaces_{};
+
+  // If true, the attributes for this processing state have already been sent.
+  bool attributes_sent_{};
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
@@ -323,6 +343,17 @@ public:
   void clearWatermark() override;
 
   Http::StreamFilterCallbacks* callbacks() const override { return decoder_callbacks_; }
+
+  bool sendAttributes(const ExpressionManager& mgr) const override {
+    return !attributes_sent_ && mgr.hasRequestExpr();
+  }
+
+  const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return nullptr; }
+  ProtobufWkt::Struct
+  evaluateAttributes(const ExpressionManager& mgr,
+                     const Filters::Common::Expr::Activation& activation) const override {
+    return mgr.evaluateRequestAttributes(activation);
+  }
 
 private:
   void setProcessingModeInternal(
@@ -403,6 +434,18 @@ public:
   void clearWatermark() override;
 
   Http::StreamFilterCallbacks* callbacks() const override { return encoder_callbacks_; }
+
+  bool sendAttributes(const ExpressionManager& mgr) const override {
+    return !attributes_sent_ && mgr.hasResponseExpr();
+  }
+
+  const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return headers_; }
+
+  ProtobufWkt::Struct
+  evaluateAttributes(const ExpressionManager& mgr,
+                     const Filters::Common::Expr::Activation& activation) const override {
+    return mgr.evaluateResponseAttributes(activation);
+  }
 
 private:
   void setProcessingModeInternal(

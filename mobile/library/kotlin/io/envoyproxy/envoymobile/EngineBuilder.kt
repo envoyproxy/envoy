@@ -112,7 +112,7 @@ open class XdsBuilder(internal val xdsServerAddress: String, internal val xdsSer
    *   made of its exact value.
    * @return this builder.
    */
-  public fun addClusterDiscoveryService(
+  fun addClusterDiscoveryService(
     cdsResourcesLocator: String? = null,
     timeoutInSeconds: Int = DEFAULT_XDS_TIMEOUT_IN_SECONDS
   ): XdsBuilder {

@@ -64,6 +64,14 @@ public:
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+
+    ON_CALL(decoder_callbacks_.stream_info_, dynamicMetadata())
+        .WillByDefault(
+            Invoke([&]() -> envoy::config::core::v3::Metadata& { return filter_metadata_; }));
+  }
+
+  void setFilterMetadata(const envoy::config::core::v3::Metadata& metadata) {
+    filter_metadata_.CopyFrom(metadata);
   }
 
   NiceMock<Runtime::MockLoader> runtime_;
@@ -71,6 +79,9 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
+
+  // Returned by mock decoder_callbacks_.stream_info_.dynamicMetadata()
+  envoy::config::core::v3::Metadata filter_metadata_;
 };
 
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
@@ -106,10 +117,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   // Set metadata context.
-  envoy::config::core::v3::Metadata metadata = input.filter_metadata();
+  mocks.setFilterMetadata(input.filter_metadata());
 
-  ON_CALL(mocks.decoder_callbacks_.stream_info_, dynamicMetadata())
-      .WillByDefault(testing::ReturnRef(metadata));
   // Set check result default action.
   envoy::service::auth::v3::CheckRequest check_request;
   ON_CALL(*client, check(_, _, _, _))

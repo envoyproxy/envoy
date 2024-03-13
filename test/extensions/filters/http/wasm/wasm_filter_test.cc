@@ -2117,6 +2117,24 @@ TEST_P(WasmHttpFilterTest, CloseResponse) {
   EXPECT_EQ(proxy_wasm::FilterHeadersStatus::Continue, filter().onResponseHeaders(0, false));
 }
 
+TEST_P(WasmHttpFilterTest, VerifySignature) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(patricio78): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "verify_signature");
+  setupFilter();
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info, Eq(absl::string_view("signature is valid"))));
+
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::err, Eq(absl::string_view("unknown is not supported."))));
+  EXPECT_CALL(rootContext(), log_(spdlog::level::err,
+                                  Eq(absl::string_view("Failed to initialize digest verify."))))
+      .Times(2);
+  rootContext().onTick(0);
+}
+
 } // namespace Wasm
 } // namespace HttpFilters
 } // namespace Extensions
