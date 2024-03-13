@@ -829,7 +829,12 @@ TEST(PacketLoss, LossTest) {
   NiceMock<MockUdpPacketProcessor> processor;
   MonotonicTime time(std::chrono::seconds(0));
   uint32_t packets_dropped = 0;
-  Utility::readFromSocket(handle, *address, processor, time, false, &packets_dropped);
+  UdpRecvMsgMethod recv_msg_method = UdpRecvMsgMethod::RecvMsg;
+  if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
+    recv_msg_method = UdpRecvMsgMethod::RecvMmsg;
+  }
+
+  Utility::readFromSocket(handle, *address, processor, time, recv_msg_method, &packets_dropped);
   EXPECT_EQ(1, packets_dropped);
 
   // Send another packet.
@@ -837,7 +842,7 @@ TEST(PacketLoss, LossTest) {
                                         reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Make sure the drop count is now 2.
-  Utility::readFromSocket(handle, *address, processor, time, false, &packets_dropped);
+  Utility::readFromSocket(handle, *address, processor, time, recv_msg_method, &packets_dropped);
   EXPECT_EQ(2, packets_dropped);
 }
 #endif

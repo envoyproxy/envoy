@@ -11,15 +11,11 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
     This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
     be flushed to stat sinks.
-- area: eds
+- area: http2
   change: |
-    Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
-    Prior to this change, Envoy required that EDS assignments were sent after an EDS cluster was updated.
-    If no EDS assignment was received for the cluster, it ended up with an empty assignment.
-    Following this change, after a cluster update, Envoy waits for an EDS assignment until
-    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
-    the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
-    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
+    requests and responses. A number of users have reported issues with oghttp2 including issue 32611 and issue 32401 This behavior
+    can be reverted by setting the feature to ``true``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -68,6 +64,21 @@ minor_behavior_changes:
   change: |
     Add more conversion in the proxy status utility. It can be disabled by the runtime guard
     ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
+- area: http2
+  change: |
+    Simplifies integration with the codec by removing translation between nghttp2 callbacks and Http2VisitorInterface events.
+    Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
+- area: http3
+  change: |
+    Use GRO (Generic Receive Offload) for reading packets from a client QUIC UDP socket. See
+    https://www.kernel.org/doc/html/next/networking/segmentation-offloads.html for a description of
+    GRO. This behavior change can be reverted by setting
+    ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to ``false``.
+- area: http3
+  change: |
+    Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
+    is not set or not supported. recvmsg will be used instead. This behavior change can be
+    reverted by setting ``envoy.reloadable_features.disallow_quic_client_udp_mmsg`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -148,6 +159,10 @@ bug_fixes:
 - area: tracing
   change: |
     Dynatrace resource detector: Only log warning message when no enrichment attributes are found.
+- area: oauth
+  change: |
+    When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
+    another Cookie header.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -268,6 +283,10 @@ new_features:
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
     Envoy is under pressure, typically memory.
+- area: string matcher
+  change: |
+    Added an :ref:`extension point for custom string matcher implementations <envoy_v3_api_field_type.matcher.v3.StringMatcher.custom>`.
+    An implementation for :ref:`running a Lua script <envoy_v3_api_msg_extensions.string_matcher.lua.v3.Lua>` is included.
 - area: overload
   change: |
     added a :ref:`configuration option
@@ -279,6 +298,26 @@ new_features:
 - area: tracing
   change: |
     Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
+- area: http
+  change: |
+    Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
+- area: tracing
+  change: |
+    Added support for variant span attribute type for the OpenTelemetry tracer.
+- area: oauth
+  change: |
+    :ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>`
+    to support disabling authorization redirects for specific requests, e.g. AJAX requests.
+- area: jwt_authn
+  change: |
+    Added
+    :ref:`subjects <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.subjects>` to allow restrictions
+    of subjects a ``JwtProvider`` can assert.
+- area: aws_request_signing
+  change: |
+    Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
+    by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
+    configuration section.
 
 deprecated:
 - area: listener

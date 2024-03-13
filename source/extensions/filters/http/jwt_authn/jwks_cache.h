@@ -12,6 +12,7 @@
 #include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 
+#include "absl/strings/string_view.h"
 #include "jwt_verify_lib/jwks.h"
 
 namespace Envoy {
@@ -54,6 +55,9 @@ public:
 
     // Check if a list of audiences are allowed.
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
+
+    // Check if a subject is allowed.
+    virtual bool isSubjectAllowed(absl::string_view sub) const PURE;
 
     // Get the cached config: JWT rule.
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
