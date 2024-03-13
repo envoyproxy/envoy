@@ -278,7 +278,7 @@ public:
     ASSERT(address_list_->empty() || *address_list_->front() == *address_);
   }
 
-  std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>
+  const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>
   copyAddressestoMem(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     auto address_list_ptr =
         std::make_shared<std::vector<Network::Address::InstanceConstSharedPtr>>();
