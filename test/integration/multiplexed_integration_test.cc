@@ -293,7 +293,6 @@ public:
             protocol_options.mutable_explicit_http_config()
                 ->mutable_http2_protocol_options()
                 ->set_allow_metadata(true);
-
           }
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
@@ -302,7 +301,8 @@ public:
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
           hcm.mutable_http2_protocol_options()->set_allow_metadata(true);
-          hcm.mutable_http3_protocol_options()->set_allow_metadata(true); });
+          hcm.mutable_http3_protocol_options()->set_allow_metadata(true);
+        });
   }
 
   void testRequestMetadataWithStopAllFilter();
@@ -311,9 +311,7 @@ public:
 
   void runHeaderOnlyTest(bool send_request_body, size_t body_size);
 
-  Http::CodecClient::Type upstreamProtocol() {
-    return GetParam().upstream_protocol;
-  }
+  Http::CodecClient::Type upstreamProtocol() { return GetParam().upstream_protocol; }
 
 protected:
   // Utility function to prepend filters. Note that the filters
@@ -590,13 +588,13 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   EXPECT_EQ(4, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers, 100-continue and data.
-  response =
-      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                        {":path", "/dynamo/url"},
-                                                                        {":scheme", "http"},
-                                                                        {":authority", "sni.lyft.com"},
-                                                                        {"expect", "100-contINUE"}},
-                                         10);
+  response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"expect", "100-contINUE"}},
+      10);
 
   waitForNextUpstreamRequest();
   upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});

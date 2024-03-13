@@ -184,7 +184,6 @@ protected:
   std::unique_ptr<Http::MetadataMap>
   metadataMapFromHeaderList(const quic::QuicHeaderList& header_list);
 
-
   // Returns true if the cumulative limit on METADATA headers has been reached
   // after adding `bytes`.
   bool mustRejectMetadata(size_t bytes) {
