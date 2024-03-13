@@ -1033,7 +1033,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
     ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
   }
 
-  Api::MockOsSysCalls os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
   if (supports_getifaddrs) {

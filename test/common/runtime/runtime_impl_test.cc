@@ -94,8 +94,9 @@ public:
 
     envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;
     Config::translateRuntime(runtime, layered_runtime);
+    absl::Status creation_status;
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                           generator_, validation_visitor_, *api_);
+                                           generator_, validation_visitor_, *api_, creation_status);
   }
 
   void write(const std::string& path, const std::string& value) {
@@ -287,7 +288,7 @@ TEST_F(DiskLoaderImplTest, GetLayers) {
   EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
   EXPECT_TRUE(layers[3]->values().empty());
 
-  loader_->mergeValues({{"foo", "bar"}});
+  ASSERT_TRUE(loader_->mergeValues({{"foo", "bar"}}).ok());
   // The old snapshot and its layers should have been invalidated. Refetch.
   const auto& new_layers = loader_->snapshot().getLayers();
   EXPECT_EQ("bar", new_layers[3]->values().find("foo")->second.raw_string_value_);
@@ -336,7 +337,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
 
   // Smoke test integer value of 0, should be interpreted as 0%
   {
-    loader_->mergeValues({{"foo", "0"}});
+    ASSERT_TRUE(loader_->mergeValues({{"foo", "0"}}).ok());
 
     EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 0));
     EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 5));
@@ -344,7 +345,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
 
   // Smoke test integer value of 5, should be interpreted as 5%
   {
-    loader_->mergeValues({{"foo", "5"}});
+    ASSERT_TRUE(loader_->mergeValues({{"foo", "5"}}).ok());
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 4));
     EXPECT_FALSE(loader_->snapshot().featureEnabled("foo", default_value, 5));
@@ -361,7 +362,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
     // not the uint32 conversion is handled properly.
     uint64_t high_value = 1ULL << 60;
     std::string high_value_str = std::to_string(high_value);
-    loader_->mergeValues({{"foo", high_value_str}});
+    ASSERT_TRUE(loader_->mergeValues({{"foo", high_value_str}}).ok());
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 50));
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 100));
@@ -375,32 +376,32 @@ void testNewOverrides(Loader& loader, Stats::TestUtil::TestStore& store) {
       store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
   // New string.
-  loader.mergeValues({{"foo", "bar"}});
+  ASSERT_TRUE(loader.mergeValues({{"foo", "bar"}}).ok());
   EXPECT_EQ("bar", loader.snapshot().get("foo").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new string.
-  loader.mergeValues({{"foo", ""}});
+  ASSERT_TRUE(loader.mergeValues({{"foo", ""}}).ok());
   EXPECT_FALSE(loader.snapshot().get("foo").has_value());
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // New integer.
-  loader.mergeValues({{"baz", "42"}});
+  ASSERT_TRUE(loader.mergeValues({{"baz", "42"}}).ok());
   EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new integer.
-  loader.mergeValues({{"baz", ""}});
+  ASSERT_TRUE(loader.mergeValues({{"baz", ""}}).ok());
   EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // New double.
-  loader.mergeValues({{"beep", "42.1"}});
+  ASSERT_TRUE(loader.mergeValues({{"beep", "42.1"}}).ok());
   EXPECT_EQ(42.1, loader.snapshot().getDouble("beep", 1.2));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new double.
-  loader.mergeValues({{"beep", ""}});
+  ASSERT_TRUE(loader.mergeValues({{"beep", ""}}).ok());
   EXPECT_EQ(1.2, loader.snapshot().getDouble("beep", 1.2));
   EXPECT_EQ(0, admin_overrides_active.value());
 }
@@ -413,42 +414,42 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
       store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
   // Override string
-  loader_->mergeValues({{"file2", "new world"}});
+  ASSERT_TRUE(loader_->mergeValues({{"file2", "new world"}}).ok());
   EXPECT_EQ("new world", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden string
-  loader_->mergeValues({{"file2", ""}});
+  ASSERT_TRUE(loader_->mergeValues({{"file2", ""}}).ok());
   EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override integer
-  loader_->mergeValues({{"file3", "42"}});
+  ASSERT_TRUE(loader_->mergeValues({{"file3", "42"}}).ok());
   EXPECT_EQ(42, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden integer
-  loader_->mergeValues({{"file3", ""}});
+  ASSERT_TRUE(loader_->mergeValues({{"file3", ""}}).ok());
   EXPECT_EQ(2, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override double
-  loader_->mergeValues({{"file_with_double", "42.1"}});
+  ASSERT_TRUE(loader_->mergeValues({{"file_with_double", "42.1"}}).ok());
   EXPECT_EQ(42.1, loader_->snapshot().getDouble("file_with_double", 1.1));
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden double
-  loader_->mergeValues({{"file_with_double", ""}});
+  ASSERT_TRUE(loader_->mergeValues({{"file_with_double", ""}}).ok());
   EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override override string
-  loader_->mergeValues({{"file1", "hello overridden override"}});
+  ASSERT_TRUE(loader_->mergeValues({{"file1", "hello overridden override"}}).ok());
   EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden override string
-  loader_->mergeValues({{"file1", ""}});
+  ASSERT_TRUE(loader_->mergeValues({{"file1", ""}}).ok());
   EXPECT_EQ("hello override", loader_->snapshot().get("file1").value().get());
   EXPECT_EQ(0, admin_overrides_active.value());
   EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport)
@@ -472,14 +473,14 @@ TEST_F(DiskLoaderImplTest, LayersOverride) {
   EXPECT_EQ("thing", loader_->snapshot().get("some").value().get());
   EXPECT_EQ("thang", loader_->snapshot().get("other").value().get());
   // Admin overrides disk and bootstrap.
-  loader_->mergeValues({{"file2", "pluto"}, {"some", "day soon"}});
+  ASSERT_TRUE(loader_->mergeValues({{"file2", "pluto"}, {"some", "day soon"}}).ok());
   EXPECT_EQ("pluto", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ("day soon", loader_->snapshot().get("some").value().get());
   EXPECT_EQ("thang", loader_->snapshot().get("other").value().get());
   // Admin overrides stick over filesystem updates.
   EXPECT_EQ("Layer cake", loader_->snapshot().get("file14").value().get());
   EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15").value().get());
-  loader_->mergeValues({{"file14", "Mega layer cake"}});
+  ASSERT_TRUE(loader_->mergeValues({{"file14", "Mega layer cake"}}).ok());
   EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14").value().get());
   EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15").value().get());
   write("test/common/runtime/test_data/current/envoy/file14", "Sad cake");
@@ -503,11 +504,12 @@ TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
     layer->set_name("admin_1");
     layer->mutable_admin_layer();
   }
-  EXPECT_THROW_WITH_MESSAGE(
+  absl::Status creation_status;
+  auto loader =
       std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                   generator_, validation_visitor_, *api_),
-      EnvoyException,
-      "Too many admin layers specified in LayeredRuntime, at most one may be specified");
+                                   generator_, validation_visitor_, *api_, creation_status);
+  EXPECT_EQ(creation_status.message(),
+            "Too many admin layers specified in LayeredRuntime, at most one may be specified");
 }
 
 class StaticLoaderImplTest : public LoaderImplTest {
@@ -525,8 +527,10 @@ protected:
       layer->set_name("admin");
       layer->mutable_admin_layer();
     }
+    absl::Status creation_status;
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                           generator_, validation_visitor_, *api_);
+                                           generator_, validation_visitor_, *api_, creation_status);
+    THROW_IF_NOT_OK(creation_status);
   }
 
   ProtobufWkt::Struct base_;
@@ -807,7 +811,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   setup();
 
   // Set up foo -> bar
-  loader_->mergeValues({{"foo", "bar"}});
+  ASSERT_TRUE(loader_->mergeValues({{"foo", "bar"}}).ok());
   EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo").value().get());
   const Snapshot* original_snapshot_pointer = loader_->threadsafeSnapshot().get();
 
@@ -844,7 +848,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
     if (!read_bar) {
       foo_read.wait(mutex);
     }
-    loader_->mergeValues({{"foo", "eep"}});
+    ASSERT_TRUE(loader_->mergeValues({{"foo", "eep"}}).ok());
     updated_eep = true;
   }
 
@@ -875,21 +879,23 @@ protected:
 };
 
 TEST_F(DiskLayerTest, IllegalPath) {
+  absl::Status creation_status;
 #ifdef WIN32
-  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", R"EOF(\\.\)EOF", *api_), EnvoyException,
-                            R"EOF(Invalid path: \\.\)EOF");
+  DiskLayer layer("test", R"EOF(\\.\)EOF", *api_, creation_status);
+  EXPECT_EQ(creation_status.message(), R"EOF(Invalid path: \\.\)EOF");
 #else
-  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", *api_), EnvoyException, "Invalid path: /dev");
+  DiskLayer layer("test", "/dev", *api_, creation_status);
+  EXPECT_EQ(creation_status.message(), "Invalid path: /dev");
 #endif
 }
 
 // Validate that we catch recursion that goes too deep in the runtime filesystem
 // walk.
 TEST_F(DiskLayerTest, Loop) {
-  EXPECT_THROW_WITH_MESSAGE(
-      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
-                *api_),
-      EnvoyException, "Walk recursion depth exceeded 16");
+  absl::Status creation_status;
+  DiskLayer layer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
+                  *api_, creation_status);
+  EXPECT_EQ(creation_status.message(), "Walk recursion depth exceeded 16");
 }
 
 TEST(NoRuntime, FeatureEnabled) {
@@ -936,8 +942,10 @@ public:
               rtds_callbacks_.push_back(&callbacks);
               return ret;
             }));
+    absl::Status creation_status;
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, config, local_info_, store_,
-                                           generator_, validation_visitor_, *api_);
+                                           generator_, validation_visitor_, *api_, creation_status);
+    THROW_IF_NOT_OK(creation_status);
     loader_->initialize(cm_);
     for (auto* sub : rtds_subscriptions_) {
       EXPECT_CALL(*sub, start(_));
@@ -1271,8 +1279,9 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   rtds_layer->mutable_rtds_config();
 
   EXPECT_CALL(cm_, subscriptionFactory());
+  absl::Status creation_status;
   LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
-                    *api_);
+                    *api_, creation_status);
 
   EXPECT_THROW_WITH_MESSAGE(loader.initialize(cm_), EnvoyException, "bad config");
 }
