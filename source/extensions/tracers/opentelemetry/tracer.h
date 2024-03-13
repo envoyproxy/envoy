@@ -85,7 +85,7 @@ public:
        Tracer& parent_tracer, OTelSpanKind span_kind);
 
   // Tracing::Span functions
-  void setOperation(absl::string_view /*operation*/) override{};
+  void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override{};
   void finishSpan() override;

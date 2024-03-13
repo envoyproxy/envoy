@@ -123,6 +123,8 @@ void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_v
 
 void Span::setTag(absl::string_view name, absl::string_view value) { setAttribute(name, value); }
 
+void Span::setOperation(absl::string_view operation) { span_.set_name(operation); }
+
 Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
