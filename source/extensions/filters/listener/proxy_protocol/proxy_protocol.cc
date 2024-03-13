@@ -155,6 +155,7 @@ bool Config::isVersionAllowed(ProxyProtocolVersion version) const {
   case ProxyProtocolVersion::V2:
     return allow_v2_;
   }
+  return false; // Should never reach here, but needed for windows compiler warning.
 }
 
 VersionedProxyProtocolStats& Config::versionToStatsStruct(ProxyProtocolVersion version) {
@@ -166,6 +167,7 @@ VersionedProxyProtocolStats& Config::versionToStatsStruct(ProxyProtocolVersion v
   case ProxyProtocolVersion::V2:
     return stats_.v2_;
   }
+  return stats_.not_found_; // Should never reach here, but needed for windows compiler warning.
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
