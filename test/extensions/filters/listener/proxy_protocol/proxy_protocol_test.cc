@@ -2391,6 +2391,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2BasicAll
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   write(buffer, sizeof(buffer));
+  expectData(std::string(buffer, buffer + sizeof(buffer)));
   disconnect();
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
@@ -2419,6 +2420,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2ShortAll
                                 0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
                                 'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   write(buffer, sizeof(buffer));
+  expectData(std::string(buffer, buffer + sizeof(buffer)));
   disconnect();
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
