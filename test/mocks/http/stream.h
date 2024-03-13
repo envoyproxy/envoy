@@ -27,6 +27,8 @@ public:
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
 
+  absl::string_view responseDetails() override { return details_; }
+
   // Use the same underlying structure as StreamCallbackHelper to insure iteration stability
   // if we remove callbacks during iteration.
   absl::InlinedVector<StreamCallbacks*, 8> callbacks_;
@@ -49,10 +51,13 @@ public:
     }
   }
 
+  void setDetails(absl::string_view details) { details_ = details; }
+
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
   CodecEventCallbacks* codec_callbacks_{nullptr};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  std::string details_;
 };
 
 } // namespace Http

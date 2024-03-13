@@ -32,6 +32,7 @@ envoy_cc_test(
         "//test/common/mocks/common:common_mocks",
         "//test/common/mocks/event:event_mocks",
         "@envoy//test/common/http:common_lib",
+        "@envoy//test/mocks/thread:thread_mocks",
         "@envoy_build_config//:test_extensions",
     ],
 )
