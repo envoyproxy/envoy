@@ -927,20 +927,24 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThreads
   io_uring_socket_handle_->resetFileEvents();
   read_buffer.drain(read_buffer.length());
 
-  std::atomic<bool> initialized_in_new_thread = false;
-
   // Migrate io_uring between threads.
-  second_dispatcher_->post(
-      [this, &second_dispatcher = second_dispatcher_, &read_buffer, &initialized_in_new_thread]() {
-        io_uring_socket_handle_->initializeFileEvent(
-            *second_dispatcher,
-            [this, &read_buffer](uint32_t event) {
-              EXPECT_EQ(event, Event::FileReadyType::Read);
-              auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
-            },
-            Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
-        initialized_in_new_thread = true;
-      });
+  std::atomic<bool> initialized_in_new_thread = false;
+  std::atomic<bool> read_in_new_thread = false;
+  second_dispatcher_->post([this, &second_dispatcher = second_dispatcher_, &read_buffer, &data,
+                            &initialized_in_new_thread, &read_in_new_thread]() {
+    io_uring_socket_handle_->initializeFileEvent(
+        *second_dispatcher,
+        [this, &read_buffer, &data, &read_in_new_thread](uint32_t event) {
+          EXPECT_EQ(event, Event::FileReadyType::Read);
+          auto ret = io_uring_socket_handle_->read(read_buffer, absl::nullopt);
+          // For the next read.
+          if (read_buffer.length() > data.substr(5).length()) {
+            read_in_new_thread = true;
+          }
+        },
+        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+    initialized_in_new_thread = true;
+  });
   while (!initialized_in_new_thread) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -949,14 +953,14 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThreads
   std::string data2 = " again";
   write_buffer.add(data2);
   io_socket_handle_->write(write_buffer);
-  while (read_buffer.length() <= data.substr(5).length()) {
+  while (!read_in_new_thread) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(read_buffer.toString(), data.substr(5) + data2);
 
   // Close safely.
   io_socket_handle_->close();
-  io_uring_socket_handle_->close();
+  second_dispatcher_->post([this]() { io_uring_socket_handle_->close(); });
   while (fcntl(fd_, F_GETFD, 0) >= 0) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
