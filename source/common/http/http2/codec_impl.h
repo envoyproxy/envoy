@@ -789,6 +789,7 @@ private:
   int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
                   uint32_t error_code);
+  void onFrameNotSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   int onError(absl::string_view error);
   virtual int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);

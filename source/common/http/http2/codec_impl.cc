@@ -1337,6 +1337,11 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   return 0;
 }
 
+void ConnectionImpl::onFrameNotSend(int32_t stream_id, size_t /*length*/, uint8_t type,
+                                    uint8_t /*flags*/) {
+  adapter_->FrameNotSent(stream_id, type);
+}
+
 int ConnectionImpl::onError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "invalid http2: {}", connection_, error);
   return 0;
