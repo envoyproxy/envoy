@@ -234,6 +234,9 @@ message ExtAuthz {
   // :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.http_service>`
   // configured, the http request will be constructed with unsanitized header values & headers with
   // the same key will still not be combined into a single comma separated header.
+  //
+  // It's recommended you set this to true unless you already rely on the old behavior. False is the
+  // default only for backwards compatibility.
   bool encode_raw_headers = 23;
 }
 
