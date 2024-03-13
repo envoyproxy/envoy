@@ -23,7 +23,7 @@ namespace ProxyProtocol {
 using KeyValuePair =
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
 
-enum ProxyProtocolVersion { Unknown = 0, V1 = 1, V2 = 2 };
+enum class ProxyProtocolVersion { NotFound = 0, V1 = 1, V2 = 2 };
 
 enum class ReadOrParseState { Done, TryAgainLater, Error, SkipFilter, Denied };
 
@@ -66,7 +66,7 @@ struct VersionedProxyProtocolStats {
  */
 struct ProxyProtocolStats {
   GeneralProxyProtocolStats general_stats_;
-  VersionedProxyProtocolStats unknown_;
+  VersionedProxyProtocolStats not_found_;
   VersionedProxyProtocolStats v1_;
   VersionedProxyProtocolStats v2_;
 
@@ -171,7 +171,7 @@ private:
   // The index in buf_ where the search for '\r\n' should continue from
   size_t search_index_{1};
 
-  ProxyProtocolVersion header_version_{Unknown};
+  ProxyProtocolVersion header_version_{ProxyProtocolVersion::NotFound};
 
   ConfigSharedPtr config_;
 

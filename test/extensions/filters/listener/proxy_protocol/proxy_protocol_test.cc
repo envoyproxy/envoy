@@ -283,7 +283,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
   write(msg);
   expectData(msg);
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
@@ -303,7 +303,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
   write(msg);
   expectData(msg);
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
@@ -323,7 +323,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
   write(msg);
   expectData(msg);
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
@@ -341,7 +341,7 @@ TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
   write(msg);
   expectData(msg);
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1Minimal) {
@@ -830,7 +830,7 @@ TEST_P(ProxyProtocolTest, V1TooLong) {
   }
   expectProxyProtoError();
   // Not tracked as v1 due to missing /r/n at end
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.error").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
@@ -846,8 +846,8 @@ TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
   // Not allowed as unknown because of PROXY v1 signature match.
   // Not tracked as v1 due to missing /r/n at end.
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 0);
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 0);
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.error").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 0);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensions) {
@@ -1970,7 +1970,7 @@ TEST_P(ProxyProtocolTest, MalformedProxyLineWithAllowNoProxyProtocol) {
   disconnect();
   // Tracked as unknown because `set_allow_requests_without_proxy_protocol` matches v1 signature
   // differently that previous test case.
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
@@ -1978,7 +1978,7 @@ TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
   write("012345678901234567890123456789012345678901234567890123456789"
         "012345678901234567890123456789012345678901234567890123456789");
   expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.error").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, NotEnoughFields) {
@@ -2392,7 +2392,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2BasicAll
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   write(buffer, sizeof(buffer));
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV2ShortError) {
@@ -2420,7 +2420,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2ShortAll
                                 'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   write(buffer, sizeof(buffer));
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BasicAllowed) {
@@ -2442,7 +2442,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BasicAll
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
   expectData("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BadPortError) {
@@ -2463,7 +2463,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BadPortA
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectData("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 // In direct comparison to V1TooLongWithAllowNoProxyProtocol.
@@ -2477,7 +2477,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest,
   expectData("PROXY TCP4 1.2.3.4 2.3.4.5 100 100 RANDOM ENDING");
   disconnect();
   // Not tracked as v1 due to missing /r/n at end.
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndAllowTinyNoProxyProtocol) {
@@ -2491,7 +2491,7 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndAllowTinyN
   write(msg);
   expectData(msg);
   disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.unknown.allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
 class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,

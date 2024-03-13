@@ -55,9 +55,9 @@ constexpr absl::string_view kVersionedStatsPrefix = "downstream_cx_proxy_proto."
 ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope) {
   return {
       /*general_stats_=*/{GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
-      /*unknown_=*/
+      /*not_found_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "unknown.")))},
+          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "not_found.")))},
       /*v1_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(
           POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "v1.")))},
@@ -108,7 +108,7 @@ Config::Config(
   }
 
   if (proto_config.allowed_versions().empty()) {
-    ENVOY_LOG(info, "No allowed_versions specified, allowing all PROXY protocol versions.");
+    ENVOY_LOG(debug, "No allowed_versions specified, allowing all PROXY protocol versions.");
     allow_v1_ = true;
     allow_v2_ = true;
   } else {
@@ -148,7 +148,7 @@ size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
 bool Config::isVersionAllowed(ProxyProtocolVersion version) const {
   switch (version) {
-  case Unknown:
+  case ProxyProtocolVersion::NotFound:
     return allow_requests_without_proxy_protocol_;
   case ProxyProtocolVersion::V1:
     return allow_v1_;
@@ -159,14 +159,13 @@ bool Config::isVersionAllowed(ProxyProtocolVersion version) const {
 
 VersionedProxyProtocolStats& Config::versionToStatsStruct(ProxyProtocolVersion version) {
   switch (version) {
-  case Unknown:
-    return stats_.unknown_;
+  case ProxyProtocolVersion::NotFound:
+    return stats_.not_found_;
   case ProxyProtocolVersion::V1:
     return stats_.v1_;
   case ProxyProtocolVersion::V2:
     return stats_.v2_;
   }
-  return stats_.unknown_; // Should never happen.
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -583,7 +582,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   auto raw_slice = buffer.rawSlice();
   const char* buf = static_cast<const char*>(raw_slice.mem_);
 
-  if (config_->isVersionAllowed(ProxyProtocolVersion::Unknown)) {
+  if (config_->isVersionAllowed(ProxyProtocolVersion::NotFound)) {
     auto matchv2 = config_->isVersionAllowed(ProxyProtocolVersion::V2) &&
                    !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
                            std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
@@ -601,7 +600,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   if (raw_slice.len_ >= PROXY_PROTO_V2_HEADER_LEN) {
     const char* sig = PROXY_PROTO_V2_SIGNATURE;
     if (!memcmp(buf, sig, PROXY_PROTO_V2_SIGNATURE_LEN)) {
-      header_version_ = V2;
+      header_version_ = ProxyProtocolVersion::V2;
     } else if (memcmp(buf, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
       // It is not v2, and can't be v1, so no sense hanging around: it is invalid
       ENVOY_LOG(debug, "failed to read proxy protocol (exceed max v1 header len)");
@@ -609,7 +608,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     }
   }
 
-  if (header_version_ == V2) {
+  if (header_version_ == ProxyProtocolVersion::V2) {
     if (!config_->isVersionAllowed(ProxyProtocolVersion::V2)) {
       ENVOY_LOG(trace, "Filter is not configured to allow v2 proxy protocol requests");
       return ReadOrParseState::Denied;
@@ -652,7 +651,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
           // for more data.
           break;
         } else {
-          header_version_ = V1;
+          header_version_ = ProxyProtocolVersion::V1;
           search_index_++;
         }
         break;
@@ -663,7 +662,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       return ReadOrParseState::Error;
     }
 
-    if (header_version_ == V1) {
+    if (header_version_ == ProxyProtocolVersion::V1) {
       if (!config_->isVersionAllowed(ProxyProtocolVersion::V1)) {
         ENVOY_LOG(trace, "Filter is not configured to allow v1 proxy protocol requests");
         return ReadOrParseState::Denied;
