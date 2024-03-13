@@ -414,7 +414,13 @@ QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection(
 
 void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
                                                const quic::QuicHeaderList& header_list) {
-  response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  if (mustRejectMetadata(header_list.uncompressed_header_bytes())) {
+    onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
+    return;
+  }
+  if (!header_list.empty()) {
+    response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  }
 }
 
 void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,

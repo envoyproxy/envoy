@@ -452,7 +452,13 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
 
 void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
                                                const quic::QuicHeaderList& header_list) {
-  request_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  if (mustRejectMetadata(header_list.uncompressed_header_bytes())) {
+    onStreamError(false, quic::QUIC_HEADERS_TOO_LARGE);
+    return;
+  }
+  if (!header_list.empty()) {
+    request_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  }
 }
 
 void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection,

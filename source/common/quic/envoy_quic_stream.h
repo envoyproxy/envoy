@@ -184,6 +184,14 @@ protected:
   std::unique_ptr<Http::MetadataMap>
   metadataMapFromHeaderList(const quic::QuicHeaderList& header_list);
 
+
+  // Returns true if the cumulative limit on METADATA headers has been reached
+  // after adding `bytes`.
+  bool mustRejectMetadata(size_t bytes) {
+    received_metadata_bytes_ += bytes;
+    return received_metadata_bytes_ > 1 << 20;
+  }
+
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
@@ -237,6 +245,7 @@ private:
   absl::optional<size_t> content_length_;
   size_t received_content_bytes_{0};
   http2::adapter::HeaderValidator header_validator_;
+  size_t received_metadata_bytes_{0};
 };
 
 // Object used for updating a BytesMeter to track bytes sent on a QuicStream since this object was

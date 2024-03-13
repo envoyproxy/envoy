@@ -276,13 +276,14 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
                         .value();
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
-#ifdef ENVOY_ENABLE_QUIC
-  } else {
-    cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
-        http2_options.value(), quic::kStreamReceiveWindowLimit);
-    cluster->http3_options_.set_allow_extended_connect(true);
-#endif
   }
+#ifdef ENVOY_ENABLE_QUIC
+  cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+      http2_options.value(), quic::kStreamReceiveWindowLimit);
+  cluster->http3_options_.set_allow_extended_connect(true);
+  cluster->http3_options_.set_allow_metadata(true);
+#endif
+
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
 

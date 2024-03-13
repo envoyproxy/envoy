@@ -153,7 +153,6 @@ void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& metadata_map
     return;
   }
   if (quic_stream_.write_side_closed()) {
-    IS_ENVOY_BUG("encodeMetadata is called on write-closed stream.");
     return;
   }
   ASSERT(!local_end_stream_);
