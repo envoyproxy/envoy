@@ -12,7 +12,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 
