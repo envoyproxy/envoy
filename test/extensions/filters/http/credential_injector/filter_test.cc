@@ -13,34 +13,120 @@ namespace CredentialInjector {
 
 class MockSecretReader : public InjectedCredentials::Common::SecretReader {
 public:
-  const std::string& credential() const override {
-    CONSTRUCT_ON_FIRST_USE(std::string, "Basic base64EncodedUsernamePassword");
-  }
+  MockSecretReader(const std::string& secret) : secret_(secret){};
+  const std::string& credential() const override { return secret_; }
+
+private:
+  const std::string secret_;
 };
 
-class FilterTest : public testing::Test {
-public:
-  FilterTest() {
-    auto secret_reader = std::make_shared<MockSecretReader>();
-    std::string header = "Authorization";
-    auto extenstion = std::make_shared<InjectedCredentials::Generic::GenericCredentialInjector>(
-        header, secret_reader);
+TEST(Factory, InjectCredential) {
+  std::string header = "Authorization";
+  auto secret_reader = std::make_shared<MockSecretReader>("Basic base64EncodedUsernamePassword");
+  auto extenstion = std::make_shared<InjectedCredentials::Generic::GenericCredentialInjector>(
+      header, secret_reader);
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
 
-    config_ = std::make_shared<FilterConfig>(extenstion, true, true, "stats", *stats_.rootScope());
-    filter_ = std::make_shared<CredentialInjectorFilter>(config_);
-    filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
-  }
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, false, false, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
 
-  NiceMock<Stats::IsolatedStoreImpl> stats_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
-  FilterConfigSharedPtr config_;
-  std::shared_ptr<CredentialInjectorFilter> filter_;
-};
-
-TEST_F(FilterTest, InjectCredential) {
   Http::TestRequestHeaderMapImpl request_headers{};
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("Basic base64EncodedUsernamePassword", request_headers.get_("Authorization"));
+}
+
+TEST(Factory, InjectCredentialExistingAllowOverwrite) {
+  std::string header = "Authorization";
+  auto secret_reader = std::make_shared<MockSecretReader>("Basic base64EncodedUsernamePassword");
+  auto extenstion = std::make_shared<InjectedCredentials::Generic::GenericCredentialInjector>(
+      header, secret_reader);
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
+
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, true, false, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic existingCredential"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("Basic base64EncodedUsernamePassword", request_headers.get_("Authorization"));
+}
+
+TEST(Factory, InjectCredentialExistingDisallowOverwrite) {
+  std::string header = "Authorization";
+  auto secret_reader = std::make_shared<MockSecretReader>("Basic base64EncodedUsernamePassword");
+  auto extenstion = std::make_shared<InjectedCredentials::Generic::GenericCredentialInjector>(
+      header, secret_reader);
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
+
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, false, false, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic existingCredential"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("Basic existingCredential", request_headers.get_("Authorization"));
+}
+
+TEST(Factory, InjectCredentialFailedToGetCredentialDisAllowWithoutCredential) {
+  std::string header = "Authorization";
+  auto secret_reader = std::make_shared<MockSecretReader>(""); // Mock failed to get credential
+  auto extenstion = std::make_shared<InjectedCredentials::Generic::GenericCredentialInjector>(
+      header, secret_reader);
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
+
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, false, false, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_CALL(decoder_filter_callbacks, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
+                           std::function<void(Http::ResponseHeaderMap & headers)>,
+                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details) {
+        EXPECT_EQ(Http::Code::Unauthorized, code);
+        EXPECT_EQ("Failed to inject credential.", body);
+        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(details, "failed_to_inject_credential");
+      }));
+  filter->decodeHeaders(request_headers, true);
+}
+
+TEST(Factory, InjectCredentialFailedToGetCredentialAllowWithoutCredential) {
+  std::string header = "Authorization";
+  auto secret_reader = std::make_shared<MockSecretReader>(""); // Mock failed to get credential
+  auto extenstion = std::make_shared<InjectedCredentials::Generic::GenericCredentialInjector>(
+      header, secret_reader);
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
+
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, false, false, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("", request_headers.get_("Authorization"));
 }
 
 } // namespace CredentialInjector
