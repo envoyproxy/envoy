@@ -30,7 +30,8 @@ public:
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status(), time_source),
         override_transport_socket_options_(override_transport_socket_options) {
-    setAddressList(address_list);
+    const auto address_list_ptr = copyAddressestoMem(address_list);
+    setAddressList(address_list_ptr);
   }
 
   // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
@@ -42,9 +43,12 @@ public:
                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
     auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
+    // Create a new shared_ptr to store the address list.
+    const auto address_list_ptr = copyAddressestoMem(address_list);
+
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);
-    setAddressList(address_list);
+    setAddressList(address_list_ptr);
     /* TODO: the health checker only gets the first address in the list and
      * will not walk the full happy eyeballs list. We should eventually fix
      * this. */

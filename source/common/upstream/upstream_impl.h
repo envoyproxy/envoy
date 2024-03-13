@@ -272,10 +272,18 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
-  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
-    address_list_ = std::make_shared<std::vector<Network::Address::InstanceConstSharedPtr>>();
-    *address_list_ = address_list;
+  void setAddressList(const std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>&
+                          address_list_ptr) {
+    address_list_ = address_list_ptr;
     ASSERT(address_list_->empty() || *address_list_->front() == *address_);
+  }
+
+  std::shared_ptr<std::vector<Network::Address::InstanceConstSharedPtr>>
+  copyAddressestoMem(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
+    auto address_list_ptr =
+        std::make_shared<std::vector<Network::Address::InstanceConstSharedPtr>>();
+    *address_list_ptr = address_list;
+    return address_list_ptr;
   }
 
 protected:

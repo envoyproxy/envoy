@@ -1552,7 +1552,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  host->setAddressList(address_list);
+  const auto address_list_ptr = host->copyAddressestoMem(address_list);
+  host->setAddressList(address_list_ptr);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -1602,7 +1603,8 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  host->setAddressList(address_list);
+  const auto address_list_ptr = host->copyAddressestoMem(address_list);
+  host->setAddressList(address_list_ptr);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, connectionInfoSetter());
@@ -1655,7 +1657,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  host->setAddressList(address_list);
+  const auto address_list_ptr = host->copyAddressestoMem(address_list);
+  host->setAddressList(address_list_ptr);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -1707,7 +1710,8 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  host->setAddressList(address_list);
+  const auto address_list_ptr = host->copyAddressestoMem(address_list);
+  host->setAddressList(address_list_ptr);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));

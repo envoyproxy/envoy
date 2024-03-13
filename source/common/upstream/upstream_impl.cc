@@ -2064,7 +2064,8 @@ void PriorityStateManager::registerHostForPriority(
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
   if (!address_list.empty()) {
-    host->setAddressList(address_list);
+    const auto address_list_ptr = host->copyAddressestoMem(address_list);
+    host->setAddressList(address_list_ptr);
   }
   registerHostForPriority(host, locality_lb_endpoint);
 }
