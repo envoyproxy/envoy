@@ -2,6 +2,8 @@
 
 #include "envoy/thread/thread.h"
 
+#include "gmock/gmock.h"
+
 #if defined(__linux__) || defined(__APPLE__)
 #include "source/common/common/posix/thread_impl.h"
 #endif

@@ -3,21 +3,20 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:95.9" # TODO(#32149): increase this once io_uring is tested.
+"source/common:96.2"
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/common/posix:88.8" # No easy way to test pthread_create failure.
-"source/common/config:95.4"
+"source/common/config:95.8"
 "source/common/crypto:95.5"
-"source/common/event:95.0" # Emulated edge events guards don't report LCOV
+"source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
-"source/common/http/http2:95.2"
-"source/common/io:57.1" # TODO(#32149): CI has stopped executing this code.
+"source/common/http/http2:95.6"
 "source/common/json:94.6"
 "source/common/matcher:94.6"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/quic:93.3"
+"source/common/quic:93.5"
 "source/common/secret:95.1"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
@@ -31,27 +30,27 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
-"source/extensions/filters/http/cache:94.9"
+"source/extensions/filters/http/cache:95.0"
 "source/extensions/filters/http/grpc_json_transcoder:93.8" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/wasm:1.8"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.4"
-"source/extensions/filters/network/mongo_proxy:96.0"
+"source/extensions/filters/network/mongo_proxy:96.1"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
-"source/extensions/stat_sinks/graphite_statsd:78.6" # Death tests don't report LCOV
-"source/extensions/stat_sinks/statsd:80.8" # Death tests don't report LCOV
-"source/extensions/tracers:96.1"
+"source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
+"source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
+"source/extensions/tracers:96.4"
 "source/extensions/tracers/common:74.8"
 "source/extensions/tracers/common/ot:72.9"
 "source/extensions/tracers/opencensus:94.0"
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:95.8"
+"source/extensions/transport_sockets:97.4"
 "source/common/tls:94.9"
 "source/common/tls/cert_validator:94.2"
 "source/common/tls/private_key:88.9"
@@ -67,7 +66,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/health_checkers:96.0"
 "source/extensions/health_checkers/http:93.9"
 "source/extensions/health_checkers/grpc:92.0"
-"source/extensions/config_subscription/rest:94.3"
+"source/extensions/config_subscription/rest:94.7"
 "source/extensions/matching/input_matchers/cel_matcher:91.3" #Death tests don't report LCOV
 )
 

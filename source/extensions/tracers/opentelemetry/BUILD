@@ -67,6 +67,7 @@ envoy_cc_library(
         "otlp_utils.h",
         "trace_exporter.h",
     ],
+    external_deps = ["opentelemetry_api"],
     deps = [
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/upstream:cluster_manager_interface",

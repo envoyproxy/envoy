@@ -68,7 +68,7 @@ public final class CronetTestRule implements TestRule {
     public ExperimentalCronetEngine mCronetEngine;
     public ExperimentalCronetEngine.Builder mBuilder;
 
-    private Context mContext;
+    private final Context mContext;
 
     private CronetTestFramework(Context context) {
       mContext = context;
