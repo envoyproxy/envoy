@@ -112,8 +112,8 @@ message JsonToMetadata {
     bool allow_empty_content_type = 3;
 
     // Allowed content-type by regex match for json to metadata transformation.
-    // This can be used in parallel with allow_content_types.
-    repeated type.matcher.v3.RegexMatcher allow_content_types_regex = 4;
+    // This can be used in parallel with ``allow_content_types``.
+    type.matcher.v3.RegexMatcher allow_content_types_regex = 4;
   }
 
   // At least one of request_rules and response_rules must be provided.

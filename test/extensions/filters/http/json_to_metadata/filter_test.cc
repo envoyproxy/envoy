@@ -1602,7 +1602,7 @@ request_rules:
       metadata_namespace: envoy.lb
       key: version
   allow_content_types_regex:
-  - google_re2: {}
+    google_re2: {}
     regex: "application/.*"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
@@ -1633,10 +1633,8 @@ request_rules:
       metadata_namespace: envoy.lb
       key: version
   allow_content_types_regex:
-  - google_re2: {}
-    regex: "text/.*"
-  - google_re2: {}
-    regex: "application/.*"
+    google_re2: {}
+    regex: "(?:text|application)/.*"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
   const std::map<std::string, std::string> expected = {{"version", "good version"}};
@@ -1672,7 +1670,7 @@ request_rules:
   allow_content_types:
   - application/better-json
   allow_content_types_regex:
-  - google_re2: {}
+    google_re2: {}
     regex: "application/.*"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
@@ -1709,7 +1707,7 @@ request_rules:
   allow_content_types:
   - application/better-json
   allow_content_types_regex:
-  - google_re2: {}
+    google_re2: {}
     regex: "application/.*"
 )EOF");
   const std::string request_body_json = R"delimiter({"version":"good version"})delimiter";
@@ -1742,7 +1740,7 @@ request_rules:
   allow_content_types:
   - "text/plain"
   allow_content_types_regex:
-  - google_re2: {}
+    google_re2: {}
     regex: "application/.*"
 )EOF");
 

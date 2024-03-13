@@ -98,9 +98,15 @@ FilterConfig::FilterConfig(
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
       response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()),
       request_allow_content_types_regex_(
-          generateAllowContentTypeRegexs(proto_config.request_rules().allow_content_types_regex())),
-      response_allow_content_types_regex_(generateAllowContentTypeRegexs(
-          proto_config.response_rules().allow_content_types_regex())) {
+          proto_config.request_rules().has_allow_content_types_regex()
+              ? generateAllowContentTypeRegexs(
+                    proto_config.request_rules().allow_content_types_regex())
+              : nullptr),
+      response_allow_content_types_regex_(
+          proto_config.response_rules().has_allow_content_types_regex()
+              ? generateAllowContentTypeRegexs(
+                    proto_config.response_rules().allow_content_types_regex())
+              : nullptr) {
   if (request_rules_.empty() && response_rules_.empty()) {
     throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
                          "either request or response rules");
@@ -128,15 +134,12 @@ absl::flat_hash_set<std::string> FilterConfig::generateAllowContentTypes(
   return allow_content_types;
 }
 
-std::vector<Regex::CompiledMatcherPtr> FilterConfig::generateAllowContentTypeRegexs(
-    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::RegexMatcher>&
-        proto_allow_content_types_regex) const {
+Regex::CompiledMatcherPtr FilterConfig::generateAllowContentTypeRegexs(
+    const envoy::type::matcher::v3::RegexMatcher& proto_allow_content_types_regex) const {
 
-  std::vector<Regex::CompiledMatcherPtr> allow_content_types_regex;
+  Regex::CompiledMatcherPtr allow_content_types_regex;
+  allow_content_types_regex = Regex::Utility::parseRegex(proto_allow_content_types_regex);
 
-  for (const auto& request_allowed_content_type : proto_allow_content_types_regex) {
-    allow_content_types_regex.push_back(Regex::Utility::parseRegex(request_allowed_content_type));
-  }
   return allow_content_types_regex;
 }
 
@@ -149,10 +152,9 @@ bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) con
     return true;
   }
 
-  for (const auto& regex : request_allow_content_types_regex_) {
-    if (regex->match(content_type)) {
-      return true;
-    }
+  if (request_allow_content_types_regex_ &&
+      request_allow_content_types_regex_->match(content_type)) {
+    return true;
   }
 
   return false;
@@ -167,10 +169,9 @@ bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) co
     return true;
   }
 
-  for (const auto& regex : response_allow_content_types_regex_) {
-    if (regex->match(content_type)) {
-      return true;
-    }
+  if (response_allow_content_types_regex_ &&
+      response_allow_content_types_regex_->match(content_type)) {
+    return true;
   }
 
   return false;

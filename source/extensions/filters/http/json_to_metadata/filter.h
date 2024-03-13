@@ -77,9 +77,8 @@ private:
   Rules generateRules(const ProtobufRepeatedRule& proto_rule) const;
   absl::flat_hash_set<std::string> generateAllowContentTypes(
       const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) const;
-  std::vector<Regex::CompiledMatcherPtr> generateAllowContentTypeRegexs(
-      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::RegexMatcher>&
-          proto_allow_content_types_regex) const;
+  Regex::CompiledMatcherPtr generateAllowContentTypeRegexs(
+      const envoy::type::matcher::v3::RegexMatcher& proto_allow_content_types_regex) const;
   JsonToMetadataStats rqstats_;
   JsonToMetadataStats respstats_;
   const Rules request_rules_;
@@ -88,8 +87,8 @@ private:
   const absl::flat_hash_set<std::string> response_allow_content_types_;
   const bool request_allow_empty_content_type_;
   const bool response_allow_empty_content_type_;
-  const std::vector<Regex::CompiledMatcherPtr> request_allow_content_types_regex_;
-  const std::vector<Regex::CompiledMatcherPtr> response_allow_content_types_regex_;
+  const Regex::CompiledMatcherPtr request_allow_content_types_regex_;
+  const Regex::CompiledMatcherPtr response_allow_content_types_regex_;
 };
 
 const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
