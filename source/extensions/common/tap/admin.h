@@ -208,13 +208,13 @@ private:
   Http::Code handler(Http::HeaderMap& response_headers, Buffer::Instance& response,
                      Server::AdminStream& admin_stream);
   Http::Code badRequest(Buffer::Instance& response, absl::string_view error);
-  const uint64_t& max_concurrent() const { return max_concurrent_streams_; }
+  const uint32_t& max_concurrent() const { return max_concurrent_streams_; }
 
   Server::Admin& admin_;
   Event::Dispatcher& main_thread_dispatcher_;
   absl::node_hash_map<std::string, absl::node_hash_set<ExtensionConfig*>> config_id_map_;
   std::shared_ptr<AttachedRequest> attached_request_;
-  const uint64_t max_concurrent_streams_;
+  const uint32_t max_concurrent_streams_;
   friend class BaseAdminHandlerTest;     // For testing purposes
   friend class BufferedAdminHandlerTest; // For testing Purposes
 };

@@ -18,7 +18,7 @@ ExtensionConfigBase::ExtensionConfigBase(
 
   switch (proto_config_.config_type_case()) {
   case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kAdminConfig: {
-    admin_handler_ = AdminHandler::getSingleton(admin, singleton_manager, main_thread_dispatcher, proto_config_.admin_config().max_concurrent_streams()) ;
+    admin_handler_ = AdminHandler::getSingleton(admin, singleton_manager, main_thread_dispatcher, proto_config_.admin_config().max_concurrent_streams().value()) ;
     admin_handler_->registerConfig(*this, proto_config_.admin_config().config_id());
     ENVOY_LOG(debug, "initializing tap extension with admin endpoint (config_id={})",
               proto_config_.admin_config().config_id());

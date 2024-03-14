@@ -17,10 +17,10 @@ namespace Tap {
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(tap_admin_handler);
 
-AdminHandlerSharedPtr AdminHandler::getSingleton(OptRef<Server::Admin> admin,
-                                                 Singleton::Manager& singleton_manager,
-                                                 Event::Dispatcher& main_thread_dispatcher,
-                                                 const uint64_t& max_concurrent_streams) {
+AdminHandlerSharedPtr
+AdminHandler::getSingleton(OptRef<Server::Admin> admin, Singleton::Manager& singleton_manager,
+                           Event::Dispatcher& main_thread_dispatcher,
+                           const uint64_t& max_concurrent_streams) {
   return singleton_manager.getTyped<AdminHandler>(
       SINGLETON_MANAGER_REGISTERED_NAME(tap_admin_handler),
       [&admin, &main_thread_dispatcher, &max_concurrent_streams] {
@@ -67,9 +67,9 @@ Http::Code AdminHandler::handler(Http::HeaderMap&, Buffer::Instance& response,
           response, fmt::format("Unknown config id '{}'. No extension has registered with this id.",
                                 tap_request.config_id()));
     }
-    if (attached_request_->streams().size() >= max_concurrent()) {
-      return badRequest(
-          response, fmt::format("Maximum concurrent attached request reach. Detach it."));
+    if (static_cast<uint32_t>(attached_request_->streams().size()) >= max_concurrent()) {
+      return badRequest(response,
+                        fmt::format("Maximum concurrent attached request reach. Detach it."));
     } else {
       ENVOY_LOG(debug, "New request stream has appended to attached request for tapping.");
       attached_request_->streams().insert(&admin_stream);

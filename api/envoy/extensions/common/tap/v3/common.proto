@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.common.tap.v3;
 
 import "envoy/config/tap/v3/common.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -42,5 +43,8 @@ message AdminConfig {
   // Opaque configuration ID. When requests are made to the admin handler, the passed opaque ID is
   // matched to the configured filter opaque ID to determine which filter to configure.
   string config_id = 1 [(validate.rules).string = {min_len: 1}];
-  uint64 max_concurrent_streams = 2 [(validate.rules).uint64 = {gt: 0}];
+
+  // Threshold of maximum atached request supported. Additional request's will be attached until re
+  // aching the maximum concurrency. The default value is 1. The maximum value is 512*1024.
+  google.protobuf.UInt32Value max_concurrent_streams = 2 [(validate.rules).uint32 = {lte: 524288 gte: 1}];
 }
