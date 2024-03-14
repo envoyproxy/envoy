@@ -102,19 +102,25 @@ TEST_F(Http3StatusTrackerImplTest, MarkBrokenWithBackoffMax) {
   EXPECT_CALL(*timer_, enabled()).WillRepeatedly(Return(false));
 
   for (int i = 0; i < 17; ++i) {
-    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1 * static_cast<int>(pow(2, i)) * 1000), nullptr));
+    EXPECT_CALL(
+        *timer_,
+        enableTimer(std::chrono::milliseconds(1 * static_cast<int>(pow(2, i)) * 1000), nullptr));
     tracker_.markHttp3Broken();
     timer_->invokeCallback();
   }
 
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1 * static_cast<int>(pow(2, 17)) * 1000), nullptr));
+  EXPECT_CALL(
+      *timer_,
+      enableTimer(std::chrono::milliseconds(1 * static_cast<int>(pow(2, 17)) * 1000), nullptr));
   tracker_.markHttp3Broken();
   timer_->invokeCallback();
-/*
+
   // Broken period no longer increases.
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1 * static_cast<int>(pow(2, 17)) * 1000), nullptr));
+  EXPECT_CALL(
+      *timer_,
+      enableTimer(std::chrono::milliseconds(1 * static_cast<int>(pow(2, 17)) * 1000), nullptr));
   tracker_.markHttp3Broken();
-  timer_->invokeCallback();*/
+  timer_->invokeCallback();
 }
 
 TEST_F(Http3StatusTrackerImplTest, MarkBrokenThenExpiresThenConfirmedThenBroken) {

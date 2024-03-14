@@ -8,7 +8,7 @@ namespace {
 // Initially, HTTP/3 is marked broken for 1 second.
 const std::chrono::seconds DefaultExpirationTime{1};
 // Cap the broken period around a day and a half.
-const int MaxConsecutiveBrokenCount = 18;
+const int MaxConsecutiveBrokenCount = 17;
 } // namespace
 
 Http3StatusTrackerImpl::Http3StatusTrackerImpl(Event::Dispatcher& dispatcher)
