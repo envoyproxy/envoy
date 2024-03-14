@@ -24,7 +24,7 @@ namespace ExtAuthz {
 namespace {
 
 std::unique_ptr<envoy::service::auth::v3::CheckResponse>
-makeCheckResponse(const Grpc::Status::WellKnownGrpcStatus status) {
+makeGrpcCheckResponse(const Grpc::Status::WellKnownGrpcStatus status) {
   auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   response->mutable_status()->set_code(status);
   // TODO: We only add the response status.
@@ -32,7 +32,7 @@ makeCheckResponse(const Grpc::Status::WellKnownGrpcStatus status) {
   return response;
 }
 
-Grpc::Status::WellKnownGrpcStatus resultCaseToCheckStatus(
+Grpc::Status::WellKnownGrpcStatus resultCaseToGrpcStatus(
     const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
   Grpc::Status::WellKnownGrpcStatus check_status;
   switch (result) {
@@ -118,29 +118,29 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
 
   // Set check result default action.
   ON_CALL(*internal_mock_client, sendRaw(_, _, _, _, _, _))
-      .WillByDefault(Invoke([&](absl::string_view, absl::string_view,
-                                Buffer::InstancePtr&& serialized_req,
-                                Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                                const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
-        envoy::service::auth::v3::CheckRequest check_request;
-        EXPECT_TRUE(check_request.ParseFromString(serialized_req->toString()))
-            << "Could not parse serialized check request";
+      .WillByDefault(
+          Invoke([&](absl::string_view, absl::string_view, Buffer::InstancePtr&& serialized_req,
+                     Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                     const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+            envoy::service::auth::v3::CheckRequest check_request;
+            EXPECT_TRUE(check_request.ParseFromString(serialized_req->toString()))
+                << "Could not parse serialized check request";
 
-        // TODO: Query the request header map in HttpFilterFuzzer to test
-        // headers_to_(add/remove/append).
-        // TODO: Test check request attributes against config
-        // and filter metadata.
-        ENVOY_LOG_MISC(trace, "Check Request attributes {}",
-                       check_request.attributes().DebugString());
+            // TODO: Query the request header map in HttpFilterFuzzer to test
+            // headers_to_(add/remove/append).
+            // TODO: Test check request attributes against config
+            // and filter metadata.
+            ENVOY_LOG_MISC(trace, "Check Request attributes {}",
+                           check_request.attributes().DebugString());
 
-        const Grpc::Status::WellKnownGrpcStatus status = resultCaseToCheckStatus(input.result());
-        if (status == Grpc::Status::WellKnownGrpcStatus::Ok) {
-          grpc_client->onSuccess(makeCheckResponse(status), mocks.mock_span_);
-        } else {
-          grpc_client->onFailure(status, "Fuzz input status was not ok!", mocks.mock_span_);
-        }
-        return &mocks.async_request_;
-      }));
+            const Grpc::Status::WellKnownGrpcStatus status = resultCaseToGrpcStatus(input.result());
+            if (status == Grpc::Status::WellKnownGrpcStatus::Ok) {
+              grpc_client->onSuccess(makeGrpcCheckResponse(status), mocks.mock_span_);
+            } else {
+              grpc_client->onFailure(status, "Fuzz input status was not ok!", mocks.mock_span_);
+            }
+            return &mocks.async_request_;
+          }));
 
   // TODO: Add response headers.
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
