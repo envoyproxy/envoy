@@ -1,4 +1,4 @@
-package test.kotlin.integration;
+package test.java.integration;
 
 import static com.google.common.truth.Truth.assertThat;
 
