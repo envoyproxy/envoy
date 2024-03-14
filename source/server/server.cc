@@ -34,6 +34,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/memory/stats.h"
@@ -56,7 +57,6 @@
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
-#include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
 namespace Envoy {
@@ -749,7 +749,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager("ssl_context_manager", server_contexts_);
+  ssl_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
