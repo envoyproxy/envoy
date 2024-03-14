@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.common.tap.v3;
 
 import "envoy/config/tap/v3/common.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -46,5 +47,6 @@ message AdminConfig {
 
   // Threshold of maximum attached request supported. Additional request's will be attached until re
   // aching the maximum concurrency. The default value is 1. The maximum value is 512*1024.
-  google.protobuf.UInt32Value max_concurrent_streams = 2 [(validate.rules).uint32 = {lte: 524288 gte: 1}];
+  google.protobuf.UInt32Value max_concurrent_streams = 2
+      [(validate.rules).uint32 = {lte: 524288 gte: 1}];
 }
