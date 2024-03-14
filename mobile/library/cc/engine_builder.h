@@ -123,7 +123,8 @@ private:
 class EngineBuilder {
 public:
   EngineBuilder();
-  virtual ~EngineBuilder() {}
+  EngineBuilder(EngineBuilder&&) = default;
+  virtual ~EngineBuilder() = default;
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setLogger(envoy_logger envoy_logger);
