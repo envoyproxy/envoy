@@ -149,8 +149,10 @@ void InstanceImpl::removeSlot(uint32_t slot) {
                   }
                 });
 
-  absl::BlockingCounter counter(running_workers);
-  runOnAllThreads([slot, &counter]() -> void {
+  std::shared_ptr<absl::BlockingCounter> counter =
+      std::make_shared<absl::BlockingCounter>(running_workers);
+  std::weak_ptr<absl::BlockingCounter> counter_weak = counter;
+  runOnAllThreads([slot, counter_weak]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
     // will be sequenced after this removal. It is also safe if there are callbacks pending on
@@ -158,9 +160,11 @@ void InstanceImpl::removeSlot(uint32_t slot) {
     if (slot < thread_local_data_.data_.size()) {
       thread_local_data_.data_[slot] = nullptr;
     }
-    counter.DecrementCount();
+    if (auto counter = counter_weak.lock()) {
+      counter->DecrementCount();
+    }
   });
-  counter.Wait();
+  counter->Wait();
 }
 
 void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
@@ -168,9 +172,7 @@ void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
   ASSERT(!shutdown_);
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
-    if (dispatcher.isRunning()) {
-      dispatcher.post(cb);
-    }
+    dispatcher.post(cb);
   }
 
   // Handle main thread.
@@ -193,9 +195,7 @@ void InstanceImpl::runOnAllThreads(std::function<void()> cb,
       });
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
-    if (dispatcher.isRunning()) {
-      dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });
-    }
+    dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });
   }
 }
 

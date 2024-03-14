@@ -83,7 +83,7 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   InSequence s;
 
   // Free a slot without ever calling set.
-  EXPECT_CALL(thread_dispatcher_, isRunning()).Times(2);
+  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   TypedSlotPtr<> slot1 = TypedSlot<>::makeUnique(tls_);
   slot1.reset();
@@ -95,7 +95,7 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   TestThreadLocalObject& object_ref2 = setObject(*slot2);
   EXPECT_EQ(freeSlotIndexesListSize(), 0);
 
-  EXPECT_CALL(thread_dispatcher_, isRunning()).Times(2);
+  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref2, onDestroy());
   EXPECT_EQ(freeSlotIndexesListSize(), 0);
@@ -130,7 +130,7 @@ struct ThreadStatus {
 class CallbackNotInvokedAfterDeletionTest : public ThreadLocalInstanceImplTest {
 protected:
   CallbackNotInvokedAfterDeletionTest() : slot_(TypedSlot<>::makeUnique(tls_)) {
-    EXPECT_CALL(thread_dispatcher_, isRunning()).Times(4);
+    EXPECT_CALL(thread_dispatcher_, isRunning());
     EXPECT_CALL(thread_dispatcher_, post(_))
         .WillOnce(Invoke([&](Event::PostCb cb) {
           // Hold callback #1.
@@ -214,7 +214,6 @@ TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
 
   TestThreadLocalObject& object_ref = setObject(slot);
   auto update_cb = [&update_called](OptRef<ThreadLocalObject>) { ++update_called; };
-  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref, onDestroy());
   slot.runOnAllThreads(update_cb);
@@ -247,7 +246,6 @@ TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
     EXPECT_TRUE(s.has_value());
     s->str_ = "goodbye";
   };
-  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   slot.runOnAllThreads(update_cb);
 
@@ -274,7 +272,6 @@ TEST_F(ThreadLocalInstanceImplTest, NoDataCallback) {
     ++update_called;
     EXPECT_FALSE(s.has_value());
   };
-  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   slot.runOnAllThreads(update_cb);
 
@@ -293,7 +290,6 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   TypedSlotPtr<> tlsptr = TypedSlot<>::makeUnique(tls_);
   TestThreadLocalObject& object_ref = setObject(*tlsptr);
 
-  EXPECT_CALL(thread_dispatcher_, isRunning());
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(main_dispatcher_, post(_));
 
