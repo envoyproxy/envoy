@@ -288,7 +288,7 @@ TEST(Factory, FailedToRequestCredentialAllowWithoutCredential) {
   filter->onDestroy();
 }
 
-TEST(Factory, AsyncRequestCredential) {
+TEST(Factory, AsyncRequestCredentialSuccess) {
   auto extenstion = std::make_shared<MockCredentialInjector>(
       "", "", false, false, true); // Mock failed to request credential
   NiceMock<Stats::IsolatedStoreImpl> stats;
@@ -304,6 +304,65 @@ TEST(Factory, AsyncRequestCredential) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(decoder_filter_callbacks, continueDecoding());
+  // Mock onSucces() is called asynchronously
+  filter->onSuccess();
+  filter->onDestroy();
+}
+
+TEST(Factory, AsyncRequestCredentialFailDisAllowWithoutCredential) {
+  auto extenstion = std::make_shared<MockCredentialInjector>(
+      "", "", false, false, true); // Mock failed to request credential
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
+
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, false, false, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(decoder_filter_callbacks, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
+                           std::function<void(Http::ResponseHeaderMap & headers)>,
+                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details) {
+        EXPECT_EQ(Http::Code::Unauthorized, code);
+        EXPECT_EQ("Failed to inject credential.", body);
+        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(details, "failed_to_inject_credential");
+      }));
+  // Mock onSucces() is called asynchronously
+  filter->onFailure("fail to get credential");
+  filter->onDestroy();
+}
+
+TEST(Factory, AsyncRequestCredentialFailAllowWithoutCredential) {
+  auto extenstion = std::make_shared<MockCredentialInjector>(
+      "", "", false, false, true); // Mock failed to request credential
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
+
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, false, true, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(decoder_filter_callbacks, continueDecoding());
+  // Mock onSucces() is called asynchronously
+  filter->onFailure("fail to get credential");
   filter->onDestroy();
 }
 
