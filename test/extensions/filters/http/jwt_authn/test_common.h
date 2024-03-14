@@ -112,6 +112,39 @@ providers:
 
 )";
 
+// Provider config with various subject constraints
+const char ExpirationConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    max_lifetime:
+      seconds: 86400
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  spiffe_provider:
+    issuer: https://spiffe.example.com
+    require_expiration: true
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  noexp_provider:
+    issuer: https://noexp.example.com
+    require_expiration: false
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+)";
+
 // A good config.
 const char ExampleConfig[] = R"(
 providers:
