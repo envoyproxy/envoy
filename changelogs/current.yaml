@@ -152,6 +152,10 @@ bug_fixes:
   change: |
     When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
     another Cookie header.
+- area: xds
+  change: |
+    Fixed dumpEcdsFilterConfigs when not have any ecds configs.
+    
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
