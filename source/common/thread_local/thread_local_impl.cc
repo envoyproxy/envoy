@@ -168,7 +168,9 @@ void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
   ASSERT(!shutdown_);
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
-    dispatcher.post(cb);
+    if (dispatcher.isRunning()) {
+      dispatcher.post(cb);
+    }
   }
 
   // Handle main thread.
@@ -191,7 +193,9 @@ void InstanceImpl::runOnAllThreads(std::function<void()> cb,
       });
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
-    dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });
+    if (dispatcher.isRunning()) {
+      dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });
+    }
   }
 }
 

@@ -110,6 +110,8 @@ public:
 
   bool isThreadSafe() const override { return impl_.isThreadSafe(); }
 
+  bool isRunning() const override { return impl_.isRunning(); }
+
   void shutdown() override { impl_.shutdown(); }
 
 protected:
