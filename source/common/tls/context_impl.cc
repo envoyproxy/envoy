@@ -80,8 +80,9 @@ int ContextImpl::sslExtendedSocketInfoIndex() {
 }
 
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-                         TimeSource& time_source, Ssl::ContextAdditionalInitFunc additional_init)
-    : scope_(scope), stats_(generateSslStats(scope)), time_source_(time_source),
+                         Server::Configuration::CommonFactoryContext& factory_context,
+                         Ssl::ContextAdditionalInitFunc additional_init)
+    : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
       tls_max_version_(config.maxProtocolVersion()),
       stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
       unknown_ssl_cipher_(stat_name_set_->add("unknown_ssl_cipher")),
@@ -104,7 +105,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   cert_validator_ = cert_validator_factory->createCertValidator(
-      config.certificateValidationContext(), stats_, time_source_);
+      config.certificateValidationContext(), stats_, factory_context_);
 
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
@@ -609,7 +610,7 @@ absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
   }
   for (auto& ctx : tls_contexts_) {
     const absl::optional<uint32_t> tmp =
-        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
+        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), factory_context_.timeSource());
     if (!tmp.has_value()) {
       return absl::nullopt;
     }
@@ -643,7 +644,7 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
     }
 
     auto detail = Utility::certificateDetails(ctx.cert_chain_.get(), ctx.getCertChainFileName(),
-                                              time_source_);
+                                              factory_context_.timeSource());
     auto ocsp_resp = ctx.ocsp_response_.get();
     if (ocsp_resp) {
       auto* ocsp_details = detail->mutable_ocsp_details();
@@ -659,8 +660,8 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ClientContextConfig& config,
-                                     TimeSource& time_source)
-    : ContextImpl(scope, config, time_source, nullptr /* additional_init */),
+                                     Server::Configuration::CommonFactoryContext& factory_context)
+    : ContextImpl(scope, config, factory_context, nullptr /* additional_init */),
       server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
@@ -789,9 +790,9 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     TimeSource& time_source,
+                                     Server::Configuration::CommonFactoryContext& factory_context,
                                      Ssl::ContextAdditionalInitFunc additional_init)
-    : ContextImpl(scope, config, time_source, additional_init),
+    : ContextImpl(scope, config, factory_context, additional_init),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
@@ -888,7 +889,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
         throwEnvoyExceptionOrPanic("Required OCSP response is missing from TLS context");
       }
     } else {
-      auto response = std::make_unique<Ocsp::OcspResponseWrapper>(ocsp_resp_bytes, time_source_);
+      auto response = std::make_unique<Ocsp::OcspResponseWrapper>(ocsp_resp_bytes,
+                                                                  factory_context_.timeSource());
       if (!response->matchesCertificate(*ctx.cert_chain_)) {
         throwEnvoyExceptionOrPanic("OCSP response does not match its TLS certificate");
       }
