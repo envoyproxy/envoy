@@ -158,16 +158,9 @@ bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) co
     return response_allow_empty_content_type_;
   }
 
-  if (response_allow_content_types_.contains(content_type)) {
-    return true;
-  }
-
-  if (response_allow_content_types_regex_ &&
-      response_allow_content_types_regex_->match(content_type)) {
-    return true;
-  }
-
-  return false;
+  return response_allow_content_types_.contains(content_type) ||
+         (response_allow_content_types_regex_ &&
+          response_allow_content_types_regex_->match(content_type));
 }
 
 void Filter::applyKeyValue(const std::string& value, const KeyValuePair& keyval,
