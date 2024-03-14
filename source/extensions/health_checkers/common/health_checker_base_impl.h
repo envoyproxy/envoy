@@ -104,6 +104,7 @@ protected:
   virtual envoy::data::core::v3::HealthCheckerType healthCheckerType() const PURE;
 
   const bool always_log_health_check_failures_;
+  const bool always_log_health_check_success_;
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds timeout_;

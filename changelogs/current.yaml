@@ -292,6 +292,10 @@ new_features:
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
     Envoy is under pressure, typically memory.
+- area: health_checks
+  change: |
+    added a :ref:`configuration option <envoy_v3_api_field_config.core.v3.HealthCheck.always_log_health_check_success>` that enables
+    health check logs on each successful health check.
 - area: string matcher
   change: |
     Added an :ref:`extension point for custom string matcher implementations <envoy_v3_api_field_type.matcher.v3.StringMatcher.custom>`.
