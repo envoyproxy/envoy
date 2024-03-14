@@ -57,6 +57,9 @@ envoy_data javaByteArrayToEnvoyData(JniHelper& jni_helper, jbyteArray j_data, si
 /** Converts from `envoy_data` to Java byte array. */
 LocalRefUniquePtr<jbyteArray> envoyDataToJavaByteArray(JniHelper& jni_helper, envoy_data data);
 
+/** Converts from `envoy_data to `java.nio.ByteBuffer`. */
+LocalRefUniquePtr<jobject> envoyDataToJavaByteBuffer(JniHelper& jni_helper, envoy_data data);
+
 /** Converts from `envoy_stream_intel` to Java long array. */
 LocalRefUniquePtr<jlongArray> envoyStreamIntelToJavaLongArray(JniHelper& jni_helper,
                                                               envoy_stream_intel stream_intel);
@@ -76,7 +79,7 @@ LocalRefUniquePtr<jstring> envoyDataToJavaString(JniHelper& jni_helper, envoy_da
 envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data);
 
 /** Converts from Java `ByteBuffer` to `envoy_data` with the given length. */
-envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data, size_t data_length);
+envoy_data javaByteBufferToEnvoyData(JniHelper& jni_helper, jobject j_data, jlong data_length);
 
 /** Returns the pointer of conversion from Java `ByteBuffer` to `envoy_data`. */
 envoy_data* javaByteBufferToEnvoyDataPtr(JniHelper& jni_helper, jobject j_data);

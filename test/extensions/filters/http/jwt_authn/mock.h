@@ -8,6 +8,7 @@
 
 #include "test/mocks/upstream/cluster_manager.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 
 using ::google::jwt_verify::Status;
@@ -76,9 +77,11 @@ public:
     ON_CALL(*this, getJwtProvider()).WillByDefault(::testing::ReturnRef(jwt_provider_));
     ON_CALL(*this, isExpired()).WillByDefault(::testing::Return(false));
     ON_CALL(*this, getJwtCache()).WillByDefault(::testing::ReturnRef(jwt_cache_));
+    ON_CALL(*this, isSubjectAllowed(_)).WillByDefault(::testing::Return(true));
   }
 
   MOCK_METHOD(bool, areAudiencesAllowed, (const std::vector<std::string>&), (const));
+  MOCK_METHOD(bool, isSubjectAllowed, (const absl::string_view), (const));
   MOCK_METHOD(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&, getJwtProvider,
               (), (const));
   MOCK_METHOD(const ::google::jwt_verify::Jwks*, getJwksObj, (), (const));

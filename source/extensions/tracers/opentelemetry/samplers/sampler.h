@@ -10,8 +10,9 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/tracing/trace_context.h"
 
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+
 #include "absl/types/optional.h"
-#include "opentelemetry/proto/trace/v1/trace.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,18 +31,11 @@ enum class Decision {
   RecordAndSample
 };
 
-/**
- * @brief The type of the span.
- * see
- * https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#spankind
- */
-using OTelSpanKind = ::opentelemetry::proto::trace::v1::Span::SpanKind;
-
 struct SamplingResult {
   /// @see Decision
   Decision decision;
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
-  std::unique_ptr<const std::map<std::string, std::string>> attributes;
+  std::unique_ptr<const OtelAttributes> attributes;
   // A Tracestate that will be associated with the Span. If the sampler
   // returns an empty Tracestate here, the Tracestate will be cleared, so samplers SHOULD normally
   // return the passed-in Tracestate if they do not intend to change it
