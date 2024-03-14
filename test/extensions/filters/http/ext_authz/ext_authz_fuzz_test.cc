@@ -8,7 +8,7 @@
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
-#include "test/integration/fake_upstream.h"
+#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
