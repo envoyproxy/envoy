@@ -8,6 +8,7 @@
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/integration/server.h"
 
@@ -26,6 +27,7 @@ enum class TestServerType {
 class TestServer : public ListenerHooks {
 private:
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   Event::GlobalTimeSystem time_system_;
   Api::ApiPtr api_;
@@ -35,7 +37,7 @@ private:
   Thread::SkipAsserts skip_asserts_;
   ProcessWide process_wide;
   Thread::MutexBasicLockable lock;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{time_system_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
   std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles_;
 
   // Either test_server_ will be set for test_server_type is a proxy, otherwise upstream_ will be
