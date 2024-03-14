@@ -453,7 +453,7 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
 void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
                                                const quic::QuicHeaderList& header_list) {
   if (mustRejectMetadata(header_list.uncompressed_header_bytes())) {
-    onStreamError(false, quic::QUIC_HEADERS_TOO_LARGE);
+    onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
     return;
   }
   if (!header_list.empty()) {

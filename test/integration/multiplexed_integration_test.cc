@@ -658,11 +658,6 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
 }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(RyanTheOptimist): Enable after QUICHE METADATA fix lands.
-    return;
-  }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -747,11 +742,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
 }
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
-      downstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(RyanTheOptimist): Enable after QUICHE METADATA fix lands.
-    return;
-  }
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
