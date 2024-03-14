@@ -11,16 +11,27 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CredentialInjector {
 
+class MockRequest : public InjectedCredentials::Common::CredentialInjector::Request {
+public:
+  MockRequest() = default;
+  void cancel() override{};
+};
+
 // Mock failed to get credential
 class MockCredentialInjector : public InjectedCredentials::Common::CredentialInjector {
 public:
   MockCredentialInjector(const std::string& header, const std::string& credentail,
-                         bool failGetCredential, bool failInjectCredential)
+                         bool failGetCredential, bool failInjectCredential, bool async)
       : header_(header), credential_(credentail), failGetCredential_(failGetCredential),
-        failInjectCredential_(failInjectCredential){};
+        failInjectCredential_(failInjectCredential), async_(async){};
 
   // Common::CredentialInjector
   RequestPtr requestCredential(Callbacks& callbacks) override {
+    // Mock async credential request
+    if (async_) {
+      return std::make_unique<MockRequest>();
+    }
+
     if (failGetCredential_) {
       callbacks.onFailure("Failed to get credential");
     } else {
@@ -43,6 +54,7 @@ private:
   const std::string credential_;
   const bool failGetCredential_;
   const bool failInjectCredential_;
+  const bool async_;
 };
 
 class MockSecretReader : public InjectedCredentials::Common::SecretReader {
@@ -206,7 +218,7 @@ TEST(Factory, FailedToGetCredentialAllowWithoutCredential) {
 
 TEST(Factory, FailedToRequestCredentialDisAllowWithoutCredential) {
   auto extenstion = std::make_shared<MockCredentialInjector>(
-      "", "", true, false); // Mock failed to request credential
+      "", "", true, false, false); // Mock failed to request credential
   NiceMock<Stats::IsolatedStoreImpl> stats;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
 
@@ -252,7 +264,7 @@ TEST(Factory, FailedToRequestCredentialDisAllowWithoutCredential) {
 
 TEST(Factory, FailedToRequestCredentialAllowWithoutCredential) {
   auto extenstion = std::make_shared<MockCredentialInjector>(
-      "", "", true, false); // Mock failed to request credential
+      "", "", true, false, false); // Mock failed to request credential
   NiceMock<Stats::IsolatedStoreImpl> stats;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
 
@@ -273,6 +285,25 @@ TEST(Factory, FailedToRequestCredentialAllowWithoutCredential) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter->decodeHeaders(second_request_headers, true));
   EXPECT_EQ("", second_request_headers.get_("Authorization"));
+  filter->onDestroy();
+}
+
+TEST(Factory, AsyncRequestCredential) {
+  auto extenstion = std::make_shared<MockCredentialInjector>(
+      "", "", false, false, true); // Mock failed to request credential
+  NiceMock<Stats::IsolatedStoreImpl> stats;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks;
+
+  auto config =
+      std::make_shared<FilterConfig>(extenstion, false, false, "stats", *stats.rootScope());
+  std::shared_ptr<CredentialInjectorFilter> filter =
+      std::make_shared<CredentialInjectorFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter->decodeHeaders(request_headers, true));
   filter->onDestroy();
 }
 
