@@ -44,8 +44,7 @@ DECLARE_FACTORY(DownstreamSslSocketFactory);
 
 class SslContextManagerFactory : public Ssl::ContextManagerFactory {
 public:
-  Ssl::ContextManagerPtr
-  createContextManager(Server::Configuration::CommonFactoryContext& factory_context) override;
+  Ssl::ContextManagerPtr createContextManager(TimeSource& time_source) override;
 };
 
 DECLARE_FACTORY(SslContextManagerFactory);

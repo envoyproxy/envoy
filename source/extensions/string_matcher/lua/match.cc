@@ -77,11 +77,12 @@ bool LuaStringMatcher::match(const absl::string_view value) const {
 // Lua state is not thread safe, so a state needs to be stored in thread local storage.
 class LuaStringMatcherThreadWrapper : public Matchers::StringMatcher {
 public:
-  LuaStringMatcherThreadWrapper(const std::string& code, ThreadLocal::SlotAllocator& tls) {
+  LuaStringMatcherThreadWrapper(const std::string& code) {
     // Validate that there are no errors while creating on the main thread.
     LuaStringMatcher validator(code);
 
-    tls_slot_ = ThreadLocal::TypedSlot<LuaStringMatcher>::makeUnique(tls);
+    tls_slot_ = ThreadLocal::TypedSlot<LuaStringMatcher>::makeUnique(
+        *InjectableSingleton<ThreadLocal::SlotAllocator>::getExisting());
     tls_slot_->set([code](Event::Dispatcher&) -> std::shared_ptr<LuaStringMatcher> {
       return std::make_shared<LuaStringMatcher>(code);
     });
@@ -94,18 +95,18 @@ private:
 };
 
 Matchers::StringMatcherPtr
-LuaStringMatcherFactory::createStringMatcher(const ProtobufWkt::Any& message,
-                                             ThreadLocal::SlotAllocator& tls, Api::Api& api) {
+LuaStringMatcherFactory::createStringMatcher(const ProtobufWkt::Any& message) {
   ::envoy::extensions::string_matcher::lua::v3::Lua config;
   Config::Utility::translateOpaqueConfig(message, ProtobufMessage::getStrictValidationVisitor(),
                                          config);
+  Api::Api* api = InjectableSingleton<Api::Api>::getExisting();
   absl::StatusOr<std::string> result = Config::DataSource::read(
-      config.source_code(), false /* allow_empty */, api, 0 /* max_size */);
+      config.source_code(), false /* allow_empty */, *api, 0 /* max_size */);
   if (!result.ok()) {
     throw EnvoyException(
         fmt::format("Failed to get lua string matcher code from source: {}", result.status()));
   }
-  return std::make_unique<LuaStringMatcherThreadWrapper>(*result, tls);
+  return std::make_unique<LuaStringMatcherThreadWrapper>(*result);
 }
 
 ProtobufTypes::MessagePtr LuaStringMatcherFactory::createEmptyConfigProto() {

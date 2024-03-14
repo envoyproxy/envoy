@@ -9,7 +9,6 @@
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/test_runtime.h"
 
@@ -72,7 +71,7 @@ public:
     const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        *store_.rootScope(), client_context_config_, server_factory_context_);
+        *store_.rootScope(), client_context_config_, time_system_);
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(verify_context_, transportSocketOptions())
         .WillByDefault(ReturnRef(transport_socket_options_));
@@ -106,7 +105,6 @@ private:
   NiceMock<Stats::MockStore> store_;
   Event::GlobalTimeSystem time_system_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<Ssl::MockCertificateValidationContextConfig> cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
   NiceMock<Ssl::MockContextManager> tls_context_manager_;
@@ -226,8 +224,7 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{time_system_};
   Ssl::MockServerContextConfig* mock_context_config_;
   std::function<void()> secret_update_callback_;
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
@@ -394,9 +391,7 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
-      server_factory_context_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{time_system_};
   Ssl::MockServerContextConfig* mock_context_config_;
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   Ssl::MockTlsCertificateConfig tls_cert_config_;

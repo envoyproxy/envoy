@@ -201,10 +201,9 @@ bool PathMatcher::match(const absl::string_view path) const {
   return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
 }
 
-StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
-                                           ThreadLocal::SlotAllocator& tls, Api::Api& api) {
+StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config) {
   auto factory = Config::Utility::getAndCheckFactory<StringMatcherExtensionFactory>(config, false);
-  return factory->createStringMatcher(config.typed_config(), tls, api);
+  return factory->createStringMatcher(config.typed_config());
 }
 
 } // namespace Matchers

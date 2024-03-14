@@ -10,13 +10,6 @@
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
-
-namespace Server {
-namespace Configuration {
-class CommonFactoryContext;
-} // namespace Configuration
-} // namespace Server
-
 namespace Ssl {
 
 // Opaque type defined and used by the ``ServerContext``.
@@ -80,8 +73,7 @@ using ContextManagerPtr = std::unique_ptr<ContextManager>;
 class ContextManagerFactory : public Config::UntypedFactory {
 public:
   ~ContextManagerFactory() override = default;
-  virtual ContextManagerPtr
-  createContextManager(Server::Configuration::CommonFactoryContext& factory_context) PURE;
+  virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
 
   // There could be only one factory thus the name is static.
   std::string name() const override { return "ssl_context_manager"; }

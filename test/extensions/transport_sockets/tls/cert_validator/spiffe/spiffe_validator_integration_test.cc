@@ -21,8 +21,8 @@ void SslSPIFFECertValidatorIntegrationTest::initialize() {
                                   .setAllowExpiredCertificate(allow_expired_cert_));
   HttpIntegrationTest::initialize();
 
-  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-      server_factory_context_);
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   registerTestServerPorts({"http"});
 }
 

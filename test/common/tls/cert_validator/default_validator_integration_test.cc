@@ -14,8 +14,8 @@ namespace Ssl {
 
 void SslCertValidatorIntegrationTest::initialize() {
   HttpIntegrationTest::initialize();
-  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-      factory_context_.serverFactoryContext());
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   registerTestServerPorts({"http"});
 
   test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->reset();

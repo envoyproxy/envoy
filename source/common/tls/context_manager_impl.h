@@ -5,7 +5,6 @@
 #include <list>
 
 #include "envoy/common/time.h"
-#include "envoy/server/factory_context.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/stats/scope.h"
@@ -19,13 +18,14 @@ namespace Tls {
 
 /**
  * The SSL context manager has the following threading model:
- * Contexts can be allocated the main thread. They can be released from any thread (and in practice
- * are since cluster information can be released from any thread). Context allocation/free is a very
- * uncommon thing so we just do a global lock to protect it all.
+ * Contexts can be allocated via any thread (through in practice they are only allocated on the main
+ * thread). They can be released from any thread (and in practice are since cluster information can
+ * be released from any thread). Context allocation/free is a very uncommon thing so we just do a
+ * global lock to protect it all.
  */
 class ContextManagerImpl final : public Envoy::Ssl::ContextManager {
 public:
-  explicit ContextManagerImpl(Server::Configuration::CommonFactoryContext& factory_context);
+  explicit ContextManagerImpl(TimeSource& time_source);
   ~ContextManagerImpl() override = default;
 
   // Ssl::ContextManager
@@ -45,7 +45,7 @@ public:
   void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) override;
 
 private:
-  Server::Configuration::CommonFactoryContext& factory_context_;
+  TimeSource& time_source_;
   absl::flat_hash_set<Envoy::Ssl::ContextSharedPtr> contexts_;
   PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };

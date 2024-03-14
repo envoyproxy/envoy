@@ -31,9 +31,8 @@ namespace Tls {
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                 SslStats& stats,
-                                 Server::Configuration::CommonFactoryContext& context)
-    : stats_(stats), time_source_(context.timeSource()) {
+                                 SslStats& stats, TimeSource& time_source)
+    : stats_(stats), time_source_(time_source) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
@@ -49,7 +48,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
         // TODO(pradeepcrao): Throw an exception when a non-URI matcher is encountered after the
         // deprecated field match_subject_alt_names is removed
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher, context));
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
       }
     }
   }
@@ -311,10 +310,9 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr
-  createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
-    return std::make_unique<SPIFFEValidator>(config, stats, context);
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                       SslStats& stats, TimeSource& time_source) override {
+    return std::make_unique<SPIFFEValidator>(config, stats, time_source);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }

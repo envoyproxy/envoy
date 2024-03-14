@@ -7,7 +7,6 @@
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/test_time.h"
 
@@ -37,7 +36,6 @@ public:
 
 private:
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   Event::GlobalTimeSystem time_system_;
   Api::ApiPtr api_;
@@ -46,7 +44,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   FakeUpstreamConfig upstream_config_;
   Thread::MutexBasicLockable lock_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{time_system_};
   std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles_;
   std::unique_ptr<FakeUpstream> xds_upstream_;
   FakeHttpConnectionPtr xds_connection_;

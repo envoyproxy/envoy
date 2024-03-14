@@ -98,7 +98,7 @@ void ValidationInstance::initialize(const Options& options,
   }
 
   // Inject regex engine to singleton.
-  regex_engine_ = createRegexEngine(
+  Regex::EnginePtr regex_engine = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
   Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags());
@@ -132,7 +132,7 @@ void ValidationInstance::initialize(const Options& options,
             "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
-  ssl_context_manager_ = createContextManager("ssl_context_manager", server_contexts_);
+  ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
