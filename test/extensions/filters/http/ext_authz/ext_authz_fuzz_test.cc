@@ -64,6 +64,8 @@ public:
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
+  // Only add mocks here that are stateless. I.e. if you need to call ON_CALL on a mock each fuzzer
+  // run, do not add the mock here, because it will leak memory.
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
