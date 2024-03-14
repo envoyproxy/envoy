@@ -6,9 +6,8 @@
 namespace Envoy {
 namespace Server {
 
-Ssl::ContextManagerPtr
-createContextManager(const std::string& factory_name,
-                     Server::Configuration::CommonFactoryContext& factory_context);
+Ssl::ContextManagerPtr createContextManager(const std::string& factory_name,
+                                            TimeSource& time_source);
 
 } // namespace Server
 } // namespace Envoy

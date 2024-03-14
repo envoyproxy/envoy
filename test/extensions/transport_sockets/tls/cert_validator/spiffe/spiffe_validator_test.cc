@@ -13,7 +13,6 @@
 
 #include "test/common/tls/cert_validator/test_common.h"
 #include "test/common/tls/ssl_test_utility.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -45,8 +44,7 @@ public:
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
         typed_conf, allow_expired_certificate_, san_matchers_);
-    ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source));
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, time_source);
   }
 
   void initialize(std::string yaml) {
@@ -54,7 +52,8 @@ public:
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
         typed_conf, allow_expired_certificate_, san_matchers_);
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    validator_ =
+        std::make_unique<SPIFFEValidator>(config_.get(), stats_, config_->api().timeSource());
   };
 
   void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, time_system_); }
@@ -91,7 +90,6 @@ public:
   };
 
 private:
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   bool allow_expired_certificate_{false};
   TestCertificateValidationContextConfigPtr config_;
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_{};

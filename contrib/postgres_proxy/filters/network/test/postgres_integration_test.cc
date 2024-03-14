@@ -295,8 +295,7 @@ public:
     // The tls transport socket will be inserted into fake_upstream when
     // Envoy's upstream starttls transport socket is converted to secure mode.
     std::unique_ptr<Ssl::ContextManager> tls_context_manager =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-            server_factory_context_);
+        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
 
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext downstream_tls_context;
 
@@ -528,8 +527,7 @@ public:
     // The tls transport socket will be inserted into fake_upstream when
     // Envoy's upstream starttls transport socket is converted to secure mode.
     std::unique_ptr<Ssl::ContextManager> tls_context_manager =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-            server_factory_context_);
+        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
 
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context;
 

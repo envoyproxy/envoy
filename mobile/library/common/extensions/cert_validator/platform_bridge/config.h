@@ -15,9 +15,8 @@ namespace Tls {
 class PlatformBridgeCertValidatorFactory : public CertValidatorFactory,
                                            public Config::TypedFactory {
 public:
-  CertValidatorPtr
-  createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override;
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                       SslStats& stats, TimeSource& time_source) override;
 
   std::string name() const override {
     return "envoy_mobile.cert_validator.platform_bridge_cert_validator";

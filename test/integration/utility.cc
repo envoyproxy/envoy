@@ -239,8 +239,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
 #ifdef ENVOY_ENABLE_QUIC
   testing::NiceMock<ThreadLocal::MockInstance> threadlocal;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  Extensions::TransportSockets::Tls::ContextManagerImpl manager(server_factory_context);
+  Extensions::TransportSockets::Tls::ContextManagerImpl manager(time_system);
   Network::UpstreamTransportSocketFactoryPtr transport_socket_factory =
       createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager, threadlocal,
                                                "spiffe://lyft.com/backend-team");

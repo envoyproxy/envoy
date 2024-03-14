@@ -197,7 +197,6 @@ public:
   ProcessContextOptRef processContext() override { return server_.processContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
-  Regex::Engine& regexEngine() override { return server_.regexEngine(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
@@ -293,7 +292,6 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
-  Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {

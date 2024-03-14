@@ -44,8 +44,8 @@ namespace Tls {
 
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& context)
-    : config_(config), stats_(stats), context_(context) {
+    TimeSource& time_source)
+    : config_(config), stats_(stats), time_source_(time_source) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
                                    envoy::extensions::transport_sockets::tls::v3::
@@ -155,7 +155,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        auto san_matcher = createStringSanMatcher(matcher, context_);
+        auto san_matcher = createStringSanMatcher(matcher);
         if (san_matcher == nullptr) {
           throwEnvoyExceptionOrPanic(
               absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
@@ -548,19 +548,18 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   if (ca_cert_ == nullptr) {
     return nullptr;
   }
-  return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), context_.timeSource());
+  return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), time_source_);
 }
 
 absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
-  return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
+  return Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
 }
 
 class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr
-  createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
-    return std::make_unique<DefaultCertValidator>(config, stats, context);
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                       SslStats& stats, TimeSource& time_source) override {
+    return std::make_unique<DefaultCertValidator>(config, stats, time_source);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.default"; }

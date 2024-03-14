@@ -90,8 +90,8 @@ filter_disabled:
     useListenerAccessLog(log_format);
     BaseIntegrationTest::initialize();
 
-    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-        server_factory_context_);
+    context_manager_ =
+        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   }
 
   void setupConnections(bool listener_filter_disabled, bool expect_connection_open, bool ssl_client,

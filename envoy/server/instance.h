@@ -254,11 +254,6 @@ public:
   virtual Configuration::StatsConfig& statsConfig() PURE;
 
   /**
-   * @return the server regex engine.
-   */
-  virtual Regex::Engine& regexEngine() PURE;
-
-  /**
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
    */
   virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;

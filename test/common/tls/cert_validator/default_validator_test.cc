@@ -6,7 +6,6 @@
 
 #include "test/common/tls/cert_validator/test_common.h"
 #include "test/common/tls/ssl_test_utility.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -35,34 +34,28 @@ TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameDNSMatched) {
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSMatched) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameIncorrectTypeMatched) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher)});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir "
                                   "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
@@ -70,13 +63,11 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
   matcher.set_exact("api.example.com");
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMultiLevelMatch) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   // san_multiple_dns_cert matches *.example.com
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir "
@@ -85,7 +76,7 @@ TEST(DefaultCertValidatorTest, TestMultiLevelMatch) {
   matcher.set_exact("foo.api.example.com");
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
@@ -107,15 +98,13 @@ TEST(DefaultCertValidatorTest, TestVerifySubjectAltMultiDomain) {
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURIMatched) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(spiffe://lyft.com/[^/]*-team)raw"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher)});
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
@@ -128,40 +117,37 @@ TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameNotMatched) {
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example\.net)raw"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher)});
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher)});
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher)});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore test_store;
   SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
-          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
 
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
   std::vector<SanMatcherPtr> san_matchers;
-  san_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+  san_matchers.push_back(SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   // Verify the certificate with correct SAN regex matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers,
                                                  nullptr, nullptr),
@@ -171,7 +157,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
   std::vector<SanMatcherPtr> invalid_san_matchers;
   invalid_san_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   std::string error;
   // Verify the certificate with incorrect SAN exact matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
@@ -181,13 +167,13 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
 }
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContext) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore test_store;
   SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
-          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
 
   EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
                                                  /*subject_alt_name_matchers=*/{}, nullptr,
@@ -205,13 +191,13 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
 }
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore test_store;
   SslStats stats = generateSslStats(*test_store.rootScope());
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
-          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
 
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -224,20 +210,18 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
 }
 
 TEST(DefaultCertValidatorTest, NoSanInCert) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example\.net)raw"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, WithVerifyDepth) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
   Stats::TestUtil::TestStore test_store;
   SslStats stats = generateSslStats(*test_store.rootScope());
   envoy::config::core::v3::TypedExtensionConfig typed_conf;
@@ -261,8 +245,8 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
       std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false, san_matchers,
                                                                ca_cert_str, 2);
   auto default_validator =
-      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(test_config.get(),
-                                                                                stats, context);
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          test_config.get(), stats, Event::GlobalTimeSystem().timeSystem());
 
   STACK_OF(X509)* intermediates = cert_chain.get();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
@@ -282,7 +266,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
   test_config = std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false,
                                                                          san_matchers, ca_cert_str);
   default_validator = std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
-      test_config.get(), stats, context);
+      test_config.get(), stats, Event::GlobalTimeSystem().timeSystem());
 
   // Re-initialize context
   ssl_ctx = SSL_CTX_new(TLS_method());
@@ -337,8 +321,6 @@ private:
 };
 
 TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   auto mock_context_config = std::make_unique<MockCertificateValidationContextConfig>();
   EXPECT_CALL(*mock_context_config.get(), trustChainVerification())
       .WillRepeatedly(testing::Return(envoy::extensions::transport_sockets::tls::v3::
@@ -347,16 +329,14 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
       std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
   Stats::TestUtil::TestStore store;
   auto ssl_stats = generateSslStats(*store.rootScope());
-  auto validator =
-      std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
+  auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats,
+                                                          Event::GlobalTimeSystem().timeSystem());
   auto ctx = std::vector<SSL_CTX*>();
   EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
                           "Failed to create string SAN matcher of type.*");
 }
 
 TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   auto mock_context_config = std::make_unique<MockCertificateValidationContextConfig>(
       "-----BEGIN CERTIFICATE-----\nincomplete payload");
   EXPECT_CALL(*mock_context_config.get(), trustChainVerification())
@@ -365,8 +345,8 @@ TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
 
   Stats::TestUtil::TestStore store;
   auto ssl_stats = generateSslStats(*store.rootScope());
-  auto validator =
-      std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
+  auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats,
+                                                          Event::GlobalTimeSystem().timeSystem());
   auto ctx = std::vector<SSL_CTX*>();
   EXPECT_THROW_WITH_REGEX(validator->initializeSslContexts(ctx, false), EnvoyException,
                           "Failed to load trusted CA certificates from.*");

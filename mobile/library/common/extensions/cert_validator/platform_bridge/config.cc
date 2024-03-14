@@ -9,7 +9,7 @@ namespace Tls {
 
 CertValidatorPtr PlatformBridgeCertValidatorFactory::createCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& /*context*/) {
+    TimeSource& /*time_source*/) {
   return std::make_unique<PlatformBridgeCertValidator>(config, stats);
 }
 
