@@ -30,7 +30,8 @@ public:
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status(), time_source),
         override_transport_socket_options_(override_transport_socket_options) {
-    const auto address_list_ptr = copyAddressestoMem(address_list);
+    const auto address_list_ptr =
+        std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
     setAddressList(address_list_ptr);
   }
 
@@ -44,7 +45,8 @@ public:
     const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
     auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
     // Create a new shared_ptr to store the address list.
-    const auto address_list_ptr = copyAddressestoMem(address_list);
+    const auto address_list_ptr =
+        std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
 
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);

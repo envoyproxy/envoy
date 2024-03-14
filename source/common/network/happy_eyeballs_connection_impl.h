@@ -18,7 +18,7 @@ class HappyEyeballsConnectionProvider : public ConnectionProvider,
 public:
   HappyEyeballsConnectionProvider(
       Event::Dispatcher& dispatcher,
-      const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list,
+      const std::vector<Address::InstanceConstSharedPtr>& address_list,
       const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
           upstream_local_address_selector,
       UpstreamTransportSocketFactory& socket_factory,
@@ -37,10 +37,10 @@ public:
   // Eyeballs v2. It is assumed that the list must already be sorted as per
   // Section 6 of RFC6724, which happens in the DNS implementations (ares_getaddrinfo()
   // and Apple DNS).
-  static std::vector<Address::InstanceConstSharedPtr> sortAddresses(
-      const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list);
+  static std::vector<Address::InstanceConstSharedPtr>
+  sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& address_list);
   static std::vector<Address::InstanceConstSharedPtr> sortAddressesWithConfig(
-      const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list,
+      const std::vector<Address::InstanceConstSharedPtr>& address_list,
       const absl::optional<
           envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config);
@@ -80,7 +80,7 @@ class HappyEyeballsConnectionImpl : public MultiConnectionBaseImpl,
 public:
   HappyEyeballsConnectionImpl(
       Event::Dispatcher& dispatcher,
-      const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list,
+      const std::vector<Address::InstanceConstSharedPtr>& address_list,
       const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
           upstream_local_address_selector,
       UpstreamTransportSocketFactory& socket_factory,

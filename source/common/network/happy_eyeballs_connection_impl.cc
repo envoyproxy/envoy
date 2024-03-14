@@ -8,8 +8,7 @@ namespace Envoy {
 namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
-    Event::Dispatcher& dispatcher,
-    const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& address_list,
+    Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
     const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
         upstream_local_address_selector,
     UpstreamTransportSocketFactory& socket_factory,
@@ -67,58 +66,49 @@ bool hasMatchingIpVersion(const Address::IpVersion& ip_version,
 } // namespace
 
 std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::sortAddresses(
-    const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& in) {
-  if (in == nullptr) {
-    return {};
-  }
+    const std::vector<Address::InstanceConstSharedPtr>& in) {
   std::vector<Address::InstanceConstSharedPtr> address_list;
-  address_list.reserve(in->size());
+  address_list.reserve(in.size());
   // Iterator which will advance through all addresses matching the first family.
-  auto first = in->begin();
+  auto first = in.begin();
   // Iterator which will advance through all addresses not matching the first family.
   // This initial value is ignored and will be overwritten in the loop below.
-  auto other = in->begin();
-  while (first != in->end() || other != in->end()) {
-    if (first != in->end()) {
+  auto other = in.begin();
+  while (first != in.end() || other != in.end()) {
+    if (first != in.end()) {
       address_list.push_back(*first);
-      first = std::find_if(first + 1, in->end(), [&](const auto& val) {
-        return hasMatchingAddressFamily((*in)[0], val);
-      });
+      first = std::find_if(first + 1, in.end(),
+                           [&](const auto& val) { return hasMatchingAddressFamily(in[0], val); });
     }
 
-    if (other != in->end()) {
-      other = std::find_if(other + 1, in->end(), [&](const auto& val) {
-        return !hasMatchingAddressFamily((*in)[0], val);
-      });
+    if (other != in.end()) {
+      other = std::find_if(other + 1, in.end(),
+                           [&](const auto& val) { return !hasMatchingAddressFamily(in[0], val); });
 
-      if (other != in->end()) {
+      if (other != in.end()) {
         address_list.push_back(*other);
       }
     }
   }
-  ASSERT(address_list.size() == in->size());
+  ASSERT(address_list.size() == in.size());
   return address_list;
 }
 
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionProvider::sortAddressesWithConfig(
-    const std::shared_ptr<const std::vector<Address::InstanceConstSharedPtr>>& in,
+    const std::vector<Address::InstanceConstSharedPtr>& in,
     const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config) {
   if (!happy_eyeballs_config.has_value()) {
     return sortAddresses(in);
   }
-  if (in == nullptr) {
-    return {};
-  }
-
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_sort_address", "sort address with happy_eyeballs config.");
   std::vector<Address::InstanceConstSharedPtr> address_list;
-  address_list.reserve(in->size());
+  address_list.reserve(in.size());
 
   // First_family_ip_version defaults to the first valid ip version
   // unless overwritten by happy_eyeballs_config.
-  Address::IpVersion first_family_ip_version = (*in)[0].get()->ip()->version();
+  Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
   auto first_address_family_count =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(happy_eyeballs_config.value(), first_address_family_count, 1);
@@ -135,31 +125,31 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
     break;
   }
 
-  auto first = std::find_if(in->begin(), in->end(), [&](const auto& val) {
+  auto first = std::find_if(in.begin(), in.end(), [&](const auto& val) {
     return hasMatchingIpVersion(first_family_ip_version, val);
   });
-  auto other = std::find_if(in->begin(), in->end(), [&](const auto& val) {
+  auto other = std::find_if(in.begin(), in.end(), [&](const auto& val) {
     return !hasMatchingIpVersion(first_family_ip_version, val);
   });
 
   // Address::IpVersion first_family_ip_version(Address::IpVersion::v4);
-  while (first != in->end() || other != in->end()) {
+  while (first != in.end() || other != in.end()) {
     uint32_t count = 0;
-    while (first != in->end() && ++count <= first_address_family_count) {
+    while (first != in.end() && ++count <= first_address_family_count) {
       address_list.push_back(*first);
-      first = std::find_if(first + 1, in->end(), [&](const auto& val) {
+      first = std::find_if(first + 1, in.end(), [&](const auto& val) {
         return hasMatchingIpVersion(first_family_ip_version, val);
       });
     }
 
-    if (other != in->end()) {
+    if (other != in.end()) {
       address_list.push_back(*other);
-      other = std::find_if(other + 1, in->end(), [&](const auto& val) {
+      other = std::find_if(other + 1, in.end(), [&](const auto& val) {
         return !hasMatchingIpVersion(first_family_ip_version, val);
       });
     }
   }
-  ASSERT(address_list.size() == in->size());
+  ASSERT(address_list.size() == in.size());
   return address_list;
 }
 
