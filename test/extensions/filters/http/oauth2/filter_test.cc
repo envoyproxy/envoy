@@ -2565,7 +2565,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
        "BearerToken=accessToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(), "IdToken=idToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=refreshToken;path=/;Max-Age=10;secure;HttpOnly"},
+       "RefreshToken=refreshToken;path=/;Max-Age=604800;secure;HttpOnly"},
   };
 
   EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
@@ -2634,7 +2634,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
        "BearerToken=accessToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(), "IdToken=idToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=refreshToken;path=/;Max-Age=10;secure;HttpOnly"},
+       "RefreshToken=refreshToken;path=/;Max-Age=604800;secure;HttpOnly"},
   };
 
   EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
