@@ -56,29 +56,20 @@ Grpc::Status::WellKnownGrpcStatus resultCaseToCheckStatus(
   return check_status;
 }
 
-class FuzzerMocks {
+class StatelessFuzzerMocks {
 public:
-  FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
-    ON_CALL(decoder_callbacks_, connection())
-        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  StatelessFuzzerMocks()
+      : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
-  void setFilterMetadata(const envoy::config::core::v3::Metadata& metadata) {
-    filter_metadata_.CopyFrom(metadata);
-  }
-
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Grpc::MockAsyncRequest> async_request_;
   Envoy::Tracing::MockSpan mock_span_;
-
-  // Returned by mock decoder_callbacks_.stream_info_.dynamicMetadata()
-  envoy::config::core::v3::Metadata filter_metadata_;
 };
 
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
@@ -89,7 +80,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
     return;
   }
 
-  FuzzerMocks mocks;
+  static StatelessFuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -111,13 +102,17 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   auto grpc_client = new Filters::Common::ExtAuthz::GrpcClientImpl(internal_mock_client,
                                                                    std::chrono::milliseconds(1000));
   auto filter = std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{grpc_client});
-  filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
-  filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   // Set metadata context.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(decoder_callbacks, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{mocks.connection_}));
   envoy::config::core::v3::Metadata metadata = input.filter_metadata();
-  ON_CALL(mocks.decoder_callbacks_.stream_info_, dynamicMetadata())
+  ON_CALL(decoder_callbacks.stream_info_, dynamicMetadata())
       .WillByDefault(testing::ReturnRef(metadata));
+
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   // Set check result default action.
   ON_CALL(*internal_mock_client, sendRaw(_, _, _, _, _, _))
