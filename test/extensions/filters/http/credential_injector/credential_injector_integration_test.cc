@@ -36,6 +36,49 @@ INSTANTIATE_TEST_SUITE_P(
 
 // Inject credential to a request without credential
 TEST_P(CredentialInjectorIntegrationTestAllProtocols, InjectCredential) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("credential");
+    auto* generic = secret->mutable_generic_secret();
+    generic->mutable_secret()->set_inline_string("Basic base64EncodedUsernamePassword");
+  });
+
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: basic_auth
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.injected_credentials.generic.v3.Generic
+      credential:
+        name: credential
+)EOF";
+  initializeFilter(filter_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Basic base64EncodedUsernamePassword",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("Authorization"))[0]
+                ->value()
+                .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
+}
+
+// Inject credential to a request without credential
+TEST_P(CredentialInjectorIntegrationTestAllProtocols, InjectCredentialStaticSecret) {
   const std::string filter_config =
       R"EOF(
 name: envoy.filters.http.credential_injector
@@ -164,3 +207,4 @@ typed_config:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
