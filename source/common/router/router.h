@@ -603,7 +603,7 @@ private:
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
   bool wait_for_connect_ : 1;
-  // set to true when retrying on connection error, buffer limit has been exceeded and
+  // Set to true when retrying on connection error, buffer limit has been exceeded and
   // the router hasn't got any connection with upstream.
   bool buffer_limit_exceeded_no_connection_ : 1;
   bool include_attempt_count_in_request_ : 1;

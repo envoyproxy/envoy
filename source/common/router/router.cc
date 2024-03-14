@@ -852,10 +852,9 @@ void Filter::giveUpRetryAndShadow(bool drain_buffer) {
   request_buffer_overflowed_ = true;
   buffer_limit_exceeded_no_connection_ = false;
   if (drain_buffer) {
-    // we previously went over the buffer limit, which pause the read on the downstream connection.
-    // draining the buffer so we enable read on the downstream connection;
-    // the buffer size will go bellow
-    // this buffer is only used to send the body when retrying and shadowing which has been disable
+    // We previously went over the buffer limit, which pause the read on the downstream connection.
+    // draining the buffer so we enable read on the downstream connection.
+    // This buffer is only used to send the body when retrying and shadowing which has been disable
     // above.
     callbacks_->modifyDecodingBuffer([](Buffer::Instance& data) { data.drain(data.length()); });
   }
@@ -863,10 +862,10 @@ void Filter::giveUpRetryAndShadow(bool drain_buffer) {
 
 void Filter::onUpstreamConnectionEstablished() {
   wait_for_connect_ = false;
-  ENVOY_LOG(trace, "Got connection with upstream");
+  ENVOY_LOG(trace, "Got connection with upstream.");
   if (buffer_limit_exceeded_no_connection_) {
-    ENVOY_LOG(debug, "Giving up on retry and shadow and enabling read on downstream connection");
-    // disabling retry and shadow: the requests is to big
+    ENVOY_LOG(debug, "Giving up on retry and shadow and enabling read on downstream connection.");
+    // Disabling retry and shadow: the requests is to big.
     giveUpRetryAndShadow(true);
   }
 }
@@ -885,16 +884,16 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   if (buffering && !buffer_limit_exceeded_no_connection_ &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     if (wait_for_connect_) {
-      // we are still waiting for a connection, going over the buffer limit which will pause the
-      // read on the downstream connection
+      // We are still waiting for a connection, going over the buffer limit which will pause the
+      // read on the downstream connection.
       ENVOY_LOG(debug,
                 "Going over buffer limit {} due to wait on connect. buffer size: {}."
                 "This will pause read on downstream connection.",
                 retry_shadow_buffer_limit_,
                 getLength(callbacks_->decodingBuffer()) + data.length());
       buffer_limit_exceeded_no_connection_ = true;
-      // ensure we stop on reading, the buffer limit might be greater than
-      // retry_shadow_buffer_limit_ due to an override per route of the retry_shadow_buffer limit
+      // Ensure we stop on reading, the buffer limit might be greater than
+      // retry_shadow_buffer_limit_ due to an override per route of the retry_shadow_buffer limit.
       callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     } else {
       ENVOY_LOG(
@@ -903,8 +902,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
           "up on the retry/shadow.",
           getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
       buffering = false;
-      // give up retrying but do not drain the buffer
-      // it can happen that the buffer has never been initialized
+      // Give up retrying but do not drain the buffer,
+      // the buffer might have never been initialized.
       giveUpRetryAndShadow(false);
 
       // If we had to abandon buffering and there's no request in progress, abort the request and
@@ -1414,8 +1413,8 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
     return;
   }
 
-  // we never got a connection and pause the read on downstream
-  // we probably did not retry because we reached the maximum allowed number of retries
+  // A connection was never successfully and read on downstream connection has been paused.
+  // The error was probably not retry because the maximum number of retries has been reached.
   if (buffer_limit_exceeded_no_connection_) {
     giveUpRetryAndShadow(true);
   }

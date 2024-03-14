@@ -2908,14 +2908,14 @@ TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
   router_->retry_connection_failure = true;
   router_->decodeHeaders(headers, false);
 
-  // still waiting for a connection does not cancel retry_state
+  // Still waiting for a connection, does not cancel retry_state.
   EXPECT_CALL(callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
   const std::string body1(50, 'a');
   Buffer::OwnedImpl buf1(body1);
   router_->decodeData(buf1, false);
 
-  // trigger retry
+  // Trigger retry.
   router_->retry_state_->expectResetRetry();
   conn_pool_callback();
   ASSERT(router_->retry_state_->callback_ != nullptr);
@@ -2925,7 +2925,7 @@ TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   router_->retry_state_->callback_();
 
-  // simulate router got connection
+  // Simulate router got connection with upstream.
   router_->onUpstreamConnectionEstablished();
 
   const std::string body2("body");
@@ -2936,7 +2936,7 @@ TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  // verify number of retries and metrics
+  // Verify number of retries and retry_or_shadow_abandoned metrics.
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("retry_or_shadow_abandoned")
                     .value());

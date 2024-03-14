@@ -443,8 +443,8 @@ public:
                                        DoRetryResetCallback callback) PURE;
 
   /**
-   * Determine whether a failed request on connection failure should be retried
-   * @return whether a connection failure should be reattempted
+   * Determine whether a failed request on connection failure should be retried.
+   * @return whether a connection failure should be reattempted.
    */
   virtual bool shouldRetryOnConnectionFailure() const PURE;
 
