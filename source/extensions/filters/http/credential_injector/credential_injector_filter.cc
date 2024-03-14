@@ -82,7 +82,7 @@ Http::FilterHeadersStatus CredentialInjectorFilter::decodeHeaders(Http::RequestH
   }
 
   // The credential provider has successfully retrieved the credential, inject it to the header
-  bool succeed = config_->injectCredential(*request_headers_);
+  bool succeed = config_->injectCredential(headers);
   if (!succeed && !config_->allowRequestWithoutCredential()) {
     decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
                                        nullptr, absl::nullopt, "failed_to_inject_credential");
@@ -102,6 +102,7 @@ void CredentialInjectorFilter::onSuccess() {
   if (!succeed && !config_->allowRequestWithoutCredential()) {
     decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, "Failed to inject credential.",
                                        nullptr, absl::nullopt, "failed_to_inject_credential");
+    request_headers_ = nullptr;
     return;
   }
 
@@ -116,6 +117,7 @@ void CredentialInjectorFilter::onFailure(const std::string& reason) {
   credential_init_ = true; // TODO: retry after a certain period of time
   credential_success_ = false;
   in_flight_credential_request_ = nullptr;
+  request_headers_ = nullptr;
 
   // Credential provider has failed to retrieve the credential
   ENVOY_LOG(warn, "Failed to get credential: {}", reason);
