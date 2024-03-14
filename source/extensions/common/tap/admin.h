@@ -36,7 +36,8 @@ class AdminHandler : public Singleton::Instance,
                      public Extensions::Common::Tap::Sink,
                      Logger::Loggable<Logger::Id::tap> {
 public:
-  AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher, const uint64_t& max_concurrent_streams);
+  AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher,
+               const uint64_t& max_concurrent_streams);
   ~AdminHandler() override;
 
   /**
@@ -148,7 +149,7 @@ private:
     envoy::config::tap::v3::OutputSink::Format format() const {
       return config_.output_config().sinks()[0].format();
     }
-    std::set<Server::AdminStream*>& streams()  { return admin_stream_set_; }
+    std::set<Server::AdminStream*>& streams() { return admin_stream_set_; }
 
   protected:
     Event::Dispatcher& dispatcher() { return main_thread_dispatcher_; }

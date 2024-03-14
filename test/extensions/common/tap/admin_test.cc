@@ -72,12 +72,14 @@ private:
 
 class BaseAdminHandlerTest : public testing::Test {
 public:
-  void setup(Network::Address::Type socket_type = Network::Address::Type::Ip, uint32_t max_concurrent_streams = 1) {
+  void setup(Network::Address::Type socket_type = Network::Address::Type::Ip,
+             uint32_t max_concurrent_streams = 1) {
     ON_CALL(admin_.socket_, addressType()).WillByDefault(Return(socket_type));
     EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true, _))
         .WillOnce(DoAll(SaveArg<2>(&cb_), Return(true)));
     EXPECT_CALL(admin_, socket());
-    handler_ = std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_, max_concurrent_streams);
+    handler_ =
+        std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_, max_concurrent_streams);
   }
 
   void TearDown() override { main_thread_dispatcher_.drain(); }
@@ -330,7 +332,7 @@ TEST_F(AdminHandlerTest, UnknownConfigId) {
 
 // Request while exceeding the max concurrency number (1 in this situation).
 TEST_F(AdminHandlerTest, RequestTapExceedMaxConcurrency) {
-  setup(Network::Address::Type::Pipe,1);
+  setup(Network::Address::Type::Pipe, 1);
   MockExtensionConfig extension_config;
   handler_->registerConfig(extension_config, "test_config_id");
 
@@ -345,9 +347,9 @@ TEST_F(AdminHandlerTest, RequestTapExceedMaxConcurrency) {
   EXPECT_EQ("Maximum concurrent attached request reach. Detach it.", response_.toString());
 }
 
-// Requests whlie max_concurrent_streams = 2 is set to allow 2 admin request attaching.
+// Requests while max_concurrent_streams = 2 is set to allow 2 admin request attaching.
 TEST_F(AdminHandlerTest, MultipleRequestTapAttached) {
-  setup(Network::Address::Type::Pipe,2);
+  setup(Network::Address::Type::Pipe, 2);
   MockExtensionConfig extension_config;
   handler_->registerConfig(extension_config, "test_config_id");
 

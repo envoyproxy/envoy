@@ -44,7 +44,7 @@ message AdminConfig {
   // matched to the configured filter opaque ID to determine which filter to configure.
   string config_id = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Threshold of maximum atached request supported. Additional request's will be attached until re
+  // Threshold of maximum attached request supported. Additional request's will be attached until re
   // aching the maximum concurrency. The default value is 1. The maximum value is 512*1024.
   google.protobuf.UInt32Value max_concurrent_streams = 2 [(validate.rules).uint32 = {lte: 524288 gte: 1}];
 }

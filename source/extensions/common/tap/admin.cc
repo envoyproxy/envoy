@@ -17,10 +17,10 @@ namespace Tap {
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(tap_admin_handler);
 
-AdminHandlerSharedPtr
-AdminHandler::getSingleton(OptRef<Server::Admin> admin, Singleton::Manager& singleton_manager,
-                           Event::Dispatcher& main_thread_dispatcher,
-                           const uint64_t& max_concurrent_streams) {
+AdminHandlerSharedPtr AdminHandler::getSingleton(OptRef<Server::Admin> admin,
+                                                 Singleton::Manager& singleton_manager,
+                                                 Event::Dispatcher& main_thread_dispatcher,
+                                                 const uint64_t& max_concurrent_streams) {
   return singleton_manager.getTyped<AdminHandler>(
       SINGLETON_MANAGER_REGISTERED_NAME(tap_admin_handler),
       [&admin, &main_thread_dispatcher, &max_concurrent_streams] {
@@ -241,8 +241,8 @@ AdminHandler::AttachedRequest::AttachedRequest(AdminHandler* admin_handler,
                                                const envoy::admin::v3::TapRequest& tap_request,
                                                Server::AdminStream* admin_stream)
     : config_id_(tap_request.config_id()), config_(tap_request.tap_config()),
-      main_thread_dispatcher_(admin_handler->main_thread_dispatcher_),
-      admin_stream_set_{admin_stream} {}
+      main_thread_dispatcher_(admin_handler->main_thread_dispatcher_), admin_stream_set_{
+                                                                           admin_stream} {}
 
 AdminHandler::AttachedRequestBuffered::AttachedRequestBuffered(
     AdminHandler* admin_handler, const envoy::admin::v3::TapRequest& tap_request,
