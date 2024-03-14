@@ -68,9 +68,12 @@ public:
     return HostImpl::address();
   }
 
-  const std::pair<
-      Network::Address::InstanceConstSharedPtr,
-      const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>>
+  // Return a thread local copy of the address and address_list pointer under lock.
+  // If the address or address_list pointers point to different memory space during DNS refreshing,
+  // the thread local pointers will still point to a valid memory space. This avoids race issues
+  // when main thread is changing the host addresses, and worker threads are using them create
+  // connections.
+  const std::pair<Network::Address::InstanceConstSharedPtr, const AddressVectorSharedPtr>
   copyAddressAndList() const {
     absl::ReaderMutexLock lock(&address_lock_);
     return {HostImpl::address(), HostImpl::addressList()};
@@ -121,10 +124,7 @@ public:
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>&
-  addressList() const override {
-    return logical_host_->addressList();
-  }
+  const AddressVectorSharedPtr addressList() const override { return logical_host_->addressList(); }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
   }

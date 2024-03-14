@@ -9,7 +9,7 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
   const std::vector<Network::Address::InstanceConstSharedPtr> address_list = {};
   const auto [current_address, address_list_ptr] = copyAddressAndList();
   return HostImpl::createConnection(
-      dispatcher, cluster(), current_address, addressList() ? *addressList() : address_list,
+      dispatcher, cluster(), current_address, address_list_ptr ? *address_list_ptr : address_list,
       transportSocketFactory(), options,
       override_transport_socket_options_ != nullptr ? override_transport_socket_options_
                                                     : transport_socket_options,
