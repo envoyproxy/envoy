@@ -14,6 +14,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "jwt_verify_lib/check_audience.h"
 
@@ -65,6 +66,16 @@ public:
       sub_matcher_.emplace(jwt_provider_.subjects());
     }
 
+    if (jwt_provider_.require_expiration()) {
+      max_exp_ = absl::InfiniteDuration();
+    }
+
+    if (jwt_provider_.has_max_lifetime()) {
+      // Intentionally overwrite previous max_exp_. max_lifetime takes precedence.
+      max_exp_ = absl::Seconds(jwt_provider_.max_lifetime().seconds()) +
+                 absl::Nanoseconds(jwt_provider_.max_lifetime().nanos());
+    }
+
     bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
     const auto& config = jwt_provider_.jwt_cache_config();
     tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
@@ -106,6 +117,27 @@ public:
     }
 
     return sub_matcher_->match(jwt_subject);
+  }
+
+  bool isLifetimeAllowed(const absl::Time& now, const absl::Time* exp) const override {
+    // This function takes the current time and calculates the remaining lifetime of the JWT.
+    // Then it compares that with the max lifetime in the config. Using issue time or not before
+    // claims would be better, but optional according to the spec.
+
+    // Without a max lifetime, any exp is allowed.
+    if (!max_exp_.has_value()) {
+      return true;
+    }
+
+    // If there's no exp field and we have a max set, then this isn't allowed.
+    if (exp == nullptr) {
+      return false;
+    }
+
+    // Take the remaining credential lifetime and return if it's less
+    // than the max.
+    absl::Duration lifetime = *exp - now;
+    return lifetime < *max_exp_;
   }
 
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
@@ -158,6 +190,7 @@ private:
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> sub_matcher_;
+  absl::optional<absl::Duration> max_exp_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
