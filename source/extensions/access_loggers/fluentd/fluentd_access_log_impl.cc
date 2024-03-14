@@ -125,9 +125,9 @@ void FluentdAccessLoggerImpl::maybeReconnect() {
     return;
   }
 
-  uint64_t nextBackOffMs = backoff_strategy_->nextBackOffMs();
-  retry_timer_->enableTimer(std::chrono::milliseconds(nextBackOffMs));
-  ENVOY_LOG(debug, "reconnect attempt scheduled for {} ms", nextBackOffMs);
+  uint64_t next_backoff_ms = backoff_strategy_->nextBackOffMs();
+  retry_timer_->enableTimer(std::chrono::milliseconds(next_backoff_ms));
+  ENVOY_LOG(debug, "reconnect attempt scheduled for {} ms", next_backoff_ms);
 }
 
 void FluentdAccessLoggerImpl::onBackoffCallback() {
