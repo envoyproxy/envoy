@@ -60,7 +60,6 @@ envoy_cc_library(
     srcs = [
         "bridge_utility.cc",
         "engine.cc",
-        "engine_callbacks.cc",
         "headers.cc",
         "headers_builder.cc",
         "key_value_store.cc",
@@ -85,7 +84,6 @@ envoy_cc_library(
         "bridge_utility.h",
         "direct_response_testing.h",
         "engine.h",
-        "engine_callbacks.h",
         "envoy_error.h",
         "headers.h",
         "headers_builder.h",

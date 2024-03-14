@@ -483,16 +483,6 @@ typedef struct {
 } envoy_http_callbacks;
 
 /**
- * Interface that can handle engine callbacks.
- */
-typedef struct {
-  envoy_on_engine_running_f on_engine_running;
-  envoy_on_exit_f on_exit;
-  // Context passed through to callbacks to provide dispatch and execution state.
-  void* context;
-} envoy_engine_callbacks;
-
-/**
  * Interface for logging.
  */
 typedef struct {
