@@ -250,7 +250,6 @@ public:
     createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
     request_encoder_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
-    request_encoder_->getStream().setDeferredLoggingHeadersAndTrailers();
     setupDefaultConnectionMocks();
     driveToCompletion();
 
