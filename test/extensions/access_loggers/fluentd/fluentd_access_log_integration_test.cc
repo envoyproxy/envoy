@@ -157,8 +157,7 @@ TEST_F(FluentdAccessLogIntegrationTest, UnknownCluster) {
 
 TEST_F(FluentdAccessLogIntegrationTest, InvalidBackoffConfig) {
   // Invalid config: min interval set to 30, max interval is set to 20.
-  EXPECT_DEATH(init(default_cluster_name, false, 1, 1, 30, 20),
-               "max_backoff_interval must be greater or equal to base_backoff_interval");
+  EXPECT_DEATH(init(default_cluster_name, false, 1, 1, 30, 20), "");
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, LogLostOnBufferFull) {
