@@ -34,7 +34,6 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
-#include "source/common/tls/context_manager_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/memory/stats.h"
@@ -51,6 +50,7 @@
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/stats/timespan_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
@@ -749,7 +749,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
