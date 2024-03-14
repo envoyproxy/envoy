@@ -306,7 +306,7 @@ TEST(Factory, AsyncRequestCredentialSuccess) {
             filter->decodeHeaders(request_headers, true));
 
   EXPECT_CALL(decoder_filter_callbacks, continueDecoding());
-  // Mock onSucces() is called asynchronously
+  // Mock onSuccess is called asynchronously
   filter->onSuccess();
   filter->onDestroy();
 }
@@ -338,7 +338,7 @@ TEST(Factory, AsyncRequestCredentialFailDisAllowWithoutCredential) {
         EXPECT_EQ(grpc_status, absl::nullopt);
         EXPECT_EQ(details, "failed_to_inject_credential");
       }));
-  // Mock onSucces() is called asynchronously
+  // Mock onFailure is called asynchronously
   filter->onFailure("fail to get credential");
   filter->onDestroy();
 }
@@ -361,7 +361,7 @@ TEST(Factory, AsyncRequestCredentialFailAllowWithoutCredential) {
             filter->decodeHeaders(request_headers, true));
 
   EXPECT_CALL(decoder_filter_callbacks, continueDecoding());
-  // Mock onSucces() is called asynchronously
+  // Mock onFailure is called asynchronously
   filter->onFailure("fail to get credential");
   filter->onDestroy();
 }
