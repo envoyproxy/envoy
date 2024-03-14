@@ -1856,8 +1856,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
         // We used to always return failure here but it looks now this can get called if the other
         // side sends GOAWAY and we are trying to send a SETTINGS ACK. Just ignore this for now.
         static_cast<ConnectionImpl*>(user_data)->onFrameNotSend(
-            frame->hd.stream_id, frame->hd.length, frame->hd.type,
-            frame->hd.flags);
+            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags);
         return 0;
       });
 
