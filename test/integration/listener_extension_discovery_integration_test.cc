@@ -677,6 +677,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemo
   envoy::admin::v3::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
   // With /config_dump?resource=ecds_filters, the response has the format: EcdsFilterConfig.
+  // The number of current ECDS configurations is zero because the ECDS resources have been deleted
+  // due to expiration.
   EXPECT_EQ(0, config_dump.configs_size());
 }
 
