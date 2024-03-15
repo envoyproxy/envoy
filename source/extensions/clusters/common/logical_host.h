@@ -124,7 +124,9 @@ public:
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const AddressVectorSharedPtr& addressList() const override { return logical_host_->addressList(); }
+  const AddressVectorSharedPtr& addressList() const override {
+    return logical_host_->addressList();
+  }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
   }
