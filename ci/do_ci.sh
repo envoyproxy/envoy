@@ -271,6 +271,7 @@ case $CI_TARGET in
             @envoy_api//tools:tap2pcap_test
         echo "Building API..."
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --action_env=FOO=BAR \
               -c fastbuild @envoy_api//envoy/...
         if [[ -n "$ENVOY_API_ONLY" ]]; then
             exit 0
