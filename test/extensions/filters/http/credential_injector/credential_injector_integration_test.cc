@@ -207,4 +207,3 @@ typed_config:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
