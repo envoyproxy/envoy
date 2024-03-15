@@ -249,8 +249,8 @@ void StartTlsIntegrationTest::initialize() {
   // Setup factory and context for tls transport socket.
   // The tls transport socket will be inserted into fake_upstream when
   // upstream starttls transport socket is converted to secure mode.
-  tls_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext downstream_tls_context;
 

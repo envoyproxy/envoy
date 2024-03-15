@@ -33,8 +33,28 @@ CALENDAR = "https://calendar.google.com/calendar/ical/d6glc0l5rc3v235q9l2j29dgov
 ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+label%3Atriage"
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
+OPSGENIE_TO_SLACK = {
+    'Adi': 'UT17EMMTP',
+    'Alyssa': 'U78RP48V9',
+    'Greg': 'U78MBV869',
+    'Harvey': 'U78E7055Z',
+    'Joshua': 'U80HPLBPG',
+    'Kevin': 'U016ZPU8KBK',
+    'Keith': 'UGS5P90CF',
+    'kuat': 'U7KTRAA8M',
+    'Lizan': 'U79E51EQ6',
+    'Matt': 'U5CALEVSL',
+    'Kateryna': 'UDYUWRL13',
+    'phlax': 'U017PLM0GNQ',
+    'Raven': 'U02MJHFEX35',
+    'Ryan': 'U01SW3JC8GP',
+    'Hejie': 'U01GNQ3B8AY',
+    'Baiping': 'U017KF5C0Q6',
+    'Yan': 'UJHLR5KFS',
+    'Stephan': 'U78J72Q82',
+}
+
 MAINTAINERS = {
-    'abeyad': 'U03CVM7GPM1',
     'adisuissa': 'UT17EMMTP',
     'alyssawilk': 'U78RP48V9',
     'ggreenway': 'U78MBV869',
@@ -49,7 +69,6 @@ MAINTAINERS = {
     'phlax': 'U017PLM0GNQ',
     'ravenblackx': 'U02MJHFEX35',
     'RyanTheOptimist': 'U01SW3JC8GP',
-    'snowp': 'U93KTPQP6',
     'soulxu': 'U01GNQ3B8AY',
     'wbpcode': 'U017KF5C0Q6',
     'yanavlasov': 'UJHLR5KFS',
@@ -151,6 +170,17 @@ class RepoNotifier(runner.Runner):
                     return component.get("summary")
         return "unable to find this week's oncall"
 
+    @async_property
+    async def oncall_slack_handle(self):
+        opsgenie_string = await self.oncall_string
+        # Snag the first name from the "oncall transitioning to" entry.
+        opsgenie_name = opsgenie_string.split(' ', 1)[0]
+        # Check that the name is in the OPSGENIE_TO_SLACK list, else cc alyssa.
+        if not (uid := OPSGENIE_TO_SLACK.get(opsgenie_name)):
+            print("could not find", opsgenie_name)
+            return OPSGENIE_TO_SLACK.get('Alyssa')
+        return uid
+
     @async_property(cache=True)
     async def tracked_prs(self):
         # A dict of maintainer : outstanding_pr_string to be sent to slack
@@ -250,11 +280,14 @@ class RepoNotifier(runner.Runner):
         try:
             unassigned = "\n".join(await self.unassigned_prs)
             stalled = "\n".join(await self.stalled_prs)
+            oncall_handle = await self.oncall_slack_handle
             # On Monday, post the new oncall.
             if datetime.date.today().weekday() == 0:
                 oncall = await self.oncall_string
                 await self.send_message(channel='#envoy-maintainer-oncall', text=(f"{oncall}"))
                 await self.send_message(channel='#general', text=(f"{oncall}"))
+            await self.send_message(
+                channel='#envoy-maintainer-oncall', text=(f"Oncall now <@{oncall_handle}>"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))

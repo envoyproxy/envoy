@@ -343,11 +343,11 @@ static Envoy::JNI::LocalRefUniquePtr<jobjectArray> jvm_on_data(const char* metho
 
   Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmCallbackContext =
       jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onData =
-      jni_helper.getMethodId(jcls_JvmCallbackContext.get(), method, "([BZ[J)Ljava/lang/Object;");
+  jmethodID jmid_onData = jni_helper.getMethodId(jcls_JvmCallbackContext.get(), method,
+                                                 "(Ljava/nio/ByteBuffer;Z[J)Ljava/lang/Object;");
 
-  Envoy::JNI::LocalRefUniquePtr<jbyteArray> j_data =
-      Envoy::JNI::envoyDataToJavaByteArray(jni_helper, data);
+  Envoy::JNI::LocalRefUniquePtr<jobject> j_data =
+      Envoy::JNI::envoyDataToJavaByteBuffer(jni_helper, data);
   Envoy::JNI::LocalRefUniquePtr<jlongArray> j_stream_intel =
       Envoy::JNI::envoyStreamIntelToJavaLongArray(jni_helper, stream_intel);
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> result = jni_helper.callObjectMethod<jobjectArray>(
@@ -605,10 +605,10 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
     headers_length = static_cast<jlong>(headers->length);
     passHeaders("passHeader", *headers, j_context);
   }
-  Envoy::JNI::LocalRefUniquePtr<jbyteArray> j_in_data = Envoy::JNI::LocalRefUniquePtr<jbyteArray>(
+  Envoy::JNI::LocalRefUniquePtr<jobject> j_in_data = Envoy::JNI::LocalRefUniquePtr<jobject>(
       nullptr, Envoy::JNI::LocalRefDeleter(jni_helper.getEnv()));
   if (data) {
-    j_in_data = Envoy::JNI::envoyDataToJavaByteArray(jni_helper, *data);
+    j_in_data = Envoy::JNI::envoyDataToJavaByteBuffer(jni_helper, *data);
   }
   jlong trailers_length = -1;
   if (trailers) {
@@ -620,8 +620,8 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
 
   Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmCallbackContext =
       jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onResume =
-      jni_helper.getMethodId(jcls_JvmCallbackContext.get(), method, "(J[BJZ[J)Ljava/lang/Object;");
+  jmethodID jmid_onResume = jni_helper.getMethodId(
+      jcls_JvmCallbackContext.get(), method, "(JLjava/nio/ByteBuffer;JZ[J)Ljava/lang/Object;");
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
   Envoy::JNI::LocalRefUniquePtr<jobjectArray> result = jni_helper.callObjectMethod<jobjectArray>(
@@ -1173,7 +1173,8 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jstring http3_connection_options, jstring http3_client_connection_options,
                       jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
                       jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
+                      jboolean enable_port_migration, jboolean enable_socket_tagging,
+                      jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
@@ -1218,6 +1219,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   for (const std::string& suffix : suffixes) {
     builder.addQuicCanonicalSuffix(suffix);
   }
+  builder.enablePortMigration(enable_port_migration);
 
 #endif
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
@@ -1268,8 +1270,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean enable_http3, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-    jboolean enable_brotli_decompression, jboolean enable_socket_tagging,
-    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jboolean enable_brotli_decompression, jboolean enable_port_migration,
+    jboolean enable_socket_tagging, jboolean enable_interface_binding,
+    jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
@@ -1288,8 +1291,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                    enable_dns_cache, dns_cache_save_interval_seconds, enable_drain_post_dns_refresh,
                    enable_http3, http3_connection_options, http3_client_connection_options,
                    quic_hints, quic_canonical_suffixes, enable_gzip_decompression,
-                   enable_brotli_decompression, enable_socket_tagging, enable_interface_binding,
-                   h2_connection_keepalive_idle_interval_milliseconds,
+                   enable_brotli_decompression, enable_port_migration, enable_socket_tagging,
+                   enable_interface_binding, h2_connection_keepalive_idle_interval_milliseconds,
                    h2_connection_keepalive_timeout_seconds, max_connections_per_host,
                    stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
                    trust_chain_verification, filter_chain, enable_platform_certificates_validation,

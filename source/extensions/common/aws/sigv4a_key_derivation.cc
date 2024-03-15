@@ -24,7 +24,7 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
   std::vector<uint8_t> fixed_input(required_fixed_input_length);
 
   const auto secret_key =
-      absl::StrCat(SigV4ASignatureConstants::get().SigV4ASignatureVersion, secret_access_key);
+      absl::StrCat(SigV4ASignatureConstants::SigV4ASignatureVersion, secret_access_key);
 
   enum SigV4AKeyDerivationResult result = AkdrNextCounter;
   uint8_t external_counter = 1;
@@ -38,8 +38,9 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
     fixed_input.clear();
 
     fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
-    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::get().SigV4ALabel.begin(),
-                       SigV4ASignatureConstants::get().SigV4ALabel.end());
+    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::SigV4AAlgorithm[0],
+                       SigV4ASignatureConstants::SigV4AAlgorithm[0] +
+                           sizeof(SigV4ASignatureConstants::SigV4AAlgorithm));
     fixed_input.insert(fixed_input.end(), 0x00);
     fixed_input.insert(fixed_input.end(), access_key_id.begin(), access_key_id.end());
     fixed_input.insert(fixed_input.end(), external_counter);

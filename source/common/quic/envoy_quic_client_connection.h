@@ -60,7 +60,7 @@ public:
                             Network::Address::InstanceConstSharedPtr local_addr,
                             Event::Dispatcher& dispatcher,
                             const Network::ConnectionSocket::OptionsSharedPtr& options,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -69,7 +69,7 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -135,7 +135,7 @@ private:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 
@@ -150,6 +150,8 @@ private:
   bool migrate_port_on_path_degrading_{false};
   uint8_t num_socket_switches_{0};
   size_t num_packets_with_unknown_dst_address_{0};
+  const bool prefer_gro_;
+  const bool disallow_mmsg_;
 };
 
 } // namespace Quic

@@ -12,7 +12,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
@@ -83,50 +83,6 @@ std::string resultCaseToHttpStatus(
   return check_status;
 }
 
-Filters::Common::ExtAuthz::ClientConfigSharedPtr createConfig() {
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
-  const std::string default_yaml = R"EOF(
-    http_service:
-      server_uri:
-        uri: "ext_authz:9000"
-        cluster: "ext_authz"
-        timeout: 0.25s
-
-      authorization_request:
-        headers_to_add:
-        - key: "x-authz-header1"
-          value: "value"
-        - key: "x-authz-header2"
-          value: "value"
-
-      authorization_response:
-        allowed_upstream_headers:
-          patterns:
-          - exact: Bar
-            ignore_case: true
-          - prefix: "X-"
-            ignore_case: true
-        allowed_upstream_headers_to_append:
-          patterns:
-          - exact: Alice
-            ignore_case: true
-          - prefix: "Append-"
-            ignore_case: true
-        allowed_client_headers:
-          patterns:
-          - exact: Foo
-            ignore_case: true
-          - prefix: "X-"
-            ignore_case: true
-        allowed_client_headers_on_success:
-          patterns:
-          - prefix: "X-Downstream-"
-            ignore_case: true
-    )EOF";
-  TestUtility::loadFromYaml(default_yaml, proto_config);
-
-  return std::make_shared<Filters::Common::ExtAuthz::ClientConfig>(proto_config, 250, "/bar");
-}
 
 class StatelessFuzzerMocks {
 public:
@@ -138,13 +94,13 @@ public:
 
   // Only add mocks here that are stateless. I.e. if you need to call ON_CALL on a mock each fuzzer
   // run, do not add the mock here, because it will leak memory.
-  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
 };
 
-class ReusableGrpcClientFactory : public Filters::Common::ExtAuthz::Client {
+class ReusableGrpcClientFactory {
 public:
   ReusableGrpcClientFactory()
       : internal_grpc_mock_client_(std::make_shared<NiceMock<Grpc::MockAsyncClient>>()) {
@@ -181,14 +137,6 @@ public:
     return std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl>{grpc_client_};
   }
 
-  void cancel() override { grpc_client_->cancel(); }
-
-  void check(Filter::RequestCallbacks& callback,
-             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
-             const StreamInfo::StreamInfo& stream_info) override {
-    grpc_client_->check(callback, request, parent_span, stream_info);
-  }
-
 private:
   std::shared_ptr<NiceMock<Grpc::MockAsyncClient>> internal_grpc_mock_client_;
   Envoy::Tracing::MockSpan mock_span_;
@@ -199,7 +147,7 @@ private:
   Filters::Common::ExtAuthz::GrpcClientImpl* grpc_client_;
 };
 
-class ReusableHttpClientFactory : public Filters::Common::ExtAuthz::Client {
+class ReusableHttpClientFactory {
 public:
   ReusableHttpClientFactory() : http_sync_request_(&internal_http_mock_client_) {
     cm_.initializeThreadLocalClusters({"ext_authz"});
@@ -227,18 +175,57 @@ public:
     return std::unique_ptr<Filters::Common::ExtAuthz::RawHttpClientImpl>(http_client_);
   }
 
-  void cancel() override { http_client_->cancel(); }
+private:
+  Filters::Common::ExtAuthz::ClientConfigSharedPtr createConfig() {
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+    const std::string default_yaml = R"EOF(
+      http_service:
+        server_uri:
+          uri: "ext_authz:9000"
+          cluster: "ext_authz"
+          timeout: 0.25s
 
-  void check(Filter::RequestCallbacks& callback,
-             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
-             const StreamInfo::StreamInfo& stream_info) override {
-    http_client_->check(callback, request, parent_span, stream_info);
+        authorization_request:
+          headers_to_add:
+          - key: "x-authz-header1"
+            value: "value"
+          - key: "x-authz-header2"
+            value: "value"
+
+        authorization_response:
+          allowed_upstream_headers:
+            patterns:
+            - exact: Bar
+              ignore_case: true
+            - prefix: "X-"
+              ignore_case: true
+          allowed_upstream_headers_to_append:
+            patterns:
+            - exact: Alice
+              ignore_case: true
+            - prefix: "Append-"
+              ignore_case: true
+          allowed_client_headers:
+            patterns:
+            - exact: Foo
+              ignore_case: true
+            - prefix: "X-"
+              ignore_case: true
+          allowed_client_headers_on_success:
+            patterns:
+            - prefix: "X-Downstream-"
+              ignore_case: true
+      )EOF";
+    TestUtility::loadFromYaml(default_yaml, proto_config);
+
+    return std::make_shared<Filters::Common::ExtAuthz::ClientConfig>(proto_config, 250, "/bar",
+                                                                     factory_context_);
   }
 
-private:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> internal_http_mock_client_;
   NiceMock<Http::MockAsyncClientRequest> http_sync_request_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 
   // Set by calling newRawHttpClientImpl
   std::string status_;
@@ -256,16 +243,15 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   static StatelessFuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  Http::ContextImpl http_context(stats_store.symbolTable());
 
   // Prepare filter.
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
   FilterConfigSharedPtr config;
 
   try {
-    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(), mocks.runtime_,
-                                            http_context, "ext_authz_prefix", bootstrap);
+    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(),
+                                            "ext_authz_prefix", mocks.factory_context_);
+
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
     return;
