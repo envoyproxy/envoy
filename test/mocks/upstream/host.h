@@ -109,6 +109,13 @@ public:
         std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), symbol_table);
     return locality_zone_stat_name_->statName();
   }
+  MOCK_METHOD(void, setAddress, (Network::Address::InstanceConstSharedPtr));
+  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, ());
+
+  MOCK_METHOD(void, setAddressList, (const std::vector<Network::Address::InstanceConstSharedPtr>&));
+  MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory, (
+      const Network::Address::InstanceConstSharedPtr& dest_address,
+      const envoy::config::core::v3::Metadata* metadata), (const));
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -229,6 +236,13 @@ public:
         std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
     return locality_zone_stat_name_->statName();
   }
+
+  MOCK_METHOD(void, setAddress, (Network::Address::InstanceConstSharedPtr));
+  MOCK_METHOD(void, setAddressList, (const std::vector<Network::Address::InstanceConstSharedPtr>&));
+  MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory, (
+      const Network::Address::InstanceConstSharedPtr& dest_address,
+      const envoy::config::core::v3::Metadata* metadata), (const));
+
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;

@@ -73,7 +73,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
         auto info = parent_->cluster_->info();
-        HostSharedPtr host(std::make_shared<HostImpl>(
+        HostSharedPtr host(std::make_shared<PhysicalHostImpl>(
             info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,

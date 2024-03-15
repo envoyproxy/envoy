@@ -403,14 +403,14 @@ LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
   return latched;
 }
 
-HostDescriptionImpl::HostDescriptionImpl(
+HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, TimeSource& time_source)
     : cluster_(cluster), hostname_(hostname),
-      health_checks_hostname_(health_check_config.hostname()), address_(dest_address),
+      health_checks_hostname_(health_check_config.hostname()), //address_(dest_address),
       canary_(Config::Metadata::metadataValue(metadata.get(),
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
@@ -429,7 +429,7 @@ HostDescriptionImpl::HostDescriptionImpl(
   health_check_address_ = resolveHealthCheckAddress(health_check_config, dest_address);
 }
 
-Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
+Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
     const envoy::config::core::v3::Metadata* metadata) const {
   auto match = cluster_->transportSocketMatcher().resolve(metadata);
@@ -2059,7 +2059,7 @@ void PriorityStateManager::registerHostForPriority(
   auto metadata = lb_endpoint.has_metadata()
                       ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
                       : nullptr;
-  const auto host = std::make_shared<HostImpl>(
+  const auto host = std::make_shared<PhysicalHostImpl>(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);

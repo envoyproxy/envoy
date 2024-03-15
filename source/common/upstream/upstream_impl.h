@@ -185,10 +185,10 @@ private:
 /**
  * Implementation of Upstream::HostDescription.
  */
-class HostDescriptionImpl : virtual public HostDescription,
-                            protected Logger::Loggable<Logger::Id::upstream> {
+class HostDescriptionImplBase : virtual public HostDescription,
+                                protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  HostDescriptionImpl(
+  HostDescriptionImplBase(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
@@ -214,7 +214,7 @@ public:
     return metadata_;
   }
   void metadata(MetadataConstSharedPtr new_metadata) override {
-    auto& new_socket_factory = resolveTransportSocketFactory(address_, new_metadata.get());
+    auto& new_socket_factory = resolveTransportSocketFactory(address(), new_metadata.get());
     {
       absl::WriterMutexLock lock(&metadata_mutex_);
       metadata_ = new_metadata;
@@ -253,10 +253,7 @@ public:
   LoadMetricStats& loadMetricStats() const override { return load_metric_stats_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
-  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
-    return address_list_;
-  }
+  //Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
@@ -268,17 +265,10 @@ public:
   void priority(uint32_t priority) override { priority_ = priority; }
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata* metadata) const;
+                                const envoy::config::core::v3::Metadata* metadata) const override;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
-  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
-    address_list_ = address_list;
-    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
-  }
-
 protected:
-  void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
-
   void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) {
     health_check_address_ = address;
   }
@@ -299,9 +289,6 @@ private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
   const std::string health_checks_hostname_;
-  Network::Address::InstanceConstSharedPtr address_;
-  // The first entry in the address_list_ should match the value in address_.
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
@@ -319,22 +306,49 @@ private:
   absl::optional<MonotonicTime> last_hc_pass_time_;
 };
 
+class HostDescriptionImpl : public HostDescriptionImplBase {
+ public:
+  HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+                      Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
+                      const envoy::config::core::v3::Locality& locality,
+                      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+                      uint32_t priority, TimeSource& time_source)
+      : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality, health_check_config,
+                                priority, time_source),
+        address_(dest_address) {}
+
+  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override { return address_list_; }
+
+  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
+    address_list_ = address_list;
+    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
+  }
+
+  void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
+
+ private:
+  Network::Address::InstanceConstSharedPtr address_;
+  // The first entry in the address_list_ should match the value in address_.
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
+};
+
 /**
  * Implementation of Upstream::Host.
  */
-class HostImpl : public HostDescriptionImpl,
-                 public Host,
+class HostImpl : public Host,
+                 protected Logger::Loggable<Logger::Id::upstream>,
                  public std::enable_shared_from_this<HostImpl> {
 public:
-  HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr metadata,
-           uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
+  HostImpl(uint32_t initial_weight,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-           uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           TimeSource& time_source)
-      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority, time_source),
-        disable_active_health_check_(health_check_config.disable_active_health_check()) {
+           const envoy::config::core::v3::HealthStatus health_status
+           /*ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+             Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr metadata,
+             const envoy::config::core::v3::Locality& locality,
+             uint32_t priority,
+             TimeSource& time_source */)
+      : disable_active_health_check_(health_check_config.disable_active_health_check()) {
     // This EDS flags setting is still necessary for stats, configuration dump, canonical
     // coarseHealth() etc.
     HostImpl::setEdsHealthStatus(health_status);
@@ -368,17 +382,6 @@ public:
   void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
   uint32_t healthFlagsGetAll() const override { return health_flags_; }
   void healthFlagsSetAll(uint32_t bits) override { health_flags_ |= bits; }
-
-  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
-    setHealthCheckerImpl(std::move(health_checker));
-  }
-  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
-    setOutlierDetectorImpl(std::move(outlier_detector));
-  }
-
-  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
-    setLastHcPassTimeImpl(std::move(last_hc_pass_time));
-  }
 
   Host::HealthStatus healthStatus() const override {
     // Evaluate active health status first.
@@ -477,6 +480,32 @@ private:
     const std::weak_ptr<const HostImpl> parent_;
   };
   mutable std::atomic<uint32_t> handle_count_{};
+
+};
+
+class PhysicalHostImpl : public HostImpl,
+                         public PhysicalHostDescriptionImpl {
+public:
+  PhysicalHostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+                   Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr metadata,
+                   uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
+                   const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+                   uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
+                   TimeSource& time_source)
+      : HostImpl(initial_weight, health_check_config, health_status),
+        PhysicalHostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
+                                    priority, time_source) {}
+
+  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
+    setHealthCheckerImpl(std::move(health_checker));
+  }
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
+    setOutlierDetectorImpl(std::move(outlier_detector));
+  }
+
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
+    setLastHcPassTimeImpl(std::move(last_hc_pass_time));
+  }
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
