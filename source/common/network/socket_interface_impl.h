@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/common/io/io_uring.h"
 #include "envoy/network/socket.h"
 
 #include "source/common/network/socket_interface.h"
@@ -27,9 +26,8 @@ public:
     return "envoy.extensions.network.socket_interface.default_socket_interface";
   };
 
-  static IoHandlePtr
-  makePlatformSpecificSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
-                             Io::IoUringWorkerFactory* io_uring_worker_factory = nullptr);
+  static IoHandlePtr makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
+                                                absl::optional<int> domain);
 
 protected:
   virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
