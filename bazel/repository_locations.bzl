@@ -1059,25 +1059,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_pkg/blob/{version}/LICENSE",
     ),
-    org_llvm_llvm = dict(
-        # When changing this, you must re-generate the list of llvm libs
-        # see `bazel/foreign_cc/BUILD` for further information.
-        project_name = "LLVM",
-        project_desc = "LLVM Compiler Infrastructure",
-        project_url = "https://llvm.org",
-        version = "12.0.1",
-        sha256 = "7d9a8405f557cefc5a21bf5672af73903b64749d9bc3a50322239f56f34ffddf",
-        strip_prefix = "llvm-{version}.src",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-{version}.src.tar.xz"],
-        release_date = "2021-07-09",
-        use_category = ["dataplane_ext"],
-        extensions = [
-            "envoy.wasm.runtime.wamr",
-        ],
-        cpe = "cpe:2.3:a:llvm:*:*",
-        license = "Apache-2.0",
-        license_url = "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/llvm/LICENSE.TXT",
-    ),
     com_github_wamr = dict(
         project_name = "Webassembly Micro Runtime",
         project_desc = "A standalone runtime with a small footprint for WebAssembly",
