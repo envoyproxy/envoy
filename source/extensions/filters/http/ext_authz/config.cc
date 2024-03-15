@@ -25,9 +25,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
 
-  const auto filter_config = std::make_shared<FilterConfig>(
-      proto_config, context.scope(), server_context.runtime(), server_context.httpContext(),
-      stats_prefix, server_context.bootstrap());
+  const auto filter_config =
+      std::make_shared<FilterConfig>(proto_config, context.scope(), stats_prefix, server_context);
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
@@ -38,7 +37,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                                                            timeout, DefaultTimeout);
     const auto client_config =
         std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
-            proto_config, timeout_ms, proto_config.http_service().path_prefix());
+            proto_config, timeout_ms, proto_config.http_service().path_prefix(), server_context);
     callback = [filter_config, client_config,
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(

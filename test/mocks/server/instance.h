@@ -102,6 +102,7 @@ public:
   std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>
       transport_socket_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
+  Regex::GoogleReEngine regex_engine_;
 };
 
 } // namespace Server
