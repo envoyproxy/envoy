@@ -47,7 +47,10 @@ public:
     return logical_host_->hostnameForHealthChecks();
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
-  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
+  Network::Address::InstanceConstSharedPtr address() const override {
+    absl::ReaderMutexLock lock(&address_lock_);
+    return address_;
+  }
   const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
     return logical_host_->addressList();
   }
@@ -67,9 +70,10 @@ public:
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
 
-private:
-  const Network::Address::InstanceConstSharedPtr address_;
+protected:
+  const Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
   const HostConstSharedPtr logical_host_;
+  mutable absl::Mutex address_lock_;
 };
 
 /**
@@ -141,10 +145,12 @@ public:
 
   void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
   const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
+    absl::ReaderMutexLock lock(&address_lock_);
     return address_list_;
   }
   void setAddressList(
       const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
+    absl::WriterMutexLock lock(&address_lock_);
     address_list_ = address_list;
     ASSERT(address_list_.empty() || *address_list_.front() == *address_);
   }
@@ -152,7 +158,8 @@ public:
 private:
   Network::Address::InstanceConstSharedPtr address_;
   // The first entry in the address_list_ should match the value in address_.
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
+  std::vector<Network::Address::InstanceConstSharedPtr>
+      address_list_ ABSL_GUARDED_BY(address_lock_);
 
   /*  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     absl::ReaderMutexLock lock(&address_lock_);
@@ -172,7 +179,6 @@ private:
 
 private:
   const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;
-  mutable absl::Mutex address_lock_;
 };
 
 using LogicalHostSharedPtr = std::shared_ptr<LogicalHost>;
