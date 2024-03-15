@@ -148,9 +148,10 @@ void FilterChainManagerImpl::addFilterChains(
       if (matching_iter != filter_chains.end()) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': filter chain '{}' has "
-                        "the same matching rules defined as '{}'",
+                        "the same matching rules defined as '{}'. duplicate matcher is: {}",
                         absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
-                        filter_chain->name(), matching_iter->second));
+                        filter_chain->name(), matching_iter->second,
+                        MessageUtil::getJsonStringFromMessageOrError(filter_chain_match, false)));
       }
       filter_chains.insert({filter_chain_match, filter_chain->name()});
     }
