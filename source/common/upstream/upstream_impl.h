@@ -77,6 +77,9 @@ using UpstreamNetworkFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Network::FilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
+using AddressVectorSharedPtr =
+    std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>;
+
 class LegacyLbPolicyConfigHelper {
 public:
   struct Result {
@@ -254,9 +257,7 @@ public:
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
-    return address_list_;
-  }
+  const AddressVectorSharedPtr& addressList() const override { return address_list_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
@@ -271,9 +272,9 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
-  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
-    address_list_ = address_list;
-    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
+  void setAddressList(const AddressVectorSharedPtr& address_list_ptr) {
+    address_list_ = address_list_ptr;
+    ASSERT(address_list_->empty() || *address_list_->front() == *address_);
   }
 
 protected:
@@ -301,7 +302,7 @@ private:
   const std::string health_checks_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   // The first entry in the address_list_ should match the value in address_.
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
+  AddressVectorSharedPtr address_list_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;

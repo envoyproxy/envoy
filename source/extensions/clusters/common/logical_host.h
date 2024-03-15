@@ -30,7 +30,9 @@ public:
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status(), time_source),
         override_transport_socket_options_(override_transport_socket_options) {
-    setAddressList(address_list);
+    const auto address_list_ptr =
+        std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
+    setAddressList(address_list_ptr);
   }
 
   // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
@@ -42,9 +44,13 @@ public:
                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
     auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
+    // Create a new shared_ptr to store the address list.
+    const auto address_list_ptr =
+        std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
+
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);
-    setAddressList(address_list);
+    setAddressList(address_list_ptr);
     /* TODO: the health checker only gets the first address in the list and
      * will not walk the full happy eyeballs list. We should eventually fix
      * this. */
@@ -61,6 +67,18 @@ public:
     absl::ReaderMutexLock lock(&address_lock_);
     return HostImpl::address();
   }
+
+  // Return a thread local copy of the address and address_list pointer under lock.
+  // If the address or address_list pointers point to different memory space during DNS refreshing,
+  // the thread local pointers will still point to a valid memory space. This avoids race issues
+  // when main thread is changing the host addresses, and worker threads are using them create
+  // connections.
+  const std::pair<Network::Address::InstanceConstSharedPtr, const AddressVectorSharedPtr>
+  copyAddressAndList() const {
+    absl::ReaderMutexLock lock(&address_lock_);
+    return {HostImpl::address(), HostImpl::addressList()};
+  }
+
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     absl::ReaderMutexLock lock(&address_lock_);
     return HostImpl::healthCheckAddress();
@@ -106,9 +124,7 @@ public:
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
-    return logical_host_->addressList();
-  }
+  const AddressVectorSharedPtr& addressList() const override { return logical_host_->addressList(); }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
   }
