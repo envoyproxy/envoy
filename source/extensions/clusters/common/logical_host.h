@@ -10,69 +10,22 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * A real host that forwards most of its calls to a logical host, but returns a snapped address.
+ * A logical family of hosts.
  */
-class RealHostDescription : public HostDescriptionImplBase {
+class LogicalHostDescription : public HostDescriptionImplBase {
 public:
-  RealHostDescription(
+  LogicalHostDescription(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, HostConstSharedPtr logical_host)
+      uint32_t priority, TimeSource& time_source)
       : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
                                 health_check_config, priority, time_source),
-        address_(dest_address), logical_host_(logical_host) {}
-
-  // Upstream:HostDescription
-  bool canary() const override { return logical_host_->canary(); }
-  void canary(bool) override {}
-  MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
-  void metadata(MetadataConstSharedPtr) override {}
-
-  Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
-    return logical_host_->transportSocketFactory();
-  }
-  const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
-  bool canCreateConnection(Upstream::ResourcePriority priority) const override {
-    return logical_host_->canCreateConnection(priority);
-  }
-  HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
-  Outlier::DetectorHostMonitor& outlierDetector() const override {
-    return logical_host_->outlierDetector();
-  }
-  HostStats& stats() const override { return logical_host_->stats(); }
-  LoadMetricStats& loadMetricStats() const override { return logical_host_->loadMetricStats(); }
-  const std::string& hostnameForHealthChecks() const override {
-    return logical_host_->hostnameForHealthChecks();
-  }
-  const std::string& hostname() const override { return logical_host_->hostname(); }
-  Network::Address::InstanceConstSharedPtr address() const override {
-    absl::ReaderMutexLock lock(&address_lock_);
-    return address_;
-  }
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
-    return logical_host_->addressList();
-  }
-  const envoy::config::core::v3::Locality& locality() const override {
-    return logical_host_->locality();
-  }
-  Stats::StatName localityZoneStatName() const override {
-    return logical_host_->localityZoneStatName();
-  }
-  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
-    // Should never be called since real hosts are used only for forwarding.
-    return nullptr;
-  }
-  absl::optional<MonotonicTime> lastHcPassTime() const override {
-    return logical_host_->lastHcPassTime();
-  }
-  uint32_t priority() const override { return logical_host_->priority(); }
-  void priority(uint32_t) override {}
+        address_(dest_address) {}
 
 protected:
   const Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
-  const HostConstSharedPtr logical_host_;
   mutable absl::Mutex address_lock_;
 };
 
@@ -80,7 +33,7 @@ protected:
  * A host implementation that can have its address changed in order to create temporal "real"
  * hosts.
  */
-class LogicalHost : public HostImplBase, public RealHostDescription {
+class LogicalHost : public HostImplBase, public LogicalHostDescription {
 public:
   LogicalHost(
       const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
@@ -98,11 +51,11 @@ public:
                  lb_endpoint.health_status(), time_source*/
                      lb_endpoint.load_balancing_weight().value(),
                      lb_endpoint.endpoint().health_check_config(), lb_endpoint.health_status()),
-        RealHostDescription(
+        LogicalHostDescription(
             cluster, hostname, address,
             std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
             locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-            locality_lb_endpoint.priority(), time_source, shared_from_this()),
+            locality_lb_endpoint.priority(), time_source),
         override_transport_socket_options_(override_transport_socket_options) {
     setAddressList(address_list);
   }
@@ -177,11 +130,88 @@ private:
     setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
 
-private:
   const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;
 };
 
 using LogicalHostSharedPtr = std::shared_ptr<LogicalHost>;
+
+/**
+ * A real host that forwards most of its calls to a logical host, but returns a snapped address.
+ */
+class RealHostDescription : public HostDescription {
+public:
+  RealHostDescription(Network::Address::InstanceConstSharedPtr address,
+                      HostConstSharedPtr logical_host)
+      : address_(address), logical_host_(logical_host) {}
+
+  // Upstream:HostDescription
+  bool canary() const override { return logical_host_->canary(); }
+  void canary(bool) override {}
+  MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  void metadata(MetadataConstSharedPtr) override {}
+
+  Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
+    return logical_host_->transportSocketFactory();
+  }
+  const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
+  bool canCreateConnection(Upstream::ResourcePriority priority) const override {
+    return logical_host_->canCreateConnection(priority);
+  }
+  HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
+  Outlier::DetectorHostMonitor& outlierDetector() const override {
+    return logical_host_->outlierDetector();
+  }
+  HostStats& stats() const override { return logical_host_->stats(); }
+  LoadMetricStats& loadMetricStats() const override { return logical_host_->loadMetricStats(); }
+  const std::string& hostnameForHealthChecks() const override {
+    return logical_host_->hostnameForHealthChecks();
+  }
+  const std::string& hostname() const override { return logical_host_->hostname(); }
+  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
+  // absl::ReaderMutexLock lock(&address_lock_);
+  // return logical_host_->address();
+  //}
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
+    return logical_host_->addressList();
+  }
+  const envoy::config::core::v3::Locality& locality() const override {
+    return logical_host_->locality();
+  }
+  Stats::StatName localityZoneStatName() const override {
+    return logical_host_->localityZoneStatName();
+  }
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+    // Should never be called since real hosts are used only for forwarding.
+    return nullptr;
+  }
+  absl::optional<MonotonicTime> lastHcPassTime() const override {
+    return logical_host_->lastHcPassTime();
+  }
+  uint32_t priority() const override { return logical_host_->priority(); }
+  void priority(uint32_t) override {}
+
+  void setAddress(Network::Address::InstanceConstSharedPtr /*address*/) override {
+    ASSERT(false);
+    // address_ = address;
+    // logical_host_->setAddress(address);
+  }
+
+  void setAddressList(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& /*address_list*/) override {
+    ASSERT(false);
+    // logical_host_->setAddressList(address_list);
+  }
+
+  Network::UpstreamTransportSocketFactory&
+  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
+                                const envoy::config::core::v3::Metadata* metadata) const override {
+    return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
+  }
+
+private:
+  const Network::Address::InstanceConstSharedPtr address_;
+  const HostConstSharedPtr logical_host_;
+};
 
 } // namespace Upstream
 } // namespace Envoy
