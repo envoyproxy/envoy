@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <utility>
 
 #include "source/common/common/logger.h"
@@ -18,29 +19,34 @@ namespace Aws {
 
 using SigV4SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
 
-class SigV4SignatureConstantValues : public SignatureConstantValues {
+class SigV4SignatureConstants : public SignatureConstants {
 public:
-  const std::string SigV4AuthorizationHeaderFormat{
-      "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}"};
-  const std::string SigV4CredentialScopeFormat{"{}/{}/{}/aws4_request"};
-  const std::string SigV4SignatureVersion{"AWS4"};
-  const std::string SigV4StringToSignFormat{"AWS4-HMAC-SHA256\n{}\n{}\n{}"};
+  static constexpr absl::string_view SigV4AuthorizationHeaderFormat{
+      "{} Credential={}, SignedHeaders={}, Signature={}"};
+  static constexpr absl::string_view SigV4CredentialScopeFormat{"{}/{}/{}/aws4_request"};
+  static constexpr absl::string_view SigV4SignatureVersion{"AWS4"};
+  static constexpr absl::string_view SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
+  static constexpr absl::string_view SigV4Algorithm{"AWS4-HMAC-SHA256"};
 };
-
-using SigV4SignatureConstants = ConstSingleton<SigV4SignatureConstantValues>;
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4 signing process.
- * See https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html
+ * See https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
+ *
+ * Query parameter support is implemented as per:
+ * https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
  */
 class SigV4SignerImpl : public SignerBaseImpl {
 public:
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                   const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
-                  const AwsSigningHeaderExclusionVector& matcher_config)
-      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config) {}
+                  const AwsSigningHeaderExclusionVector& matcher_config,
+                  const bool query_string = false,
+                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
+      : SignerBaseImpl(service_name, region, credentials_provider, time_source, matcher_config,
+                       query_string, expiration_time) {}
 
 private:
   std::string createCredentialScope(const absl::string_view short_date,
@@ -60,6 +66,8 @@ private:
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
+
+  absl::string_view getAlgorithmString() const override;
 };
 
 } // namespace Aws

@@ -12,6 +12,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 
@@ -66,7 +67,7 @@ public:
 
   // Only add mocks here that are stateless. I.e. if you need to call ON_CALL on a mock each fuzzer
   // run, do not add the mock here, because it will leak memory.
-  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
@@ -85,16 +86,14 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   static StatelessFuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  Http::ContextImpl http_context(stats_store.symbolTable());
 
   // Prepare filter.
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
   FilterConfigSharedPtr config;
 
   try {
-    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(), mocks.runtime_,
-                                            http_context, "ext_authz_prefix", bootstrap);
+    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(),
+                                            "ext_authz_prefix", mocks.factory_context_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
     return;

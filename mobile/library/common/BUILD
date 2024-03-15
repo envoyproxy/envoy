@@ -35,6 +35,7 @@ envoy_cc_library(
         "//library/common/types:c_types_lib",
         "@envoy//envoy/server:lifecycle_notifier_interface",
         "@envoy//envoy/stats:stats_interface",
+        "@envoy//source/common/common:thread_impl_lib_posix",
         "@envoy//source/common/runtime:runtime_lib",
         "@envoy_build_config//:extension_registry",
     ],

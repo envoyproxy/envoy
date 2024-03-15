@@ -57,15 +57,14 @@ namespace quiche {
 
 #define SetQuicheFlagImpl(flag, value) absl::SetFlag(&FLAGS_envoy_##flag, value)
 
-#define GetQuicheReloadableFlagImpl(module, flag)                                                  \
-  absl::GetFlag(FLAGS_envoy_quic_reloadable_flag_##flag)
+#define GetQuicheReloadableFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quic_reloadable_flag_##flag)
 
-#define SetQuicheReloadableFlagImpl(module, flag, value)                                           \
+#define SetQuicheReloadableFlagImpl(flag, value)                                                   \
   absl::SetFlag(&FLAGS_envoy_quic_reloadable_flag_##flag, value)
 
-#define GetQuicheRestartFlagImpl(module, flag) absl::GetFlag(FLAGS_envoy_quic_restart_flag_##flag)
+#define GetQuicheRestartFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quic_restart_flag_##flag)
 
-#define SetQuicheRestartFlagImpl(module, flag, value)                                              \
+#define SetQuicheRestartFlagImpl(flag, value)                                                      \
   absl::SetFlag(&FLAGS_envoy_quic_restart_flag_##flag, value)
 
 } // namespace quiche
