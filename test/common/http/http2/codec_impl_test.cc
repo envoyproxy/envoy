@@ -249,7 +249,6 @@ public:
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
-    request_encoder_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
     setupDefaultConnectionMocks();
     driveToCompletion();
 

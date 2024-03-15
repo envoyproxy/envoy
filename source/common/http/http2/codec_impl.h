@@ -216,7 +216,7 @@ protected:
                              int /*weight*/, bool /*exclusive*/) override {}
     void OnPing(Http2PingId ping_id, bool is_ack) override;
     void OnPushPromiseForStream(Http2StreamId /*stream_id*/,
-                                Http2StreamId /*promised_stream_id*/) override {}
+                                Http2StreamId /*promised_stream_id*/) override {}  // GCOVR_EXCL_LINE
     bool OnGoAway(Http2StreamId last_accepted_stream_id, Http2ErrorCode error_code,
                   absl::string_view opaque_data) override;
     void OnWindowUpdate(Http2StreamId /*stream_id*/, int /*window_increment*/) override {}
@@ -517,7 +517,7 @@ protected:
     // Http::MultiplexedStreamImplBase
     // Client streams do not need a flush timer because we currently assume that any failure
     // to flush would be covered by a request/stream/etc. timeout.
-    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
+    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}  // GCOVR_EXCL_LINE
     CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks*) override {
       ENVOY_BUG(false, "CodecEventCallbacks for HTTP2 client stream unimplemented.");
       return nullptr;
@@ -559,7 +559,7 @@ protected:
     void encodeTrailers(const RequestTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
-    void enableTcpTunneling() override {}
+    void enableTcpTunneling() override {}  // GCOVR_EXCL_LINE
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
@@ -620,7 +620,7 @@ protected:
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
                                               Http::ResponseHeaderMapConstSharedPtr,
                                               Http::ResponseTrailerMapConstSharedPtr,
-                                              StreamInfo::StreamInfo&) override {}
+                                              StreamInfo::StreamInfo&) override {}  // GCOVR_EXCL_LINE
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
