@@ -12,8 +12,6 @@ namespace Common {
 
 class NamedCredentialInjectorConfigFactory : public Config::TypedFactory {
 public:
-  ~NamedCredentialInjectorConfigFactory() override = default;
-
   virtual CredentialInjectorSharedPtr
   createCredentialInjectorFromProto(const Protobuf::Message& config,
                                     Server::Configuration::FactoryContext& context) PURE;
