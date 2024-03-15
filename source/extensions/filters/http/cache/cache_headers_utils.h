@@ -128,7 +128,8 @@ class VaryAllowList {
 public:
   // Parses the allow list from the Cache Config into the object's private allow_list_.
   VaryAllowList(
-      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
+      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Checks if the headers contain an allowed value in the Vary header.
   bool allowsHeaders(const Http::ResponseHeaderMap& headers) const;
