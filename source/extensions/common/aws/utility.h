@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
