@@ -24,8 +24,13 @@ public:
                                 health_check_config, priority, time_source),
         address_(dest_address) {}
 
+  void setAddress(Network::Address::InstanceConstSharedPtr address) {
+    absl::WriterMutexLock lock(&address_lock_);
+    address_ = address;
+  }
+
 protected:
-  const Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
+  Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
   mutable absl::Mutex address_lock_;
 };
 
@@ -69,18 +74,29 @@ public:
                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
     auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
-    absl::WriterMutexLock lock(&address_lock_);
-    setAddress(address);
-    setAddressList(address_list);
+    {
+      absl::WriterMutexLock lock(&address_lock_);
+      address_ = address;
+      address_list_ = address_list;
+      ASSERT(address_list_.empty() || *address_list_.front() == *address_);
+    }
+
     /* TODO: the health checker only gets the first address in the list and
      * will not walk the full happy eyeballs list. We should eventually fix
      * this. */
     setHealthCheckAddress(health_check_address);
   }
 
-  void setAddress(Network::Address::InstanceConstSharedPtr address) {
+  void setAddressList(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
     absl::WriterMutexLock lock(&address_lock_);
-    address_ = address;
+    address_list_ = address_list;
+    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
+  }
+
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
+    absl::ReaderMutexLock lock(&address_lock_);
+    return address_list_;
   }
 
   // Upstream::Host
@@ -101,21 +117,11 @@ public:
     return {address_, address_list_};
   }
 
-  //void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
-    absl::ReaderMutexLock lock(&address_lock_);
-    return address_list_;
-  }
-  void setAddressList(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
-    absl::WriterMutexLock lock(&address_lock_);
-    address_list_ = address_list;
-    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
-  }
-
+  // void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ =
+  // address; }
 private:
-  Network::Address::InstanceConstSharedPtr address_;
-  // The first entry in the address_list_ should match the value in address_.
+  // Network::Address::InstanceConstSharedPtr address_;
+  //  The first entry in the address_list_ should match the value in address_.
   std::vector<Network::Address::InstanceConstSharedPtr>
       address_list_ ABSL_GUARDED_BY(address_lock_);
 
@@ -201,11 +207,13 @@ public:
     // logical_host_->setAddress(address);
   }*/
 
+#if 0
   void setAddressList(
       const std::vector<Network::Address::InstanceConstSharedPtr>& /*address_list*/) override {
     ASSERT(false);
     // logical_host_->setAddressList(address_list);
   }
+#endif
 
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,

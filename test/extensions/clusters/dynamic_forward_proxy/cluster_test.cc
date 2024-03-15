@@ -249,8 +249,14 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ("1.2.3.4:0",
-            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  auto host0 = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  Network::Address::InstanceConstSharedPtr address0 = host0->address();
+  const Network::Address::Instance& addr0 = *address0;
+  std::string addr0_str = addr0.asString();
+  // const auto& address0 =
+  EXPECT_EQ("1.2.3.4:0", addr0_str);
+  // EXPECT_EQ("1.2.3.4:0",
+  //           cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());

@@ -203,9 +203,10 @@ public:
    */
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
 
-  //virtual void setAddress(Network::Address::InstanceConstSharedPtr address) PURE;
-  virtual void
-  setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
+  // virtual void setAddress(Network::Address::InstanceConstSharedPtr address) PURE;
+  // virtual void
+  // setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
+
   virtual Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const PURE;

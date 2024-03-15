@@ -323,13 +323,13 @@ public:
     return address_list_;
   }
 
-  void setAddressList(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
+  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
     ASSERT(address_list_.empty() || *address_list_.front() == *address_);
   }
 
-  //void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
+  // void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ =
+  // address; }
 
 private:
   Network::Address::InstanceConstSharedPtr address_;
@@ -363,6 +363,9 @@ public:
   void setDisableActiveHealthCheck(bool disable_active_health_check) override {
     disable_active_health_check_ = disable_active_health_check;
   }
+
+  virtual void
+  setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
 
   // Upstream::Host
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
@@ -507,6 +510,13 @@ public:
 
   void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
     setLastHcPassTimeImpl(std::move(last_hc_pass_time));
+  }
+
+  void setAddressList(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
+    HostDescriptionImpl::setAddressList(address_list);
+    /*address_list_ = address_list;
+      ASSERT(address_list_.empty() || *address_list_.front() == *address_);*/
   }
 };
 
