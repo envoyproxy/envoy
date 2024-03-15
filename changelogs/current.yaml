@@ -296,7 +296,7 @@ new_features:
     configuration section.
 - area: aws
   change: |
-    Update credential_provider common AWS component to support EKS Pod Identity provided via token file.
+    Update credential_provider utility to support EKS Pod Identity provided via token file.
 
 deprecated:
 - area: listener

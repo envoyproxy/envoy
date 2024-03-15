@@ -1459,9 +1459,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationS
 // End unit test for deprecated option using Libcurl client.
 
 // Begin unit test for new option via Http Async client.
-class ContainerRoleCredentialsProviderTest : public testing::Test {
+class ContainerCredentialsProviderTest : public testing::Test {
 public:
-  ContainerRoleCredentialsProviderTest()
+  ContainerCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)), raw_metadata_fetcher_(new MockMetadataFetcher) {
     // Tue Jan  2 03:04:05 UTC 2018
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
@@ -1471,7 +1471,7 @@ public:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    provider_ = std::make_shared<ContainerRoleCredentialsProvider>(
+    provider_ = std::make_shared<ContainerCredentialsProvider>(
         *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
@@ -1529,14 +1529,14 @@ public:
   MetadataFetcherPtr metadata_fetcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  ContainerRoleCredentialsProviderPtr provider_;
+  ContainerCredentialsProviderPtr provider_;
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
 };
 
-TEST_F(ContainerRoleCredentialsProviderTest, TestAddMissingCluster) {
+TEST_F(ContainerCredentialsProviderTest, TestAddMissingCluster) {
   // Setup without thread local cluster yet
   envoy::config::cluster::v3::Cluster expected_cluster;
   constexpr static const char* kStaticCluster = R"EOF(
@@ -1579,7 +1579,7 @@ typed_extension_protocol_options:
   setupProviderWithContext();
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, TestClusterMissing) {
+TEST_F(ContainerCredentialsProviderTest, TestClusterMissing) {
   // Setup without thread local cluster
   Http::RequestMessageImpl message;
 
@@ -1593,7 +1593,7 @@ TEST_F(ContainerRoleCredentialsProviderTest, TestClusterMissing) {
   metadata_fetcher_.reset(raw_metadata_fetcher_);
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, FailedFetchingDocument) {
+TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(403 /*Forbidden*/, std::move(std::string()));
@@ -1615,7 +1615,7 @@ TEST_F(ContainerRoleCredentialsProviderTest, FailedFetchingDocument) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, EmptyDocument) {
+TEST_F(ContainerCredentialsProviderTest, EmptyDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(std::string()));
@@ -1637,7 +1637,7 @@ TEST_F(ContainerRoleCredentialsProviderTest, EmptyDocument) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, MalformedDocument) {
+TEST_F(ContainerCredentialsProviderTest, MalformedDocument) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
@@ -1662,7 +1662,7 @@ not json
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, EmptyValues) {
+TEST_F(ContainerCredentialsProviderTest, EmptyValues) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
@@ -1693,7 +1693,7 @@ TEST_F(ContainerRoleCredentialsProviderTest, EmptyValues) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, FullCachedCredentials) {
+TEST_F(ContainerCredentialsProviderTest, FullCachedCredentials) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(R"EOF(
@@ -1739,7 +1739,7 @@ TEST_F(ContainerRoleCredentialsProviderTest, FullCachedCredentials) {
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
+TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
@@ -1800,7 +1800,7 @@ TEST_F(ContainerRoleCredentialsProviderTest, RefreshOnNormalCredentialExpiration
   EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderTest, TimestampCredentialExpiration) {
+TEST_F(ContainerCredentialsProviderTest, TimestampCredentialExpiration) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(R"EOF(
@@ -1852,15 +1852,15 @@ TEST_F(ContainerRoleCredentialsProviderTest, TimestampCredentialExpiration) {
 
 // Begin unit test for deprecated option using Libcurl client.
 // TODO(suniltheta): Remove this test class once libcurl is removed from Envoy.
-class ContainerRoleCredentialsProviderUsingLibcurlTest : public testing::Test {
+class ContainerCredentialsProviderUsingLibcurlTest : public testing::Test {
 public:
-  ContainerRoleCredentialsProviderUsingLibcurlTest() : api_(Api::createApiForTest(time_system_)) {
+  ContainerCredentialsProviderUsingLibcurlTest() : api_(Api::createApiForTest(time_system_)) {
     // Tue Jan  2 03:04:05 UTC 2018
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
   void setupProvider() {
-    provider_ = std::make_shared<ContainerRoleCredentialsProvider>(
+    provider_ = std::make_shared<ContainerCredentialsProvider>(
         *api_, absl::nullopt,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
@@ -1880,10 +1880,10 @@ public:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<MockFetchMetadata> fetch_metadata_;
-  ContainerRoleCredentialsProviderPtr provider_;
+  ContainerCredentialsProviderPtr provider_;
 };
 
-TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, FailedFetchingDocument) {
+TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FailedFetchingDocument) {
   setupProvider();
   expectDocument(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
@@ -1892,7 +1892,7 @@ TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, FailedFetchingDocument)
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, EmptyDocument) {
+TEST_F(ContainerCredentialsProviderUsingLibcurlTest, EmptyDocument) {
   setupProvider();
   expectDocument("");
   const auto credentials = provider_->getCredentials();
@@ -1901,7 +1901,7 @@ TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, EmptyDocument) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, MalformedDocument) {
+TEST_F(ContainerCredentialsProviderUsingLibcurlTest, MalformedDocument) {
   setupProvider();
   expectDocument(R"EOF(
 not json
@@ -1912,7 +1912,7 @@ not json
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, EmptyValues) {
+TEST_F(ContainerCredentialsProviderUsingLibcurlTest, EmptyValues) {
   setupProvider();
   expectDocument(R"EOF(
 {
@@ -1928,7 +1928,7 @@ TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, EmptyValues) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, FullCachedCredentials) {
+TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FullCachedCredentials) {
   setupProvider();
   expectDocument(R"EOF(
 {
@@ -1948,7 +1948,7 @@ TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, FullCachedCredentials) 
   EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, NormalCredentialExpiration) {
+TEST_F(ContainerCredentialsProviderUsingLibcurlTest, NormalCredentialExpiration) {
   setupProvider();
   InSequence sequence;
   expectDocument(R"EOF(
@@ -1978,7 +1978,7 @@ TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, NormalCredentialExpirat
   EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 
-TEST_F(ContainerRoleCredentialsProviderUsingLibcurlTest, TimestampCredentialExpiration) {
+TEST_F(ContainerCredentialsProviderUsingLibcurlTest, TimestampCredentialExpiration) {
   setupProvider();
   InSequence sequence;
   expectDocument(R"EOF(
@@ -2022,7 +2022,7 @@ public:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true"}});
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    provider_ = std::make_shared<ContainerRoleCredentialsProvider>(
+    provider_ = std::make_shared<ContainerCredentialsProvider>(
         *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
           return this->fetch_metadata_.fetch(message);
@@ -2031,7 +2031,7 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        "169.254.170.2:80/path/to/doc", "", "credentials_provider_cluster");
+        "169.254.170.23:80/v1/credentials", "", "credentials_provider_cluster");
   }
 
   void setupProviderWithContext() {
@@ -2045,8 +2045,8 @@ public:
 
   void expectDocument(const uint64_t status_code, const std::string&& document,
                       const std::string auth_token) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
-                                           {":authority", "169.254.170.2:80"},
+    Http::TestRequestHeaderMapImpl headers{{":path", "/v1/credentials"},
+                                           {":authority", "169.254.170.23:80"},
                                            {":scheme", "http"},
                                            {":method", "GET"},
                                            {"authorization", auth_token}};
@@ -2081,7 +2081,7 @@ public:
   MetadataFetcherPtr metadata_fetcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  ContainerRoleCredentialsProviderPtr provider_;
+  ContainerCredentialsProviderPtr provider_;
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
@@ -2096,9 +2096,10 @@ TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
   auto temp = TestEnvironment::temporaryDirectory();
   std::string token_file(temp + "/tokenfile");
 
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI",
+                             "http://169.254.170.23/v1/credentials", 1);
   auto token_file_path =
       TestEnvironment::writeStringToFileForTest(token_file, TOKEN_FILE_CONTENTS, true, false);
-
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", token_file_path, 1);
   EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(token_file_path))
       .WillRepeatedly(Return(TOKEN_FILE_CONTENTS));
@@ -2858,7 +2859,7 @@ public:
     EXPECT_CALL(factories_, createEnvironmentCredentialsProvider());
   }
 
-  ~DefaultCredentialsProviderChainTest() override {
+  void SetUp() override {
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN");
@@ -2880,7 +2881,7 @@ public:
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view,
                  absl::string_view, absl::string_view),
                 (const));
-    MOCK_METHOD(CredentialsProviderSharedPtr, createContainerRoleCredentialsProvider,
+    MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view),
@@ -2902,6 +2903,10 @@ public:
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
+  ENVOY_LOG_MISC(debug, "env var AWS_CONTAINER_CREDENTIALS_FULL_URI = {}",
+                 getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI"));
+  ENVOY_LOG_MISC(debug, "env var AWS_CONTAINER_CREDENTIALS_RELATIVE_URI = {}",
+                 getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _));
 
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
@@ -2928,8 +2933,8 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerRoleCredentialsProvider(
-                              Ref(*api_), _, _, _, _, "169.254.170.2:80/path/to/creds", ""));
+  EXPECT_CALL(factories_, createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
+                                                             "169.254.170.2:80/path/to/creds", ""));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
@@ -2937,8 +2942,8 @@ TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerRoleCredentialsProvider(Ref(*api_), _, _, _, _,
-                                                                 "http://host/path/to/creds", ""));
+  EXPECT_CALL(factories_, createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
+                                                             "http://host/path/to/creds", ""));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
 }
@@ -2947,7 +2952,7 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerRoleCredentialsProvider(
+  EXPECT_CALL(factories_, createContainerCredentialsProvider(
                               Ref(*api_), _, _, _, _, "http://host/path/to/creds", "auth_token"));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);

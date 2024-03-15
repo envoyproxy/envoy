@@ -426,7 +426,7 @@ void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
   }
 }
 
-ContainerRoleCredentialsProvider::ContainerRoleCredentialsProvider(
+ContainerCredentialsProvider::ContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
@@ -436,23 +436,28 @@ ContainerRoleCredentialsProvider::ContainerRoleCredentialsProvider(
           envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/, credential_uri),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
 
-bool ContainerRoleCredentialsProvider::needsRefresh() {
+bool ContainerCredentialsProvider::needsRefresh() {
   const auto now = api_.timeSource().systemTime();
   return (now - last_updated_ > REFRESH_INTERVAL) ||
          (expiration_time_ - now < REFRESH_GRACE_PERIOD);
 }
 
-void ContainerRoleCredentialsProvider::refresh() {
+void ContainerCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}", credential_uri_);
 
+  absl::string_view authorization_header;
+
   // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
-  if (context_.has_value()) {
+  if (context_.has_value() && authorization_token_.empty()) {
     auto token = Utility::getAuthorizationTokenFromEnvFile(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE,
                                                            context_->api().fileSystem());
     if (token.has_value()) {
       ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
-      authorization_token_ = token.value();
+      authorization_header = token.value();
     }
+  } else {
+    // ECS Task role: use const authorization_token set during initialization
+    authorization_header = authorization_token_;
   }
 
   absl::string_view host;
@@ -464,7 +469,7 @@ void ContainerRoleCredentialsProvider::refresh() {
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(host);
   message.headers().setPath(path);
-  message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_token_);
+  message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
   if (!useHttpAsyncClient() || !context_) {
     // Using curl to fetch the AWS credentials.
     const auto credential_document = fetch_metadata_using_curl_(message);
@@ -491,7 +496,7 @@ void ContainerRoleCredentialsProvider::refresh() {
   }
 }
 
-void ContainerRoleCredentialsProvider::extractCredentials(
+void ContainerCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
   if (credential_document_value.empty()) {
     handleFetchDone();
@@ -534,13 +539,13 @@ void ContainerRoleCredentialsProvider::extractCredentials(
   handleFetchDone();
 }
 
-void ContainerRoleCredentialsProvider::onMetadataSuccess(const std::string&& body) {
+void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   // TODO(suniltheta): increment fetch success stats
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
-void ContainerRoleCredentialsProvider::onMetadataError(Failure reason) {
+void ContainerCredentialsProvider::onMetadataError(Failure reason) {
   // TODO(suniltheta): increment fetch failed stats
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
@@ -760,9 +765,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   if (!relative_uri.empty()) {
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
     ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
-    add(factories.createContainerRoleCredentialsProvider(api, context, fetch_metadata_using_curl,
-                                                         MetadataFetcher::create,
-                                                         CONTAINER_METADATA_CLUSTER, uri));
+    add(factories.createContainerCredentialsProvider(api, context, fetch_metadata_using_curl,
+                                                     MetadataFetcher::create,
+                                                     CONTAINER_METADATA_CLUSTER, uri));
   } else if (!full_uri.empty()) {
     auto authorization_token =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
@@ -771,14 +776,14 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                 "Using container role credentials provider with URI: "
                 "{} and authorization token",
                 full_uri);
-      add(factories.createContainerRoleCredentialsProvider(
+      add(factories.createContainerCredentialsProvider(
           api, context, fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, authorization_token));
     } else {
       ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
-      add(factories.createContainerRoleCredentialsProvider(api, context, fetch_metadata_using_curl,
-                                                           MetadataFetcher::create,
-                                                           CONTAINER_METADATA_CLUSTER, full_uri));
+      add(factories.createContainerCredentialsProvider(api, context, fetch_metadata_using_curl,
+                                                       MetadataFetcher::create,
+                                                       CONTAINER_METADATA_CLUSTER, full_uri));
     }
   } else if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
