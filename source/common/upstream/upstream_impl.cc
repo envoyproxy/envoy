@@ -403,6 +403,18 @@ LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
   return latched;
 }
 
+HostDescriptionImpl::HostDescriptionImpl(
+    ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+    Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
+    const envoy::config::core::v3::Locality& locality,
+    const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+    uint32_t priority, TimeSource& time_source)
+    : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
+                              health_check_config, priority, time_source),
+      address_(dest_address) {
+  health_check_address_ = resolveHealthCheckAddress(health_check_config, dest_address);
+}
+
 HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
@@ -426,7 +438,6 @@ HostDescriptionImplBase::HostDescriptionImplBase(
     throwEnvoyExceptionOrPanic(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
   }
-  health_check_address_ = resolveHealthCheckAddress(health_check_config, dest_address);
 }
 
 Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTransportSocketFactory(

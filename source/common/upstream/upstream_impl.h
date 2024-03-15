@@ -254,9 +254,6 @@ public:
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   // Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
-    return health_check_address_;
-  }
   const envoy::config::core::v3::Locality& locality() const override { return locality_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
@@ -268,11 +265,9 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const override;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
-protected:
-  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) {
-    health_check_address_ = address;
-  }
+  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) PURE;
 
+protected:
   void setHealthCheckerImpl(HealthCheckHostMonitorPtr&& health_checker) {
     health_checker_ = std::move(health_checker);
   }
@@ -289,7 +284,6 @@ private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
   const std::string health_checks_hostname_;
-  Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr metadata_ ABSL_GUARDED_BY(metadata_mutex_);
@@ -313,10 +307,7 @@ public:
       Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source)
-      : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
-                                health_check_config, priority, time_source),
-        address_(dest_address) {}
+      uint32_t priority, TimeSource& time_source);
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
@@ -328,13 +319,22 @@ public:
     ASSERT(address_list_.empty() || *address_list_.front() == *address_);
   }
 
+  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
+    health_check_address_ = address;
+  }
+
   // void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ =
   // address; }
+
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+    return health_check_address_;
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr address_;
   // The first entry in the address_list_ should match the value in address_.
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
+  Network::Address::InstanceConstSharedPtr health_check_address_;
 };
 
 /**

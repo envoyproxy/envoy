@@ -29,8 +29,19 @@ public:
     address_ = address;
   }
 
+  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
+    absl::WriterMutexLock lock(&address_lock_);
+    health_check_address_ = address;
+  }
+
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+    absl::ReaderMutexLock lock(&address_lock_);
+    return health_check_address_;
+  }
+
 protected:
   Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
+  Network::Address::InstanceConstSharedPtr health_check_address_ ABSL_GUARDED_BY(address_lock_);
   mutable absl::Mutex address_lock_;
 };
 
@@ -63,6 +74,8 @@ public:
             locality_lb_endpoint.priority(), time_source),
         override_transport_socket_options_(override_transport_socket_options) {
     setAddressList(address_list);
+    health_check_address_ =
+        resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
   }
 
   // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
@@ -74,17 +87,15 @@ public:
                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
     auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
-    {
-      absl::WriterMutexLock lock(&address_lock_);
-      address_ = address;
-      address_list_ = address_list;
-      ASSERT(address_list_.empty() || *address_list_.front() == *address_);
-    }
+    absl::WriterMutexLock lock(&address_lock_);
+    address_ = address;
+    address_list_ = address_list;
+    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
 
     /* TODO: the health checker only gets the first address in the list and
      * will not walk the full happy eyeballs list. We should eventually fix
      * this. */
-    setHealthCheckAddress(health_check_address);
+    health_check_address_ = health_check_address;
   }
 
   void setAddressList(
