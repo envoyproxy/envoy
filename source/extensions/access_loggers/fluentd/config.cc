@@ -17,9 +17,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Fluentd {
 
-using BackOffStrategyType =
-    envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig::BackOffStrategy;
-
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(fluentd_access_logger_cache);
 
@@ -48,11 +45,11 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
     throw EnvoyException(fmt::format("cluster '{}' was not found", proto_config.cluster()));
   }
 
-  if (proto_config.has_retry_options()) {
+  if (proto_config.has_retry_options() && proto_config.retry_options().has_backoff_options()) {
     uint64_t base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
-        proto_config.retry_options(), base_backoff_interval, DefaultBaseBackoffIntervalMs);
+        proto_config.retry_options().backoff_options(), base_interval, DefaultBaseBackoffIntervalMs);
     uint64_t max_interval_ms =
-        PROTOBUF_GET_MS_OR_DEFAULT(proto_config.retry_options(), max_backoff_interval,
+        PROTOBUF_GET_MS_OR_DEFAULT(proto_config.retry_options().backoff_options(), max_interval,
                                    base_interval_ms * DefaultMaxBackoffIntervalFactor);
 
     if (max_interval_ms < base_interval_ms) {

@@ -18,7 +18,7 @@ using FluentdAccessLogConfig =
     envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig;
 using FluentdAccessLogConfigSharedPtr = std::shared_ptr<FluentdAccessLogConfig>;
 
-static constexpr uint64_t DefaultBaseBackoffIntervalMs = 1;
+static constexpr uint64_t DefaultBaseBackoffIntervalMs = 500;
 static constexpr uint64_t DefaultMaxBackoffIntervalFactor = 10;
 static constexpr uint64_t DefaultBufferFlushIntervalMs = 1000;
 static constexpr uint64_t DefaultMaxBufferSize = 16384;

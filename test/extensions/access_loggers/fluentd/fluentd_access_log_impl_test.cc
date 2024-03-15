@@ -403,62 +403,6 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   EXPECT_NE(logger1, logger2);
 }
 
-TEST_F(FluentdAccessLoggerCacheImplTest, FixedBackOffStrategyConfig) {
-  init();
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(*async_client1_, connected()).WillOnce(Return(false));
-  EXPECT_CALL(*async_client1_, connect()).WillOnce(Return(false)).WillOnce(Return(false));
-  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
-    return Tcp::AsyncTcpClientPtr{async_client1_};
-  }));
-
-  envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
-  config.set_cluster(cluster_name_);
-  config.set_tag("test.tag");
-  config.mutable_buffer_size_bytes()->set_value(1);
-  config.mutable_retry_options()->set_backoff_strategy(FluentdAccessLogConfig::Fixed);
-  config.mutable_retry_options()->mutable_base_backoff_interval()->set_nanos(2000000);
-
-  auto logger =
-      logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config), random_);
-  ASSERT_TRUE(logger != nullptr);
-
-  // Since the strategy is fixed, we expect the timer to be enabled twice with the same duration.
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2), _)).Times(2);
-  logger->log(std::make_unique<Entry>(time_, std::move(data_)));
-  retry_timer_->invokeCallback();
-}
-
-TEST_F(FluentdAccessLoggerCacheImplTest, JitteredLowerBoundBackOffStrategyConfig) {
-  init();
-
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(*async_client1_, connected()).WillOnce(Return(false));
-  EXPECT_CALL(*async_client1_, connect()).WillOnce(Return(false)).WillOnce(Return(false));
-  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
-    return Tcp::AsyncTcpClientPtr{async_client1_};
-  }));
-
-  envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
-  config.set_cluster(cluster_name_);
-  config.set_tag("test.tag");
-  config.mutable_buffer_size_bytes()->set_value(1);
-  config.mutable_retry_options()->set_backoff_strategy(FluentdAccessLogConfig::JitteredLowerBound);
-  config.mutable_retry_options()->mutable_base_backoff_interval()->set_nanos(4000000);
-
-  auto logger =
-      logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config), random_);
-  ASSERT_TRUE(logger != nullptr);
-
-  // Since the strategy is JitteredLowerBound, we expect the timer to be enabled twice with a
-  // duration that is in the range of [4, 6).
-  EXPECT_CALL(random_, random()).WillRepeatedly(Return(123)); // Will add jitter of 1
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(5), _)).Times(2);
-  logger->log(std::make_unique<Entry>(time_, std::move(data_)));
-  retry_timer_->invokeCallback();
-}
-
 TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfig) {
   init();
 
@@ -473,9 +417,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfi
   config.set_cluster(cluster_name_);
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(1);
-  config.mutable_retry_options()->set_backoff_strategy(FluentdAccessLogConfig::JitteredExponential);
-  config.mutable_retry_options()->mutable_base_backoff_interval()->set_nanos(7000000);
-  config.mutable_retry_options()->mutable_max_backoff_interval()->set_nanos(20000000);
+  config.mutable_retry_options()->mutable_backoff_options()->mutable_base_interval()->set_nanos(7000000);
+  config.mutable_retry_options()->mutable_backoff_options()->mutable_max_interval()->set_nanos(20000000);
 
   auto logger =
       logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config), random_);

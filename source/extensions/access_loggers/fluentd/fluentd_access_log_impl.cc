@@ -170,33 +170,19 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
   auto client =
       cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
 
-  // Default backoff strategy configurations
-  auto strategy_type = FluentdAccessLogConfig::JitteredExponential;
-  if (config->has_retry_options()) {
-    strategy_type = config->retry_options().backoff_strategy();
-  }
-
   uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
   uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
 
-  if (config->has_retry_options()) {
-    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options(), base_backoff_interval,
-                                                  DefaultBaseBackoffIntervalMs);
+  if (config->has_retry_options() && config->retry_options().has_backoff_options()) {
+    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+        config->retry_options().backoff_options(), base_interval, DefaultBaseBackoffIntervalMs);
     max_interval_ms =
-        PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options(), max_backoff_interval,
+        PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(), max_interval,
                                    base_interval_ms * DefaultMaxBackoffIntervalFactor);
   }
 
-  BackOffStrategyPtr backoff_strategy;
-  if (strategy_type == FluentdAccessLogConfig::JitteredExponential) {
-    backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+  BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, random);
-  } else if (strategy_type == FluentdAccessLogConfig::JitteredLowerBound) {
-    backoff_strategy =
-        std::make_unique<JitteredLowerBoundBackOffStrategy>(base_interval_ms, random);
-  } else if (strategy_type == FluentdAccessLogConfig::Fixed) {
-    backoff_strategy = std::make_unique<FixedBackOffStrategy>(base_interval_ms);
-  }
 
   const auto logger = std::make_shared<FluentdAccessLoggerImpl>(
       *cluster, std::move(client), cache.dispatcher_, *config, std::move(backoff_strategy),
