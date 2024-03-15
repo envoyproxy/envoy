@@ -654,15 +654,17 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     if (!success) {
       throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
-    if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
-                               Http::Headers::get().MethodValues.Connect) ||
-        (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-         absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
-                                Http::Headers::get().UpgradeValues.ConnectUdp))) {
-      connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
-    } else if (upgrade_config.has_connect_config()) {
-      throwEnvoyExceptionOrPanic(absl::StrCat("Non-CONNECT upgrade type ",
-                                              upgrade_config.upgrade_type(), " has ConnectConfig"));
+    if (upgrade_config.has_connect_config()) {
+      if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                                 Http::Headers::get().MethodValues.Connect) ||
+          (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
+           absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                                  Http::Headers::get().UpgradeValues.ConnectUdp))) {
+        connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      } else {
+        throwEnvoyExceptionOrPanic(absl::StrCat(
+            "Non-CONNECT upgrade type ", upgrade_config.upgrade_type(), " has ConnectConfig"));
+      }
     }
   }
 
