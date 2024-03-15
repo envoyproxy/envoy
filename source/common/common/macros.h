@@ -50,7 +50,7 @@ namespace Envoy {
 #define FALLTHRU [[fallthrough]]
 #elif __cplusplus >= 201103L && __GNUC__ >= 7 // C++11 gcc 7
 #define FALLTHRU [[gnu::fallthrough]]
-#else // C++11 on gcc 6, and all other cases
+#elif __cplusplus < 201703L
 #define FALLTHRU
 #endif
 
