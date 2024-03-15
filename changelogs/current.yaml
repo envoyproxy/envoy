@@ -152,7 +152,7 @@ bug_fixes:
   change: |
     When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
     another Cookie header.
-- area: xds
+- area: admin
   change: |
     Fixed dumpEcdsFilterConfigs when not have any ecds configs.
     
