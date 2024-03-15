@@ -46,8 +46,9 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
   }
 
   if (proto_config.has_retry_options() && proto_config.retry_options().has_backoff_options()) {
-    uint64_t base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
-        proto_config.retry_options().backoff_options(), base_interval, DefaultBaseBackoffIntervalMs);
+    uint64_t base_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(proto_config.retry_options().backoff_options(), base_interval,
+                                   DefaultBaseBackoffIntervalMs);
     uint64_t max_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.retry_options().backoff_options(), max_interval,
                                    base_interval_ms * DefaultMaxBackoffIntervalFactor);

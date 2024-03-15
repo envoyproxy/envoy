@@ -174,15 +174,15 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
   uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
 
   if (config->has_retry_options() && config->retry_options().has_backoff_options()) {
-    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
-        config->retry_options().backoff_options(), base_interval, DefaultBaseBackoffIntervalMs);
+    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(),
+                                                  base_interval, DefaultBaseBackoffIntervalMs);
     max_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(), max_interval,
                                    base_interval_ms * DefaultMaxBackoffIntervalFactor);
   }
 
   BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
-        base_interval_ms, max_interval_ms, random);
+      base_interval_ms, max_interval_ms, random);
 
   const auto logger = std::make_shared<FluentdAccessLoggerImpl>(
       *cluster, std::move(client), cache.dispatcher_, *config, std::move(backoff_strategy),

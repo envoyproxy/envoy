@@ -417,8 +417,10 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfi
   config.set_cluster(cluster_name_);
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(1);
-  config.mutable_retry_options()->mutable_backoff_options()->mutable_base_interval()->set_nanos(7000000);
-  config.mutable_retry_options()->mutable_backoff_options()->mutable_max_interval()->set_nanos(20000000);
+  config.mutable_retry_options()->mutable_backoff_options()->mutable_base_interval()->set_nanos(
+      7000000);
+  config.mutable_retry_options()->mutable_backoff_options()->mutable_max_interval()->set_nanos(
+      20000000);
 
   auto logger =
       logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config), random_);

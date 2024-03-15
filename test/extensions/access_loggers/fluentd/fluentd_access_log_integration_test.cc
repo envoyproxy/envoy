@@ -73,13 +73,17 @@ public:
           }
 
           if (base_backoff_interval.has_value()) {
-            access_log_config.mutable_retry_options()->mutable_backoff_options()->mutable_base_interval()->set_nanos(
-                base_backoff_interval.value() * 1000000);
+            access_log_config.mutable_retry_options()
+                ->mutable_backoff_options()
+                ->mutable_base_interval()
+                ->set_nanos(base_backoff_interval.value() * 1000000);
           }
 
           if (max_backoff_interval.has_value()) {
-            access_log_config.mutable_retry_options()->mutable_backoff_options()->mutable_max_interval()->set_nanos(
-                max_backoff_interval.value() * 1000000);
+            access_log_config.mutable_retry_options()
+                ->mutable_backoff_options()
+                ->mutable_max_interval()
+                ->set_nanos(max_backoff_interval.value() * 1000000);
           }
 
           auto* record = access_log_config.mutable_record();
