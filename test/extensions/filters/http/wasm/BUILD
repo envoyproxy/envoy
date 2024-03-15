@@ -18,7 +18,6 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "wasm_filter_test",
-    size = "enormous",  # For WAVM without precompilation. TODO: add precompilation.
     srcs = ["wasm_filter_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
@@ -55,7 +54,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "config_test",
-    size = "enormous",  # For WAVM without precompilation. TODO: add precompilation.
     srcs = ["config_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
