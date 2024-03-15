@@ -432,8 +432,27 @@ message DataSource {
 }
 
 // The message specifies the retry policy of remote data source when fetching fails.
+// [#next-free-field: 7]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RetryPolicy";
+
+  // See :ref:`RetryPriority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`.
+  message RetryPriority {
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    oneof config_type {
+      google.protobuf.Any typed_config = 2;
+    }
+  }
+
+  // See :ref:`RetryHostPredicate <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`.
+  message RetryHostPredicate {
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    oneof config_type {
+      google.protobuf.Any typed_config = 2;
+    }
+  }
 
   // Specifies parameters that control :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
   // This parameter is optional, in which case the default base interval is 1000 milliseconds. The
@@ -444,6 +463,18 @@ message RetryPolicy {
   // defaults to 1.
   google.protobuf.UInt32Value num_retries = 2
       [(udpa.annotations.field_migrate).rename = "max_retries"];
+
+  // For details, see :ref:`retry_on <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_on>`.
+  string retry_on = 3;
+
+  // For details, see :ref:`retry_priority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`.
+  RetryPriority retry_priority = 4;
+
+  // For details, see :ref:`RetryHostPredicate <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`.
+  repeated RetryHostPredicate retry_host_predicate = 5;
+
+  // For details, see :ref:`host_selection_retry_max_attempts <envoy_v3_api_field_config.route.v3.RetryPolicy.host_selection_retry_max_attempts>`.
+  int64 host_selection_retry_max_attempts = 6;
 }
 
 // The message specifies how to fetch data from remote and how to verify it.
