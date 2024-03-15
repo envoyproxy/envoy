@@ -106,11 +106,13 @@ envoy_cc_fuzz_test(
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
+        "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
     ],
 )

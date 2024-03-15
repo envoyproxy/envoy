@@ -172,7 +172,7 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
-    : cm_(cm), config_(config) {}
+    : cm_(cm), config_(std::move(config)) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(callbacks_ == nullptr); }
 
