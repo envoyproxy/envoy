@@ -37,9 +37,9 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
   envoy::config::core::v3::Locality locality;
   locality.set_zone(zone);
   return HostSharedPtr{
-      new PhysicalHostImpl(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight, locality,
-                           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-                           envoy::config::core::v3::UNKNOWN, time_source)};
+      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight, locality,
+                   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::config::core::v3::UNKNOWN, time_source)};
 }
 
 // Defines parameters for LeastRequestLoadBalancerWeightTest cases.

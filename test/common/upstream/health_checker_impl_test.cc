@@ -1708,7 +1708,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(host);
-  auto test_host = std::make_shared<PhysicalHostImpl>(
+  auto test_host = std::make_shared<HostImpl>(
       cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());
@@ -1753,7 +1753,7 @@ TEST_F(HttpHealthCheckerImplTest,
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(host);
-  auto test_host = std::make_shared<PhysicalHostImpl>(
+  auto test_host = std::make_shared<HostImpl>(
       cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());
@@ -2590,7 +2590,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicRemoveDisableHC) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_disable_active_health_check(false);
-  auto enable_host = std::make_shared<PhysicalHostImpl>(
+  auto enable_host = std::make_shared<HostImpl>(
       cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());
@@ -2599,7 +2599,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicRemoveDisableHC) {
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   health_check_config.set_disable_active_health_check(true);
-  auto disable_host = std::make_shared<PhysicalHostImpl>(
+  auto disable_host = std::make_shared<HostImpl>(
       cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());
@@ -2619,7 +2619,7 @@ TEST_F(HttpHealthCheckerImplTest, AddDisableHC) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_disable_active_health_check(true);
-  auto disable_host = std::make_shared<PhysicalHostImpl>(
+  auto disable_host = std::make_shared<HostImpl>(
       cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());
@@ -5153,7 +5153,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostname) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(expected_host);
-  auto test_host = std::make_shared<PhysicalHostImpl>(
+  auto test_host = std::make_shared<HostImpl>(
       cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());
@@ -5168,7 +5168,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostnameOverridesConfig) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(expected_host);
-  auto test_host = std::make_shared<PhysicalHostImpl>(
+  auto test_host = std::make_shared<HostImpl>(
       cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());

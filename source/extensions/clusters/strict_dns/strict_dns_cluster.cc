@@ -131,7 +131,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               continue;
             }
 
-            new_hosts.emplace_back(new PhysicalHostImpl(
+            new_hosts.emplace_back(new HostImpl(
                 parent_.info_, hostname_, address,
                 // TODO(zyfjeff): Created through metadata shared pool
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),

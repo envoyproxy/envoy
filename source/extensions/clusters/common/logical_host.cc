@@ -9,12 +9,12 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
   const std::pair<Network::Address::InstanceConstSharedPtr,
                   const std::vector<Network::Address::InstanceConstSharedPtr>>
       address = addressAndListCopy();
-  return HostImpl::createConnection(
+  return HostImplBase::createConnection(
       dispatcher, cluster(), address.first, address.second, transportSocketFactory(), options,
       override_transport_socket_options_ != nullptr ? override_transport_socket_options_
                                                     : transport_socket_options,
       shared_from_this());
-  //std::make_shared<RealHostDescription>(address.first, shared_from_this()));
+  // std::make_shared<RealHostDescription>(address.first, shared_from_this()));
 }
 
 } // namespace Upstream

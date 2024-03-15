@@ -12,16 +12,16 @@ namespace Upstream {
 /**
  * A real host that forwards most of its calls to a logical host, but returns a snapped address.
  */
-class RealHostDescription : public HostDescriptionImpl {
+class RealHostDescription : public HostDescriptionImplBase {
 public:
-  RealHostDescription(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-                      Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
-                      const envoy::config::core::v3::Locality& locality,
-                      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-                      uint32_t priority, TimeSource& time_source,
-                      HostConstSharedPtr logical_host)
-      : HostDescriptionImpl(cluster, hostname, dest_address, metadata, locality, health_check_config,
-                            priority, time_source),
+  RealHostDescription(
+      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+      Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
+      const envoy::config::core::v3::Locality& locality,
+      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+      uint32_t priority, TimeSource& time_source, HostConstSharedPtr logical_host)
+      : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
+                                health_check_config, priority, time_source),
         address_(dest_address), logical_host_(logical_host) {}
 
   // Upstream:HostDescription
@@ -76,7 +76,7 @@ private:
  * A host implementation that can have its address changed in order to create temporal "real"
  * hosts.
  */
-class LogicalHost : public HostImpl, public RealHostDescription {
+class LogicalHost : public HostImplBase, public RealHostDescription {
 public:
   LogicalHost(
       const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
@@ -86,19 +86,19 @@ public:
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
       TimeSource& time_source)
-      : HostImpl(/*cluster, hostname, address,
+      : HostImplBase(/*cluster, hostname, address,
                  // TODO(zyfjeff): Created through metadata shared pool
                  std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status(), time_source*/
-            lb_endpoint.load_balancing_weight().value(), lb_endpoint.endpoint().health_check_config(),
-            lb_endpoint.health_status()),
-        RealHostDescription(cluster, hostname, address,
-                            std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
-                            locality_lb_endpoint.locality(),
-                            lb_endpoint.endpoint().health_check_config(),
-                            locality_lb_endpoint.priority(), time_source, shared_from_this()),
+                     lb_endpoint.load_balancing_weight().value(),
+                     lb_endpoint.endpoint().health_check_config(), lb_endpoint.health_status()),
+        RealHostDescription(
+            cluster, hostname, address,
+            std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
+            locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
+            locality_lb_endpoint.priority(), time_source, shared_from_this()),
         override_transport_socket_options_(override_transport_socket_options) {
     setAddressList(address_list);
   }
@@ -143,12 +143,13 @@ public:
   const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
     return address_list_;
   }
-  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
+  void setAddressList(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
     address_list_ = address_list;
     ASSERT(address_list_.empty() || *address_list_.front() == *address_);
   }
 
- private:
+private:
   Network::Address::InstanceConstSharedPtr address_;
   // The first entry in the address_list_ should match the value in address_.
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;

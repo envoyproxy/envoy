@@ -410,7 +410,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, TimeSource& time_source)
     : cluster_(cluster), hostname_(hostname),
-      health_checks_hostname_(health_check_config.hostname()), //address_(dest_address),
+      health_checks_hostname_(health_check_config.hostname()), // address_(dest_address),
       canary_(Config::Metadata::metadataValue(metadata.get(),
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
@@ -440,20 +440,20 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTranspo
   return match.factory_;
 }
 
-Host::CreateConnectionData HostImpl::createConnection(
+Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
                           options, transport_socket_options, shared_from_this());
 }
 
-void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
+void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
   // Clear all old EDS health flags first.
-  HostImpl::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
-  HostImpl::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  HostImplBase::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+  HostImplBase::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-    HostImpl::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
+    HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
   }
 
   // Set the appropriate EDS health flag.
@@ -461,16 +461,16 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   case envoy::config::core::v3::UNHEALTHY:
     FALLTHRU;
   case envoy::config::core::v3::TIMEOUT:
-    HostImpl::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+    HostImplBase::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DRAINING:
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-      HostImpl::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
+      HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     }
     break;
   case envoy::config::core::v3::DEGRADED:
-    HostImpl::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+    HostImplBase::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
     break;
   default:
     break;
@@ -478,7 +478,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
   }
 }
 
-Host::CreateConnectionData HostImpl::createHealthCheckConnection(
+Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
@@ -490,7 +490,7 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
                           transport_socket_options, shared_from_this());
 }
 
-Host::CreateConnectionData HostImpl::createConnection(
+Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
@@ -547,7 +547,7 @@ Host::CreateConnectionData HostImpl::createConnection(
   return {std::move(connection), std::move(host)};
 }
 
-void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
+void HostImplBase::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
 
 std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
     const std::vector<std::function<bool(const Host&)>>& predicates) const {
@@ -2059,7 +2059,7 @@ void PriorityStateManager::registerHostForPriority(
   auto metadata = lb_endpoint.has_metadata()
                       ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
                       : nullptr;
-  const auto host = std::make_shared<PhysicalHostImpl>(
+  const auto host = std::make_shared<HostImpl>(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
