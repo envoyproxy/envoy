@@ -245,42 +245,6 @@ private:
   Filters::Common::ExtAuthz::RawHttpClientImpl* http_client_;
 };
 
-class FanOutClient : public Filters::Common::ExtAuthz::Client {
-public:
-  FanOutClient(std::unique_ptr<Filters::Common::ExtAuthz::RawHttpClientImpl>&& http_client,
-               std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl>&& grpc_client)
-      : http_client_(std::move(http_client)), grpc_client_(std::move(grpc_client)) {}
-
-  void cancel() override {
-    http_client_->cancel();
-    grpc_client_->cancel();
-  }
-
-  void check(Filter::RequestCallbacks& callback,
-             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
-             const StreamInfo::StreamInfo& stream_info) override {
-    http_client_->check(callback, request, parent_span, stream_info);
-    grpc_client_->check(callback, request, parent_span, stream_info);
-  }
-
-private:
-  std::unique_ptr<Filters::Common::ExtAuthz::RawHttpClientImpl> http_client_;
-  std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl> grpc_client_;
-};
-
-class ReusableFanOutClientFactory {
-public:
-  std::unique_ptr<FanOutClient> newFanOutClient(
-      const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
-    return std::make_unique<FanOutClient>(http_client_factory_.newRawHttpClientImpl(result),
-                                          grpc_client_factory_.newGrpcClientImpl(result));
-  }
-
-private:
-  ReusableHttpClientFactory http_client_factory_;
-  ReusableGrpcClientFactory grpc_client_factory_;
-};
-
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
   try {
     TestUtility::validate(input);
@@ -307,10 +271,6 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
     return;
   }
 
-  static ReusableFanOutClientFactory client_factory;
-  std::unique_ptr<FanOutClient> client = client_factory.newFanOutClient(input.result());
-  auto filter = std::make_unique<Filter>(config, std::move(client));
-
   // Set metadata context.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   ON_CALL(decoder_callbacks, connection())
@@ -319,13 +279,28 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   ON_CALL(decoder_callbacks.stream_info_, dynamicMetadata())
       .WillByDefault(testing::ReturnRef(metadata));
 
+  static ReusableGrpcClientFactory grpc_client_factory;
+  auto grpc_client = grpc_client_factory.newGrpcClientImpl(input.result());
+  auto filter = std::make_unique<Filter>(config, std::move(grpc_client));
   filter->setDecoderFilterCallbacks(decoder_callbacks);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   // TODO: Add response headers.
-  Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
+  static Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()),
                  input.request_data());
+  fuzzer.reset();
+
+  static ReusableHttpClientFactory http_client_factory;
+  auto http_client = http_client_factory.newRawHttpClientImpl(input.result());
+  filter = std::make_unique<Filter>(config, std::move(http_client));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
+
+  // TODO: Add response headers.
+  fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()),
+                 input.request_data());
+  fuzzer.reset();
 }
 
 } // namespace
