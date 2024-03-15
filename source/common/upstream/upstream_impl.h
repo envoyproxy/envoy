@@ -329,7 +329,7 @@ public:
     ASSERT(address_list_.empty() || *address_list_.front() == *address_);
   }
 
-  void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
+  //void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
 
 private:
   Network::Address::InstanceConstSharedPtr address_;

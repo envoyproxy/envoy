@@ -78,6 +78,11 @@ public:
     setHealthCheckAddress(health_check_address);
   }
 
+  void setAddress(Network::Address::InstanceConstSharedPtr address) {
+    absl::WriterMutexLock lock(&address_lock_);
+    address_ = address;
+  }
+
   // Upstream::Host
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -96,7 +101,7 @@ public:
     return {address_, address_list_};
   }
 
-  void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
+  //void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ = address; }
   const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
     absl::ReaderMutexLock lock(&address_lock_);
     return address_list_;
@@ -190,11 +195,11 @@ public:
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
 
-  void setAddress(Network::Address::InstanceConstSharedPtr /*address*/) override {
+  /*void setAddress(Network::Address::InstanceConstSharedPtr address) override {
     ASSERT(false);
     // address_ = address;
     // logical_host_->setAddress(address);
-  }
+  }*/
 
   void setAddressList(
       const std::vector<Network::Address::InstanceConstSharedPtr>& /*address_list*/) override {

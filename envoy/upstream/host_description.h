@@ -203,7 +203,7 @@ public:
    */
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
 
-  virtual void setAddress(Network::Address::InstanceConstSharedPtr address) PURE;
+  //virtual void setAddress(Network::Address::InstanceConstSharedPtr address) PURE;
   virtual void
   setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
   virtual Network::UpstreamTransportSocketFactory&
