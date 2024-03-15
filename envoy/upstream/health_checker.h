@@ -94,11 +94,19 @@ public:
    * Log a healthy host addition event.
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
-   * @param healthy_threshold supplied the configured healthy threshold for this health check.
    * @param first_check whether this is a fast path success on the first health check for this host.
    */
   virtual void logAddHealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                              const HostDescriptionConstSharedPtr& host, bool first_check) PURE;
+
+  /**
+   * A health check was successful.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   */
+  virtual void
+  logSuccessfulHealthCheck(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                           const HostDescriptionConstSharedPtr& host) PURE;
 
   /**
    * Log a degraded healthy host event.

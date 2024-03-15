@@ -150,27 +150,8 @@ checks:
     - publish
     - verify
     required: true
-  windows:
-    name: Envoy/Windows
-    required: true
-    on-run:
-    - build-windows
 
 run:
-  build-windows:
-    paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - api/**/*
-    - bazel/**/*
-    - ci/**/*
-    - configs/**/*
-    - contrib/**/*
-    - envoy/**/*
-    - source/**/*
-    - test/**/*
-    - VERSION.txt
   build-macos:
     paths:
     - .bazelrc

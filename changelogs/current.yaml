@@ -146,9 +146,20 @@ bug_fixes:
     to support half close semantics during TCP tunneling.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` to false.
+- area: eds-caching
+  change: |
+    Fixing an issue where EDS caching is used (protected by the ``envoy.restart_features.use_eds_cache_for_ads``
+    runtime flag that is false by default), when multiple clusters use the same EDS resource, and that cached EDS
+    resource is used.
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
+- area: jwt_authn
+  change: |
+    Added
+    :ref:`max_lifetime <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.max_lifetime>` and
+    :ref:`require_expiration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.require_expiration>`
+    to limit the maximum remaining lifetime of a token from a ``JwtProvider`` and implement restrictions for JWT-SVIDs.
 - area: router
   change: |
     Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happens. This is
@@ -239,6 +250,9 @@ new_features:
   change: |
     Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
     during signature.
+- area: http3
+  change: |
+    Added experimental support for sending and receiving HTTP/3 METADATA frames.
 - area: ext_proc
   change: |
     added
@@ -283,6 +297,10 @@ new_features:
   change: |
     Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
     Envoy is under pressure, typically memory.
+- area: health_checks
+  change: |
+    added a :ref:`configuration option <envoy_v3_api_field_config.core.v3.HealthCheck.always_log_health_check_success>` that enables
+    health check logs on each successful health check.
 - area: string matcher
   change: |
     Added an :ref:`extension point for custom string matcher implementations <envoy_v3_api_field_type.matcher.v3.StringMatcher.custom>`.
