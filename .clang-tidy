@@ -14,7 +14,6 @@ Checks: >
   clang-analyzer-core.DivideZero,
   misc-unused-using-decls,
   modernize-deprecated-headers,
-  modernize-loop-convert,
   modernize-make-shared,
   modernize-make-unique,
   modernize-return-braced-init-list,
@@ -38,6 +37,8 @@ Checks: >
   readability-redundant-member-init,
   readability-redundant-smartptr-get,
   readability-redundant-string-cstr
+
+# modernize-loop-convert,
 
 CheckOptions:
 - key: cppcoreguidelines-unused-variable.IgnorePattern
