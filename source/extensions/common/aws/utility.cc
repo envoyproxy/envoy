@@ -477,21 +477,6 @@ std::string Utility::getConfigProfileName() {
   }
 }
 
-absl::optional<std::string>
-Utility::getAuthorizationTokenFromEnvFile(const char* environment_variable,
-                                          Filesystem::Instance& filesystem) {
-
-  if (const auto token_file = std::getenv(environment_variable)) {
-    const auto token = filesystem.fileReadToEnd(std::string(token_file));
-    {
-      if (token.ok()) {
-        return token.value();
-      }
-    }
-  }
-  return absl::nullopt;
-}
-
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

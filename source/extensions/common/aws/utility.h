@@ -177,16 +177,6 @@ public:
    * @return Name of the profile string.
    */
   static std::string getCredentialProfileName();
-
-  /**
-   * @brief Retrieve an authorization token from a file contained in an  environment variable
-   * expansions
-   *
-   * @return The authorization token
-   */
-  static absl::optional<std::string>
-  getAuthorizationTokenFromEnvFile(const char* environment_variable,
-                                   Filesystem::Instance& filesystem);
 };
 
 } // namespace Aws

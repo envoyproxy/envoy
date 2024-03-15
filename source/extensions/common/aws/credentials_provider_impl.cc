@@ -445,19 +445,18 @@ bool ContainerCredentialsProvider::needsRefresh() {
 void ContainerCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}", credential_uri_);
 
-  absl::string_view authorization_header;
+  // ECS Task role: use const authorization_token set during initialization
+  absl::string_view authorization_header = authorization_token_;
 
-  // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
-  if (context_.has_value() && authorization_token_.empty()) {
-    auto token = Utility::getAuthorizationTokenFromEnvFile(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE,
-                                                           context_->api().fileSystem());
-    if (token.has_value()) {
-      ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
-      authorization_header = token.value();
+  if (authorization_token_.empty()) {
+    // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
+    if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
+      const auto token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
+      if (token_or_error.ok()) {
+        ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
+        authorization_header = token_or_error.value();
+      }
     }
-  } else {
-    // ECS Task role: use const authorization_token set during initialization
-    authorization_header = authorization_token_;
   }
 
   absl::string_view host;
