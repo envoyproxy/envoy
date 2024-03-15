@@ -19,6 +19,17 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
 
+enum class BlanketRule {
+  NOT_SPECIFIED,
+  ALLOW_ALL,
+  DENY_ALL,
+};
+
+struct ConfigOption {
+  bool valid_rlqs_server = true;
+  BlanketRule no_assignment_blanket_rule = BlanketRule::NOT_SPECIFIED;
+};
+
 // These tests exercise the rate limit quota filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
@@ -38,55 +49,79 @@ protected:
     }
   }
 
-  void initializeConfig(bool valid_rlqs_server = true) {
-    config_helper_.addConfigModifier(
-        [this, valid_rlqs_server](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
-          ConfigHelper::setHttp2(
-              *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
+  void initializeConfig(ConfigOption config_option = {}) {
+    config_helper_.addConfigModifier([this, config_option](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
+      ConfigHelper::setHttp2(
+          *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
 
-          // Clusters for ExtProc gRPC servers, starting by copying an existing cluster
-          for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
-            auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
-            server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-            std::string cluster_name = absl::StrCat("rlqs_server_", i);
-            server_cluster->set_name(cluster_name);
-            server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
-          }
+      // Clusters for ExtProc gRPC servers, starting by copying an existing cluster
+      for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
+        auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+        std::string cluster_name = absl::StrCat("rlqs_server_", i);
+        server_cluster->set_name(cluster_name);
+        server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
+      }
 
-          if (valid_rlqs_server) {
-            // Load configuration of the server from YAML and use a helper to add a grpc_service
-            // stanza pointing to the cluster that we just made
-            setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_server_0",
-                           grpc_upstreams_[0]->localAddress());
-          } else {
-            // Set up the gRPC service with wrong cluster name and address.
-            setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
-                           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
-            // setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
-            //                grpc_upstreams_[0]->localAddress());
-          }
+      if (config_option.valid_rlqs_server) {
+        // Load configuration of the server from YAML and use a helper to add a grpc_service
+        // stanza pointing to the cluster that we just made
+        setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_server_0",
+                       grpc_upstreams_[0]->localAddress());
+      } else {
+        // Set up the gRPC service with wrong cluster name and address.
+        setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
+                       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+      }
 
-          // Set the domain name.
-          proto_config_.set_domain("cloud_12345_67890_rlqs");
+      // Set the domain name.
+      proto_config_.set_domain("cloud_12345_67890_rlqs");
 
-          xds::type::matcher::v3::Matcher matcher;
-          TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
-          proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
+      xds::type::matcher::v3::Matcher matcher;
+      TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
 
-          // Construct a configuration proto for our filter and then re-write it
-          // to JSON so that we can add it to the overall config
-          envoy::config::listener::v3::Filter rate_limit_quota_filter;
-          rate_limit_quota_filter.set_name("envoy.filters.http.rate_limit_quota");
-          rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
-          config_helper_.prependFilter(
-              MessageUtil::getJsonStringFromMessageOrError(rate_limit_quota_filter));
+      // Configure the no_assignment behavior.
+      if (config_option.no_assignment_blanket_rule != BlanketRule::NOT_SPECIFIED) {
+        auto* mutable_config = matcher.mutable_matcher_list()
+                                   ->mutable_matchers(0)
+                                   ->mutable_on_match()
+                                   ->mutable_action()
+                                   ->mutable_typed_config();
+        ASSERT_TRUE(mutable_config->Is<::envoy::extensions::filters::http::rate_limit_quota::v3::
+                                           RateLimitQuotaBucketSettings>());
 
-          // Parameterize with defer processing to prevent bit rot as filter made
-          // assumptions of data flow, prior relying on eager processing.
-          config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                            deferredProcessing() ? "true" : "false");
-        });
+        auto mutable_bucket_settings = MessageUtil::anyConvert<
+            ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>(
+            *mutable_config);
+        if (config_option.no_assignment_blanket_rule == BlanketRule::ALLOW_ALL) {
+          mutable_bucket_settings.mutable_no_assignment_behavior()
+              ->mutable_fallback_rate_limit()
+              ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
+        } else if (config_option.no_assignment_blanket_rule == BlanketRule::DENY_ALL) {
+          mutable_bucket_settings.mutable_no_assignment_behavior()
+              ->mutable_fallback_rate_limit()
+              ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
+        }
+        mutable_config->PackFrom(mutable_bucket_settings);
+      }
+
+      proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
+
+      // Construct a configuration proto for our filter and then re-write it
+      // to JSON so that we can add it to the overall config
+      envoy::config::listener::v3::Filter rate_limit_quota_filter;
+      rate_limit_quota_filter.set_name("envoy.filters.http.rate_limit_quota");
+      rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
+      config_helper_.prependFilter(
+          MessageUtil::getJsonStringFromMessageOrError(rate_limit_quota_filter));
+
+      // Parameterize with defer processing to prevent bit rot as filter made
+      // assumptions of data flow, prior relying on eager processing.
+      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
+                                        deferredProcessing() ? "true" : "false");
+    });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
@@ -131,7 +166,9 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(RateLimitQuotaIntegrationTest, StarFailed) {
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
-  initializeConfig(/*valid_rlqs_server=*/false);
+  ConfigOption option;
+  option.valid_rlqs_server = false;
+  initializeConfig(option);
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
@@ -359,6 +396,168 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
   }
 }
 
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = BlanketRule::DENY_ALL;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  for (int i = 0; i < 3; ++i) {
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers);
+
+    // After first request, the downstream client request will not trigger the reports to RLQS
+    // server since the request which is same as first request will find the entry in the cache.
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The request is denied by no_assignment_behavior.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    }
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    // Verify that all the denied requests send the 429 local reply.
+    EXPECT_EQ(response_->headers().getStatusValue(), "429");
+
+    cleanUp();
+  }
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = BlanketRule::ALLOW_ALL;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+
+  int totol_num_of_request = 10;
+  std::vector<absl::flat_hash_map<std::string, std::string>> custom_headers(
+      totol_num_of_request, {{"environment", "staging"}});
+  std::string key_prefix = "envoy_";
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    custom_headers[i].insert({"group", absl::StrCat(key_prefix, i)});
+  }
+
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers[i]);
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The first request is allowed due to ALLOW_ALL no_assignment_behavior
+      EXPECT_EQ(usage.num_requests_allowed(), 1);
+      EXPECT_EQ(usage.num_requests_denied(), 0);
+    } else {
+      // No need to start gRPC stream again since it is kept open.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+      // Verify usage content.
+      for (const auto& usage : reports.bucket_quota_usages()) {
+        // Only the client request that triggers usage report is allowed.
+        // It is because the usage report only account for last reporting period.
+        if (usage.bucket_id().bucket().at("group") == absl::StrCat(key_prefix, i)) {
+          EXPECT_EQ(usage.num_requests_allowed(), 1);
+          EXPECT_EQ(usage.num_requests_denied(), 0);
+        } else {
+          EXPECT_EQ(usage.num_requests_allowed(), 0);
+          EXPECT_EQ(usage.num_requests_denied(), 0);
+        }
+      }
+    }
+
+    // No RLQS server response is sent back in this test.
+
+    // Handle the request received by upstream.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
+    // open.
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = BlanketRule::DENY_ALL;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+
+  int totol_num_of_request = 5;
+  std::vector<absl::flat_hash_map<std::string, std::string>> custom_headers(
+      totol_num_of_request, {{"environment", "staging"}});
+  std::string key_prefix = "envoy_";
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    custom_headers[i].insert({"group", absl::StrCat(key_prefix, i)});
+  }
+
+  for (int i = 0; i < totol_num_of_request; ++i) {
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers[i]);
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The request is denied by no_assignment_behavior.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    } else {
+      // No need to start gRPC stream again since it is kept open.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+    }
+    // No RLQS server response is sent back in this test.
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    // Verify that all the denied requests send the 429 local reply.
+    EXPECT_EQ(response_->headers().getStatusValue(), "429");
+
+    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
+    // open.
+    cleanupUpstreamAndDownstream();
+  }
+}
+
 TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -440,6 +639,9 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   }
 }
 
+// RLQS filter is operating in non-blocking mode now, this test could be flaky until the stats are
+// added to make the test behavior deterministic. (e.g., wait for stats in the test).
+// Disable the test for now.
 TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
   initializeConfig();
   HttpIntegrationTest::initialize();
