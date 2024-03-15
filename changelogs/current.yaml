@@ -154,7 +154,7 @@ bug_fixes:
     another Cookie header.
 - area: admin
   change: |
-    Fixed dumpEcdsFilterConfigs when not have any ecds configs.
+    Removing the ECDS config entry from the config dump when it does not exist (or has expired).
     
 
 removed_config_or_runtime:
