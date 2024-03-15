@@ -1552,9 +1552,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  const auto address_list_ptr =
-      std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
-  host->setAddressList(address_list_ptr);
+  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -1604,9 +1602,7 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  const auto address_list_ptr =
-      std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
-  host->setAddressList(address_list_ptr);
+  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, connectionInfoSetter());
@@ -1659,9 +1655,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  const auto address_list_ptr =
-      std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
-  host->setAddressList(address_list_ptr);
+  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -1713,9 +1707,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  const auto address_list_ptr =
-      std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
-  host->setAddressList(address_list_ptr);
+  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -1861,7 +1853,8 @@ TEST_F(HostImplTest, HealthPipeAddress) {
 TEST_F(HostImplTest, HostAddressList) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
-  EXPECT_EQ(nullptr, host->addressList());
+  const std::vector<Network::Address::InstanceConstSharedPtr> address_list = {};
+  EXPECT_EQ(address_list, host->addressList());
 }
 
 // Test that hostname flag from the health check config propagates.

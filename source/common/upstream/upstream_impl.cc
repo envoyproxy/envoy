@@ -443,9 +443,7 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSo
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {};
-  return createConnection(dispatcher, cluster(), address(),
-                          addressList() ? *addressList() : address_list, transportSocketFactory(),
+  return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
                           options, transport_socket_options, shared_from_this());
 }
 
@@ -2066,9 +2064,7 @@ void PriorityStateManager::registerHostForPriority(
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
   if (!address_list.empty()) {
-    const auto address_list_ptr =
-        std::make_shared<const std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
-    host->setAddressList(address_list_ptr);
+    host->setAddressList(address_list);
   }
   registerHostForPriority(host, locality_lb_endpoint);
 }

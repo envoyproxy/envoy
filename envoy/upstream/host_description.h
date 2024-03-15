@@ -159,8 +159,7 @@ public:
    * @return a optional list of additional addresses which the host resolved to. These addresses
    *         may be used to create upstream connections if the primary address is unreachable.
    */
-  virtual const std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>&
-  addressList() const PURE;
+  virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
 
   /**
    * @return host specific stats.

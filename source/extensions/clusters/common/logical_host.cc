@@ -6,11 +6,11 @@ namespace Upstream {
 Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  const std::vector<Network::Address::InstanceConstSharedPtr> address_list = {};
-  const auto [current_address, address_list_ptr] = copyAddressAndList();
+  const auto current_address = address();
+  const std::vector<Network::Address::InstanceConstSharedPtr>& address_list = addressList();
+
   return HostImpl::createConnection(
-      dispatcher, cluster(), current_address, address_list_ptr ? *address_list_ptr : address_list,
-      transportSocketFactory(), options,
+      dispatcher, cluster(), current_address, address_list, transportSocketFactory(), options,
       override_transport_socket_options_ != nullptr ? override_transport_socket_options_
                                                     : transport_socket_options,
       std::make_shared<RealHostDescription>(current_address, shared_from_this()));
