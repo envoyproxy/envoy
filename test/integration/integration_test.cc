@@ -2505,7 +2505,9 @@ TEST_P(IntegrationTest, BufferOverflowConnectionRetry) {
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), HttpStatusIs("503"));
+  // Can be 503 if buffer overflow before connection failure or 507 if the connection failed
+  // afterward.
+  EXPECT_THAT(response->headers(), testing::AnyOf(HttpStatusIs("503"), HttpStatusIs("507")));
 }
 
 class TestRetryOptionsPredicateFactory : public Upstream::RetryOptionsPredicateFactory {
