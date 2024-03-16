@@ -10,11 +10,11 @@ QatzstdCompressorImpl::QatzstdCompressorImpl(uint32_t compression_level, bool en
                                              uint32_t strategy, uint32_t chunk_size,
                                              bool enable_qat_zstd,
                                              uint32_t qat_zstd_fallback_threshold,
-                                             void* sequenceProducerState)
+                                             void* sequence_producer_state)
     : ZstdCompressorImplBase(compression_level, enable_checksum, strategy, chunk_size),
       enable_qat_zstd_(enable_qat_zstd), qat_zstd_fallback_threshold_(qat_zstd_fallback_threshold),
-      sequenceProducerState_(sequenceProducerState), input_ptr_{std::make_unique<uint8_t[]>(
-                                                         chunk_size)},
+      sequence_producer_state_(sequence_producer_state), input_ptr_{std::make_unique<uint8_t[]>(
+                                                             chunk_size)},
       input_len_(0), chunk_size_(chunk_size) {
   size_t result;
   result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_compressionLevel, compression_level_);
@@ -26,7 +26,7 @@ QatzstdCompressorImpl::QatzstdCompressorImpl(uint32_t compression_level, bool en
             compression_level, strategy, chunk_size, enable_qat_zstd, qat_zstd_fallback_threshold);
   if (enable_qat_zstd_) {
     /* register qatSequenceProducer */
-    ZSTD_registerSequenceProducer(cctx_.get(), sequenceProducerState_, qatSequenceProducer);
+    ZSTD_registerSequenceProducer(cctx_.get(), sequence_producer_state_, qatSequenceProducer);
     result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_enableSeqProducerFallback, 1);
     RELEASE_ASSERT(!ZSTD_isError(result), "");
   }

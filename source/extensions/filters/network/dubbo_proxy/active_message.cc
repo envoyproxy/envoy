@@ -15,7 +15,7 @@ ActiveResponseDecoder::ActiveResponseDecoder(ActiveMessage& parent, DubboFilterS
                                              ProtocolPtr&& protocol)
     : parent_(parent), stats_(stats), response_connection_(connection),
       protocol_(std::move(protocol)),
-      decoder_(std::make_unique<ResponseDecoder>(*protocol_, *this)), complete_(false) {}
+      decoder_(std::make_unique<ResponseDecoder>(*protocol_, *this)) {}
 
 DubboFilters::UpstreamResponseStatus ActiveResponseDecoder::onData(Buffer::Instance& data) {
   ENVOY_LOG(debug, "dubbo response: the received reply data length is {}", data.length());
@@ -179,8 +179,7 @@ ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::HistogramCompletableTimespanImpl>(
                            parent_.stats().request_time_ms_, parent.timeSystem())),
       stream_id_(parent.randomGenerator().random()),
-      stream_info_(parent.timeSystem(), parent_.connection().connectionInfoProviderSharedPtr()),
-      pending_stream_decoded_(false), local_response_sent_(false) {
+      stream_info_(parent.timeSystem(), parent_.connection().connectionInfoProviderSharedPtr()) {
   parent_.stats().request_active_.inc();
 }
 

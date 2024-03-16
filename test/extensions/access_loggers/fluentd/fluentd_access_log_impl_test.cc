@@ -65,7 +65,7 @@ public:
       packer.pack_bin_body(record_bytes, data_.size());
     }
 
-    return std::string(buffer.data(), buffer.size());
+    return {buffer.data(), buffer.size()};
   }
 
   std::string tag_ = "test.tag";

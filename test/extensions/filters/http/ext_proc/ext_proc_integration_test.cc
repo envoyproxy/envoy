@@ -204,7 +204,7 @@ protected:
     }
   }
 
-  bool IsEnvoyGrpc() {
+  bool isEnvoyGrpc() {
     return std::get<1>(std::get<0>(GetParam())) == Envoy::Grpc::ClientType::EnvoyGrpc;
   }
 
@@ -3834,7 +3834,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
 // Test the filter when configured, upon a grpc error, can retry the request and
 // get response back.
 TEST_P(ExtProcIntegrationTest, RetryOnResponseError) {
-  if (!IsEnvoyGrpc()) {
+  if (!isEnvoyGrpc()) {
     GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
   }
   // Set envoy filter timeout to 5s to rule out noise.
@@ -3889,7 +3889,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnResponseError) {
 // Test the filter when configured, retries on a different host in the same
 // cluster.
 TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
-  if (!IsEnvoyGrpc()) {
+  if (!isEnvoyGrpc()) {
     GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
   }
   // Set envoy filter timeout to 5s to rule out noise.

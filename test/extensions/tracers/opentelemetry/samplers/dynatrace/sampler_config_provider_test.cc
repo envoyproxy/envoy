@@ -20,7 +20,6 @@ namespace Tracers {
 namespace OpenTelemetry {
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 class SamplerConfigProviderTest : public testing::Test {
 public:

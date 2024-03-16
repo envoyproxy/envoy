@@ -301,10 +301,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config, FilterStats& stats)
-      : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
-        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")) {}
+      : config_(config), stats_(stats), streaming_shadows_(Runtime::runtimeFeatureEnabled(
+                                            "envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -596,14 +594,14 @@ private:
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
-  bool grpc_request_ : 1;
-  bool exclude_http_code_stats_ : 1;
-  bool downstream_response_started_ : 1;
-  bool downstream_end_stream_ : 1;
-  bool is_retry_ : 1;
+  bool grpc_request_ : 1 {false};
+  bool exclude_http_code_stats_ : 1 {false};
+  bool downstream_response_started_ : 1 {false};
+  bool downstream_end_stream_ : 1 {false};
+  bool is_retry_ : 1 {false};
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
-  bool request_buffer_overflowed_ : 1;
+  bool request_buffer_overflowed_ : 1 {false};
   const bool streaming_shadows_ : 1;
 };
 

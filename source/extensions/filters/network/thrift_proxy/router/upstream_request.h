@@ -79,9 +79,9 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   };
 
   ResponseState response_state_{ResponseState::None};
-  bool request_complete_ : 1;
-  bool response_underflow_ : 1;
-  bool charged_response_timing_ : 1;
+  bool request_complete_ : 1 {false};
+  bool response_underflow_ : 1 {false};
+  bool charged_response_timing_ : 1 {false};
   bool close_downstream_on_error_ : 1;
 
   absl::optional<MonotonicTime> downstream_request_complete_time_;

@@ -187,8 +187,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           Network::Utility::getCanonicalIpv4LoopbackAddress(),
           Network::Utility::getCanonicalIpv4LoopbackAddress())),
-      protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)), expect_reset_(false),
-      reuse_connection_(false), request_in_flight_(false) {}
+      protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);

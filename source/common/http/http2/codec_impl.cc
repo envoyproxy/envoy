@@ -180,13 +180,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      local_end_stream_sent_(false), remote_end_stream_(false), remote_rst_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
-      pending_receive_buffer_high_watermark_called_(false),
-      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
       defer_processing_backedup_streams_(
-          Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)),
-      extend_stream_lifetime_flag_(false) {
+          Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit);
@@ -886,8 +881,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      random_(random_generator),
+      protocol_constraints_(stats, http2_options), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
     use_oghttp2_library_ = http2_options.use_oghttp2_codec().value();

@@ -20,7 +20,6 @@ namespace Config {
 namespace {
 using ::testing::AtLeast;
 using ::testing::NiceMock;
-using ::testing::Return;
 
 class AsyncDataSourceTest : public testing::Test {
 protected:

@@ -425,17 +425,17 @@ protected:
     // to determine whether we should continue processing that data.
     absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
-    bool local_end_stream_sent_ : 1;
-    bool remote_end_stream_ : 1;
-    bool remote_rst_ : 1;
-    bool data_deferred_ : 1;
-    bool received_noninformational_headers_ : 1;
-    bool pending_receive_buffer_high_watermark_called_ : 1;
-    bool pending_send_buffer_high_watermark_called_ : 1;
-    bool reset_due_to_messaging_error_ : 1;
+    bool local_end_stream_sent_ : 1 {false};
+    bool remote_end_stream_ : 1 {false};
+    bool remote_rst_ : 1 {false};
+    bool data_deferred_ : 1 {false};
+    bool received_noninformational_headers_ : 1 {false};
+    bool pending_receive_buffer_high_watermark_called_ : 1 {false};
+    bool pending_send_buffer_high_watermark_called_ : 1 {false};
+    bool reset_due_to_messaging_error_ : 1 {false};
     bool defer_processing_backedup_streams_ : 1;
     // Latch whether this stream is operating with this flag.
-    bool extend_stream_lifetime_flag_ : 1;
+    bool extend_stream_lifetime_flag_ : 1 {false};
     absl::string_view details_;
 
     /**
@@ -816,8 +816,8 @@ private:
   // remove streams from the map when they are closed in order to avoid calls to resetStreamWorker
   // after the stream has been removed from the active list.
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
-  bool dispatching_ : 1;
-  bool raised_goaway_ : 1;
+  bool dispatching_ : 1 {false};
+  bool raised_goaway_ : 1 {false};
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   MonotonicTime last_received_data_time_{};

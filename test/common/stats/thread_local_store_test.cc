@@ -2186,7 +2186,7 @@ protected:
     loader_ = std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_,
                                                     *store_, generator_, validation_visitor_, *api_,
                                                     creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;

@@ -100,9 +100,7 @@ static constexpr absl::string_view COLON_SPACE = ": ";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      StreamInfo::BytesMeterSharedPtr&& bytes_meter)
-    : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), bytes_meter_(std::move(bytes_meter)) {
+    : connection_(connection), bytes_meter_(std::move(bytes_meter)) {
   if (!bytes_meter_) {
     bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
   }
@@ -528,9 +526,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                uint32_t max_headers_kb, const uint32_t max_headers_count)
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
-      processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
-      deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
-      max_headers_count_(max_headers_count) {
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   if (codec_settings_.use_balsa_parser_) {
     parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
                                             codec_settings_.allow_custom_methods_);

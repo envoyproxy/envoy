@@ -86,8 +86,7 @@ private:
   struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          protocol_converter_(std::make_shared<ProtocolConverter>()), complete_{false},
-          passthrough_{false}, pending_transport_end_{false} {
+          protocol_converter_(std::make_shared<ProtocolConverter>()) {
       protocol_converter_->initProtocolConverter(*parent_.parent_.protocol_,
                                                  parent_.response_buffer_);
     }
@@ -133,9 +132,9 @@ private:
     MessageMetadataSharedPtr metadata_;
     ProtocolConverterSharedPtr protocol_converter_;
     absl::optional<bool> success_;
-    bool complete_ : 1;
-    bool passthrough_ : 1;
-    bool pending_transport_end_ : 1;
+    bool complete_ : 1 {false};
+    bool passthrough_ : 1 {false};
+    bool pending_transport_end_ : 1 {false};
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
@@ -215,9 +214,7 @@ private:
                                parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
-                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
-          under_on_local_reply_{false} {
+                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()) {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {
@@ -367,10 +364,10 @@ private:
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
-    bool local_response_sent_ : 1;
-    bool pending_transport_end_ : 1;
-    bool passthrough_ : 1;
-    bool under_on_local_reply_ : 1;
+    bool local_response_sent_ : 1 {false};
+    bool pending_transport_end_ : 1 {false};
+    bool passthrough_ : 1 {false};
+    bool under_on_local_reply_ : 1 {false};
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;

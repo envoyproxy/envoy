@@ -84,10 +84,10 @@ private:
     SerializerPtr serializer_;
     ProtocolPtr protocol_;
 
-    bool request_complete_ : 1;
-    bool response_started_ : 1;
-    bool response_complete_ : 1;
-    bool stream_reset_ : 1;
+    bool request_complete_ : 1 {false};
+    bool response_started_ : 1 {false};
+    bool response_complete_ : 1 {false};
+    bool stream_reset_ : 1 {false};
   };
 
   void cleanup();

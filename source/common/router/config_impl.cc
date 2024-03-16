@@ -97,7 +97,7 @@ public:
     if (!route) {
       throwEnvoyExceptionOrPanic("Invalid route config");
     }
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
 
     if (validation_clusters.has_value()) {
       THROW_IF_NOT_OK(route->validateClusters(*validation_clusters));
@@ -1720,7 +1720,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     absl::Status creation_status;
     rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(),
                                                                factory_context, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());

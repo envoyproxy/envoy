@@ -13,9 +13,7 @@
 
 #include "gmock/gmock.h"
 
-using Envoy::Extensions::Filters::Common::ExtAuthz::TestCommon;
 using envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {

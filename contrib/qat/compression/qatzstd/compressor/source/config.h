@@ -49,7 +49,7 @@ private:
                               public Logger::Loggable<Logger::Id::compression> {
     QatzstdThreadLocal();
     ~QatzstdThreadLocal() override;
-    void* GetQATSession();
+    void* getQATSession();
     bool initialized_;
     void* sequenceProducerState_;
   };

@@ -54,7 +54,7 @@ private:
   ProtocolPtr protocol_;
   ResponseDecoderPtr decoder_;
   MessageMetadataSharedPtr metadata_;
-  bool complete_ : 1;
+  bool complete_ : 1 {false};
   DubboFilters::UpstreamResponseStatus response_status_{
       DubboFilters::UpstreamResponseStatus::MoreData};
 };
@@ -209,8 +209,8 @@ private:
 
   Buffer::OwnedImpl response_buffer_;
 
-  bool pending_stream_decoded_ : 1;
-  bool local_response_sent_ : 1;
+  bool pending_stream_decoded_ : 1 {false};
+  bool local_response_sent_ : 1 {false};
 
   friend class ActiveResponseDecoder;
 };

@@ -19,14 +19,15 @@ using testing::HasSubstr;
 class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                 public HttpProtocolIntegrationTest {
 protected:
-  void initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
-                                 absl::optional<bool> appendLocalOverloadHeader = absl::nullopt) {
+  void
+  initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
+                            absl::optional<bool> append_local_overload_header = absl::nullopt) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
     });
 
-    if (appendLocalOverloadHeader.has_value() && appendLocalOverloadHeader.value()) {
+    if (append_local_overload_header.has_value() && append_local_overload_header.value()) {
       config_helper_.addConfigModifier(
           [=](envoy::extensions::filters::network::http_connection_manager::v3::
                   HttpConnectionManager& cm) -> void { cm.set_append_local_overload(true); });

@@ -312,7 +312,7 @@ resources:
     return ret;
   }
 
-  static std::string CompositeFilterTestParamsToString(
+  static std::string compositeFilterTestParamsToString(
       const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
     return absl::StrCat(
         (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
@@ -330,7 +330,7 @@ resources:
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, CompositeFilterIntegrationTest,
     testing::ValuesIn(CompositeFilterIntegrationTest::getValuesForCompositeFilterTest()),
-    CompositeFilterIntegrationTest::CompositeFilterTestParamsToString);
+    CompositeFilterIntegrationTest::compositeFilterTestParamsToString);
 
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified filter to the stream.

@@ -47,7 +47,7 @@ public:
     Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_,
         creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     // This will ignore values set in test, but just use flag defaults!
     runtime_ = std::move(runtime_ptr);
   }
@@ -92,7 +92,7 @@ public:
     Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_,
         creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     // This will ignore values set in test, but just use flag defaults!
     runtime_ = std::move(runtime_ptr);
   }

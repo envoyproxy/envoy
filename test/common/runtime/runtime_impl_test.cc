@@ -98,7 +98,7 @@ public:
     absl::Status creation_status;
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
                                            generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   void write(const std::string& path, const std::string& value) {
@@ -545,7 +545,7 @@ protected:
     absl::Status creation_status;
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
                                            generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   ProtobufWkt::Struct base_;
@@ -960,7 +960,7 @@ public:
     absl::Status creation_status;
     loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, config, local_info_, store_,
                                            generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     loader_->initialize(cm_);
     for (auto* sub : rtds_subscriptions_) {
       EXPECT_CALL(*sub, start(_));

@@ -417,7 +417,7 @@ private:
   bool enable_reuse_port_default_{false};
   Regex::EnginePtr regex_engine_;
 
-  bool stats_flush_in_progress_ : 1;
+  bool stats_flush_in_progress_ : 1 {false};
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

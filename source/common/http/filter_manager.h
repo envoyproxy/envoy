@@ -67,9 +67,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   ActiveStreamFilterBase(FilterManager& parent, bool is_encoder_decoder_filter,
                          FilterContext filter_context)
       : parent_(parent), iteration_state_(IterationState::Continue),
-        filter_context_(std::move(filter_context)), iterate_from_current_filter_(false),
-        headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
-        is_encoder_decoder_filter_(is_encoder_decoder_filter), processed_headers_(false) {}
+        filter_context_(std::move(filter_context)),
+        is_encoder_decoder_filter_(is_encoder_decoder_filter) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -185,14 +184,14 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
   // current filter instead of the next one. If true, filter iteration starts with the current
   // filter. Otherwise, starts with the next filter in the chain.
-  bool iterate_from_current_filter_ : 1;
-  bool headers_continued_ : 1;
-  bool continued_1xx_headers_ : 1;
+  bool iterate_from_current_filter_ : 1 {false};
+  bool headers_continued_ : 1 {false};
+  bool continued_1xx_headers_ : 1 {false};
   // If true, end_stream is called for this filter.
-  bool end_stream_ : 1;
+  bool end_stream_ : 1 {false};
   const bool is_encoder_decoder_filter_ : 1;
   // If true, the filter has processed headers.
-  bool processed_headers_ : 1;
+  bool processed_headers_ : 1 {false};
 };
 
 /**
@@ -864,35 +863,30 @@ public:
 
 protected:
   struct State {
-    State()
-        : remote_decode_complete_(false), remote_encode_complete_(false), local_complete_(false),
-          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
-          is_grpc_request_(false), non_100_response_headers_encoded_(false),
-          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
-          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
+    State() = default;
     uint32_t filter_call_state_{0};
 
-    bool remote_decode_complete_ : 1;
-    bool remote_encode_complete_ : 1;
-    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                              // A filter can still stop the stream from being complete as seen
-                              // by the codec.
+    bool remote_decode_complete_ : 1 {false};
+    bool remote_encode_complete_ : 1 {false};
+    bool local_complete_ : 1 {false}; // This indicates that local is complete prior to filter
+                                      // processing. A filter can still stop the stream from being
+                                      // complete as seen by the codec.
     // By default, we will assume there are no 1xx. If encode1xxHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 1xx.
-    bool has_1xx_headers_ : 1;
-    bool created_filter_chain_ : 1;
+    bool has_1xx_headers_ : 1 {false};
+    bool created_filter_chain_ : 1 {false};
     // These two are latched on initial header read, to determine if the original headers
     // constituted a HEAD or gRPC request, respectively.
-    bool is_head_request_ : 1;
-    bool is_grpc_request_ : 1;
+    bool is_head_request_ : 1 {false};
+    bool is_grpc_request_ : 1 {false};
     // Tracks if headers other than 100-Continue have been encoded to the codec.
-    bool non_100_response_headers_encoded_ : 1;
+    bool non_100_response_headers_encoded_ : 1 {false};
     // True under the stack of onLocalReply, false otherwise.
-    bool under_on_local_reply_ : 1;
+    bool under_on_local_reply_ : 1 {false};
     // True when the filter chain iteration was aborted with local reply.
-    bool decoder_filter_chain_aborted_ : 1;
-    bool encoder_filter_chain_aborted_ : 1;
-    bool saw_downstream_reset_ : 1;
+    bool decoder_filter_chain_aborted_ : 1 {false};
+    bool encoder_filter_chain_aborted_ : 1 {false};
+    bool saw_downstream_reset_ : 1 {false};
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

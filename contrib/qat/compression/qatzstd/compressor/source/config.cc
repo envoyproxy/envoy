@@ -36,7 +36,7 @@ QatzstdCompressorFactory::QatzstdThreadLocal::~QatzstdThreadLocal() {
   }
 }
 
-void* QatzstdCompressorFactory::QatzstdThreadLocal::GetQATSession() {
+void* QatzstdCompressorFactory::QatzstdThreadLocal::getQATSession() {
   // The session must be initialized only once in every worker thread.
   if (!initialized_) {
 
@@ -57,7 +57,7 @@ void* QatzstdCompressorFactory::QatzstdThreadLocal::GetQATSession() {
 Envoy::Compression::Compressor::CompressorPtr QatzstdCompressorFactory::createCompressor() {
   return std::make_unique<QatzstdCompressorImpl>(
       compression_level_, enable_checksum_, strategy_, chunk_size_, enable_qat_zstd_,
-      qat_zstd_fallback_threshold_, enable_qat_zstd_ ? tls_slot_->get()->GetQATSession() : nullptr);
+      qat_zstd_fallback_threshold_, enable_qat_zstd_ ? tls_slot_->get()->getQATSession() : nullptr);
 }
 
 Envoy::Compression::Compressor::CompressorFactoryPtr

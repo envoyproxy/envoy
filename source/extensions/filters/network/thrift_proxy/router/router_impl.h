@@ -231,8 +231,8 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
 public:
   Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
          Runtime::Loader& runtime, ShadowWriter& shadow_writer, bool close_downstream_on_error)
-      : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
-        shadow_writer_(shadow_writer), close_downstream_on_error_(close_downstream_on_error) {}
+      : RequestOwner(cluster_manager, stats), runtime_(runtime), shadow_writer_(shadow_writer),
+        close_downstream_on_error_(close_downstream_on_error) {}
 
   ~Router() override = default;
 
@@ -329,7 +329,7 @@ private:
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
 
-  bool passthrough_supported_ : 1;
+  bool passthrough_supported_ : 1 {false};
   uint64_t request_size_{};
   Runtime::Loader& runtime_;
   ShadowWriter& shadow_writer_;

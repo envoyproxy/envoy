@@ -714,7 +714,7 @@ using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
  */
 class PrioritySetImpl : public PrioritySet {
 public:
-  PrioritySetImpl() : batch_update_(false) {}
+  PrioritySetImpl() = default;
   // From PrioritySet
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const override {
@@ -779,7 +779,7 @@ private:
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
-  bool batch_update_ : 1;
+  bool batch_update_ : 1 {false};
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
   // that have been added/removed throughout the batch update, and ensures that we properly manage
@@ -1195,7 +1195,7 @@ private:
   const bool set_local_interface_name_on_upstream_connections_ : 1;
   const bool added_via_api_ : 1;
   // true iff the cluster proto specified upstream http filters.
-  bool has_configured_http_filters_ : 1;
+  bool has_configured_http_filters_ : 1 {false};
   const bool per_endpoint_stats_ : 1;
   const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
