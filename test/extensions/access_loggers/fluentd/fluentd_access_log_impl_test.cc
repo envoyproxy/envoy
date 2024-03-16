@@ -466,24 +466,25 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config_;
-  MockFluentdFormatter* formatter_{new NiceMock<MockFluentdFormatter>()};
-  std::shared_ptr<MockFluentdAccessLogger> logger_{new MockFluentdAccessLogger()};
-  std::shared_ptr<MockFluentdAccessLoggerCache> logger_cache_{new MockFluentdAccessLoggerCache()};
 };
 
 TEST_F(FluentdAccessLogTest, CreateAndLog) {
-  EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _)).WillOnce(Return(logger_));
-  auto access_log = FluentdAccessLog(AccessLog::FilterPtr{filter_}, FluentdFormatterPtr{formatter_},
+  auto* formatter = new NiceMock<MockFluentdFormatter>();
+  auto logger = std::make_shared<MockFluentdAccessLogger>();
+  auto logger_cache = std::make_shared<MockFluentdAccessLoggerCache>();
+
+  EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _)).WillOnce(Return(logger));
+  auto access_log = FluentdAccessLog(AccessLog::FilterPtr{filter_}, FluentdFormatterPtr{formatter},
                                      std::make_shared<FluentdAccessLogConfig>(config_), tls_,
-                                     random_, logger_cache_);
+                                     random_, logger_cache);
 
   MockTimeSystem time_system;
   EXPECT_CALL(time_system, systemTime).WillOnce(Return(SystemTime(std::chrono::seconds(200))));
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(stream_info, timeSource()).WillOnce(ReturnRef(time_system));
 
-  EXPECT_CALL(*formatter_, format(_, _)).WillOnce(Return(std::vector<uint8_t>{10, 20}));
-  EXPECT_CALL(*logger_, log(_)).WillOnce(Invoke([](EntryPtr&& entry) {
+  EXPECT_CALL(*formatter, format(_, _)).WillOnce(Return(std::vector<uint8_t>{10, 20}));
+  EXPECT_CALL(*logger, log(_)).WillOnce(Invoke([](EntryPtr&& entry) {
     EXPECT_EQ(200, entry->time_);
     ASSERT_EQ(2, entry->record_.size());
     EXPECT_EQ(uint8_t(10), entry->record_[0]);
