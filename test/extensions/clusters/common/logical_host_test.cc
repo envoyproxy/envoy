@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 
-class RealHostDescription : public testing::Test {
+class LogicalHostTest : public testing::Test {
 public:
   Network::Address::InstanceConstSharedPtr address_ = nullptr;
   Upstream::MockHost* mock_host_{new NiceMock<Upstream::MockHost>()};
@@ -20,7 +20,7 @@ public:
   Upstream::RealHostDescription description_{address_, host_};
 };
 
-TEST_F(RealHostDescription, UnitTest) {
+TEST_F(LogicalHostTest, RealHost) {
   // No-op unit tests
   description_.canary();
   description_.metadata();
@@ -41,6 +41,8 @@ TEST_F(RealHostDescription, UnitTest) {
       .WillOnce(Return(std::make_shared<Upstream::HostDescription::AddressVector>()));
   description_.addressList();
 }
+
+TEST_F(LogicalHostTest, LogicalHost) {}
 
 } // namespace Clusters
 } // namespace Extensions

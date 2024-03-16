@@ -80,6 +80,13 @@ public:
     health_check_address_ = health_check_address;
   }
 
+  /**
+   * Sets the address-list: this can be called dynamically during operation, and
+   * is thread-safe. Note this is not an override of an interface method but
+   * there is a similar method in HostDescriptionImpl which is not thread safe.
+   *
+   * @param address_list the new address list.
+   */
   void setAddressList(const AddressVector& address_list) {
     absl::MutexLock lock(&address_lock_);
     setAddressListLockHeld(address_list);

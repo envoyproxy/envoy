@@ -253,7 +253,6 @@ public:
   LoadMetricStats& loadMetricStats() const override { return load_metric_stats_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
-  // Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const envoy::config::core::v3::Locality& locality() const override { return locality_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
@@ -307,21 +306,26 @@ public:
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, TimeSource& time_source);
 
-  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  SharedAddressVector addressList() const override {
-    if (address_list_ == nullptr) {
-      return std::make_shared<AddressVector>();
-    }
-    return address_list_;
-  }
-
+  /**
+   * Sets the address-list: this must be done right after construction for
+   * HostImpl and HostDescriptionImpl; this implementation is not thread
+   * safe. Note this is not an override of an interface method but there is a
+   * similar method in LogicalHost which is thread safe.
+   *
+   * @param address_list the new address list.
+   */
   void setAddressList(const AddressVector& address_list) {
     address_list_ = std::make_shared<AddressVector>(address_list);
     ASSERT(address_list_->empty() || *address_list_->front() == *address_);
   }
 
+  // HostDescription
+  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
+  }
+  SharedAddressVector addressList() const override {
+    return (address_list_ == nullptr) ? std::make_shared<AddressVector>() : address_list_;
   }
 
 private:
