@@ -42,6 +42,7 @@ namespace Envoy {
 // Fully-qualified for use in external callsites.
 #define GENERATE_PRIMITIVE_COUNTER_STRUCT(NAME) Envoy::Stats::PrimitiveCounter NAME##_;
 #define GENERATE_PRIMITIVE_GAUGE_STRUCT(NAME) Envoy::Stats::PrimitiveGauge NAME##_;
+#define GENERATE_PRIMITIVE_EWMA_STRUCT(NAME) Envoy::Stats::PrimitiveEwma NAME##_;
 
 // Name and counter/gauge reference pair used to construct map of counters/gauges.
 #define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {absl::string_view(#X), std::ref(X##_)},
@@ -50,5 +51,6 @@ namespace Envoy {
 // Ignore a counter or gauge.
 #define IGNORE_PRIMITIVE_COUNTER(X)
 #define IGNORE_PRIMITIVE_GAUGE(X)
+#define IGNORE_PRIMITIVE_EWMA(X)
 
 } // namespace Envoy

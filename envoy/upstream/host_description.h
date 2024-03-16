@@ -29,7 +29,7 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
  * envoy.api.v2.endpoint.UpstreamLocalityStats for the definitions of success/error. These are
  * latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
-#define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \
+#define ALL_HOST_STATS(COUNTER, GAUGE, EWMA)                                                       \
   COUNTER(cx_connect_fail)                                                                         \
   COUNTER(cx_total)                                                                                \
   COUNTER(rq_error)                                                                                \
@@ -37,22 +37,28 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_total)                                                                                \
   GAUGE(cx_active)                                                                                 \
-  GAUGE(rq_active)
+  GAUGE(rq_active)                                                                                 \
+  EWMA(decay_rtt)                                                                                  \
+  EWMA(decay_err)                                                                                  \
+  EWMA(decay_total)
 
 /**
  * All per host stats defined. @see stats_macros.h
  */
 struct HostStats {
-  ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
+  ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT,
+                 GENERATE_PRIMITIVE_EWMA_STRUCT);
 
   // Provide access to name,counter pairs.
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters() {
-    return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
+    return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE,
+                           IGNORE_PRIMITIVE_EWMA)};
   }
 
   // Provide access to name,gauge pairs.
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges() {
-    return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
+    return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE,
+                           IGNORE_PRIMITIVE_EWMA)};
   }
 };
 

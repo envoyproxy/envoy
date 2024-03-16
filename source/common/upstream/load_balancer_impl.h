@@ -784,5 +784,26 @@ protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
 };
 
+class PeakEWMALoadBalancer : public ZoneAwareLoadBalancerBase {
+public:
+  ~PeakEWMALoadBalancer() = default;
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
+
+  PeakEWMALoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                       ClusterLbStats& stats, Runtime::Loader& runtime,
+                       Random::RandomGenerator& random,
+                       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+      : ZoneAwareLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random,
+            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+                                                           100, 50),
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
+
+private:
+  constexpr static const double DEFAULT_RTT = 100; // 100ms as default for new instance
+
+  double score(HostSharedPtr host);
+};
+
 } // namespace Upstream
 } // namespace Envoy
