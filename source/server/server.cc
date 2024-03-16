@@ -29,6 +29,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
@@ -105,7 +106,20 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+
+  // These are needed for string matcher extensions. It is too painful to pass these objects through
+  // all call chains that construct a `StringMatcherImpl`, so these are singletons.
+  //
+  // They must be cleared before being set to make the multi-envoy integration test pass. Note that
+  // this means that extensions relying on these singletons probably will not function correctly in
+  // some Envoy mobile setups where multiple Envoy engines are used in the same process. The same
+  // caveat also applies to a few other singletons, such as the global regex engine.
+  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
+  InjectableSingleton<ThreadLocal::SlotAllocator>::initialize(&thread_local_);
+  InjectableSingleton<Api::Api>::clear();
+  InjectableSingleton<Api::Api>::initialize(api_.get());
+}
 
 InstanceBase::~InstanceBase() {
   terminate();
@@ -137,6 +151,9 @@ InstanceBase::~InstanceBase() {
     close(tracing_fd_);
   }
 #endif
+
+  InjectableSingleton<ThreadLocal::SlotAllocator>::clear();
+  InjectableSingleton<Api::Api>::clear();
 }
 
 Upstream::ClusterManager& InstanceBase::clusterManager() {
@@ -312,13 +329,14 @@ bool canBeRegisteredAsInlineHeader(const Http::LowerCaseString& header_name) {
   return true;
 }
 
-void registerCustomInlineHeadersFromBootstrap(
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+absl::Status
+registerCustomInlineHeadersFromBootstrap(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   for (const auto& inline_header : bootstrap.inline_headers()) {
     const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
     if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
-      throwEnvoyExceptionOrPanic(fmt::format("Header {} cannot be registered as an inline header.",
-                                             inline_header.inline_header_name()));
+      return absl::InvalidArgumentError(
+          fmt::format("Header {} cannot be registered as an inline header.",
+                      inline_header.inline_header_name()));
     }
     switch (inline_header.inline_header_type()) {
     case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_HEADER:
@@ -341,6 +359,7 @@ void registerCustomInlineHeadersFromBootstrap(
       PANIC("not implemented");
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -406,7 +425,7 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
     }
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initializeOrThrow(std::move(local_address), component_factory);
+    THROW_IF_NOT_OK(initializeOrThrow(std::move(local_address), component_factory));
   }
   END_TRY
   MULTI_CATCH(
@@ -425,8 +444,8 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
       });
 }
 
-void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
-                                     ComponentFactory& component_factory) {
+absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                                             ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
@@ -441,9 +460,9 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   if (bootstrap_.has_application_log_config()) {
-    THROW_IF_NOT_OK(
+    RETURN_IF_NOT_OK(
         Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
-    THROW_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
+    RETURN_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
   }
 
 #ifdef ENVOY_PERFETTO
@@ -467,7 +486,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   tracing_session_ = perfetto::Tracing::NewTrace();
   tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (tracing_fd_ == -1) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
   }
   // Configure the tracing session.
@@ -484,7 +503,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   // Register Custom O(1) headers from bootstrap.
-  registerCustomInlineHeadersFromBootstrap(bootstrap_);
+  RETURN_IF_NOT_OK(registerCustomInlineHeadersFromBootstrap(bootstrap_));
 
   ENVOY_LOG(info, "HTTP header map info:");
   for (const auto& info : Http::HeaderMapImplUtility::getAllHeaderMapImplInfo()) {
@@ -500,7 +519,8 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
+  stats_store_.setTagProducer(
+      Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(
@@ -535,7 +555,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
     version_int = bootstrap_.stats_server_version_override().value();
   } else {
     if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-      throwEnvoyExceptionOrPanic("compiled GIT SHA is invalid. Invalid build.");
+      return absl::InvalidArgumentError("compiled GIT SHA is invalid. Invalid build.");
     }
   }
   server_stats_->version_.set(version_int);
@@ -585,7 +605,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
 
   absl::Status creation_status;
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
-  THROW_IF_NOT_OK_REF(creation_status);
+  RETURN_IF_NOT_OK(creation_status);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -715,7 +735,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
     admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
                               initial_config.admin().socketOptions());
 #else
-    throwEnvoyExceptionOrPanic("Admin address configured but admin support compiled out");
+    return absl::InvalidArgumentError("Admin address configured but admin support compiled out");
 #endif
   } else {
     ENVOY_LOG(info, "No admin address given, so no admin HTTP server started.");
@@ -729,7 +749,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   }
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
+  ssl_context_manager_ = createContextManager("ssl_context_manager", server_contexts_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
@@ -740,7 +760,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
-  THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
+  RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -783,6 +803,7 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
   // started and before our own run() loop runs.
   main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
   worker_guard_dog_ = maybeCreateGuardDog("workers");
+  return absl::OkStatus();
 }
 
 void InstanceBase::onClusterManagerPrimaryInitializationComplete() {
@@ -858,10 +879,13 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 #ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
 #endif
-  return std::make_unique<Runtime::LoaderImpl>(
+  absl::Status creation_status;
+  auto loader = std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
-      server.messageValidationContext().dynamicValidationVisitor(), server.api());
+      server.messageValidationContext().dynamicValidationVisitor(), server.api(), creation_status);
+  THROW_IF_NOT_OK(creation_status);
+  return loader;
 }
 
 void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {

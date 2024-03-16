@@ -11,9 +11,18 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_include_histograms`` is now enabled by default.
     This causes the ``includeHistogram()`` method on ``Stats::SinkPredicates`` to filter histograms to
     be flushed to stat sinks.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
+    requests and responses. A number of users have reported issues with oghttp2 including issue 32611 and issue 32401 This behavior
+    can be reverted by setting the feature to ``true``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: sockets
+  change: |
+    Failure to create an upstream socket should now result in clean connection failure rather than failing a release assert. This behavior
+    can be temporarily reverted by setting runtime feature ``envoy.restart_features_.allow_client_socket_creation_failure`` to false.
 - area: adaptive concurrency filter stats
   change: |
     Multiply the gradient value stat by 1000 to make it more granular (values will range between 500 and 2000).
@@ -38,6 +47,10 @@ minor_behavior_changes:
     Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
     is degrading. Can be manually turned on via
     :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: QUIC
+  change: |
+    Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
+    ``envoy.reloadable_features.quic_upstream_reads_fixed_number_packets`` to false.
 - area: aws
   change: |
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
@@ -47,9 +60,32 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: proxy status
+  change: |
+    Add more conversion in the proxy status utility. It can be disabled by the runtime guard
+    ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
+- area: http2
+  change: |
+    Simplifies integration with the codec by removing translation between nghttp2 callbacks and Http2VisitorInterface events.
+    Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
+- area: http3
+  change: |
+    Use GRO (Generic Receive Offload) for reading packets from a client QUIC UDP socket. See
+    https://www.kernel.org/doc/html/next/networking/segmentation-offloads.html for a description of
+    GRO. This behavior change can be reverted by setting
+    ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to ``false``.
+- area: http3
+  change: |
+    Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
+    is not set or not supported. recvmsg will be used instead. This behavior change can be
+    reverted by setting ``envoy.reloadable_features.disallow_quic_client_udp_mmsg`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http3_upstream
+  change: |
+    Fixing a bug with HTTP/3 upstream using a non-threadsafe cache cross-thread. Bumping HTTP/3 support down
+    to alpha as the severity of this bug indicates it is both not in use and not GA quality code.
 - area: tracers
   change: |
     use unary RPC calls for OpenTelemetry trace exports, rather than client-side streaming connections.
@@ -88,6 +124,9 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: quic
+  change: |
+    Fixed crash bug with QUIC upstream + X.509v1 certificates.
 - area: proxy_protocol
   change: |
     Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
@@ -107,16 +146,34 @@ bug_fixes:
     to support half close semantics during TCP tunneling.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` to false.
+- area: eds-caching
+  change: |
+    Fixing an issue where EDS caching is used (protected by the ``envoy.restart_features.use_eds_cache_for_ads``
+    runtime flag that is false by default), when multiple clusters use the same EDS resource, and that cached EDS
+    resource is used.
 - area: jwt_authn
   change: |
     Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
+- area: jwt_authn
+  change: |
+    Added
+    :ref:`max_lifetime <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.max_lifetime>` and
+    :ref:`require_expiration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.require_expiration>`
+    to limit the maximum remaining lifetime of a token from a ``JwtProvider`` and implement restrictions for JWT-SVIDs.
 - area: router
   change: |
-    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happends. This is
+    Fix a timing issue when upstream requests are empty when decoding data and send local reply when that happens. This is
     controlled by ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
 - area: deps
   change: |
     Updated QUICHE dependencies to incorporate fixes for https://github.com/envoyproxy/envoy/issues/32401.
+- area: tracing
+  change: |
+    Dynatrace resource detector: Only log warning message when no enrichment attributes are found.
+- area: oauth
+  change: |
+    When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
+    another Cookie header.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -141,8 +198,20 @@ removed_config_or_runtime:
 - area: aws
   change: |
     Removed ``envoy.reloadable_features.enable_aws_credentials_file`` runtime flag and legacy code paths.
+- area: upstream
+  change: |
+    removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
+- area: ext_proc
+  change: |
+    Added
+    :ref:`grpc_initial_metadata <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_initial_metadata>`
+    config API to allow extending inherited metadata from
+    :ref:`ExternalProcessor.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`
+    and
+    :ref:`ExtProcOverrides.grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExtProcOverrides.grpc_service>`
+    with the new or updated values.
 - area: aws_request_signing
   change: |
     Update ``aws_request_signing`` filter to support use as an upstream HTTP filter. This allows successful calculation of
@@ -161,6 +230,11 @@ new_features:
     Added QUIC protocol option :ref:`send_disable_active_migration
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration>` to make the server send clients a transport
     parameter to discourage client endpoints from active migration.
+- area: quic
+  change: |
+    Added support for QUIC listeners to :ref:`choose certificates based on SNI <arch_overview_ssl_cert_select>` and load certificates
+    from formats other than PEM, such as :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`.
+    This behavior can be disabled with runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code``.
 - area: ext_proc
   change: |
     implemented
@@ -176,6 +250,9 @@ new_features:
   change: |
     Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
     during signature.
+- area: http3
+  change: |
+    Added experimental support for sending and receiving HTTP/3 METADATA frames.
 - area: ext_proc
   change: |
     added
@@ -204,6 +281,10 @@ new_features:
     Envoy will select the host with the fewest active requests from the entire host set rather than
     :ref:`choice_count <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
     random choices.
+- area: access_loggers
+  change: |
+    Added :ref:`Fluentd access logger <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig>`
+    to support flushing access logs in `Fluentd format <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 - area: redis
   change: |
     Added support for the ``ECHO`` command.
@@ -212,9 +293,57 @@ new_features:
     added an option to dynamically set a per downstream connection idle timeout period object under the key
     ``envoy.tcp_proxy.per_connection_idle_timeout_ms``. If this filter state value exists, it will override the idle timeout
     specified in the filter configuration and the default idle timeout.
+- area: load shed point
+  change: |
+    Added load shed point ``envoy.load_shed_points.hcm_ondata_creating_codec`` that closes connections before creating codec if
+    Envoy is under pressure, typically memory.
+- area: health_checks
+  change: |
+    added a :ref:`configuration option <envoy_v3_api_field_config.core.v3.HealthCheck.always_log_health_check_success>` that enables
+    health check logs on each successful health check.
+- area: string matcher
+  change: |
+    Added an :ref:`extension point for custom string matcher implementations <envoy_v3_api_field_type.matcher.v3.StringMatcher.custom>`.
+    An implementation for :ref:`running a Lua script <envoy_v3_api_msg_extensions.string_matcher.lua.v3.Lua>` is included.
+- area: overload
+  change: |
+    added a :ref:`configuration option
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>` to add
+    ``x-envoy-local-overloaded`` header when Overload Manager is triggered.
+- area: tracing
+  change: |
+    Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
+- area: tracing
+  change: |
+    Added User-Agent header to OTLP trace exporters according to the OpenTelemetry specification.
+- area: http
+  change: |
+    Added DownstreamRemoteReset to CoreResponseFlag, and it is set when stream is remote reset.
+- area: tracing
+  change: |
+    Added support for variant span attribute type for the OpenTelemetry tracer.
+- area: oauth
+  change: |
+    :ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>`
+    to support disabling authorization redirects for specific requests, e.g. AJAX requests.
+- area: jwt_authn
+  change: |
+    Added
+    :ref:`subjects <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.subjects>` to allow restrictions
+    of subjects a ``JwtProvider`` can assert.
+- area: aws_request_signing
+  change: |
+    Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
+    by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
+    configuration section.
 
 deprecated:
 - area: listener
   change: |
     deprecated runtime key ``overload.global_downstream_max_connections`` in favor of :ref:`downstream connections monitor
     <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`.
+- area: tracing
+  change: |
+    deprecated :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>`
+    in favor of :ref:`spawn_upstream_span
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.

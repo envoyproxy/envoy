@@ -28,7 +28,8 @@ public:
               (Stats::Scope & scope, const ClientContextConfig& config));
   MOCK_METHOD(ServerContextSharedPtr, createSslServerContext,
               (Stats::Scope & stats, const ServerContextConfig& config,
-               const std::vector<std::string>& server_names));
+               const std::vector<std::string>& server_names,
+               ContextAdditionalInitFunc additional_init));
   MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
@@ -148,6 +149,14 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
   MOCK_METHOD(bool, fullScanCertsOnSNIMismatch, (), (const));
+
+  Ssl::HandshakerCapabilities capabilities_;
+  std::string ciphers_{"RSA"};
+  std::string alpn_{""};
+  std::string sigalgs_{""};
+  Network::Address::IpList iplist_;
+  std::string path_;
+  std::vector<SessionTicketKey> ticket_keys_;
 };
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {

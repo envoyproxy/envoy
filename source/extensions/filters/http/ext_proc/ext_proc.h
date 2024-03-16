@@ -129,7 +129,7 @@ public:
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
-               const LocalInfo::LocalInfo& local_info)
+               Server::Configuration::CommonFactoryContext& context)
       : failure_mode_allow_(config.failure_mode_allow()),
         disable_clear_route_cache_(config.disable_clear_route_cache()),
         message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
@@ -138,8 +138,9 @@ public:
         filter_metadata_(config.filter_metadata()),
         allow_mode_override_(config.allow_mode_override()),
         disable_immediate_response_(config.disable_immediate_response()),
-        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers())),
-        disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers())),
+        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+        disallowed_headers_(
+            initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
         untyped_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().untyped().begin(),
             config.metadata_options().forwarding_namespaces().untyped().end()),
@@ -149,7 +150,7 @@ public:
         untyped_receiving_namespaces_(
             config.metadata_options().receiving_namespaces().untyped().begin(),
             config.metadata_options().receiving_namespaces().untyped().end()),
-        expression_manager_(builder, local_info, config.request_attributes(),
+        expression_manager_(builder, context.localInfo(), config.request_attributes(),
                             config.response_attributes()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -247,6 +248,9 @@ public:
   const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
   }
+  const std::vector<envoy::config::core::v3::HeaderValue>& grpcInitialMetadata() const {
+    return grpc_initial_metadata_;
+  }
 
   const absl::optional<const std::vector<std::string>>&
   untypedForwardingMetadataNamespaces() const {
@@ -260,31 +264,11 @@ public:
   }
 
 private:
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  initProcessingMode(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::config::core::v3::GrpcService>
-  initGrpcService(const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns);
-
-  absl::optional<std::vector<std::string>> initUntypedForwardingNamespaces(
-      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<std::vector<std::string>> initTypedForwardingNamespaces(
-      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<std::vector<std::string>> initUntypedReceivingNamespaces(
-      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
-
-  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-  mergeProcessingMode(const FilterConfigPerRoute& less_specific,
-                      const FilterConfigPerRoute& more_specific);
-
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       processing_mode_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  std::vector<envoy::config::core::v3::HeaderValue> grpc_initial_metadata_;
 
   const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
@@ -321,6 +305,9 @@ public:
                         config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
+  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+    return config_with_hash_key_.config();
+  }
 
   ExtProcFilterStats& stats() { return stats_; }
   ExtProcLoggingInfo* loggingInfo() { return logging_info_; }

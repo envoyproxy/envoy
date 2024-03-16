@@ -5,6 +5,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
@@ -97,10 +98,10 @@ void ValidationInstance::initialize(const Options& options,
   }
 
   // Inject regex engine to singleton.
-  Regex::EnginePtr regex_engine = createRegexEngine(
+  regex_engine_ = createRegexEngine(
       bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
-  Config::Utility::createTagProducer(bootstrap_, options_.statsTags());
+  Config::StatsUtility::createTagProducer(bootstrap_, options_.statsTags());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }
@@ -131,7 +132,7 @@ void ValidationInstance::initialize(const Options& options,
             "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
-  ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
+  ssl_context_manager_ = createContextManager("ssl_context_manager", server_contexts_);
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },

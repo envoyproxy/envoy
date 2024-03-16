@@ -62,7 +62,7 @@ public class RequestFinishedInfoTest {
       assertTrue(mCallback.isDone());
       super.onRequestFinished(requestInfo);
     }
-  };
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -77,7 +77,7 @@ public class RequestFinishedInfoTest {
   }
 
   static class DirectExecutor implements Executor {
-    private ConditionVariable mBlock = new ConditionVariable();
+    private final ConditionVariable mBlock = new ConditionVariable();
 
     @Override
     public void execute(Runnable task) {
@@ -89,7 +89,7 @@ public class RequestFinishedInfoTest {
   }
 
   static class ThreadExecutor implements Executor {
-    private List<Thread> mThreads = new ArrayList<Thread>();
+    private final List<Thread> mThreads = new ArrayList<Thread>();
 
     @Override
     public void execute(Runnable task) {
@@ -114,8 +114,7 @@ public class RequestFinishedInfoTest {
     mTestFramework.mCronetEngine.addRequestFinishedListener(requestFinishedListener);
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -144,8 +143,7 @@ public class RequestFinishedInfoTest {
     mTestFramework.mCronetEngine.addRequestFinishedListener(requestFinishedListener);
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -176,8 +174,7 @@ public class RequestFinishedInfoTest {
     mTestFramework.mCronetEngine.addRequestFinishedListener(secondListener);
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -249,8 +246,8 @@ public class RequestFinishedInfoTest {
     assertNotNull(metrics.getRequestEnd());
     MetricsTestUtil.assertAfter(endTime, metrics.getRequestEnd());
     MetricsTestUtil.assertAfter(metrics.getRequestEnd(), metrics.getRequestStart());
-    assertTrue(metrics.getSentByteCount() == 0);
-    assertTrue(metrics.getReceivedByteCount() == 0);
+    assertEquals(0, (long)metrics.getSentByteCount());
+    assertEquals(0, (long)metrics.getReceivedByteCount());
   }
 
   @Test
@@ -390,8 +387,7 @@ public class RequestFinishedInfoTest {
         new AssertCallbackDoneRequestFinishedListener(callback);
     mTestFramework.mCronetEngine.addRequestFinishedListener(requestFinishedListener);
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -427,8 +423,7 @@ public class RequestFinishedInfoTest {
     TestRequestFinishedListener requestFinishedListener =
         new AssertCallbackDoneRequestFinishedListener(callback);
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation(requestAnnotation)
         .setRequestFinishedListener(requestFinishedListener)

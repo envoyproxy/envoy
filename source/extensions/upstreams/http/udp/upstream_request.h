@@ -44,9 +44,14 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
   Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
-    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
-                                                 /*remote_address=*/nullptr,
-                                                 Network::SocketCreationOptions{});
+    auto ret = std::make_unique<Network::SocketImpl>(
+        Network::Socket::Type::Datagram, host->address(),
+        /*remote_address=*/nullptr, Network::SocketCreationOptions{});
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_client_socket_creation_failure")) {
+      RELEASE_ASSERT(ret->isOpen(), "Socket creation fail");
+    }
+    return ret;
   }
 
   bool valid() const override { return host_ != nullptr; }

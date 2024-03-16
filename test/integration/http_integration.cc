@@ -32,9 +32,9 @@
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
@@ -276,13 +276,14 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
                         .value();
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
-#ifdef ENVOY_ENABLE_QUIC
-  } else {
-    cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
-        http2_options.value(), quic::kStreamReceiveWindowLimit);
-    cluster->http3_options_.set_allow_extended_connect(true);
-#endif
   }
+#ifdef ENVOY_ENABLE_QUIC
+  cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+      http2_options.value(), quic::kStreamReceiveWindowLimit);
+  cluster->http3_options_.set_allow_extended_connect(true);
+  cluster->http3_options_.set_allow_metadata(true);
+#endif
+
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
 
@@ -368,7 +369,7 @@ void HttpIntegrationTest::initialize() {
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
   quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
-      *api_, stats_store_, context_manager_, san_to_match_);
+      *api_, stats_store_, context_manager_, thread_local_, san_to_match_);
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().

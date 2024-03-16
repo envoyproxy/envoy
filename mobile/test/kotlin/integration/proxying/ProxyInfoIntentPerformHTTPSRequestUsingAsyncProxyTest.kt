@@ -33,7 +33,7 @@ import org.robolectric.RobolectricTestRunner
 //                                                │                  │
 //                                                └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPSRequestUsingAsyncProxyTest {
+class ProxyInfoIntentPerformHTTPSRequestUsingAsyncProxyTest {
   init {
     JniLibrary.loadTestLibrary()
     JniLibrary.load()
@@ -49,7 +49,7 @@ class PerformHTTPSRequestUsingAsyncProxyTest {
     Mockito.doReturn(connectivityManager)
       .`when`(context)
       .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.getDefaultProxy())
+    Mockito.`when`(connectivityManager.defaultProxy)
       .thenReturn(ProxyInfo.buildDirectProxy("localhost", port))
 
     val onEngineRunningLatch = CountDownLatch(1)

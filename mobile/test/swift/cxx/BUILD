@@ -10,6 +10,7 @@ envoy_mobile_swift_test(
     srcs = [
         "LogLevelCxxTests.swift",
     ],
+    tags = ["no-remote-exec"],  # TODO(32551): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/swift/EnvoyCxxSwiftInterop",
