@@ -461,12 +461,12 @@ class FluentdAccessLogTest : public testing::Test {
 public:
   FluentdAccessLogTest() {
     ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _)).WillOnce(Return(logger_));
   }
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config_;
   MockFluentdFormatter* formatter_{new NiceMock<MockFluentdFormatter>()};
   std::shared_ptr<MockFluentdAccessLogger> logger_{new MockFluentdAccessLogger()};
@@ -474,6 +474,7 @@ public:
 };
 
 TEST_F(FluentdAccessLogTest, CreateAndLog) {
+  EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _)).WillOnce(Return(logger_));
   auto access_log = FluentdAccessLog(AccessLog::FilterPtr{filter_}, FluentdFormatterPtr{formatter_},
                                      std::make_shared<FluentdAccessLogConfig>(config_), tls_,
                                      random_, logger_cache_);
@@ -492,6 +493,49 @@ TEST_F(FluentdAccessLogTest, CreateAndLog) {
   }));
 
   access_log.log({}, stream_info);
+}
+
+TEST_F(FluentdAccessLogTest, UnknownCluster) {
+  FluentdAccessLogFactory factory;
+
+  config_.set_cluster("unknown");
+  config_.set_tag("tag");
+  config_.set_stat_prefix("prefix");
+  auto* record = config_.mutable_record();
+  (*record->mutable_fields())["Message"].set_string_value("SomeValue");
+
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
+              checkActiveStaticCluster("unknown"))
+      .WillOnce(Return(absl::InvalidArgumentError("no cluster")));
+
+  EXPECT_THROW_WITH_MESSAGE(factory.createAccessLogInstance(
+                                config_, AccessLog::FilterPtr{filter_}, context_),
+                            EnvoyException,
+                            "cluster 'unknown' was not found");
+  
+}
+
+TEST_F(FluentdAccessLogTest, InvalidBackoffConfig) {
+  FluentdAccessLogFactory factory;
+
+  config_.set_cluster("unknown");
+  config_.set_tag("tag");
+  config_.set_stat_prefix("prefix");
+  auto* record = config_.mutable_record();
+  (*record->mutable_fields())["Message"].set_string_value("SomeValue");
+  auto* retry_options = config_.mutable_retry_options();
+  retry_options->mutable_backoff_options()->mutable_base_interval()->set_seconds(3);
+  retry_options->mutable_backoff_options()->mutable_max_interval()->set_seconds(2);
+
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
+              checkActiveStaticCluster("unknown"))
+      .WillOnce(Return(absl::OkStatus()));
+
+  EXPECT_THROW_WITH_MESSAGE(factory.createAccessLogInstance(
+                                config_, AccessLog::FilterPtr{filter_}, context_),
+                            EnvoyException,
+                            "max_backoff_interval must be greater or equal to base_backoff_interval");
+  
 }
 
 } // namespace
