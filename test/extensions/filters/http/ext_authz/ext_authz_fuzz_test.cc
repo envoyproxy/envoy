@@ -83,7 +83,6 @@ std::string resultCaseToHttpStatus(
   return check_status;
 }
 
-
 class StatelessFuzzerMocks {
 public:
   StatelessFuzzerMocks()
