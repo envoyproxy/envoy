@@ -106,7 +106,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+      enable_reuse_port_default_(true) {
 
   // These are needed for string matcher extensions. It is too painful to pass these objects through
   // all call chains that construct a `StringMatcherImpl`, so these are singletons.
@@ -884,7 +884,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
       server.messageValidationContext().dynamicValidationVisitor(), server.api(), creation_status);
-  THROW_IF_NOT_OK(creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
   return loader;
 }
 

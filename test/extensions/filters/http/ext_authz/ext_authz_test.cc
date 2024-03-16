@@ -55,7 +55,7 @@ namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
-  HttpFilterTestBase() {}
+  HttpFilterTestBase() = default;
 
   void initialize(std::string&& yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
