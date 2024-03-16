@@ -265,8 +265,6 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const override;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
-  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) PURE;
-
 protected:
   void setHealthCheckerImpl(HealthCheckHostMonitorPtr&& health_checker) {
     health_checker_ = std::move(health_checker);
@@ -322,10 +320,6 @@ public:
     ASSERT(address_list_->empty() || *address_list_->front() == *address_);
   }
 
-  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
-    health_check_address_ = address;
-  }
-
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
@@ -345,13 +339,8 @@ class HostImplBase : public Host,
                      public std::enable_shared_from_this<HostImplBase> {
 public:
   HostImplBase(uint32_t initial_weight,
-           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-           const envoy::config::core::v3::HealthStatus health_status
-           /*ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-             Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr metadata,
-             const envoy::config::core::v3::Locality& locality,
-             uint32_t priority,
-             TimeSource& time_source */)
+               const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+               const envoy::config::core::v3::HealthStatus health_status)
       : disable_active_health_check_(health_check_config.disable_active_health_check()) {
     // This EDS flags setting is still necessary for stats, configuration dump, canonical
     // coarseHealth() etc.
@@ -511,15 +500,6 @@ public:
   void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
     setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
-
-#if 0
-  void setAddressList(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
-    HostDescriptionImpl::setAddressList(address_list);
-    /*address_list_ = address_list;
-      ASSERT(address_list_.empty() || *address_list_.front() == *address_);*/
-  }
-#endif
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {

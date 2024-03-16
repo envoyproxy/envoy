@@ -24,16 +24,6 @@ public:
                                 health_check_config, priority, time_source),
         address_(dest_address) {}
 
-  void setAddress(Network::Address::InstanceConstSharedPtr address) {
-    absl::MutexLock lock(&address_lock_);
-    address_ = address;
-  }
-
-  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
-    absl::MutexLock lock(&address_lock_);
-    health_check_address_ = address;
-  }
-
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     absl::MutexLock lock(&address_lock_);
     return health_check_address_;
@@ -53,8 +43,7 @@ class LogicalHost : public HostImplBase, public LogicalHostDescription {
 public:
   LogicalHost(
       const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
-      const Network::Address::InstanceConstSharedPtr& address,
-      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+      const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
@@ -73,26 +62,25 @@ public:
         resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
   }
 
-  // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
-  // Note that the health check address update requires no lock to be held since it is only
-  // used on the main thread, but we do so anyway since it shouldn't be perf critical and will
-  // future proof the code.
+  // Set the new address. Updates are typically rare so a R/W lock is used for
+  // address updates. Note that the health check address update requires no
+  // lock to be held since it is only used on the main thread, but we do so
+  // anyway since it shouldn't be perf critical and will future proof the code.
+  //
+  // TODO: the health checker only gets the first address in the list and will
+  // not walk the full happy eyeballs list. We should eventually fix this.
   void setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
-                       const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+                       const AddressVector& address_list,
                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
     auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
     absl::MutexLock lock(&address_lock_);
     address_ = address;
     setAddressListLockHeld(address_list);
-
-    /* TODO: the health checker only gets the first address in the list and
-     * will not walk the full happy eyeballs list. We should eventually fix
-     * this. */
     health_check_address_ = health_check_address;
   }
 
-  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
+  void setAddressList(const AddressVector& address_list) {
     absl::MutexLock lock(&address_lock_);
     setAddressListLockHeld(address_list);
   }
