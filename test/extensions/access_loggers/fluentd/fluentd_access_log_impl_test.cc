@@ -459,9 +459,7 @@ using FilterPtr = Envoy::AccessLog::FilterPtr;
 
 class FluentdAccessLogTest : public testing::Test {
 public:
-  FluentdAccessLogTest() {
-    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
-  }
+  FluentdAccessLogTest() { ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true)); }
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -508,11 +506,9 @@ TEST_F(FluentdAccessLogTest, UnknownCluster) {
               checkActiveStaticCluster("unknown"))
       .WillOnce(Return(absl::InvalidArgumentError("no cluster")));
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createAccessLogInstance(
-                                config_, AccessLog::FilterPtr{filter_}, context_),
-                            EnvoyException,
-                            "cluster 'unknown' was not found");
-  
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createAccessLogInstance(config_, AccessLog::FilterPtr{filter_}, context_),
+      EnvoyException, "cluster 'unknown' was not found");
 }
 
 TEST_F(FluentdAccessLogTest, InvalidBackoffConfig) {
@@ -531,11 +527,9 @@ TEST_F(FluentdAccessLogTest, InvalidBackoffConfig) {
               checkActiveStaticCluster("unknown"))
       .WillOnce(Return(absl::OkStatus()));
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createAccessLogInstance(
-                                config_, AccessLog::FilterPtr{filter_}, context_),
-                            EnvoyException,
-                            "max_backoff_interval must be greater or equal to base_backoff_interval");
-  
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createAccessLogInstance(config_, AccessLog::FilterPtr{filter_}, context_),
+      EnvoyException, "max_backoff_interval must be greater or equal to base_backoff_interval");
 }
 
 } // namespace
