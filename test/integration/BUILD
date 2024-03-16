@@ -986,7 +986,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 10,
+    shard_count = 16,
     tags = [
         "cpu:3",
     ],
@@ -1538,7 +1538,7 @@ envoy_cc_test(
     name = "overload_integration_test",
     size = "large",
     srcs = ["overload_integration_test.cc"],
-    shard_count = 4,
+    shard_count = 10,
     tags = [
         "cpu:3",
     ],
@@ -1812,7 +1812,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 16,
+    shard_count = 40,
     tags = [
         "cpu:3",
     ],
