@@ -92,23 +92,20 @@ public:
     health_check_address_ = health_check_address;
   }
 
-  void setAddressList(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
+  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     absl::MutexLock lock(&address_lock_);
     setAddressListLockHeld(address_list);
   }
 
-  void
-  setAddressListLockHeld(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list)
+  void setAddressListLockHeld(const AddressVector& address_list)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(address_lock_) {
-    address_list_ =
-        std::make_shared<std::vector<Network::Address::InstanceConstSharedPtr>>(address_list);
+    address_list_ = std::make_shared<AddressVector>(address_list);
     ASSERT(address_list_->empty() || *address_list_->front() == *address_);
   }
 
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
+  SharedAddressVector addressList() const override {
     absl::MutexLock lock(&address_lock_);
-    return *address_list_;
+    return address_list_;
   }
 
   // Upstream::Host
@@ -122,10 +119,8 @@ public:
     return address_;
   }
 
-  using SharedVectorOfAddress =
-      std::shared_ptr<const std::vector<Network::Address::InstanceConstSharedPtr>>;
   using AddressAndListPair =
-      std::pair<Network::Address::InstanceConstSharedPtr, SharedVectorOfAddress>;
+      std::pair<Network::Address::InstanceConstSharedPtr, SharedAddressVector>;
   const AddressAndListPair addressAndListCopy() const {
     absl::MutexLock lock(&address_lock_);
     return {address_, address_list_};
@@ -133,7 +128,7 @@ public:
 
 private:
   //  The first entry in the address_list_ should match the value in address_.
-  SharedVectorOfAddress address_list_ ABSL_GUARDED_BY(address_lock_);
+  SharedAddressVector address_list_ ABSL_GUARDED_BY(address_lock_);
 
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     setHealthCheckerImpl(std::move(health_checker));
@@ -187,9 +182,7 @@ public:
   // absl::MutexLock lock(&address_lock_);
   // return logical_host_->address();
   //}
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
-    return logical_host_->addressList();
-  }
+  SharedAddressVector addressList() const override { return logical_host_->addressList(); }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
   }
@@ -205,20 +198,6 @@ public:
   }
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
-
-  /*void setAddress(Network::Address::InstanceConstSharedPtr address) override {
-    ASSERT(false);
-    // address_ = address;
-    // logical_host_->setAddress(address);
-  }*/
-
-#if 0
-  void setAddressList(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& /*address_list*/) override {
-    ASSERT(false);
-    // logical_host_->setAddressList(address_list);
-  }
-#endif
 
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,

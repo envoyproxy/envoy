@@ -454,8 +454,9 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTranspo
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
-                          options, transport_socket_options, shared_from_this());
+  return createConnection(dispatcher, cluster(), address(), *addressList(),
+                          transportSocketFactory(), options, transport_socket_options,
+                          shared_from_this());
 }
 
 void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {

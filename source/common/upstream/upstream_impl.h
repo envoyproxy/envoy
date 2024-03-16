@@ -310,21 +310,21 @@ public:
       uint32_t priority, TimeSource& time_source);
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
+  SharedAddressVector addressList() const override {
+    if (address_list_ == nullptr) {
+      return std::make_shared<AddressVector>();
+    }
     return address_list_;
   }
 
-  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
-    address_list_ = address_list;
-    ASSERT(address_list_.empty() || *address_list_.front() == *address_);
+  void setAddressList(const AddressVector& address_list) {
+    address_list_ = std::make_shared<AddressVector>(address_list);
+    ASSERT(address_list_->empty() || *address_list_->front() == *address_);
   }
 
   void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
     health_check_address_ = address;
   }
-
-  // void setAddress(Network::Address::InstanceConstSharedPtr address) override { address_ =
-  // address; }
 
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
@@ -333,7 +333,7 @@ public:
 private:
   Network::Address::InstanceConstSharedPtr address_;
   // The first entry in the address_list_ should match the value in address_.
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
+  SharedAddressVector address_list_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
 };
 
@@ -364,8 +364,8 @@ public:
     disable_active_health_check_ = disable_active_health_check;
   }
 
-  virtual void
-  setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
+  // virtual void
+  // setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
 
   // Upstream::Host
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
@@ -512,12 +512,14 @@ public:
     setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
 
+#if 0
   void setAddressList(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) override {
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     HostDescriptionImpl::setAddressList(address_list);
     /*address_list_ = address_list;
       ASSERT(address_list_.empty() || *address_list_.front() == *address_);*/
   }
+#endif
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {

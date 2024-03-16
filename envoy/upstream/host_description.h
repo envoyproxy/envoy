@@ -91,6 +91,9 @@ class ClusterInfo;
  */
 class HostDescription {
 public:
+  using AddressVector = std::vector<Network::Address::InstanceConstSharedPtr>;
+  using SharedAddressVector = std::shared_ptr<const AddressVector>;
+
   virtual ~HostDescription() = default;
 
   /**
@@ -158,8 +161,15 @@ public:
   /**
    * @return a optional list of additional addresses which the host resolved to. These addresses
    *         may be used to create upstream connections if the primary address is unreachable.
+   *
+   * The address-list is returned as a shared_ptr<const vector<...>> because in
+   * some implements of HostDescription, the address-list can be mutated
+   * asynchronously. Those implementations must use a lock to ensure this is
+   * safe. However this is not sufficient when returning the addressList by
+   * reference.
+   *
    */
-  virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
+  virtual SharedAddressVector addressList() const PURE;
 
   /**
    * @return host specific stats.
@@ -202,10 +212,6 @@ public:
    *         healthy state via an active healthchecking.
    */
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
-
-  // virtual void setAddress(Network::Address::InstanceConstSharedPtr address) PURE;
-  // virtual void
-  // setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
 
   virtual Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,

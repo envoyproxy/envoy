@@ -83,8 +83,7 @@ public:
   ~MockHostDescription() override;
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
-  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, (),
-              (const));
+  MOCK_METHOD(SharedAddressVector, addressList, (), (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
@@ -112,7 +111,7 @@ public:
   MOCK_METHOD(void, setAddress, (Network::Address::InstanceConstSharedPtr));
   MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, ());
 
-  MOCK_METHOD(void, setAddressList, (const std::vector<Network::Address::InstanceConstSharedPtr>&));
+  MOCK_METHOD(void, setAddressList, (const AddressVector&));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
                const envoy::config::core::v3::Metadata* metadata),
@@ -175,8 +174,7 @@ public:
   }
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
-  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, (),
-              (const));
+  MOCK_METHOD(SharedAddressVector, addressList, (), (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
@@ -239,7 +237,7 @@ public:
   }
 
   MOCK_METHOD(void, setAddress, (Network::Address::InstanceConstSharedPtr));
-  MOCK_METHOD(void, setAddressList, (const std::vector<Network::Address::InstanceConstSharedPtr>&));
+  MOCK_METHOD(void, setAddressList, (const AddressVector&));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
                const envoy::config::core::v3::Metadata* metadata),

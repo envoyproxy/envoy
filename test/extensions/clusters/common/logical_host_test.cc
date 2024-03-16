@@ -6,7 +6,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ReturnRef;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -37,8 +37,8 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, loadMetricStats());
   description_.loadMetricStats();
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list;
-  EXPECT_CALL(*mock_host_, addressList()).WillOnce(ReturnRef(address_list));
+  EXPECT_CALL(*mock_host_, addressList())
+      .WillOnce(Return(std::make_shared<Upstream::HostDescription::AddressVector>()));
   description_.addressList();
 }
 
