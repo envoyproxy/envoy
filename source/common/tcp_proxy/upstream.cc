@@ -475,6 +475,7 @@ bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
     }
     return true;
   }
+  return true;
 }
 
 void CombinedUpstream::onResetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
