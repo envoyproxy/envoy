@@ -32,7 +32,7 @@ public:
 protected:
   // The first entry in the address_list_ should match the value in address_.
   Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
-  SharedAddressVector address_list_ ABSL_GUARDED_BY(address_lock_);
+  SharedConstAddressVector address_list_ ABSL_GUARDED_BY(address_lock_);
   Network::Address::InstanceConstSharedPtr health_check_address_ ABSL_GUARDED_BY(address_lock_);
   mutable absl::Mutex address_lock_;
 };
@@ -72,7 +72,7 @@ public:
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
 
   // Upstream::HostDescription
-  SharedAddressVector addressList() const override;
+  SharedConstAddressVector addressList() const override;
   Network::Address::InstanceConstSharedPtr address() const override;
 
 private:
@@ -128,7 +128,7 @@ public:
   // absl::MutexLock lock(&address_lock_);
   // return logical_host_->address();
   //}
-  SharedAddressVector addressList() const override { return logical_host_->addressList(); }
+  SharedConstAddressVector addressList() const override { return logical_host_->addressList(); }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
   }

@@ -414,6 +414,16 @@ HostDescriptionImpl::HostDescriptionImpl(
       address_(dest_address), address_list_(makeAddressVector(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
 
+HostDescriptionImpl::SharedConstAddressVector
+HostDescriptionImpl::makeAddressVector(const Network::Address::InstanceConstSharedPtr& address,
+                                       const AddressVector& address_list) {
+  if (address_list.empty()) {
+    return SharedConstAddressVector();
+  }
+  ASSERT(address_list.front() == address);
+  return std::make_shared<AddressVector>(address_list);
+}
+
 HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,

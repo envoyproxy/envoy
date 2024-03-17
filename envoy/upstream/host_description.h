@@ -92,7 +92,7 @@ class ClusterInfo;
 class HostDescription {
 public:
   using AddressVector = std::vector<Network::Address::InstanceConstSharedPtr>;
-  using SharedAddressVector = std::shared_ptr<const AddressVector>;
+  using SharedConstAddressVector = std::shared_ptr<const AddressVector>;
 
   virtual ~HostDescription() = default;
 
@@ -169,7 +169,7 @@ public:
    * reference.
    *
    */
-  virtual SharedAddressVector addressList() const PURE;
+  virtual SharedConstAddressVector addressList() const PURE;
 
   /**
    * @return host specific stats.

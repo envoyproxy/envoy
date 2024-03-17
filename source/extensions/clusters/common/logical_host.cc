@@ -42,7 +42,7 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
   health_check_address_ = health_check_address;
 }
 
-HostDescription::SharedAddressVector LogicalHost::addressList() const {
+HostDescription::SharedConstAddressVector LogicalHost::addressList() const {
   absl::MutexLock lock(&address_lock_);
   return address_list_;
 }
@@ -56,7 +56,7 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   Network::Address::InstanceConstSharedPtr address;
-  SharedAddressVector address_list;
+  SharedConstAddressVector address_list;
   {
     absl::MutexLock lock(&address_lock_);
     address = address_;

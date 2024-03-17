@@ -332,27 +332,21 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
-  SharedAddressVector addressList() const override {
+  SharedConstAddressVector addressList() const override {
     return (address_list_ == nullptr) ? std::make_shared<AddressVector>() : address_list_;
   }
 
 private:
-  static SharedAddressVector
+  inline static SharedConstAddressVector
   makeAddressVector(const Network::Address::InstanceConstSharedPtr& address,
-                    const AddressVector& address_list) {
-    if (address_list.empty()) {
-      return SharedAddressVector();
-    }
-    ASSERT(address_list.front() == address);
-    return std::make_shared<AddressVector>(address_list);
-  }
+                    const AddressVector& address_list);
 
   // No locks are required in this implementation: all address-related member
   // variables are set at construction and never change. See
   // LogicalHostDescription in source/extensions/clusters/common/logical_host.h
   // for an alternative that supports dynamic update.
   const Network::Address::InstanceConstSharedPtr address_;
-  const SharedAddressVector address_list_;
+  const SharedConstAddressVector address_list_; // May be nullptr.
   const Network::Address::InstanceConstSharedPtr health_check_address_;
 };
 
