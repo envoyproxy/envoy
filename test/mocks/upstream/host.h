@@ -103,15 +103,10 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
   Stats::StatName localityZoneStatName() const override {
-    Stats::SymbolTable& symbol_table = *symbol_table_;
     locality_zone_stat_name_ =
-        std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), symbol_table);
+        std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
     return locality_zone_stat_name_->statName();
   }
-  MOCK_METHOD(void, setAddress, (Network::Address::InstanceConstSharedPtr));
-  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, ());
-
-  MOCK_METHOD(void, setAddressList, (const AddressVector&));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
                const envoy::config::core::v3::Metadata* metadata),
@@ -236,8 +231,6 @@ public:
     return locality_zone_stat_name_->statName();
   }
 
-  MOCK_METHOD(void, setAddress, (Network::Address::InstanceConstSharedPtr));
-  MOCK_METHOD(void, setAddressList, (const AddressVector&));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
                const envoy::config::core::v3::Metadata* metadata),
