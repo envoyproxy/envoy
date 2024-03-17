@@ -2074,9 +2074,6 @@ void PriorityStateManager::registerHostForPriority(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source, address_list);
-  /*if (!address_list.empty()) {
-    host->setAddressList(address_list);
-    }*/
   registerHostForPriority(host, locality_lb_endpoint);
 }
 

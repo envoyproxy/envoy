@@ -378,9 +378,6 @@ public:
     disable_active_health_check_ = disable_active_health_check;
   }
 
-  // virtual void
-  // setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) PURE;
-
   // Upstream::Host
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
   counters() const override {

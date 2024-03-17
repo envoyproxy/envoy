@@ -30,7 +30,9 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
 
 protected:
+  // The first entry in the address_list_ should match the value in address_.
   Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
+  SharedAddressVector address_list_ ABSL_GUARDED_BY(address_lock_);
   Network::Address::InstanceConstSharedPtr health_check_address_ ABSL_GUARDED_BY(address_lock_);
   mutable absl::Mutex address_lock_;
 };
@@ -74,9 +76,6 @@ public:
   Network::Address::InstanceConstSharedPtr address() const override;
 
 private:
-  //  The first entry in the address_list_ should match the value in address_.
-  SharedAddressVector address_list_ ABSL_GUARDED_BY(address_lock_);
-
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     setHealthCheckerImpl(std::move(health_checker));
   }

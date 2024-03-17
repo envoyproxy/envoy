@@ -84,8 +84,6 @@ public:
 
   Health coarseHealth() const override { return Upstream::Host::Health::Healthy; }
 
-  // void setAddress(Network::Address::InstanceConstSharedPtr) override {}
-  // void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>&) override {};
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr&,
                                 const envoy::config::core::v3::Metadata*) const override {

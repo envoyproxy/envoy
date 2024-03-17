@@ -1439,7 +1439,10 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
       " both");
 }
 
-class HostImplTest : public Event::TestUsingSimulatedTime, public testing::Test {};
+class HostImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
+ protected:
+  using AddressVector = HostDescription::AddressVector;
+};
 
 TEST_F(HostImplTest, HostCluster) {
   MockClusterMockPrioritySet cluster;
@@ -1537,7 +1540,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+  AddressVector address_list = {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
@@ -1582,7 +1585,7 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   Network::Address::InstanceConstSharedPtr proxy_address =
       Network::Utility::resolveUrl("tcp://10.0.0.1:9999");
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+  AddressVector address_list = {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
@@ -1639,7 +1642,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+  AddressVector address_list = {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
@@ -1690,7 +1693,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+  AddressVector address_list = {
       address,
       Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
@@ -1850,7 +1853,7 @@ TEST_F(HostImplTest, HealthPipeAddress) {
 TEST_F(HostImplTest, HostAddressList) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
-  const std::vector<Network::Address::InstanceConstSharedPtr> address_list = {};
+  const AddressVector address_list = {};
   EXPECT_EQ(address_list, *host->addressList());
 }
 
