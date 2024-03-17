@@ -336,6 +336,9 @@ new_features:
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
     by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
     configuration section.
+- area: rbac
+  change: |
+    Added additional statistics for rules and shadow rules to the RBAC HTTP filter.
 
 deprecated:
 - area: listener

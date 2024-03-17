@@ -32,6 +32,51 @@ namespace RBAC {
 struct RoleBasedAccessControlFilterStats {
   ENFORCE_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
   SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+
+  Stats::Scope& scope_;
+  Stats::StatName per_policy_stat_;
+  Stats::StatName per_policy_shadow_stat_;
+  Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName unknown_policy_allowed_;
+  const Stats::StatName unknown_policy_denied_;
+  const Stats::StatName unknown_shadow_policy_allowed_;
+  const Stats::StatName unknown_shadow_policy_denied_;
+
+  void addPolicy(const std::string& name) {
+    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".allowed"));
+    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".denied"));
+  }
+
+  void addShadowPolicy(const std::string& name) {
+    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".shadow_allowed"));
+    stat_name_set_->rememberBuiltin(absl::StrCat(name, ".shadow_denied"));
+  }
+
+  void incPolicyAllowed(absl::string_view name) {
+    incCounter(per_policy_stat_,
+               stat_name_set_->getBuiltin(absl::StrCat(name, ".allowed"), unknown_policy_allowed_));
+  }
+
+  void incPolicyDenied(absl::string_view name) {
+    incCounter(per_policy_stat_,
+               stat_name_set_->getBuiltin(absl::StrCat(name, ".denied"), unknown_policy_denied_));
+  }
+
+  void incPolicyShadowAllowed(absl::string_view name) {
+    incCounter(per_policy_shadow_stat_,
+               stat_name_set_->getBuiltin(absl::StrCat(name, ".shadow_allowed"),
+                                          unknown_shadow_policy_allowed_));
+  }
+
+  void incPolicyShadowDenied(absl::string_view name) {
+    incCounter(per_policy_shadow_stat_,
+               stat_name_set_->getBuiltin(absl::StrCat(name, ".shadow_denied"),
+                                          unknown_shadow_policy_denied_));
+  }
+
+  void incCounter(const Stats::StatName& prefix, Stats::StatName name) {
+    Stats::Utility::counterFromElements(scope_, {prefix, name}).inc();
+  }
 };
 
 RoleBasedAccessControlFilterStats

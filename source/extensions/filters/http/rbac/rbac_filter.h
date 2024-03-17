@@ -67,6 +67,8 @@ public:
   engine(const Http::StreamFilterCallbacks* callbacks,
          Filters::Common::RBAC::EnforcementMode mode) const;
 
+  bool perRuleStatsEnabled() const { return per_rule_stats_; }
+
 private:
   const Filters::Common::RBAC::RoleBasedAccessControlEngine*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
@@ -76,6 +78,7 @@ private:
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
   const std::string shadow_rules_stat_prefix_;
+  const bool per_rule_stats_;
 
   ActionValidationVisitor action_validation_visitor_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
