@@ -124,6 +124,7 @@ envoy_extension_cc_test(
         "cache_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.cache"],
+    shard_count = 2,
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache:http_cache_lib",
