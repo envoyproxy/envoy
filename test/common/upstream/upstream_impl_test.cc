@@ -1440,7 +1440,7 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
 }
 
 class HostImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
- protected:
+protected:
   using AddressVector = HostDescription::AddressVector;
 };
 
