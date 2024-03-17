@@ -447,11 +447,12 @@ void ContainerCredentialsProvider::refresh() {
 
   // ECS Task role: use const authorization_token set during initialization
   absl::string_view authorization_header = authorization_token_;
+  absl::StatusOr<std::string> token_or_error;
 
   if (authorization_token_.empty()) {
     // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
     if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
-      const auto token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
+      token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
       if (token_or_error.ok()) {
         ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
         authorization_header = token_or_error.value();
