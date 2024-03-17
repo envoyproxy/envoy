@@ -29,8 +29,9 @@ public:
    * Parse list of formatter configurations to commands.
    */
   template <class FormatterContext = HttpFormatterContext>
-  static std::vector<CommandParserBasePtr<FormatterContext>> parseFormatters(
-      const FormattersConfig& formatters, Server::Configuration::GenericFactoryContext& context) {
+  static std::vector<CommandParserBasePtr<FormatterContext>>
+  parseFormatters(const FormattersConfig& formatters,
+                  Server::Configuration::GenericFactoryContext& context) {
     std::vector<CommandParserBasePtr<FormatterContext>> commands;
     for (const auto& formatter : formatters) {
       auto* factory =
