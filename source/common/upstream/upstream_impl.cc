@@ -408,12 +408,11 @@ HostDescriptionImpl::HostDescriptionImpl(
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source)
+    uint32_t priority, TimeSource& time_source, const AddressVector& address_list)
     : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
                               health_check_config, priority, time_source),
-      address_(dest_address) {
-  health_check_address_ = resolveHealthCheckAddress(health_check_config, dest_address);
-}
+      address_(dest_address), address_list_(makeAddressVector(dest_address, address_list)),
+      health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
 
 HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
@@ -2074,10 +2073,10 @@ void PriorityStateManager::registerHostForPriority(
   const auto host = std::make_shared<HostImpl>(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
-  if (!address_list.empty()) {
+      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source, address_list);
+  /*if (!address_list.empty()) {
     host->setAddressList(address_list);
-  }
+    }*/
   registerHostForPriority(host, locality_lb_endpoint);
 }
 

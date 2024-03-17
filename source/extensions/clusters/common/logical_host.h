@@ -10,7 +10,9 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * A logical family of hosts.
+ * A logical family of hosts, supporting dynamic update. This shares much
+ * of its implementation with HostDescriptionImpl, but has non-const address
+ * member variables that are lock-protected.
  */
 class LogicalHostDescription : public HostDescriptionImplBase {
 public:
@@ -24,10 +26,8 @@ public:
                                 health_check_config, priority, time_source),
         address_(dest_address) {}
 
-  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
-    absl::MutexLock lock(&address_lock_);
-    return health_check_address_;
-  }
+  // HostDescription
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
 
 protected:
   Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
@@ -47,61 +47,22 @@ public:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-      TimeSource& time_source)
-      : HostImplBase(lb_endpoint.load_balancing_weight().value(),
-                     lb_endpoint.endpoint().health_check_config(), lb_endpoint.health_status()),
-        LogicalHostDescription(
-            cluster, hostname, address,
-            // TODO(zyfjeff): Created through metadata shared pool
-            std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
-            locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-            locality_lb_endpoint.priority(), time_source),
-        override_transport_socket_options_(override_transport_socket_options) {
-    setAddressList(address_list);
-    health_check_address_ =
-        resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
-  }
-
-  // Set the new address. Updates are typically rare so a R/W lock is used for
-  // address updates. Note that the health check address update requires no
-  // lock to be held since it is only used on the main thread, but we do so
-  // anyway since it shouldn't be perf critical and will future proof the code.
-  //
-  // TODO: the health checker only gets the first address in the list and will
-  // not walk the full happy eyeballs list. We should eventually fix this.
-  void setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
-                       const AddressVector& address_list,
-                       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
-    const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
-    auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
-    absl::MutexLock lock(&address_lock_);
-    address_ = address;
-    setAddressListLockHeld(address_list);
-    health_check_address_ = health_check_address;
-  }
+      TimeSource& time_source);
 
   /**
-   * Sets the address-list: this can be called dynamically during operation, and
-   * is thread-safe. Note this is not an override of an interface method but
-   * there is a similar method in HostDescriptionImpl which is not thread safe.
+   * Sets new addresses. This can be called dynamically during operation, and
+   * is thread-safe.
    *
-   * @param address_list the new address list.
+   * TODO: the health checker only gets the first address in the list and will
+   * not walk the full happy eyeballs list. We should eventually fix this.
+   *
+   * @param address the primary address, also used for health checking
+   * @param address_list alternative addresses; the first of these must be 'address'
+   * @param lb_endpoint the load-balanced endpoint
    */
-  void setAddressList(const AddressVector& address_list) {
-    absl::MutexLock lock(&address_lock_);
-    setAddressListLockHeld(address_list);
-  }
-
-  void setAddressListLockHeld(const AddressVector& address_list)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(address_lock_) {
-    address_list_ = std::make_shared<AddressVector>(address_list);
-    ASSERT(address_list_->empty() || *address_list_->front() == *address_);
-  }
-
-  SharedAddressVector addressList() const override {
-    absl::MutexLock lock(&address_lock_);
-    return address_list_;
-  }
+  void setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
+                       const AddressVector& address_list,
+                       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
 
   // Upstream::Host
   CreateConnectionData createConnection(
@@ -109,17 +70,8 @@ public:
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
 
   // Upstream::HostDescription
-  Network::Address::InstanceConstSharedPtr address() const override {
-    absl::MutexLock lock(&address_lock_);
-    return address_;
-  }
-
-  using AddressAndListPair =
-      std::pair<Network::Address::InstanceConstSharedPtr, SharedAddressVector>;
-  const AddressAndListPair addressAndListCopy() const {
-    absl::MutexLock lock(&address_lock_);
-    return {address_, address_list_};
-  }
+  SharedAddressVector addressList() const override;
+  Network::Address::InstanceConstSharedPtr address() const override;
 
 private:
   //  The first entry in the address_list_ should match the value in address_.

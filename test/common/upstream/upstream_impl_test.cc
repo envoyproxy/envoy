@@ -1537,22 +1537,21 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::MockTransportSocketFactory socket_factory;
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
-  };
-  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -1582,11 +1581,16 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
       Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   Network::Address::InstanceConstSharedPtr proxy_address =
       Network::Utility::resolveUrl("tcp://10.0.0.1:9999");
+
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   auto proxy_info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
@@ -1598,11 +1602,6 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::MockTransportSocketFactory socket_factory;
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
-  };
-  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, connectionInfoSetter());
@@ -1640,22 +1639,21 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::MockTransportSocketFactory socket_factory;
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
-  };
-  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
@@ -1692,22 +1690,21 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::MockTransportSocketFactory socket_factory;
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-      address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
-  };
-  host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));

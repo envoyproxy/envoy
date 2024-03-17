@@ -183,7 +183,20 @@ private:
 };
 
 /**
- * Implementation of Upstream::HostDescription.
+ * Base implementation of most of Upstream::HostDescription, shared between
+ * HostDescriptionImpl and LogicalHostDescriptionImpl, which is in
+ * source/extensions/clusters/common/logical_host.h. These differ in threading.
+ *
+ * HostDescriptionImpl and HostImpl are intended to be initialized in the main
+ * thread, and are thereafter read-only, and thus do not require locking.
+ *
+ * LogicalDescriptionHostImpl and LogicalHostImpl are intended to be dynamically
+ * changed due to DNS resolution and Happy Eyeballs from multiple threads, and
+ * thus require an address_lock and lock annotations to enforce this.
+ *
+ * The two level implementation inheritance allows most of the implementation
+ * to be shared, but sinks the ones requiring different lock semantics into
+ * the leaf subclasses.
  */
 class HostDescriptionImplBase : virtual public HostDescription,
                                 protected Logger::Loggable<Logger::Id::upstream> {
@@ -297,6 +310,14 @@ private:
   absl::optional<MonotonicTime> last_hc_pass_time_;
 };
 
+/**
+ * Final implementation of most of Upstream::HostDescription, providing const
+ * of the address-related member variables.
+ *
+ * See also LogicalHostDescriptionImpl in
+ * source/extensions/clusters/common/logical_host.h for a variant that allows
+ * safe dynamic update to addresses.
+ */
 class HostDescriptionImpl : public HostDescriptionImplBase {
 public:
   HostDescriptionImpl(
@@ -304,20 +325,7 @@ public:
       Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source);
-
-  /**
-   * Sets the address-list: this must be done right after construction for
-   * HostImpl and HostDescriptionImpl; this implementation is not thread
-   * safe. Note this is not an override of an interface method but there is a
-   * similar method in LogicalHost which is thread safe.
-   *
-   * @param address_list the new address list.
-   */
-  void setAddressList(const AddressVector& address_list) {
-    address_list_ = std::make_shared<AddressVector>(address_list);
-    ASSERT(address_list_->empty() || *address_list_->front() == *address_);
-  }
+      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
 
   // HostDescription
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -329,10 +337,23 @@ public:
   }
 
 private:
-  Network::Address::InstanceConstSharedPtr address_;
-  // The first entry in the address_list_ should match the value in address_.
-  SharedAddressVector address_list_;
-  Network::Address::InstanceConstSharedPtr health_check_address_;
+  static SharedAddressVector
+  makeAddressVector(const Network::Address::InstanceConstSharedPtr& address,
+                    const AddressVector& address_list) {
+    if (address_list.empty()) {
+      return SharedAddressVector();
+    }
+    ASSERT(address_list.front() == address);
+    return std::make_shared<AddressVector>(address_list);
+  }
+
+  // No locks are required in this implementation: all address-related member
+  // variables are set at construction and never change. See
+  // LogicalHostDescription in source/extensions/clusters/common/logical_host.h
+  // for an alternative that supports dynamic update.
+  const Network::Address::InstanceConstSharedPtr address_;
+  const SharedAddressVector address_list_;
+  const Network::Address::InstanceConstSharedPtr health_check_address_;
 };
 
 /**
@@ -489,10 +510,10 @@ public:
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           TimeSource& time_source)
+           TimeSource& time_source, const AddressVector& address_list = {})
       : HostImplBase(initial_weight, health_check_config, health_status),
         HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority, time_source) {}
+                            priority, time_source, address_list) {}
 
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     setHealthCheckerImpl(std::move(health_checker));
