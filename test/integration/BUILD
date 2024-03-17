@@ -615,6 +615,7 @@ envoy_cc_test(
     srcs = [
         "buffer_accounting_integration_test.cc",
     ],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -1356,7 +1357,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "cpu:3",
         "nofips",
@@ -1392,6 +1393,7 @@ envoy_cc_test(
     name = "websocket_integration_test",
     size = "large",
     srcs = ["websocket_integration_test.cc"],
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -1838,6 +1840,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 4,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -2282,6 +2285,7 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
+    shard_count = 2,
     tags = [
         "cpu:2",
     ],
