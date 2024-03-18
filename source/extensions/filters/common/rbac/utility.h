@@ -51,7 +51,7 @@ createEngine(const ConfigType& config, Server::Configuration::ServerFactoryConte
   }
   if (config.has_rules()) {
     return std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules(), validation_visitor,
-                                                              EnforcementMode::Enforced);
+                                                              context, EnforcementMode::Enforced);
   }
 
   return nullptr;
@@ -71,7 +71,7 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
   }
   if (config.has_shadow_rules()) {
     return std::make_unique<RoleBasedAccessControlEngineImpl>(
-        config.shadow_rules(), validation_visitor, EnforcementMode::Shadow);
+        config.shadow_rules(), validation_visitor, context, EnforcementMode::Shadow);
   }
 
   return nullptr;

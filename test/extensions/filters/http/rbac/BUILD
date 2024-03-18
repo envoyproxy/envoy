@@ -58,7 +58,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["rbac_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    shard_count = 3,
+    shard_count = 10,
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
