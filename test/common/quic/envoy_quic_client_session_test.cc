@@ -1,5 +1,6 @@
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/client_codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
@@ -18,6 +19,8 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -29,6 +32,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::Return;
 
 namespace Envoy {
 namespace Quic {
@@ -45,7 +49,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator) {
+                                  generator, /*prefer_gro=*/true) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     InstallDecrypter(quic::ENCRYPTION_FORWARD_SECURE,
@@ -73,45 +77,50 @@ public:
             *Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]),
             54321)),
         peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
-        quic_connection_(new TestEnvoyQuicClientConnection(
-            quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
-            quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
-            connection_id_generator_)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
         transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
-        envoy_quic_session_(
-            quic_config_, quic_version_,
-            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-            quic::QuicServerId("example.com", 443, false), crypto_config_, *dispatcher_,
-            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, {},
-            *store_.rootScope(), transport_socket_options_, {}),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}) {
     http3_options_.mutable_quic_protocol_options()
         ->mutable_num_timeouts_to_trigger_port_migration()
         ->set_value(1);
+  }
+
+  void SetUp() override {
+    quic_connection_ = new TestEnvoyQuicClientConnection(
+        quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
+        *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
+        connection_id_generator_);
+
+    OptRef<Http::HttpServerPropertiesCache> cache;
+    OptRef<Network::UpstreamTransportSocketFactory> uts_factory;
+    envoy_quic_session_ = std::make_unique<EnvoyQuicClientSession>(
+        quic_config_, quic_version_,
+        std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
+        quic::QuicServerId("example.com", 443, false), crypto_config_, *dispatcher_,
+        /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, cache,
+        *store_.rootScope(), transport_socket_options_, uts_factory);
+
     http_connection_ = std::make_unique<QuicHttpClientConnectionImpl>(
-        envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100);
-    EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
-    EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
+        *envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100);
+    EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_->streamInfo().startTime());
+    EXPECT_EQ(EMPTY_STRING, envoy_quic_session_->nextProtocol());
     EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
 
     time_system_.advanceTimeWait(std::chrono::milliseconds(1));
     ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
-  }
 
-  void SetUp() override {
-    envoy_quic_session_.Initialize();
-    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
+    envoy_quic_session_->Initialize();
+    setQuicConfigWithDefaultValues(envoy_quic_session_->config());
     quic::test::QuicConfigPeer::SetReceivedStatelessResetToken(
-        envoy_quic_session_.config(),
+        envoy_quic_session_->config(),
         quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
-    envoy_quic_session_.OnConfigNegotiated();
-    envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
-    envoy_quic_session_.setConnectionStats(
+    envoy_quic_session_->OnConfigNegotiated();
+    envoy_quic_session_->addConnectionCallbacks(network_connection_callbacks_);
+    envoy_quic_session_->setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
     EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
   }
@@ -121,7 +130,7 @@ public:
       EXPECT_CALL(*quic_connection_,
                   SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-      envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
+      envoy_quic_session_->close(Network::ConnectionCloseType::NoFlush);
     }
     peer_socket_->close();
   }
@@ -163,7 +172,7 @@ protected:
   Stats::IsolatedStoreImpl store_;
   QuicStatNames quic_stat_names_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
-  EnvoyQuicClientSession envoy_quic_session_;
+  std::unique_ptr<EnvoyQuicClientSession> envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
   testing::StrictMock<Stats::MockCounter> read_total_;
@@ -199,8 +208,8 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
 
 TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   // We always allow for reading packets, even if there's no stream.
-  EXPECT_EQ(0, envoy_quic_session_.GetNumActiveStreams());
-  EXPECT_EQ(16, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+  EXPECT_EQ(0, envoy_quic_session_->GetNumActiveStreams());
+  EXPECT_EQ(16, envoy_quic_session_->numPacketsExpectedPerEventLoop());
 
   NiceMock<Http::MockResponseDecoder> response_decoder;
   NiceMock<Http::MockStreamCallbacks> stream_callbacks;
@@ -217,8 +226,8 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
       }));
   stream.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
   // With one stream, still read 16 packets.
-  EXPECT_EQ(1, envoy_quic_session_.GetNumActiveStreams());
-  EXPECT_EQ(16, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+  EXPECT_EQ(1, envoy_quic_session_->GetNumActiveStreams());
+  EXPECT_EQ(16, envoy_quic_session_->numPacketsExpectedPerEventLoop());
 
   EnvoyQuicClientStream& stream2 = sendGetRequest(response_decoder, stream_callbacks);
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
@@ -227,13 +236,13 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
       }));
   stream2.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
   // With 2 streams, read 32 packets.
-  EXPECT_EQ(2, envoy_quic_session_.GetNumActiveStreams());
-  EXPECT_EQ(32, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+  EXPECT_EQ(2, envoy_quic_session_->GetNumActiveStreams());
+  EXPECT_EQ(32, envoy_quic_session_->numPacketsExpectedPerEventLoop());
 
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
+  envoy_quic_session_->close(Network::ConnectionCloseType::NoFlush);
 }
 
 TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
@@ -246,7 +255,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream_id,
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
-  envoy_quic_session_.OnRstStream(rst1);
+  envoy_quic_session_->OnRstStream(rst1);
 
   EXPECT_EQ(
       1U, TestUtility::findCounter(
@@ -263,7 +272,7 @@ TEST_P(EnvoyQuicClientSessionTest, SendResetFrame) {
   quic::QuicStreamId stream_id = stream.id();
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
-  envoy_quic_session_.ResetStream(stream_id, quic::QUIC_ERROR_PROCESSING_STREAM);
+  envoy_quic_session_->ResetStream(stream_id, quic::QUIC_ERROR_PROCESSING_STREAM);
 
   EXPECT_EQ(
       1U, TestUtility::findCounter(
@@ -276,7 +285,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
   Http::MockStreamCallbacks stream_callbacks;
 
   EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
-  envoy_quic_session_.OnHttp3GoAway(4u);
+  envoy_quic_session_->OnHttp3GoAway(4u);
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
@@ -288,8 +297,8 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
   quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
-            envoy_quic_session_.transportFailureReason());
-  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+            envoy_quic_session_->transportFailureReason());
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_->state());
 
   EXPECT_EQ(
       1U, TestUtility::findCounter(
@@ -305,8 +314,8 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
-  envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
-  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  envoy_quic_session_->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_->state());
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());
   EXPECT_EQ(1U, TestUtility::findCounter(
                     store_, "http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR")
@@ -321,8 +330,8 @@ TEST_P(EnvoyQuicClientSessionTest, HandshakeTimesOutWithActiveStream) {
               SendConnectionClosePacket(quic::QUIC_HANDSHAKE_FAILED, _, "fake handshake time out"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalConnectionFailure, _));
-  envoy_quic_session_.OnStreamError(quic::QUIC_HANDSHAKE_FAILED, "fake handshake time out");
-  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  envoy_quic_session_->OnStreamError(quic::QUIC_HANDSHAKE_FAILED, "fake handshake time out");
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_->state());
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());
   EXPECT_EQ(1U,
             TestUtility::findCounter(
@@ -339,8 +348,8 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
   quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
-            envoy_quic_session_.transportFailureReason());
-  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+            envoy_quic_session_->transportFailureReason());
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_->state());
   std::string quic_version_stat_name;
   switch (GetParam().transport_version) {
   case quic::QUIC_VERSION_IETF_DRAFT_29:
@@ -360,8 +369,8 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
 TEST_P(EnvoyQuicClientSessionTest, IncomingUnidirectionalReadStream) {
   quic::QuicStreamId stream_id = 1u;
   quic::QuicStreamFrame stream_frame(stream_id, false, 0, "aaa");
-  envoy_quic_session_.OnStreamFrame(stream_frame);
-  EXPECT_FALSE(quic::test::QuicSessionPeer::IsStreamCreated(&envoy_quic_session_, stream_id));
+  envoy_quic_session_->OnStreamFrame(stream_frame);
+  EXPECT_FALSE(quic::test::QuicSessionPeer::IsStreamCreated(envoy_quic_session_.get(), stream_id));
   // IETF stream 3 is server initiated uni-directional stream.
   stream_id = 3u;
   auto payload = std::make_unique<char[]>(8);
@@ -371,17 +380,18 @@ TEST_P(EnvoyQuicClientSessionTest, IncomingUnidirectionalReadStream) {
   EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_HTTP_RECEIVE_SERVER_PUSH, _,
                                                            "Received server push stream"));
   quic::QuicStreamFrame stream_frame2(stream_id, false, 0, absl::string_view(payload.get(), 1));
-  envoy_quic_session_.OnStreamFrame(stream_frame2);
+  envoy_quic_session_->OnStreamFrame(stream_frame2);
 }
 
 TEST_P(EnvoyQuicClientSessionTest, GetRttAndCwnd) {
-  EXPECT_GT(envoy_quic_session_.lastRoundTripTime().value(), std::chrono::microseconds(0));
+  EXPECT_GT(envoy_quic_session_->lastRoundTripTime().value(), std::chrono::microseconds(0));
   // Just make sure the CWND is non-zero. We don't want to make strong assertions on what the value
   // should be in this test, that is the job the congestion controllers' tests.
-  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(), 500);
+  EXPECT_GT(envoy_quic_session_->congestionWindowInBytes().value(), 500);
 
-  envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
-  EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
+  envoy_quic_session_->configureInitialCongestionWindow(8000000,
+                                                        std::chrono::microseconds(1000000));
+  EXPECT_GT(envoy_quic_session_->congestionWindowInBytes().value(),
             quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
 }
 
@@ -463,7 +473,7 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
 
   // Trigger port migration.
   quic_connection_->OnPathDegradingDetected();
-  EXPECT_TRUE(envoy_quic_session_.HasPendingPathValidation());
+  EXPECT_TRUE(envoy_quic_session_->HasPendingPathValidation());
   auto* path_validation_context =
       dynamic_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(
           quic_connection_->GetPathValidationContext());
@@ -486,12 +496,179 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   // fail the probing.
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
       .Times(0);
-  while (envoy_quic_session_.HasPendingPathValidation()) {
+  while (envoy_quic_session_->HasPendingPathValidation()) {
     // Running event loop to receive the STATELESS_RESET and following socket reads shouldn't cause
     // crash.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_EQ(self_addr_->asString(), quic_connection_->self_address().ToString());
+}
+
+class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
+public:
+  MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags),
+              (override));
+  MOCK_METHOD(Api::SysCallIntResult, recvmmsg,
+              (os_fd_t socket, struct mmsghdr* msgvec, unsigned int vlen, int flags,
+               struct timespec* timeout),
+              (override));
+  MOCK_METHOD(bool, supportsUdpGro, (), (const));
+};
+
+// Ensures that the Network::Utility::readFromSocket function uses GRO.
+// Only Linux platforms support GRO.
+TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    GTEST_SKIP() << "Platform doesn't support GRO.";
+  }
+
+  NiceMock<MockOsSysCallsImpl> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&os_sys_calls};
+
+  // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
+  envoy_quic_session_->connect();
+
+  std::string write_data = "abc";
+  Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+
+  // Make sure the option for GRO is set on the socket.
+// Windows doesn't have the GRO socket options.
+#if !defined(WIN32)
+  int sock_opt;
+  socklen_t sock_len = sizeof(int);
+  EXPECT_EQ(0, quic_connection_->connectionSocket()
+                   ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
+                   .return_value_);
+  EXPECT_EQ(1, sock_opt);
+#endif
+
+  // GRO uses `recvmsg`, not `recvmmsg`.
+  EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+            dispatcher_->exit();
+            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+            // use the msghdr that would normally have been populated by recvmsg but is not
+            // populated by this mock.
+            return {-1, SOCKET_ERROR_AGAIN};
+          }));
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+
+  EXPECT_LOG_CONTAINS("trace", "starting gro recvmsg with max",
+                      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
+}
+
+class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+
+protected:
+  NiceMock<MockOsSysCallsImpl> os_sys_calls_;
+
+private:
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionDisallowMmsgTests,
+                         EnvoyQuicClientSessionDisallowMmsgTest,
+                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+
+// Ensures that the Network::Utility::readFromSocket function uses `recvmsg` for client QUIC
+// connections when GRO is not supported.
+TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
+  // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
+  envoy_quic_session_->connect();
+
+  std::string write_data = "abc";
+  Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+
+// Windows doesn't have the GRO socket options.
+#if !defined(WIN32)
+  // Make sure the option for GRO is *not* set on the socket.
+  int sock_opt;
+  socklen_t sock_len = sizeof(int);
+  EXPECT_EQ(0, quic_connection_->connectionSocket()
+                   ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
+                   .return_value_);
+  EXPECT_EQ(0, sock_opt);
+#endif
+
+  // Uses `recvmsg`, not `recvmmsg`.
+  EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+            dispatcher_->exit();
+            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+            // use the msghdr that would normally have been populated by recvmsg but is not
+            // populated by this mock.
+            return {-1, SOCKET_ERROR_AGAIN};
+          }));
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+
+  EXPECT_LOG_CONTAINS("trace", "starting recvmsg with max",
+                      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
+}
+
+class EnvoyQuicClientSessionAllowMmsgTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
+
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.disallow_quic_client_udp_mmsg", "false"}});
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+
+protected:
+  NiceMock<MockOsSysCallsImpl> os_sys_calls_;
+
+private:
+  TestScopedRuntime scoped_runtime_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector_{&os_sys_calls_};
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionAllowMmsgTests, EnvoyQuicClientSessionAllowMmsgTest,
+                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+
+TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed) {
+  if (!Api::OsSysCallsSingleton::get().supportsMmsg()) {
+    GTEST_SKIP() << "Platform doesn't support recvmmsg.";
+  }
+
+  // Have to connect the QUIC session, so that the socket is set up so we can do I/O on it.
+  envoy_quic_session_->connect();
+
+  std::string write_data = "abc";
+  Buffer::RawSlice slice;
+  slice.mem_ = write_data.data();
+  slice.len_ = write_data.length();
+
+  // Make sure recvmmsg is used when GRO isn't supported.
+  EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
+  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _))
+      .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
+                                 struct timespec*) -> Api::SysCallIntResult {
+        dispatcher_->exit();
+        return {0, SOCKET_ERROR_AGAIN};
+      }));
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+
+  EXPECT_LOG_CONTAINS("trace", "starting recvmmsg with packets",
+                      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
 }
 
 } // namespace Quic

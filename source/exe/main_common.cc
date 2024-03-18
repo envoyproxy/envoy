@@ -59,8 +59,8 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                        std::move(platform_impl), std::move(random_generator),
                        std::move(process_context), createFunction())
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-      //,
-      //shared_response_set_(std::make_shared<AdminResponse::PtrSet>())
+      ,
+      shared_response_set_(std::make_shared<AdminResponse::PtrSet>())
 #endif
 {
 }

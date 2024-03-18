@@ -36,9 +36,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
-constexpr const char* CookieTailHttpOnlyFormatString =
-    ";version=1;path=/;Max-Age={};secure;HttpOnly";
+constexpr const char* CookieTailFormatString = ";path=/;Max-Age={};secure";
+constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
@@ -609,7 +608,7 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   }
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
-  request_headers_->addReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);
   if (config_->forwardBearerToken() && !access_token_.empty()) {
     setBearerToken(*request_headers_, access_token_);
   }
