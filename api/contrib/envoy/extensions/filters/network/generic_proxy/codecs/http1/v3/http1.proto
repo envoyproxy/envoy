@@ -43,7 +43,7 @@ message Http1CodecConfig {
 
   // The maximum size of the HTTP1 message body in bytes. If not set, 8*1024*1024 (8MB) is used.
   // This only makes sense when single_frame_mode is true.
-  // If the HTTP1 message body size exceeds this value, this will result in an decoding error
+  // If the HTTP1 message body size exceeds this value, this will result in a decoding error
   // and the generic proxy will close the connection.
   google.protobuf.UInt32Value max_buffer_size = 2;
 }
