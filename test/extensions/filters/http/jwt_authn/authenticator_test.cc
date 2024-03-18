@@ -128,6 +128,34 @@ TEST_F(AuthenticatorTest, TestSubject) {
   }
 }
 
+// Test authenticator constraints for subjects
+TEST_F(AuthenticatorTest, TestLifetimeConstraint) {
+  TestUtility::loadFromYaml(ExpirationConfig, proto_config_);
+
+  {
+    // Test that GoodToken fails because the expiration time is more than 24h in the future.
+    createAuthenticator();
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    expectVerifyStatus(Status::JwtVerificationFail, headers);
+  }
+
+  {
+    // spiffe_provider has an inf expiration time, so any expiration works.
+    createAuthenticator(nullptr, "spiffe_provider");
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+        .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+          receiver.onJwksSuccess(std::move(jwks_));
+        }));
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    expectVerifyStatus(Status::Ok, headers);
+
+    // Tokens without expiration should fail for infinite constraints
+    Http::TestRequestHeaderMapImpl non_expiring_headers{
+        {"Authorization", "Bearer " + std::string(NonExpiringToken)}};
+    expectVerifyStatus(Status::JwtVerificationFail, non_expiring_headers);
+  }
+}
+
 // This test validates a good JWT authentication with a remote Jwks.
 // It also verifies Jwks cache with 10 JWT authentications, but only one Jwks fetch.
 TEST_F(AuthenticatorTest, TestOkJWTandCache) {
