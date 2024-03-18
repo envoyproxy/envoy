@@ -82,7 +82,7 @@ void SdsApi::onWatchUpdate() {
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                     const std::string& version_info) {
-  const absl::Status status = validateUpdateSize(resources.size());
+  const absl::Status status = validateUpdateSize(resources.size(), 0);
   if (!status.ok()) {
     return status;
   }
@@ -143,12 +143,23 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   return absl::OkStatus();
 }
 
-absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                    const Protobuf::RepeatedPtrField<std::string>&,
-                                    const std::string&) {
-  const absl::Status status = validateUpdateSize(added_resources.size());
+absl::Status
+SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                       const std::string&) {
+  const absl::Status status = validateUpdateSize(added_resources.size(), removed_resources.size());
   if (!status.ok()) {
     return status;
+  }
+
+  if (removed_resources.size() == 1) {
+    // We only removed a resource here; don't go through the SotW init process
+    // and expect this to be cleaned up by the owning cluster or listener.
+    ENVOY_LOG_MISC(
+        trace,
+        "Server sent a delta SDS update attempting to remove a resource (name: {}). Ignoring.",
+        removed_resources[0]);
+    return absl::OkStatus();
   }
   return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
@@ -160,14 +171,17 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
   init_target_.ready();
 }
 
-absl::Status SdsApi::validateUpdateSize(int num_resources) {
-  if (num_resources == 0) {
+absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
+                                        uint32_t removed_resources_num) {
+  if (added_resources_num == 0 && removed_resources_num == 0) {
     return absl::InvalidArgumentError(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
   }
-  if (num_resources != 1) {
+  if (added_resources_num > 1 || removed_resources_num > 1) {
     return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secrets length: {}", num_resources));
+        fmt::format("Unexpected SDS secrets length for {}, number of added resources "
+                    "{}, number of removed resources {}. Expected sum is 1",
+                    sds_config_name_, added_resources_num, removed_resources_num));
   }
   return absl::OkStatus();
 }
