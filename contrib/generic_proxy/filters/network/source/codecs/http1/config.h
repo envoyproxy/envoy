@@ -309,6 +309,8 @@ public:
       parser_->pause();
     }
   }
+
+  // TODO(wbpcode): send 400 bad request to client as response and then call the callback.
   void onDecodingFailure() override { callbacks_->onDecodingFailure(); }
 
   absl::optional<ActiveRequest> active_request_;

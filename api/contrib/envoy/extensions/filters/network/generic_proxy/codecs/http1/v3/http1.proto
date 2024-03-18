@@ -20,6 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // Configuration for HTTP codec. This HTTP1 codec is used to parse and serialize HTTP1 messages
 // for the generic proxy filter.
+// Any decoding error will result in the generic proxy closing the connection.
 //
 // .. note::
 //   This codec only supports HTTP1.1 messages and does not support HTTP1.0 messages. And it limits
@@ -42,5 +43,7 @@ message Http1CodecConfig {
 
   // The maximum size of the HTTP1 message body in bytes. If not set, 8*1024*1024 (8MB) is used.
   // This only makes sense when single_frame_mode is true.
+  // If the HTTP1 message body size exceeds this value, this will result in an decoding error
+  // and the generic proxy will close the connection.
   google.protobuf.UInt32Value max_buffer_size = 2;
 }
