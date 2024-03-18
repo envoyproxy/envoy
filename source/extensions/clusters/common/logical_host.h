@@ -58,6 +58,9 @@ public:
    * TODO: the health checker only gets the first address in the list and will
    * not walk the full happy eyeballs list. We should eventually fix this.
    *
+   * TODO(jmarantz): change call-site to pass the address_list as a shared_ptr to
+   * avoid having to copy it.
+   *
    * @param address the primary address, also used for health checking
    * @param address_list alternative addresses; the first of these must be 'address'
    * @param lb_endpoint the load-balanced endpoint
@@ -76,17 +79,6 @@ public:
   Network::Address::InstanceConstSharedPtr address() const override;
 
 private:
-  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
-    setHealthCheckerImpl(std::move(health_checker));
-  }
-  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
-    setOutlierDetectorImpl(std::move(outlier_detector));
-  }
-
-  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
-    setLastHcPassTimeImpl(std::move(last_hc_pass_time));
-  }
-
   const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;
 };
 
@@ -115,6 +107,8 @@ public:
     return logical_host_->canCreateConnection(priority);
   }
   HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
+  void setHealthChecker(HealthCheckHostMonitorPtr&&) override {}
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&&) override {}
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     return logical_host_->outlierDetector();
   }
@@ -125,9 +119,6 @@ public:
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  // absl::MutexLock lock(&address_lock_);
-  // return logical_host_->address();
-  //}
   SharedConstAddressVector addressList() const override { return logical_host_->addressList(); }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
@@ -142,6 +133,7 @@ public:
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
+  void setLastHcPassTime(MonotonicTime) override {}
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
 

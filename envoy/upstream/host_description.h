@@ -133,9 +133,24 @@ public:
   virtual Outlier::DetectorHostMonitor& outlierDetector() const PURE;
 
   /**
+   * Set the host's outlier detector monitor. Outlier detector monitors are assumed to be thread
+   * safe, however a new outlier detector monitor must be installed before the host is used across
+   * threads. Thus, this routine should only be called on the main thread before the host is used
+   * across threads.
+   */
+  virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
+
+  /**
    * @return the host's health checker monitor.
    */
   virtual HealthCheckHostMonitor& healthChecker() const PURE;
+
+  /**
+   * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
+   * a new monitor must be installed before the host is used across threads. Thus,
+   * this routine should only be called on the main thread before the host is used across threads.
+   */
+  virtual void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) PURE;
 
   /**
    * @return The hostname used as the host header for health checking.
@@ -212,6 +227,12 @@ public:
    *         healthy state via an active healthchecking.
    */
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+
+  /**
+   * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
+   * active health checking.
+   */
+  virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
 
   virtual Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,

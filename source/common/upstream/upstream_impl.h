@@ -277,16 +277,15 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const override;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
-protected:
-  void setHealthCheckerImpl(HealthCheckHostMonitorPtr&& health_checker) {
+  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     health_checker_ = std::move(health_checker);
   }
 
-  void setOutlierDetectorImpl(Outlier::DetectorHostMonitorPtr&& outlier_detector) {
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     outlier_detector_ = std::move(outlier_detector);
   }
 
-  void setLastHcPassTimeImpl(MonotonicTime last_hc_pass_time) {
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
     last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
@@ -505,17 +504,6 @@ public:
       : HostImplBase(initial_weight, health_check_config, health_status),
         HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source, address_list) {}
-
-  void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
-    setHealthCheckerImpl(std::move(health_checker));
-  }
-  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
-    setOutlierDetectorImpl(std::move(outlier_detector));
-  }
-
-  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
-    setLastHcPassTimeImpl(std::move(last_hc_pass_time));
-  }
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {

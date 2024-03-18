@@ -7,6 +7,7 @@
 
 using testing::_;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -40,6 +41,16 @@ TEST_F(LogicalHostTest, RealHost) {
   EXPECT_CALL(*mock_host_, addressList())
       .WillOnce(Return(std::make_shared<Upstream::HostDescription::AddressVector>()));
   description_.addressList();
+
+  const envoy::config::core::v3::Metadata metadata;
+  Network::UpstreamTransportSocketFactoryPtr socket_factory;
+  EXPECT_CALL(*mock_host_, resolveTransportSocketFactory(_, _))
+      .WillOnce(ReturnRef(*socket_factory));
+  description_.resolveTransportSocketFactory(address_, &metadata);
+
+  description_.canary(false);
+  description_.priority(0);
+  description_.metadata(nullptr);
 }
 
 TEST_F(LogicalHostTest, LogicalHost) {}
