@@ -18,6 +18,12 @@
 
 namespace Envoy {
 
+/** The callbacks for the `InternalEngine`. */
+struct InternalEngineCallbacks {
+  std::function<void()> on_engine_running = [] {};
+  std::function<void()> on_exit = [] {};
+};
+
 class InternalEngine : public Logger::Loggable<Logger::Id::main> {
 public:
   /**

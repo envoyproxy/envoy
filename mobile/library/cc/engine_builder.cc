@@ -138,7 +138,9 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const
 }
 #endif
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>()) {
+EngineBuilder::EngineBuilder()
+    : callbacks_(std::make_shared<EngineCallbacks>()),
+      internal_engine_callbacks_(std::make_unique<InternalEngineCallbacks>()) {
 #ifndef ENVOY_ENABLE_QUIC
   enable_http3_ = false;
 #endif
