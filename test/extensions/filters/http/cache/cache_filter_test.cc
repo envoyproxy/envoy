@@ -30,15 +30,15 @@ protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
   CacheFilterSharedPtr makeFilter(std::shared_ptr<HttpCache> cache, bool auto_destroy = true) {
-    std::shared_ptr<CacheFilter> filter(
-        new CacheFilter(config_, /*stats_prefix=*/"", context_.scope(),
-                        context_.server_factory_context_.timeSource(), cache),
-        [auto_destroy](CacheFilter* f) {
-          if (auto_destroy) {
-            f->onDestroy();
-          }
-          delete f;
-        });
+    std::shared_ptr<CacheFilter> filter(new CacheFilter(config_, /*stats_prefix=*/"",
+                                                        context_.scope(),
+                                                        context_.server_factory_context_, cache),
+                                        [auto_destroy](CacheFilter* f) {
+                                          if (auto_destroy) {
+                                            f->onDestroy();
+                                          }
+                                          delete f;
+                                        });
     filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
         StreamInfo::FilterState::LifeSpan::FilterChain);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);

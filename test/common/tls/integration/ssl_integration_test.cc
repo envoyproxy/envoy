@@ -66,8 +66,8 @@ void SslIntegrationTestBase::initialize() {
 
   HttpIntegrationTest::initialize();
 
-  context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
 
   registerTestServerPorts({"http"});
 }

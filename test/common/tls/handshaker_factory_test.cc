@@ -92,8 +92,8 @@ public:
 class HandshakerFactoryTest : public testing::Test {
 protected:
   HandshakerFactoryTest()
-      : context_manager_(
-            std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)),
+      : context_manager_(std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+            server_factory_context_)),
         registered_factory_(handshaker_factory_) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
@@ -111,7 +111,7 @@ protected:
     return SSL_get_SSL_CTX(ssl);
   }
 
-  Event::GlobalTimeSystem time_system_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   HandshakerFactoryImplForTest handshaker_factory_;
@@ -248,8 +248,8 @@ public:
 class HandshakerFactoryDownstreamTest : public testing::Test {
 protected:
   HandshakerFactoryDownstreamTest()
-      : context_manager_(
-            std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)) {
+      : context_manager_(std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+            server_factory_context_)) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
   }
@@ -262,7 +262,7 @@ protected:
     return SSL_get_SSL_CTX(ssl);
   }
 
-  Event::GlobalTimeSystem time_system_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context_;

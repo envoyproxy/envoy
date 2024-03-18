@@ -48,6 +48,8 @@ public:
                          envoy::data::core::v3::HealthCheckFailureType failure_type) override;
   void logAddHealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                      const HostDescriptionConstSharedPtr& host, bool first_check) override;
+  void logSuccessfulHealthCheck(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                const HostDescriptionConstSharedPtr& host) override;
   void logUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                     const HostDescriptionConstSharedPtr& host,
                     envoy::data::core::v3::HealthCheckFailureType failure_type,

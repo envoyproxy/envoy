@@ -228,6 +228,8 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["clusters_handler_test.cc"]),
     deps = [
         ":admin_instance_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

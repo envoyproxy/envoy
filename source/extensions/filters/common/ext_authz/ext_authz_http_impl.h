@@ -25,7 +25,8 @@ namespace ExtAuthz {
 class ClientConfig {
 public:
   ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               uint32_t timeout, absl::string_view path_prefix);
+               uint32_t timeout, absl::string_view path_prefix,
+               Server::Configuration::CommonFactoryContext& context);
 
   /**
    * Returns the name of the authorization cluster.
@@ -87,13 +88,17 @@ public:
   const Router::HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
 
 private:
-  static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
+  static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                           Server::Configuration::CommonFactoryContext& context);
   static MatcherSharedPtr
-  toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list);
+  toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
+                            Server::Configuration::CommonFactoryContext& context);
   static MatcherSharedPtr
-  toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
+  toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                            Server::Configuration::CommonFactoryContext& context);
   static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
+  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                     Server::Configuration::CommonFactoryContext& context);
 
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;

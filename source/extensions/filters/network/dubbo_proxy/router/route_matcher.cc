@@ -166,8 +166,9 @@ ParameterRouteEntryImpl::ParameterData::ParameterData(uint32_t index,
 }
 
 MethodRouteEntryImpl::MethodRouteEntryImpl(
-    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
-    : RouteEntryImplBase(route), method_name_(route.match().method().name()) {
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+    Server::Configuration::CommonFactoryContext& context)
+    : RouteEntryImplBase(route), method_name_(route.match().method().name(), context) {
   if (route.match().method().params_match_size() != 0) {
     parameter_route_ = std::make_shared<ParameterRouteEntryImpl>(route);
   }
@@ -206,12 +207,12 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 }
 
 SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
-                                               Server::Configuration::ServerFactoryContext&)
+                                               Server::Configuration::ServerFactoryContext& context)
     : interface_matcher_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::extensions::filters::network::dubbo_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
-    routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));
+    routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route, context));
   }
   ENVOY_LOG(debug, "dubbo route matcher: routes list size {}", routes_.size());
 }

@@ -17,15 +17,22 @@ envoy_cc_library(
         "upstream.h",
     ],
     deps = [
+        "//envoy/http:header_map_interface",
+        "//envoy/router:router_ratelimit_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tcp:upstream_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_balancer_interface",
+        "//source/common/http:async_client_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:hash_policy_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/network:utility_lib",
         "//source/common/router:header_parser_lib",
+        "//source/common/router:router_lib",
+        "//source/common/router:shadow_writer_lib",
     ],
 )
 

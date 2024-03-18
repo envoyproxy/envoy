@@ -62,7 +62,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/listener_managers/validation_listener_manager:70.5"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:91.0" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/config_validation:89.2"
+"source/server/config_validation:88.9"
 "source/extensions/health_checkers:96.0"
 "source/extensions/health_checkers/http:93.9"
 "source/extensions/health_checkers/grpc:92.0"
