@@ -11,6 +11,8 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "absl/time/time.h"
+
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using ::google::jwt_verify::Status;
@@ -218,6 +220,45 @@ TEST_F(JwksCacheTest, TestSubjects) {
     EXPECT_TRUE(jwks->isSubjectAllowed("spiffe://test1.example.com/service"));
     EXPECT_TRUE(jwks->isSubjectAllowed("spiffe://test2.example.com/service"));
     EXPECT_FALSE(jwks->isSubjectAllowed("spiffe://test1.baz.com/service"));
+  }
+}
+
+// Test lifetime constraints for JwtProvider
+TEST_F(JwksCacheTest, TestLifetime) {
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+  setupCache(ExpirationConfig);
+
+  {
+    auto jwks = cache_->findByIssuer("https://example.com");
+
+    absl::Time created;
+    absl::Time good_exp = created + absl::Minutes(30);
+    absl::Time bad_exp = created + absl::Hours(25);
+    // Issuer has a lifetime constraint of 24 hours, so 30 minutes is good.
+    EXPECT_TRUE(jwks->isLifetimeAllowed(created, &good_exp));
+    // 25 hours should fail based on lifetime
+    EXPECT_FALSE(jwks->isLifetimeAllowed(created, &bad_exp));
+    // Tokens without expiration should also fail
+    EXPECT_FALSE(jwks->isLifetimeAllowed(created, nullptr));
+  }
+
+  {
+    auto jwks = cache_->findByIssuer("https://spiffe.example.com");
+
+    absl::Time created;
+    absl::Time long_exp = created + absl::Hours(2500);
+    // Spiffe provider has a infinite constraint, so any time should work.
+    EXPECT_TRUE(jwks->isLifetimeAllowed(created, &long_exp));
+    // Infinite constraints require an expiration, so null should fail.
+    EXPECT_FALSE(jwks->isLifetimeAllowed(created, nullptr));
+  }
+
+  {
+    auto jwks = cache_->findByIssuer("https://noexp.example.com");
+
+    absl::Time created;
+    // Require_expiration set to false, so this should pass.
+    EXPECT_TRUE(jwks->isLifetimeAllowed(created, nullptr));
   }
 }
 

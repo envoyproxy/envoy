@@ -34,24 +34,24 @@ ISSUE_LINK = "https://github.com/envoyproxy/envoy/issues?q=is%3Aissue+is%3Aopen+
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
 OPSGENIE_TO_SLACK = {
-    'Adi': 'Adi Peleg',
-    'Alyssa': 'Alyssa Wilk',
-    'Greg': 'Greg Greenway',
-    'Harvey': 'htuch',
-    'Joshua': 'jmarantz',
-    'Kevin': 'kbaichoo',
-    'Keith': 'Keith Smiley',
-    'kuat': 'kuat',
-    'Lizan': 'Lizan Zhou',
-    'Matt': 'mklein',
-    'Kateryna': 'nezdolik',
-    'phlax': 'phlax',
-    'Raven': 'ravenblackx',
-    'Ryan': 'Ryan Hamilton',
-    'Hejie': 'soulxu',
-    'Baiping': 'wbpcode',
-    'Yan': 'Yan Avlasov',
-    'Stephan': 'stephan',
+    'Adi': 'UT17EMMTP',
+    'Alyssa': 'U78RP48V9',
+    'Greg': 'U78MBV869',
+    'Harvey': 'U78E7055Z',
+    'Joshua': 'U80HPLBPG',
+    'Kevin': 'U016ZPU8KBK',
+    'Keith': 'UGS5P90CF',
+    'kuat': 'U7KTRAA8M',
+    'Lizan': 'U79E51EQ6',
+    'Matt': 'U5CALEVSL',
+    'Kateryna': 'UDYUWRL13',
+    'phlax': 'U017PLM0GNQ',
+    'Raven': 'U02MJHFEX35',
+    'Ryan': 'U01SW3JC8GP',
+    'Hejie': 'U01GNQ3B8AY',
+    'Baiping': 'U017KF5C0Q6',
+    'Yan': 'UJHLR5KFS',
+    'Stephan': 'U78J72Q82',
 }
 
 MAINTAINERS = {
@@ -287,7 +287,7 @@ class RepoNotifier(runner.Runner):
                 await self.send_message(channel='#envoy-maintainer-oncall', text=(f"{oncall}"))
                 await self.send_message(channel='#general', text=(f"{oncall}"))
             await self.send_message(
-                channel='#envoy-maintainer-oncall', text=(f"Oncall now @{oncall_handle}"))
+                channel='#envoy-maintainer-oncall', text=(f"Oncall now <@{oncall_handle}>"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
