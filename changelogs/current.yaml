@@ -341,7 +341,7 @@ new_features:
     configuration section.
 - area: proxy_protocol
   change: |
-    Added :ref:`allowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allowed_versions>`
+    Added :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`
     to enforce the filter only matches specific PROXY protocol versions.
 - area: proxy_protocol
   change: |

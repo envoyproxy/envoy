@@ -115,8 +115,8 @@ private:
   const bool allow_requests_without_proxy_protocol_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
-  bool allow_v1_{false};
-  bool allow_v2_{false};
+  bool allow_v1_{true};
+  bool allow_v2_{true};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

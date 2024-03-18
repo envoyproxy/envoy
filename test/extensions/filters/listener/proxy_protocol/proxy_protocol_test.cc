@@ -2177,26 +2177,26 @@ TEST_P(ProxyProtocolTest, DrainError) {
 }
 #endif
 
-class ProxyProtocolAllowedVersionsTest : public ProxyProtocolTest {
+class ProxyProtocolDisallowedVersionsTest : public ProxyProtocolTest {
 public:
   virtual envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol
-  createConfig(const std::vector<ProxyProtocolConfig::Version>& allowed_versions) const {
+  createConfig(const std::vector<ProxyProtocolConfig::Version>& disallowed_versions) const {
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-    for (const auto& version : allowed_versions) {
-      proto_config.mutable_allowed_versions()->Add(version);
+    for (const auto& version : disallowed_versions) {
+      proto_config.mutable_disallowed_versions()->Add(version);
     }
     return proto_config;
   }
 };
 
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolAllowedVersionsTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolDisallowedVersionsTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV2BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV2BasicAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2});
+      createConfig({ProxyProtocolConfig::V1});
   connect(true, &proto_config);
 
   // A well-formed ipv4/tcp message, no extensions
@@ -2210,25 +2210,9 @@ TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV2BasicAllowed) {
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV2BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2BasicRejected) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2, ProxyProtocolConfig::V1});
-  connect(true, &proto_config);
-
-  // A well-formed ipv4/tcp message, no extensions
-  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
-                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
-                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
-                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
-  write(buffer, sizeof(buffer));
-  expectData("more data");
-  disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
-}
-
-TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV2BasicRejected) {
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
+      createConfig({ProxyProtocolConfig::V2});
   connect(false, &proto_config);
 
   // A well-formed ipv4/tcp message, no extensions
@@ -2241,38 +2225,38 @@ TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV2BasicRejected) {
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.denied").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV2ShortError) {
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1V2DisallowedV2BasicRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1, ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.denied").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV2ShortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2ShortRejected) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
       createConfig({ProxyProtocolConfig::V2});
-  connect(false, &proto_config);
-
-  // An ipv4/tcp connection that has incorrect addr-len encoded
-  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
-                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
-                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
-  write(buffer, sizeof(buffer));
-  expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
-}
-
-TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV2ShortError) {
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
-  proto_config.mutable_allowed_versions()->Add(ProxyProtocolConfig::V2);
-  connect(false, &proto_config);
-
-  // An ipv4/tcp connection that has incorrect addr-len encoded
-  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
-                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
-                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
-  write(buffer, sizeof(buffer));
-  expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
-}
-
-TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV2ShortRejected) {
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
   connect(false, &proto_config);
 
   // An ipv4/tcp connection that has incorrect addr-len encoded
@@ -2284,9 +2268,9 @@ TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV2ShortRejected) {
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.denied").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV1BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV1BasicAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
+      createConfig({ProxyProtocolConfig::V2});
   connect(true, &proto_config);
 
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -2295,21 +2279,9 @@ TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV1BasicAllowed) {
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV1BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV1BasicRejected) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
       createConfig({ProxyProtocolConfig::V1});
-  proto_config.mutable_allowed_versions()->Add(ProxyProtocolConfig::V2);
-  connect(true, &proto_config);
-
-  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
-  expectData("more data");
-  disconnect();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
-}
-
-TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV1BasicRejected) {
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2});
   connect(false, &proto_config);
 
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -2317,30 +2289,29 @@ TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV1BasicRejected) {
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.denied").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsTest, V1InConfigAndV1BadPortError) {
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
-  connect(false, &proto_config);
-
-  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
-  expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
-}
-
-TEST_P(ProxyProtocolAllowedVersionsTest, V1V2InConfigAndV1BadPortError) {
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
-  proto_config.mutable_allowed_versions()->Add(ProxyProtocolConfig::V2);
-  connect(false, &proto_config);
-
-  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
-  expectProxyProtoError();
-  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
-}
-
-TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV1BadPortError) {
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV1BadPortError) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
       createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1V2DisallowedV1BasicRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1, ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.denied").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
   connect(false, &proto_config);
 
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
@@ -2348,25 +2319,26 @@ TEST_P(ProxyProtocolAllowedVersionsTest, V2InConfigAndV1BadPortError) {
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.denied").value(), 1);
 }
 
-// Tests a combination of `allowed_versions` and `allow_requests_without_proxy_protocol`.
-class ProxyProtocolAllowedVersionsWithNoProxyProtoTest : public ProxyProtocolAllowedVersionsTest {
+// Tests a combination of `disallowed_versions` and `allow_requests_without_proxy_protocol`.
+class ProxyProtocolDisallowedVersionsWithNoProxyProtoTest
+    : public ProxyProtocolDisallowedVersionsTest {
 public:
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol
-  createConfig(const std::vector<ProxyProtocolConfig::Version>& allowed_versions) const override {
-    auto proto_config = ProxyProtocolAllowedVersionsTest::createConfig(allowed_versions);
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol createConfig(
+      const std::vector<ProxyProtocolConfig::Version>& disallowed_versions) const override {
+    auto proto_config = ProxyProtocolDisallowedVersionsTest::createConfig(disallowed_versions);
     proto_config.set_allow_requests_without_proxy_protocol(true);
     return proto_config;
   }
 };
 
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolAllowedVersionsWithNoProxyProtoTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolDisallowedVersionsWithNoProxyProtoTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV2BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV2BasicAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2});
+      createConfig({ProxyProtocolConfig::V1});
   connect(true, &proto_config);
 
   // A well-formed ipv4/tcp message, no extensions
@@ -2380,9 +2352,9 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV2BasicAll
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV2BasicAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
+      createConfig({ProxyProtocolConfig::V2});
   connect(true, &proto_config);
 
   // A well-formed ipv4/tcp message, no extensions
@@ -2396,9 +2368,9 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2BasicAll
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV2ShortError) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV2ShortError) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2});
+      createConfig({ProxyProtocolConfig::V1});
   connect(false, &proto_config);
 
   // An ipv4/tcp connection that has incorrect addr-len encoded
@@ -2410,9 +2382,9 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV2ShortErr
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v2.error").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2ShortAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV2ShortAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
+      createConfig({ProxyProtocolConfig::V2});
   connect(true, &proto_config);
 
   // An ipv4/tcp connection that has incorrect addr-len encoded
@@ -2425,9 +2397,9 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV2ShortAll
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV1BasicAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
+      createConfig({ProxyProtocolConfig::V2});
   connect(true, &proto_config);
 
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -2436,9 +2408,9 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BasicAll
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BasicAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV1BasicAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2});
+      createConfig({ProxyProtocolConfig::V1});
   connect(true, &proto_config);
 
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -2447,9 +2419,9 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BasicAll
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BadPortError) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV1BadPortError) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1});
+      createConfig({ProxyProtocolConfig::V2});
   connect(false, &proto_config);
 
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
@@ -2457,9 +2429,9 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndV1BadPortE
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.v1.error").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BadPortAllowed) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV1BadPortAllowed) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2});
+      createConfig({ProxyProtocolConfig::V1});
   connect(true, &proto_config);
 
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
@@ -2469,10 +2441,10 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V2InConfigAndV1BadPortA
 }
 
 // In direct comparison to V1TooLongWithAllowNoProxyProtocol.
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest,
-       V2InConfigAllowNoProxyProtocolAndV1NotMatched) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest,
+       V1DisallowedAllowNoProxyProtocolAndV1NotMatched) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V2});
+      createConfig({ProxyProtocolConfig::V1});
   connect(true, &proto_config);
 
   write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100 RANDOM ENDING");
@@ -2482,11 +2454,11 @@ TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest,
   EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto.not_found.allowed").value(), 1);
 }
 
-TEST_P(ProxyProtocolAllowedVersionsWithNoProxyProtoTest, V1InConfigAndAllowTinyNoProxyProtocol) {
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedAllowTinyNoProxyProtocol) {
   // Allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
   // proxy protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
-      createConfig({ProxyProtocolConfig::V1}); // Essentially NOOP.
+      createConfig({ProxyProtocolConfig::V2}); // Essentially NOOP.
   connect(true, &proto_config);
 
   std::string msg = "data";

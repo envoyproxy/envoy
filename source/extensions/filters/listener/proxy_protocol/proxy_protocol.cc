@@ -107,23 +107,17 @@ Config::Config(
     }
   }
 
-  if (proto_config.allowed_versions().empty()) {
-    ENVOY_LOG(debug, "No allowed_versions specified, allowing all PROXY protocol versions.");
-    allow_v1_ = true;
-    allow_v2_ = true;
-  } else {
-    for (const auto& version : proto_config.allowed_versions()) {
-      switch (version) {
-      case ProxyProtocolConfig::V1:
-        allow_v1_ = true;
-        break;
-      case ProxyProtocolConfig::V2:
-        allow_v2_ = true;
-        break;
-      default:
-        throw EnvoyException(
-            absl::StrCat("Unknown proxy protocol version (enum int cast): ", version));
-      }
+  for (const auto& version : proto_config.disallowed_versions()) {
+    switch (version) {
+    case ProxyProtocolConfig::V1:
+      allow_v1_ = false;
+      break;
+    case ProxyProtocolConfig::V2:
+      allow_v2_ = false;
+      break;
+    default:
+      throw EnvoyException(
+          absl::StrCat("Unknown proxy protocol version (enum int cast): ", version));
     }
   }
 }

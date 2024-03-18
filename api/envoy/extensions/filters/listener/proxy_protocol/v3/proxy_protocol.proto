@@ -71,18 +71,18 @@ message ProxyProtocol {
   //   which controls pass-through for the upstream.
   config.core.v3.ProxyProtocolPassThroughTLVs pass_through_tlvs = 3;
 
-  // The PROXY protocol versions to match. See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details.
-  // By default, the filter will match any version.
+  // The PROXY protocol versions that won't be matched. Useful to limit the scope and attack surface of the filter.
   //
-  // When the filter receives PROXY protocol data that does not match the specified versions,
-  // it will reject the connection.
+  // When the filter receives PROXY protocol data that is disallowed, it will reject the connection.
+  // By default, the filter will match all PROXY protocol versions.
+  // See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details.
   //
   // .. attention::
   //
   //   When used in conjunction with the :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`,
-  //   the filter will only attempt to match signatures for the allowed versions.
-  //   For example, when ``allowed_versions=V1``, ``allow_requests_without_proxy_protocol=true``,
-  //   and an incoming request matches the V2 signature, the filter will allow the request through as if it did not contain
-  //   PROXY protocol information.
-  repeated config.core.v3.ProxyProtocolConfig.Version allowed_versions = 4;
+  //   the filter will not attempt to match signatures for the disallowed versions.
+  //   For example, when ``disallowed_versions=V2``, ``allow_requests_without_proxy_protocol=true``,
+  //   and an incoming request matches the V2 signature, the filter will allow the request through without any modification.
+  //   The filter treats this request as if it did not have any PROXY protocol information.
+  repeated config.core.v3.ProxyProtocolConfig.Version disallowed_versions = 4;
 }

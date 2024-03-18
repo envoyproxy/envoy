@@ -49,5 +49,5 @@ Proxy protocol versions include ``v1``, ``v2``, and ``not_found``.
   :widths: 1, 1, 2
 
   allowed, Counter, Total number of connections allowed
-  denied, Counter, Total number of connections rejected due to :ref:`allowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allowed_versions>`.
+  denied, Counter, Total number of connections rejected due to :ref:`allowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`.
   error, Counter, Total number of connections rejected due to parsing error
