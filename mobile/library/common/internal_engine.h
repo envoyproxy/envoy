@@ -1,28 +1,21 @@
 #pragma once
 
 #include "envoy/server/lifecycle_notifier.h"
-#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
-#include "absl/base/call_once.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
 #include "library/common/http/client.h"
+#include "library/common/internal_engine_callbacks.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
-
-/** The callbacks for the `InternalEngine`. */
-struct InternalEngineCallbacks {
-  std::function<void()> on_engine_running = [] {};
-  std::function<void()> on_exit = [] {};
-};
 
 class InternalEngine : public Logger::Loggable<Logger::Id::main> {
 public:
