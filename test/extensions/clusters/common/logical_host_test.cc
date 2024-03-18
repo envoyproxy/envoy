@@ -37,7 +37,7 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, loadMetricStats());
   description_.loadMetricStats();
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list;
+  const Upstream::AddressVectorSharedPtr address_list;
   EXPECT_CALL(*mock_host_, addressList()).WillOnce(ReturnRef(address_list));
   description_.addressList();
 }
