@@ -1,5 +1,3 @@
-#include <android/log.h>
-
 #include "library/jni/jni_support.h"
 
 // NOLINT(namespace-envoy)
