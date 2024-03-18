@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 
-class LogicalHostTest : public testing::Test {
+class RealHostDescription : public testing::Test {
 public:
   Network::Address::InstanceConstSharedPtr address_ = nullptr;
   Upstream::MockHost* mock_host_{new NiceMock<Upstream::MockHost>()};
@@ -21,7 +21,7 @@ public:
   Upstream::RealHostDescription description_{address_, host_};
 };
 
-TEST_F(LogicalHostTest, RealHost) {
+TEST_F(RealHostDescription, UnitTest) {
   // No-op unit tests
   description_.canary();
   description_.metadata();
@@ -52,8 +52,6 @@ TEST_F(LogicalHostTest, RealHost) {
   description_.priority(0);
   description_.metadata(nullptr);
 }
-
-TEST_F(LogicalHostTest, LogicalHost) {}
 
 } // namespace Clusters
 } // namespace Extensions
