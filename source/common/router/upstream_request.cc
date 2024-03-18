@@ -80,7 +80,8 @@ public:
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
-                                 bool can_send_early_data, bool can_use_http3)
+                                 bool can_send_early_data, bool can_use_http3,
+                                 bool enable_half_close)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -93,7 +94,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")) {
+          "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")),
+      enable_half_close_(enable_half_close) {
   if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
     if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
@@ -258,7 +260,8 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
 // on to the router.
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(headers.get());
-  ENVOY_STREAM_LOG(trace, "upstream response headers:\n{}", *parent_.callbacks(), *headers);
+  ENVOY_STREAM_LOG(trace, "end_stream: {}, upstream response headers:\n{}", *parent_.callbacks(),
+                   end_stream, *headers);
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   resetPerTryIdleTimer();
@@ -581,6 +584,9 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
+  if (enable_half_close_) {
+    upstream_->enableHalfClose();
+  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
