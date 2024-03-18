@@ -1,5 +1,6 @@
 #include "source/extensions/clusters/common/logical_host.h"
 
+#include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
@@ -43,9 +44,9 @@ TEST_F(RealHostDescription, UnitTest) {
   description_.addressList();
 
   const envoy::config::core::v3::Metadata metadata;
-  Network::UpstreamTransportSocketFactoryPtr socket_factory;
-  EXPECT_CALL(*mock_host_, resolveTransportSocketFactory(_, _))
-      .WillOnce(ReturnRef(*socket_factory));
+  const envoy::config::cluster::v3::Cluster cluster;
+  Network::MockTransportSocketFactory socket_factory;
+  EXPECT_CALL(*mock_host_, resolveTransportSocketFactory(_, _)).WillOnce(ReturnRef(socket_factory));
   description_.resolveTransportSocketFactory(address_, &metadata);
 
   description_.canary(false);
