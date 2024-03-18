@@ -21,7 +21,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:90.3"
+"source/exe:94.0" # increased by #32346, need coverage for terminate_handler and hot restart failures
 "source/extensions/clusters/common:91.5" # This can be increased again once `#24903` lands
 "source/extensions/common:93.0" #flaky: be careful adjusting
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
@@ -56,7 +56,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tls/private_key:88.9"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
-"source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/listener_managers:70.5"
 "source/extensions/listener_managers/validation_listener_manager:70.5"

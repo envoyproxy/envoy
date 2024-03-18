@@ -1,6 +1,4 @@
 #import "library/objective-c/EnvoyEngine.h"
-#include <memory>
-
 #import "library/objective-c/EnvoyBridgeUtility.h"
 #import "library/objective-c/EnvoyHTTPFilterCallbacksImpl.h"
 #import "library/objective-c/EnvoyKeyValueStoreBridgeImpl.h"

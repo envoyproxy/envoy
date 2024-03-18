@@ -427,6 +427,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
     const auto admin_addr =
         test_server->server().admin()->socket().connectionInfoProvider().localAddress();
     if (admin_addr->type() == Network::Address::Type::Ip) {
+      ENVOY_LOG(debug, "registered 'admin' as port {}.", admin_addr->ip()->port());
       registerPort("admin", admin_addr->ip()->port());
     }
   }
