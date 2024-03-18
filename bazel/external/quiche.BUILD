@@ -3139,6 +3139,7 @@ envoy_quic_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_http_spdy_session_lib",
     srcs = [
+        "quiche/quic/core/http/metadata_decoder.cc",
         "quiche/quic/core/http/quic_headers_stream.cc",
         "quiche/quic/core/http/quic_receive_control_stream.cc",
         "quiche/quic/core/http/quic_send_control_stream.cc",
@@ -3149,6 +3150,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/web_transport_stats.cc",
     ],
     hdrs = [
+        "quiche/quic/core/http/metadata_decoder.h",
         "quiche/quic/core/http/quic_headers_stream.h",
         "quiche/quic/core/http/quic_receive_control_stream.h",
         "quiche/quic/core/http/quic_send_control_stream.h",
