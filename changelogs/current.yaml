@@ -203,7 +203,7 @@ removed_config_or_runtime:
     removed ``envoy_reloadable_features_initialize_upstream_filters`` and legacy code paths.
 
 new_features:
- area: basic_auth
+- area: basic_auth
   change: |
     Added :ref:`forward_username_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.forward_username_header>`
     config to forward the username to the backend.
