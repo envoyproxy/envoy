@@ -1,12 +1,14 @@
 #pragma once
 
 #include "envoy/server/lifecycle_notifier.h"
+#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
+#include "absl/base/call_once.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
 #include "library/common/http/client.h"
