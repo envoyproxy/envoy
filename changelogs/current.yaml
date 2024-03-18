@@ -99,6 +99,9 @@ bug_fixes:
 - area: quic
   change: |
     Applied 2 QUICHE patches for crash bugs in ``QuicSpdyStream`` ``OnDataAvailable()`` and ``OnInitialHeaderComplete()``.
+- area: quic
+  change: |
+    Fixed crash bug when QUIC downstream stream was read closed and then timed out.
 - area: tls
   change: |
     Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`

@@ -2359,5 +2359,31 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
       });
 }
 
+TEST_P(QuicHttpIntegrationTest, StreamTimeoutWithHalfClose) {
+  // Tighten the stream idle timeout to 400ms.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(400 * 1000 * 1000);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, "partial body", false);
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  quic::QuicStream* stream = quic_session->GetActiveStream(0);
+  // Only send RESET_STREAM to close write side of this stream.
+  stream->ResetWriteSide(quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR));
+
+  // Wait for the server to timeout this request and the local reply.
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+  codec_client_->close();
+}
+
 } // namespace Quic
 } // namespace Envoy
