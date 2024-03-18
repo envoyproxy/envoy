@@ -23,7 +23,7 @@ typed_config:
     inline_string: |-
       user1:{SHA}tESsBmE/yNY3lb6a0L6vVQEZNqw=
       user2:{SHA}EJ9LPFDXsN9ynSmbxvjp75Bmlx8=
-  forward_username_header: x-username    
+  forward_username_header: x-username
 )EOF";
     config_helper_.prependFilter(filter_config);
     initialize();
