@@ -644,6 +644,7 @@ struct FakeUpstreamConfig {
     http2_options_.set_allow_connect(true);
     http2_options_.set_allow_metadata(true);
     http3_options_.set_allow_extended_connect(true);
+    http3_options_.set_allow_metadata(true);
   }
 
   Event::TestTimeSystem& time_system_;
@@ -724,8 +725,7 @@ public:
   }
 
   // Wait for one of the upstreams to receive a connection
-  ABSL_MUST_USE_RESULT
-  static testing::AssertionResult
+  static absl::StatusOr<int>
   waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                         std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                         FakeHttpConnectionPtr& connection,

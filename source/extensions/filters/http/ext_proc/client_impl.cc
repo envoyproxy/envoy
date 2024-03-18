@@ -43,6 +43,7 @@ bool ExternalProcessorStreamImpl::startStream(
   grpc_context_.stream_info = &stream_info;
   Http::AsyncClient::StreamOptions options;
   options.setParentContext(grpc_context_);
+  options.setBufferBodyForRetry(true);
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
   return stream_ != nullptr;

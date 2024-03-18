@@ -738,7 +738,6 @@ To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wa
 * `v8` (the default included engine)
 * `wamr`
 * `wasmtime`
-* `wavm`
 
 If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
