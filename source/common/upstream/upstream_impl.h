@@ -290,9 +290,12 @@ public:
   }
 
 protected:
+  /**
+   * @return nullptr if address_list is empty, otherwise a shared_ptr copy of address_list.
+   */
   static SharedConstAddressVector
-  makeAddressVector(const Network::Address::InstanceConstSharedPtr& address,
-                    const AddressVector& address_list);
+  makeAddressListOrNull(const Network::Address::InstanceConstSharedPtr& address,
+                        const AddressVector& address_list);
 
 private:
   ClusterInfoConstSharedPtr cluster_;

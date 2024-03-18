@@ -19,7 +19,7 @@ LogicalHost::LogicalHost(
           locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
           locality_lb_endpoint.priority(), time_source),
       override_transport_socket_options_(override_transport_socket_options), address_(address),
-      address_list_or_null_(makeAddressVector(address, address_list)) {
+      address_list_or_null_(makeAddressListOrNull(address, address_list)) {
   health_check_address_ =
       resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
 }

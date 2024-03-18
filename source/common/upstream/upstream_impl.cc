@@ -411,7 +411,8 @@ HostDescriptionImpl::HostDescriptionImpl(
     uint32_t priority, TimeSource& time_source, const AddressVector& address_list)
     : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
                               health_check_config, priority, time_source),
-      address_(dest_address), address_list_or_null_(makeAddressVector(dest_address, address_list)),
+      address_(dest_address),
+      address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
 
 HostDescriptionImplBase::HostDescriptionImplBase(
@@ -439,9 +440,8 @@ HostDescriptionImplBase::HostDescriptionImplBase(
   }
 }
 
-HostDescription::SharedConstAddressVector
-HostDescriptionImplBase::makeAddressVector(const Network::Address::InstanceConstSharedPtr& address,
-                                           const AddressVector& address_list) {
+HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressListOrNull(
+    const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list) {
   if (address_list.empty()) {
     return SharedConstAddressVector();
   }
