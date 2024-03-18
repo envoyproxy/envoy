@@ -16,21 +16,7 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
   absl::StatusOr<std::string> file_or_error;
   switch (source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename:
-    if (max_size > 0) {
-      if (!api.fileSystem().fileExists(source.filename())) {
-        return absl::InvalidArgumentError(fmt::format("file {} does not exist", source.filename()));
-      }
-      const ssize_t size = api.fileSystem().fileSize(source.filename());
-      if (size < 0) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("cannot determine size of file ", source.filename()));
-      }
-      if (static_cast<uint64_t>(size) > max_size) {
-        return absl::InvalidArgumentError(fmt::format("file {} size is {} bytes; maximum is {}",
-                                                      source.filename(), size, max_size));
-      }
-    }
-    file_or_error = api.fileSystem().fileReadToEnd(source.filename());
+    file_or_error = readFileDatasource(source.filename(), api, max_size);
     RETURN_IF_STATUS_NOT_OK(file_or_error);
     data = file_or_error.value();
     break;
@@ -59,6 +45,26 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
     return absl::InvalidArgumentError("DataSource cannot be empty");
   }
   return data;
+}
+
+absl::StatusOr<std::string> readFileDatasource(const std::string& source, Api::Api& api,
+                                               uint64_t max_size) {
+  if (max_size > 0) {
+    if (!api.fileSystem().fileExists(source)) {
+      return absl::InvalidArgumentError(fmt::format("file {} does not exist", source));
+    }
+    const ssize_t size = api.fileSystem().fileSize(source);
+    if (size < 0) {
+      return absl::InvalidArgumentError(absl::StrCat("cannot determine size of file ", source));
+    }
+    if (static_cast<uint64_t>(size) > max_size) {
+      return absl::InvalidArgumentError(
+          fmt::format("file {} size is {} bytes; maximum is {}", source, size, max_size));
+    }
+  }
+  absl::StatusOr<std::string> file_or_error = api.fileSystem().fileReadToEnd(source);
+  RETURN_IF_STATUS_NOT_OK(file_or_error);
+  return file_or_error.value();
 }
 
 absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {

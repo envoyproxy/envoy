@@ -29,6 +29,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
@@ -549,12 +550,13 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     direct_response_file_watcher_->addWatch(
         route.direct_response().body().filename(),
         Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
-        [this, &api, &route](uint32_t) {
-          auto body_or_error = ConfigUtility::parseDirectResponseBody(
-              route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
-          THROW_IF_STATUS_NOT_OK(body_or_error, throw);
+        [this, &api, file_name = route.direct_response().body().filename()](uint32_t) {
+          auto file_or_error = Envoy::Config::DataSource::readFileDatasource(
+              file_name, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+          RETURN_IF_STATUS_NOT_OK(file_or_error);
           absl::MutexLock lock(&direct_response_mutex_);
-          direct_response_body_ = body_or_error.value();
+          direct_response_body_ = file_or_error.value();
+          return absl::OkStatus();
         });
   }
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
