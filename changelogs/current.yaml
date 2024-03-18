@@ -11,6 +11,9 @@ bug_fixes:
 - area: quic
   change: |
     Applied 2 QUICHE patches for crash bugs in ``QuicSpdyStream`` ``OnDataAvailable()`` and ``OnInitialHeaderComplete()``.
+- area: quic
+  change: |
+    Fixed crash bug when QUIC downstream stream was read closed and then timed out.
 - area: decompression
   change: |
     Fixed a bug where Envoy will go into an endless loop when using the brotli decompressor. If the input stream has
