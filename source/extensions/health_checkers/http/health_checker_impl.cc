@@ -48,20 +48,18 @@ getMethod(const envoy::config::core::v3::RequestMethod config_method) {
 Upstream::HealthCheckerSharedPtr HttpHealthCheckerFactory::createCustomHealthChecker(
     const envoy::config::core::v3::HealthCheck& config,
     Server::Configuration::HealthCheckerFactoryContext& context) {
-  return std::make_shared<ProdHttpHealthCheckerImpl>(
-      context.cluster(), config, context.mainThreadDispatcher(), context.runtime(),
-      context.api().randomGenerator(), context.eventLogger());
+  return std::make_shared<ProdHttpHealthCheckerImpl>(context.cluster(), config, context,
+                                                     context.eventLogger());
 }
 
 REGISTER_FACTORY(HttpHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
 
-HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
-                                             const envoy::config::core::v3::HealthCheck& config,
-                                             Event::Dispatcher& dispatcher,
-                                             Runtime::Loader& runtime,
-                                             Random::RandomGenerator& random,
-                                             HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+HttpHealthCheckerImpl::HttpHealthCheckerImpl(
+    const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+    Server::Configuration::HealthCheckerFactoryContext& context,
+    HealthCheckEventLoggerPtr&& event_logger)
+    : HealthCheckerImplBase(cluster, config, context.mainThreadDispatcher(), context.runtime(),
+                            context.api().randomGenerator(), std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       method_(getMethod(config.http_health_check().method())),
       response_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -73,12 +71,13 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
-      random_generator_(random) {
+      random_generator_(context.api().randomGenerator()) {
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().receive());
   THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
   receive_bytes_ = bytes_or_error.value();
   if (config.http_health_check().has_service_name_matcher()) {
-    service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
+    service_name_matcher_.emplace(config.http_health_check().service_name_matcher(),
+                                  context.serverFactoryContext());
   }
 
   if (response_buffer_size_ != 0 && !receive_bytes_.empty()) {
