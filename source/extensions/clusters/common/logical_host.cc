@@ -3,11 +3,6 @@
 namespace Envoy {
 namespace Upstream {
 
-Network::Address::InstanceConstSharedPtr LogicalHostDescription::healthCheckAddress() const {
-  absl::MutexLock lock(&address_lock_);
-  return health_check_address_;
-}
-
 LogicalHost::LogicalHost(
     const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
     const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
@@ -17,19 +12,21 @@ LogicalHost::LogicalHost(
     TimeSource& time_source)
     : HostImplBase(lb_endpoint.load_balancing_weight().value(),
                    lb_endpoint.endpoint().health_check_config(), lb_endpoint.health_status()),
-      LogicalHostDescription(
+      HostDescriptionImplBase(
           cluster, hostname, address,
           // TODO(zyfjeff): Created through metadata shared pool
           std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
           locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
           locality_lb_endpoint.priority(), time_source),
-      override_transport_socket_options_(override_transport_socket_options) {
-  if (!address_list.empty()) {
-    address_list_or_null_ = std::make_shared<AddressVector>(address_list);
-    ASSERT(*address_list_or_null_->front() == *address_);
-  }
+      override_transport_socket_options_(override_transport_socket_options), address_(address),
+      address_list_or_null_(makeAddressVector(address, address_list)) {
   health_check_address_ =
       resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
+}
+
+Network::Address::InstanceConstSharedPtr LogicalHost::healthCheckAddress() const {
+  absl::MutexLock lock(&address_lock_);
+  return health_check_address_;
 }
 
 void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,

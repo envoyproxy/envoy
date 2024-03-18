@@ -10,38 +10,12 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * A logical family of hosts, supporting dynamic update. This shares much
- * of its implementation with HostDescriptionImpl, but has non-const address
- * member variables that are lock-protected.
+ * A host implementation that can have its address changed during request
+ * processing in order to create temporal "real" hosts. This shares much of its
+ * implementation with HostImpl, but has non-const address member variables that
+ * are lock-protected.
  */
-class LogicalHostDescription : public HostDescriptionImplBase {
-public:
-  LogicalHostDescription(
-      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-      Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
-      const envoy::config::core::v3::Locality& locality,
-      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source)
-      : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
-                                health_check_config, priority, time_source),
-        address_(dest_address) {}
-
-  // HostDescription
-  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
-
-protected:
-  // The first entry in the address_list_ should match the value in address_.
-  Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
-  SharedConstAddressVector address_list_or_null_ ABSL_GUARDED_BY(address_lock_);
-  Network::Address::InstanceConstSharedPtr health_check_address_ ABSL_GUARDED_BY(address_lock_);
-  mutable absl::Mutex address_lock_;
-};
-
-/**
- * A host implementation that can have its address changed in order to create temporal "real"
- * hosts.
- */
-class LogicalHost : public HostImplBase, public LogicalHostDescription {
+class LogicalHost : public HostImplBase, public HostDescriptionImplBase {
 public:
   LogicalHost(
       const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
@@ -77,9 +51,16 @@ public:
   // Upstream::HostDescription
   SharedConstAddressVector addressListOrNull() const override;
   Network::Address::InstanceConstSharedPtr address() const override;
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
 
 private:
   const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;
+
+  // The first entry in the address_list_ should match the value in address_.
+  Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
+  SharedConstAddressVector address_list_or_null_ ABSL_GUARDED_BY(address_lock_);
+  Network::Address::InstanceConstSharedPtr health_check_address_ ABSL_GUARDED_BY(address_lock_);
+  mutable absl::Mutex address_lock_;
 };
 
 using LogicalHostSharedPtr = std::shared_ptr<LogicalHost>;

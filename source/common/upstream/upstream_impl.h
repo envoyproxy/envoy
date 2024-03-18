@@ -289,6 +289,11 @@ public:
     last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
+protected:
+  static SharedConstAddressVector
+  makeAddressVector(const Network::Address::InstanceConstSharedPtr& address,
+                    const AddressVector& address_list);
+
 private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
@@ -334,10 +339,6 @@ public:
   SharedConstAddressVector addressListOrNull() const override { return address_list_or_null_; }
 
 private:
-  inline static SharedConstAddressVector
-  makeAddressVector(const Network::Address::InstanceConstSharedPtr& address,
-                    const AddressVector& address_list);
-
   // No locks are required in this implementation: all address-related member
   // variables are set at construction and never change. See
   // LogicalHostDescription in source/extensions/clusters/common/logical_host.h
