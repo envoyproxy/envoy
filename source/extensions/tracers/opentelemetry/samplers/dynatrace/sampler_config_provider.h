@@ -68,7 +68,6 @@ private:
   const std::string authorization_header_value_;
   Http::AsyncClient::Request* active_request_{};
   SamplerConfig sampler_config_;
-  const std::chrono::milliseconds timeout_;
 };
 
 using SamplerConfigProviderPtr = std::unique_ptr<SamplerConfigProvider>;

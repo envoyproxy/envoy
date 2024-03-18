@@ -29,16 +29,6 @@ bool reEnableTimer(Http::Code response_code) {
   }
 }
 
-std::chrono::milliseconds getTimeout(envoy::config::core::v3::HttpUri& http_uri) {
-  auto timeout =
-      std::chrono::milliseconds(DurationUtil::durationToMilliseconds(http_uri.timeout()));
-  // we want to ensure that we don't have more than one pending request
-  if (timeout > (TIMER_INTERVAL / 2)) {
-    timeout = (TIMER_INTERVAL / 2);
-  }
-  return timeout;
-}
-
 } // namespace
 
 SamplerConfigProviderImpl::SamplerConfigProviderImpl(
@@ -47,7 +37,7 @@ SamplerConfigProviderImpl::SamplerConfigProviderImpl(
     : cluster_manager_(context.serverFactoryContext().clusterManager()),
       http_uri_(config.http_uri()),
       authorization_header_value_(absl::StrCat("Api-Token ", config.token())),
-      sampler_config_(config.root_spans_per_minute()), timeout_(getTimeout(http_uri_)) {
+      sampler_config_(config.root_spans_per_minute()) {
 
   timer_ = context.serverFactoryContext().mainThreadDispatcher().createTimer([this]() -> void {
     const auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(http_uri_.cluster());
@@ -60,7 +50,9 @@ SamplerConfigProviderImpl::SamplerConfigProviderImpl(
       message->headers().setReference(Http::CustomHeaders::get().Authorization,
                                       authorization_header_value_);
       active_request_ = thread_local_cluster->httpAsyncClient().send(
-          std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout_));
+          std::move(message), *this,
+          Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
+              DurationUtil::durationToMilliseconds(http_uri_.timeout()))));
     }
   });
 
@@ -92,6 +84,8 @@ void SamplerConfigProviderImpl::onSuccess(const Http::AsyncClient::Request& /*re
 
   if (json_valid || reEnableTimer(static_cast<Http::Code>(response_code))) {
     timer_->enableTimer(std::chrono::seconds(TIMER_INTERVAL));
+  } else {
+    ENVOY_LOG(error, "Stopped to query sampling configuration from Dynatrace.");
   }
 }
 
