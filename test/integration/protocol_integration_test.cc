@@ -3110,17 +3110,23 @@ TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
 }
 
 TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
-  if (downstream_protocol_ != Http::CodecType::HTTP2 ||
-      upstreamProtocol() != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      upstreamProtocol() == Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "Metadata is not enabled for HTTP1 protocols.";
   }
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->set_allow_metadata(true);
+    if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->set_allow_metadata(true);
+    } else {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->set_allow_metadata(true);
+    }
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
@@ -3161,17 +3167,23 @@ TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContinueAllFromDecodeMetadataFollowedByLocalReply) {
-  if (downstream_protocol_ != Http::CodecType::HTTP2 ||
-      upstreamProtocol() != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      upstreamProtocol() == Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "Metadata is not enabled for HTTP1 protocols.";
   }
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->set_allow_metadata(true);
+    if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->set_allow_metadata(true);
+    } else {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->set_allow_metadata(true);
+    }
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
@@ -3205,16 +3217,22 @@ TEST_P(DownstreamProtocolIntegrationTest, ContinueAllFromDecodeMetadataFollowedB
 }
 
 TEST_P(ProtocolIntegrationTest, ContinueAllFromEncodeMetadata) {
-  if (upstreamProtocol() != Http::CodecType::HTTP2 ||
-      downstream_protocol_ != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      upstreamProtocol() == Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "Metadata is not enabled for HTTP1 protocols.";
   }
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->set_allow_metadata(true);
+    if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->set_allow_metadata(true);
+    } else {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->set_allow_metadata(true);
+    }
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
