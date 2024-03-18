@@ -205,8 +205,8 @@ removed_config_or_runtime:
 new_features:
  area: basic_auth
   change: |
-    Added :ref:`forward_username_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.forward_username_header>` config to
-    forward the username to the backend.
+    Added :ref:`forward_username_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.forward_username_header>`
+    config to forward the username to the backend.
 - area: ext_proc
   change: |
     Added
