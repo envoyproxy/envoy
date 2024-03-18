@@ -525,7 +525,7 @@ TEST_F(FluentdAccessLogTest, InvalidBackoffConfig) {
   retry_options->mutable_backoff_options()->mutable_max_interval()->set_seconds(2);
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
-              checkActiveStaticCluster("unknown"))
+              checkActiveStaticCluster(_))
       .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_THROW_WITH_MESSAGE(
