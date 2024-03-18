@@ -34,12 +34,14 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
                                   const AddressVector& address_list,
                                   const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
   const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
+  // TODO(jmarantz): change setNewAddresses interface to specify the address_list as a shared_ptr.
   auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
+  auto shared_address_list = std::make_shared<AddressVector>(address_list);
   absl::MutexLock lock(&address_lock_);
   address_ = address;
-  address_list_ = std::make_shared<AddressVector>(address_list);
+  address_list_ = shared_address_list;
   ASSERT(address_list_->empty() || *address_list_->front() == *address_);
-  health_check_address_ = health_check_address;
+  health_check_address_ = std::move(health_check_address);
 }
 
 HostDescription::SharedConstAddressVector LogicalHost::addressList() const {
