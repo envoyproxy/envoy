@@ -143,8 +143,8 @@ public:
                           const Ssl::ClientSslTransportOptions& ssl_options = {},
                           const std::string& curves_list = "") {
     // Set up the SSL client.
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
     context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
