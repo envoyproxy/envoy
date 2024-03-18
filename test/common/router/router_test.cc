@@ -2887,7 +2887,7 @@ TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(10));
+  EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillRepeatedly(Return(64));
 
   std::function<void()> conn_pool_callback;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
@@ -2901,15 +2901,15 @@ TEST_F(RouterTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
         return &cancellable_;
       }));
 
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "connect-failure,reset"},
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "connect-failure"},
                                          {"x-envoy-internal", "true"},
                                          {"myheader", "present"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->retry_connection_failure = true;
   router_->decodeHeaders(headers, false);
+  // Reduce the retry_shadow_buffer_limit
+  router_->setRetryShadowBufferLimit(20);
 
-  // Still waiting for a connection, does not cancel retry_state.
-  EXPECT_CALL(callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
   const std::string body1(50, 'a');
   Buffer::OwnedImpl buf1(body1);

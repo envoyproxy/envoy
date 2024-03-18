@@ -750,6 +750,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       Runtime::runtimeFeatureEnabled("envoy.restart_features.ensure_connection_retry")) {
     upstream_request->addUpstreamCallbacks(*this);
     wait_for_connect_ = true;
+    retry_connection_failure_buffer_limit_ =
+        std::max(retry_shadow_buffer_limit_, 2 * cluster_->perConnectionBufferLimitBytes());
+    callbacks_->setDecoderBufferLimit(retry_connection_failure_buffer_limit_);
   }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
@@ -842,16 +845,12 @@ void Filter::sendNoHealthyUpstreamResponse() {
                              StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
-void Filter::giveUpRetryAndShadow(bool drain_buffer) {
+void Filter::giveUpRetryAndShadow() {
   cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
   retry_state_.reset();
   active_shadow_policies_.clear();
-  if (buffer_limit_exceeded_no_connection_) {
-    callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
-  }
   request_buffer_overflowed_ = true;
-  buffer_limit_exceeded_no_connection_ = false;
-  if (drain_buffer) {
+  if (getLength(callbacks_->decodingBuffer()) > 0) {
     // We previously went over the buffer limit, which pause the read on the downstream connection.
     // draining the buffer so we enable read on the downstream connection.
     // This buffer is only used to send the body when retrying and shadowing which has been disable
@@ -863,10 +862,14 @@ void Filter::giveUpRetryAndShadow(bool drain_buffer) {
 void Filter::onUpstreamConnectionEstablished() {
   wait_for_connect_ = false;
   ENVOY_LOG(trace, "Got connection with upstream.");
-  if (buffer_limit_exceeded_no_connection_) {
-    ENVOY_LOG(debug, "Giving up on retry and shadow and enabling read on downstream connection.");
+  if (!request_buffer_overflowed_ &&
+      getLength(callbacks_->decodingBuffer()) > retry_shadow_buffer_limit_) {
+    ENVOY_LOG(debug,
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
+              "up on the retry/shadow.",
+              getLength(callbacks_->decodingBuffer()), retry_shadow_buffer_limit_);
     // Disabling retry and shadow: the requests is to big.
-    giveUpRetryAndShadow(true);
+    giveUpRetryAndShadow();
   }
 }
 
@@ -881,42 +884,27 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   bool buffering = (retry_state_ && retry_state_->enabled()) ||
                    (!active_shadow_policies_.empty() && !streaming_shadows_) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
-  if (buffering && !buffer_limit_exceeded_no_connection_ &&
-      getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
-    if (wait_for_connect_) {
-      // We are still waiting for a connection, going over the buffer limit which will pause the
-      // read on the downstream connection.
-      ENVOY_LOG(debug,
-                "Going over buffer limit {} due to wait on connect. buffer size: {}."
-                "This will pause read on downstream connection.",
-                retry_shadow_buffer_limit_,
-                getLength(callbacks_->decodingBuffer()) + data.length());
-      buffer_limit_exceeded_no_connection_ = true;
-      // Ensure we stop on reading, the buffer limit might be greater than
-      // retry_shadow_buffer_limit_ due to an override per route of the retry_shadow_buffer limit.
-      callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
-    } else {
-      ENVOY_LOG(
-          debug,
-          "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
-          "up on the retry/shadow.",
-          getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
-      buffering = false;
-      // Give up retrying but do not drain the buffer,
-      // the buffer might have never been initialized.
-      giveUpRetryAndShadow(false);
+  if (buffering && ((!wait_for_connect_ && getLength(callbacks_->decodingBuffer()) + data.length() >
+                                               retry_shadow_buffer_limit_) ||
+                    (wait_for_connect_ && getLength(callbacks_->decodingBuffer()) + data.length() >
+                                              retry_connection_failure_buffer_limit_))) {
+    ENVOY_LOG(debug,
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
+              "up on the retry/shadow.",
+              getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
+    buffering = false;
+    giveUpRetryAndShadow();
 
-      // If we had to abandon buffering and there's no request in progress, abort the request and
-      // clean up. This happens if the initial upstream request failed, and we are currently waiting
-      // for a backoff timer before starting the next upstream attempt.
-      if (upstream_requests_.empty()) {
-        cleanup();
-        callbacks_->sendLocalReply(
-            Http::Code::InsufficientStorage,
-            "exceeded request buffer limit while retrying upstream", modify_headers_, absl::nullopt,
-            StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
-        return Http::FilterDataStatus::StopIterationNoBuffer;
-      }
+    // If we had to abandon buffering and there's no request in progress, abort the request and
+    // clean up. This happens if the initial upstream request failed, and we are currently waiting
+    // for a backoff timer before starting the next upstream attempt.
+    if (upstream_requests_.empty()) {
+      cleanup();
+      callbacks_->sendLocalReply(
+          Http::Code::InsufficientStorage, "exceeded request buffer limit while retrying upstream",
+          modify_headers_, absl::nullopt,
+          StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
+      return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
 
@@ -1411,12 +1399,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   // don't return anything downstream.
   if (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0) {
     return;
-  }
-
-  // A connection was never successfully and read on downstream connection has been paused.
-  // The error was probably not retry because the maximum number of retries has been reached.
-  if (buffer_limit_exceeded_no_connection_) {
-    giveUpRetryAndShadow(true);
   }
 
   const StreamInfo::CoreResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);

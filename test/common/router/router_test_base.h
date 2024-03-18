@@ -50,6 +50,10 @@ public:
     return RetryStatePtr{retry_state_};
   }
 
+  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
+    Filter::setRetryShadowBufferLimit(retry_shadow_buffer_limit);
+  }
+
   const Network::Connection* downstreamConnection() const override {
     return &downstream_connection_;
   }
