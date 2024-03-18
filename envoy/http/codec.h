@@ -303,8 +303,35 @@ public:
  * Callbacks that fire against a stream.
  */
 class StreamCallbacks {
+
 public:
-  virtual ~StreamCallbacks() = default;
+  class StreamCallbacksRegistry {
+  public:
+    virtual ~StreamCallbacksRegistry() = default;
+
+    void addCallbacksHelper(StreamCallbacks& callbacks) {
+      registerStreamCallbacks(callbacks);
+      callbacks.registry_ = this;
+    }
+
+    void removeCallbacksHelper(StreamCallbacks& callbacks) {
+      unregisterStreamCallbacks(callbacks);
+      callbacks.registry_ = nullptr;
+    }
+
+  protected:
+    virtual void registerStreamCallbacks(StreamCallbacks& callbacks) PURE;
+
+    virtual void unregisterStreamCallbacks(StreamCallbacks& callbacks) PURE;
+  };
+
+  virtual ~StreamCallbacks() {
+    if (registry_ != nullptr) {
+      registry_->removeCallbacksHelper(*this);
+    }
+  }
+
+  void clearRegistry() { registry_ = nullptr; }
 
   /**
    * Fires when a stream has been remote reset.
@@ -324,6 +351,9 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
+
+private:
+  StreamCallbacksRegistry* registry_{nullptr};
 };
 
 /**
