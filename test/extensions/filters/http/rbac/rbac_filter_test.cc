@@ -422,7 +422,8 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
 
   envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
   route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
-  NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules()};
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules(), factory_context};
   NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config,
                                                                                   context_};
 
