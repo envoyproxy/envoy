@@ -1854,7 +1854,7 @@ TEST_F(HostImplTest, HostAddressList) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
   const AddressVector address_list = {};
-  EXPECT_EQ(address_list, *host->addressList());
+  EXPECT_TRUE(host->addressListOrNull() == nullptr);
 }
 
 // Test that hostname flag from the health check config propagates.

@@ -24,8 +24,10 @@ LogicalHost::LogicalHost(
           locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
           locality_lb_endpoint.priority(), time_source),
       override_transport_socket_options_(override_transport_socket_options) {
-  address_list_ = std::make_shared<AddressVector>(address_list);
-  ASSERT(address_list_->empty() || *address_list_->front() == *address_);
+  if (!address_list.empty()) {
+    address_list_or_null_ = std::make_shared<AddressVector>(address_list);
+    ASSERT(*address_list_or_null_->front() == *address_);
+  }
   health_check_address_ =
       resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
 }
@@ -36,17 +38,22 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
   const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
   // TODO(jmarantz): change setNewAddresses interface to specify the address_list as a shared_ptr.
   auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
-  auto shared_address_list = std::make_shared<AddressVector>(address_list);
-  absl::MutexLock lock(&address_lock_);
-  address_ = address;
-  address_list_ = shared_address_list;
-  ASSERT(address_list_->empty() || *address_list_->front() == *address_);
-  health_check_address_ = std::move(health_check_address);
+  SharedConstAddressVector shared_address_list;
+  if (!address_list.empty()) {
+    shared_address_list = std::make_shared<AddressVector>(address_list);
+    ASSERT(*address_list.front() == *address);
+  }
+  {
+    absl::MutexLock lock(&address_lock_);
+    address_ = address;
+    address_list_or_null_ = std::move(shared_address_list);
+    health_check_address_ = std::move(health_check_address);
+  }
 }
 
-HostDescription::SharedConstAddressVector LogicalHost::addressList() const {
+HostDescription::SharedConstAddressVector LogicalHost::addressListOrNull() const {
   absl::MutexLock lock(&address_lock_);
-  return address_list_;
+  return address_list_or_null_;
 }
 
 Network::Address::InstanceConstSharedPtr LogicalHost::address() const {
@@ -58,14 +65,14 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   Network::Address::InstanceConstSharedPtr address;
-  SharedConstAddressVector address_list;
+  SharedConstAddressVector address_list_or_null;
   {
     absl::MutexLock lock(&address_lock_);
     address = address_;
-    address_list = address_list_;
+    address_list_or_null = address_list_or_null_;
   }
   return HostImplBase::createConnection(
-      dispatcher, cluster(), address, *address_list, transportSocketFactory(), options,
+      dispatcher, cluster(), address, address_list_or_null, transportSocketFactory(), options,
       override_transport_socket_options_ != nullptr ? override_transport_socket_options_
                                                     : transport_socket_options,
       std::make_shared<RealHostDescription>(address, shared_from_this()));

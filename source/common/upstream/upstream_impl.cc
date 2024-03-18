@@ -411,7 +411,7 @@ HostDescriptionImpl::HostDescriptionImpl(
     uint32_t priority, TimeSource& time_source, const AddressVector& address_list)
     : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
                               health_check_config, priority, time_source),
-      address_(dest_address), address_list_(makeAddressVector(dest_address, address_list)),
+      address_(dest_address), address_list_or_null_(makeAddressVector(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
 
 HostDescriptionImpl::SharedConstAddressVector
@@ -463,7 +463,7 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTranspo
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  return createConnection(dispatcher, cluster(), address(), *addressList(),
+  return createConnection(dispatcher, cluster(), address(), addressListOrNull(),
                           transportSocketFactory(), options, transport_socket_options,
                           shared_from_this());
 }
@@ -514,7 +514,7 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    const SharedConstAddressVector& address_list_or_null,
     Network::UpstreamTransportSocketFactory& socket_factory,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -534,7 +534,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
-  } else if (address_list.size() > 1) {
+  } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
     absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
@@ -550,8 +550,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
       }
     }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
-        dispatcher, address_list, source_address_selector, socket_factory, transport_socket_options,
-        host, options, happy_eyeballs_config);
+        dispatcher, *address_list_or_null, source_address_selector, socket_factory,
+        transport_socket_options, host, options, happy_eyeballs_config);
   } else {
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);

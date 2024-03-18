@@ -39,9 +39,9 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, loadMetricStats());
   description_.loadMetricStats();
 
-  EXPECT_CALL(*mock_host_, addressList())
+  EXPECT_CALL(*mock_host_, addressListOrNull())
       .WillOnce(Return(std::make_shared<Upstream::HostDescription::AddressVector>()));
-  description_.addressList();
+  description_.addressListOrNull();
 
   const envoy::config::core::v3::Metadata metadata;
   const envoy::config::cluster::v3::Cluster cluster;

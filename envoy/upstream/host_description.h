@@ -174,8 +174,9 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
-   * @return a optional list of additional addresses which the host resolved to. These addresses
-   *         may be used to create upstream connections if the primary address is unreachable.
+   * @return nullptr, or a optional list of additional addresses which the host
+   *         resolved to. These addresses may be used to create upstream
+   *         connections if the primary address is unreachable.
    *
    * The address-list is returned as a shared_ptr<const vector<...>> because in
    * some implements of HostDescription, the address-list can be mutated
@@ -183,8 +184,9 @@ public:
    * safe. However this is not sufficient when returning the addressList by
    * reference.
    *
+   * Caller must check return-value for nullptr before accessing the vector.
    */
-  virtual SharedConstAddressVector addressList() const PURE;
+  virtual SharedConstAddressVector addressListOrNull() const PURE;
 
   /**
    * @return host specific stats.

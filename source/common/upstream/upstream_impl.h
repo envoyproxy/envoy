@@ -331,9 +331,7 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
-  SharedConstAddressVector addressList() const override {
-    return (address_list_ == nullptr) ? std::make_shared<AddressVector>() : address_list_;
-  }
+  SharedConstAddressVector addressListOrNull() const override { return address_list_or_null_; }
 
 private:
   inline static SharedConstAddressVector
@@ -345,7 +343,7 @@ private:
   // LogicalHostDescription in source/extensions/clusters/common/logical_host.h
   // for an alternative that supports dynamic update.
   const Network::Address::InstanceConstSharedPtr address_;
-  const SharedConstAddressVector address_list_; // May be nullptr.
+  const SharedConstAddressVector address_list_or_null_;
   const Network::Address::InstanceConstSharedPtr health_check_address_;
 };
 
@@ -458,7 +456,7 @@ protected:
   static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
-                   const AddressVector& address_list,
+                   const SharedConstAddressVector& address_list,
                    Network::UpstreamTransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
