@@ -3128,11 +3128,11 @@ envoy_quic_cc_library(
 
 envoy_quic_cc_library(
     name = "quic_core_http_metadata_decoder_lib",
-    hdrs = ["quiche/quic/core/http/metadata_decoder.h"],
     srcs = ["quiche/quic/core/http/metadata_decoder.cc"],
+    hdrs = ["quiche/quic/core/http/metadata_decoder.h"],
     deps = [
-        ":quic_core_http_header_list_lib",
         ":quic_core_error_codes_lib",
+        ":quic_core_http_header_list_lib",
         ":quic_core_qpack_qpack_decoded_headers_accumulator_lib",
         ":quic_core_qpack_qpack_decoder_lib",
     ],
