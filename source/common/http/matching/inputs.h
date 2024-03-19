@@ -198,6 +198,53 @@ public:
 
 DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
 
+class FilterStateDataInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  explicit FilterStateDataInput(const std::string& filter_state_key)
+      :  filter_state_key_(filter_state_key) {}
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+    const auto* filter_state_object =
+        data.streamInfo().filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
+
+    if (filter_state_object != nullptr) {
+      auto str = filter_state_object->serializeAsString();
+      if (str.has_value()) {
+        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, str.value()};
+      } else {
+        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      }
+    }
+
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  }
+
+private:
+  const std::string filter_state_key_;
+};
+
+class FilterStateDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  std::string name() const override { return "filter_state"; }
+
+  Matcher::DataInputFactoryCb<HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::type::matcher::v3::FilterStateMatchInput&>(config,
+                                                             validation_visitor);
+                                                            
+    return [filter_state_key = typed_config.filter_state_key()] {
+      return std::make_unique<FilterStateDataInput>(filter_state_key);
+    };
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::type::matcher::v3::FilterStateMatchInput>();
+  }
+};
+
+DECLARE_FACTORY(FilterStateDataInputFactory);
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy
