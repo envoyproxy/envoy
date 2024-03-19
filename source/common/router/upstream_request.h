@@ -62,27 +62,29 @@ class UpstreamCodecFilter;
  * UpstreamCodecFilter. This is accomplished via the UpstreamStreamFilterCallbacks
  * interface, with the UpstreamFilterManager acting as intermediary.
  *
+ * UpstreamRequest is marked as final because no subclasses are expected.
+ * This class is intended to be used as-is without any specialized inheritance.
  */
-class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
-                        public UpstreamToDownstream,
-                        public LinkedObject<UpstreamRequest>,
-                        public GenericConnectionPoolCallbacks,
-                        public Event::DeferredDeletable {
+class UpstreamRequest final : public Logger::Loggable<Logger::Id::router>,
+                              public UpstreamToDownstream,
+                              public LinkedObject<UpstreamRequest>,
+                              public GenericConnectionPoolCallbacks,
+                              public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_send_early_data, bool can_use_http3, bool enable_half_close);
+                  bool can_send_early_data, bool can_use_http3);
   ~UpstreamRequest() override;
   void deleteIsPending() override { cleanUp(); }
 
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  virtual void acceptHeadersFromRouter(bool end_stream);
-  virtual void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
+  void acceptHeadersFromRouter(bool end_stream);
+  void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
   void acceptTrailersFromRouter(Http::RequestTrailerMap& trailers);
   void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
 
-  virtual void resetStream();
+  void resetStream();
   void setupPerTryTimeout();
   void maybeEndDecode(bool end_stream);
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host, bool pool_success);
@@ -256,7 +258,6 @@ private:
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   bool grpc_rq_success_deferred_ : 1;
   bool upstream_wait_for_response_headers_before_disabling_read_ : 1;
-  bool enable_half_close_ : 1;
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,
@@ -370,7 +371,7 @@ public:
   void setUpstreamToDownstream(UpstreamToDownstream& upstream_to_downstream_interface) override {
     upstream_request_.upstream_interface_ = upstream_to_downstream_interface;
   }
-  bool isHalfCloseEnabled() override { return upstream_request_.enable_half_close_; }
+
   Http::RequestTrailerMapPtr trailers_;
   Http::ResponseHeaderMapPtr informational_headers_;
   Http::ResponseHeaderMapPtr response_headers_;

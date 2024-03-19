@@ -18,7 +18,6 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster,
     TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-    Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
     StreamInfo::StreamInfo& downstream_info) const {
   if (config.has_value() && !disableTunnelingByFilterState(downstream_info)) {
     Http::CodecType pool_type;
@@ -31,8 +30,7 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
       pool_type = Http::CodecType::HTTP1;
     }
     auto ret = std::make_unique<TcpProxy::HttpConnPool>(
-        thread_local_cluster, context, *config, upstream_callbacks, stream_decoder_callbacks,
-        pool_type, downstream_info);
+        thread_local_cluster, context, *config, upstream_callbacks, pool_type, downstream_info);
     return (ret->valid() ? std::move(ret) : nullptr);
   }
   auto ret = std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context,
