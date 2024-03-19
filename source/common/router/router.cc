@@ -752,6 +752,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     wait_for_connect_ = true;
     retry_connection_failure_buffer_limit_ =
         std::max(retry_shadow_buffer_limit_, 2 * cluster_->perConnectionBufferLimitBytes());
+    original_buffer_limit_ = callbacks_->decoderBufferLimit();
     callbacks_->setDecoderBufferLimit(retry_connection_failure_buffer_limit_);
   }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
@@ -850,7 +851,7 @@ void Filter::giveUpRetryAndShadow() {
   retry_state_.reset();
   active_shadow_policies_.clear();
   request_buffer_overflowed_ = true;
-  if (getLength(callbacks_->decodingBuffer()) > 0) {
+  if (callbacks_->decodingBuffer() != nullptr) {
     // We previously went over the buffer limit, which pause the read on the downstream connection.
     // draining the buffer so we enable read on the downstream connection.
     // This buffer is only used to send the body when retrying and shadowing which has been disable
@@ -860,8 +861,11 @@ void Filter::giveUpRetryAndShadow() {
 }
 
 void Filter::onUpstreamConnectionEstablished() {
-  wait_for_connect_ = false;
   ENVOY_LOG(trace, "Got connection with upstream.");
+  if (wait_for_connect_) {
+    callbacks_->setDecoderBufferLimit(original_buffer_limit_);
+    wait_for_connect_ = false;
+  }
   if (!request_buffer_overflowed_ &&
       getLength(callbacks_->decodingBuffer()) > retry_shadow_buffer_limit_) {
     ENVOY_LOG(debug,

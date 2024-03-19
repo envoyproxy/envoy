@@ -2447,7 +2447,7 @@ TEST_P(IntegrationTest, EnsureConnectionRetry) {
   // Waiting to have at least one connection failure,
   // greater than 0, because in some cases, we retry the connection-failure within less than 10ms
   // which would make the counter superior to 1.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 0);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 1);
 
   createUpstream(upstream_address, upstreamConfig());
 
