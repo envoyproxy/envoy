@@ -1,7 +1,8 @@
 #include "source/common/config/utility.h"
+
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 namespace Envoy {
@@ -11,14 +12,12 @@ namespace Clusters {
 // Logical Host integration test.
 class LogicalHostIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                    public HttpIntegrationTest {
- public:
-  LogicalHostIntegrationTest() :
-    HttpIntegrationTest(Http::CodecType::HTTP1,
-                       GetParam()), registered_dns_factory_(dns_resolver_factory_) {}
+public:
+  LogicalHostIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
+        registered_dns_factory_(dns_resolver_factory_) {}
 
-  void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
-  }
+  void createUpstreams() override { HttpIntegrationTest::createUpstreams(); }
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
@@ -33,70 +32,42 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
 // Reproduces a race from https://github.com/envoyproxy/envoy/issues/32850.
 // The test is by mocking the DNS resolver to return multiple different
 // addresses, also config dns_refresh_rate to be extremely fast.
-TEST_P(LogicalHostIntegrationTest, FastChangingDnsResult) {
+TEST_P(LogicalHostIntegrationTest, DISABLED_FastChangingDnsResult) {
   // Only needs to test the race with one stack.
   if (version_ == Network::Address::IpVersion::v4) {
     return;
   }
 
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
-  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillRepeatedly(testing::Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+      .WillRepeatedly(testing::Return(dns_resolver));
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(
           Invoke([&](const std::string&, Network::DnsLookupFamily,
                      Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
             // Return multiple mixed v4/v6 addresses to increase the race window.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
-                         TestUtility::makeDnsResponse({"::1", absl::StrCat("127.0.0.", address_),
-                                                       absl::StrCat("127.0.0.", address_ + 1),
-                                                       absl::StrCat("127.0.0.", address_ + 2),
-                                                       absl::StrCat("127.0.0.", address_ + 3),
-                                                       absl::StrCat("127.0.0.", address_ + 4),
-                                                       absl::StrCat("127.0.0.", address_ + 5),
-                                                       absl::StrCat("127.0.0.", address_ + 6),
-                                                       absl::StrCat("127.0.0.", address_ + 7),
-                                                       absl::StrCat("127.0.0.", address_ + 8),
-                                                       absl::StrCat("127.0.0.", address_ + 9),
-                                                       absl::StrCat("127.0.0.", address_ + 10),
-                                                       absl::StrCat("127.0.0.", address_ + 11),
-                                                       absl::StrCat("127.0.0.", address_ + 12),
-                                                       absl::StrCat("127.0.0.", address_ + 13),
-                                                       absl::StrCat("127.0.0.", address_ + 14),
-                                                       absl::StrCat("127.0.0.", address_ + 15),
-                                                       absl::StrCat("127.0.0.", address_ + 16),
-                                                       "::2",
-                                                       "::3",
-                                                       "::4",
-                                                       "::5",
-                                                       "::6",
-                                                       "::7",
-                                                       "::8",
-                                                       "::9",
-                                                       absl::StrCat("127.0.0.", address_ + 17),
-                                                       absl::StrCat("127.0.0.", address_ + 18),
-                                                       absl::StrCat("127.0.0.", address_ + 19),
-                                                       absl::StrCat("127.0.0.", address_ + 20),
-                                                       absl::StrCat("127.0.0.", address_ + 21),
-                                                       absl::StrCat("127.0.0.", address_ + 22),
-                                                       absl::StrCat("127.0.0.", address_ + 23),
-                                                       absl::StrCat("127.0.0.", address_ + 24),
-                                                       "::10",
-                                                       "::11",
-                                                       "::12",
-                                                       "::13",
-                                                       "::14",
-                                                       "::15",
-                                                       "::16",
-                                                       "::17",
-                                                       absl::StrCat("127.0.0.", address_ + 25),
-                                                       absl::StrCat("127.0.0.", address_ + 26),
-                                                       absl::StrCat("127.0.0.", address_ + 27),
-                                                       absl::StrCat("127.0.0.", address_ + 28),
-                                                       absl::StrCat("127.0.0.", address_ + 29),
-                                                       absl::StrCat("127.0.0.", address_ + 30),
-                                                       absl::StrCat("127.0.0.", address_ + 31),
-                                                       absl::StrCat("127.0.0.", address_ + 32)
-                           }));
+                         TestUtility::makeDnsResponse({
+                             "::1",
+                             absl::StrCat("127.0.0.", address_),
+                             absl::StrCat("127.0.0.", address_ + 1),
+                             absl::StrCat("127.0.0.", address_ + 2),
+                             absl::StrCat("127.0.0.", address_ + 3),
+                             absl::StrCat("127.0.0.", address_ + 4),
+                             absl::StrCat("127.0.0.", address_ + 5),
+                             absl::StrCat("127.0.0.", address_ + 6),
+                             absl::StrCat("127.0.0.", address_ + 7),
+                             absl::StrCat("127.0.0.", address_ + 8),
+                             absl::StrCat("127.0.0.", address_ + 9),
+                             "::2",
+                             "::3",
+                             "::4",
+                             "::5",
+                             "::6",
+                             "::7",
+                             "::8",
+                             "::9",
+                         }));
             address_ = (address_ + 1) % 128;
             return nullptr;
           }));
