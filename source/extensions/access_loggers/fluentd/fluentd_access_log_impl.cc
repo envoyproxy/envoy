@@ -75,7 +75,7 @@ void FluentdAccessLoggerImpl::log(EntryPtr&& entry) {
 void FluentdAccessLoggerImpl::flush() {
   ASSERT(!disconnected_);
 
-  if (entries_.size() == 0 || connecting_) {
+  if (entries_.empty() || connecting_) {
     // nothing to send, or we're still waiting for an upstream connection.
     return;
   }
