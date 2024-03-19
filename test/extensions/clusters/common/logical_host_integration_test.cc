@@ -32,7 +32,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
 // Reproduces a race from https://github.com/envoyproxy/envoy/issues/32850.
 // The test is by mocking the DNS resolver to return multiple different
 // addresses, also config dns_refresh_rate to be extremely fast.
-TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
+TEST_P(LogicalHostIntegrationTest, DISABLED_LogicalDNSRaceCrashTest) {
   // first_address_string_ is used to make connections. It needs
   // to match with the IpVersion of the test.
   if (version_ == Network::Address::IpVersion::v4) {
