@@ -207,6 +207,9 @@ TagNameValues::TagNameValues() {
 
   // (<stat_prefix>.).rbac.**
   addTokenized(RBAC_PREFIX, "$.rbac.**");
+
+  // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)*
+  addTokenized(RBAC_HTTP_PREFIX, "http.*.rbac.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
