@@ -10,7 +10,6 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "envoy/http/codec.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -23,7 +22,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
@@ -145,29 +143,24 @@ public:
 private:
   const Http::ResponseTrailerMapPtr response_trailers_;
 };
-class Config;
+
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {
 public:
   TunnelingConfigHelperImpl(
-      Stats::Scope& scope,
-      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
+          config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
-
-  const Envoy::Router::FilterConfig& routerFilterConfig() const override { return router_config_; }
   void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
-  Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
-    return server_factory_context_;
-  }
 
 private:
   const bool use_post_;
@@ -176,9 +169,6 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
-  Stats::StatNameManagedStorage route_stat_name_storage_;
-  const Router::FilterConfig router_config_;
-  Server::Configuration::ServerFactoryContext& server_factory_context_;
 };
 
 /**
@@ -471,107 +461,6 @@ public:
   };
 
   StreamInfo::StreamInfo& getStreamInfo();
-  class HttpStreamDecoderFilterCallbacks : public Http::StreamDecoderFilterCallbacks,
-                                           public ScopeTrackedObject {
-  public:
-    HttpStreamDecoderFilterCallbacks(Filter* parent);
-    // Http::StreamDecoderFilterCallbacks
-    OptRef<const Network::Connection> connection() override {
-      return parent_->read_callbacks_->connection();
-    }
-    StreamInfo::StreamInfo& streamInfo() override { return parent_->getStreamInfo(); }
-    const ScopeTrackedObject& scope() override { return *this; }
-    Event::Dispatcher& dispatcher() override {
-      return parent_->read_callbacks_->connection().dispatcher();
-    }
-    void resetStream(Http::StreamResetReason, absl::string_view) override {
-      IS_ENVOY_BUG("Not implemented. Unexpected call to resetStream()");
-    };
-    Router::RouteConstSharedPtr route() override { return route_; }
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
-      return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
-          ->info();
-    }
-    uint64_t streamId() const override {
-      auto sip = parent_->getStreamInfo().getStreamIdProvider();
-      if (sip) {
-        return sip->toInteger().value();
-      }
-      return 0;
-    }
-    Tracing::Span& activeSpan() override { return parent_->active_span_; }
-    OptRef<const Tracing::Config> tracingConfig() const override {
-      return makeOptRef<const Tracing::Config>(parent_->tracing_config_);
-    }
-    void continueDecoding() override {}
-    void addDecodedData(Buffer::Instance&, bool) override {}
-    void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
-    Http::RequestTrailerMap& addDecodedTrailers() override { return *request_trailer_map_; }
-    Http::MetadataMapVector& addDecodedMetadata() override {
-      static Http::MetadataMapVector metadata_map_vector;
-      return metadata_map_vector;
-    }
-    const Buffer::Instance* decodingBuffer() override { return nullptr; }
-    void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
-    void sendLocalReply(Http::Code, absl::string_view,
-                        std::function<void(Http::ResponseHeaderMap& headers)>,
-                        const absl::optional<Grpc::Status::GrpcStatus>,
-                        absl::string_view) override {}
-    void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
-    Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
-    void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
-    Http::ResponseHeaderMapOptRef responseHeaders() override { return {}; }
-    void encodeData(Buffer::Instance&, bool) override {}
-    Http::RequestHeaderMapOptRef requestHeaders() override { return {}; }
-    Http::RequestTrailerMapOptRef requestTrailers() override { return {}; }
-    void encodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
-    Http::ResponseTrailerMapOptRef responseTrailers() override { return {}; }
-    void encodeMetadata(Http::MetadataMapPtr&&) override {}
-    // TODO(vikaschoudhary16): Implement watermark callbacks and test through flow control e2es.
-    void onDecoderFilterAboveWriteBufferHighWatermark() override {}
-    void onDecoderFilterBelowWriteBufferLowWatermark() override {}
-    void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
-    void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
-    void setDecoderBufferLimit(uint32_t) override {}
-    uint32_t decoderBufferLimit() override { return 0; }
-    bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }
-    void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
-    Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return nullptr; }
-    const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
-      return nullptr;
-    }
-    Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
-    void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
-    absl::optional<Upstream::LoadBalancerContext::OverrideHost>
-    upstreamOverrideHost() const override {
-      return absl::nullopt;
-    }
-    void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
-      tracked_object_stack.add(*this);
-    }
-    void traversePerFilterConfig(
-        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
-    Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
-    OptRef<Http::DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
-    OptRef<Http::UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
-    void resetIdleTimer() override {}
-    // absl::optional<absl::string_view> upstreamOverrideHost() const override {
-    //   return absl::nullopt;
-    // }
-    absl::string_view filterConfigName() const override { return ""; }
-
-    // ScopeTrackedObject
-    void dumpState(std::ostream& os, int indent_level) const override {
-      const char* spaces = spacesForLevel(indent_level);
-      os << spaces << "TcpProxy " << this << DUMP_MEMBER(streamId()) << "\n";
-      DUMP_DETAILS(parent_->getStreamInfo().upstreamInfo());
-    }
-    Filter* parent_{};
-    Http::RequestTrailerMapPtr request_trailer_map_;
-    std::shared_ptr<Http::NullRouteImpl> route_;
-  };
-  Tracing::NullSpan active_span_;
-  const Tracing::Config& tracing_config_;
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -656,7 +545,6 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
-  HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
