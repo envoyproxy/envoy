@@ -1049,7 +1049,7 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
     auto current_time = time_source_.monotonicTime();
     // Host enters slow start if only it has transitioned into healthy state.
     if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
-      auto host_last_hc_pass_time =
+      MonotonicTime host_last_hc_pass_time =
           host->lastHcPassTime() ? host->lastHcPassTime().value() : current_time;
       auto in_healthy_state_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           current_time - host_last_hc_pass_time);

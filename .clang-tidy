@@ -9,6 +9,7 @@ Checks: >
   abseil-string-find-startswith,
   abseil-upgrade-duration-conversions,
   bugprone-assert-side-effect,
+  bugprone-unchecked-optional-access,
   bugprone-unused-raii,
   bugprone-use-after-move,
   clang-analyzer-core.DivideZero,
