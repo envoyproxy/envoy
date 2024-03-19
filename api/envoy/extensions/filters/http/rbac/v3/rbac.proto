@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.rbac]
 
 // RBAC filter config.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rbac.v2.RBAC";
@@ -33,6 +33,11 @@ message RBAC {
   // If both rules and matcher are configured, rules will be ignored.
   config.rbac.v3.RBAC rules = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "rules_specifier"];
+
+  // If specified, rules will emit stats with the given prefix.
+  // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with
+  // rules.
+  string rules_stat_prefix = 6;
 
   // The match tree to use when resolving RBAC action for incoming requests. Requests do not
   // match any matcher will be denied.

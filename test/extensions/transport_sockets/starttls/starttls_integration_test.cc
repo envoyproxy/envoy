@@ -208,8 +208,8 @@ void StartTlsIntegrationTest::initialize() {
       factory->createTransportSocketFactory(*config, factory_context_)};
 
   // Setup factories and contexts for tls transport socket.
-  tls_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
   tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
   payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 

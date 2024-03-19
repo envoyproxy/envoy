@@ -35,7 +35,7 @@ public:
   SPIFFEValidator(SslStats& stats, TimeSource& time_source)
       : stats_(stats), time_source_(time_source){};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                  TimeSource& time_source);
+                  Server::Configuration::CommonFactoryContext& context);
   ~SPIFFEValidator() override = default;
 
   // Tls::CertValidator

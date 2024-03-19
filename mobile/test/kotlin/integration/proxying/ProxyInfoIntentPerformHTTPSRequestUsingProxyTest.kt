@@ -33,7 +33,7 @@ import org.robolectric.RobolectricTestRunner
 //                                                │                  │
 //                                                └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPSRequestUsingProxy {
+class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
   init {
     JniLibrary.loadTestLibrary()
     JniLibrary.load()

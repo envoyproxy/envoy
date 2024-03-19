@@ -52,6 +52,8 @@ envoy_cc_library(
         ":assert_lib",
         "//envoy/common:backoff_strategy_interface",
         "//envoy/common:random_generator_interface",
+        "//source/common/protobuf:utility_lib_header",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

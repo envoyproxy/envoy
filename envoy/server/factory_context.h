@@ -36,6 +36,11 @@
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
+
+namespace Regex {
+class Engine;
+}
+
 namespace Server {
 namespace Configuration {
 
@@ -129,6 +134,11 @@ public:
    * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
    */
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
+
+  /**
+   * @return the server regex engine.
+   */
+  virtual Regex::Engine& regexEngine() PURE;
 };
 
 /**

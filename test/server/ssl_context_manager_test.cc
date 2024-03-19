@@ -2,9 +2,9 @@
 
 #include "source/server/ssl_context_manager.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -14,14 +14,15 @@ namespace Server {
 namespace {
 
 TEST(SslContextManager, createStub) {
-  Event::SimulatedTimeSystem time_system;
   Stats::MockStore store;
   Stats::Scope& scope(*store.rootScope());
   Ssl::MockClientContextConfig client_config;
   Ssl::MockServerContextConfig server_config;
   std::vector<std::string> server_names;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
 
-  Ssl::ContextManagerPtr manager = createContextManager("fake_factory_name", time_system);
+  Ssl::ContextManagerPtr manager =
+      createContextManager("fake_factory_name", server_factory_context);
 
   // Check we've created a stub, not real manager.
   EXPECT_EQ(manager->daysUntilFirstCertExpires().value(), std::numeric_limits<uint32_t>::max());

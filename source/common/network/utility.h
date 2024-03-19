@@ -85,6 +85,17 @@ struct ResolvedUdpSocketConfig {
   bool prefer_gro_;
 };
 
+// The different options for receiving UDP packet(s) from system calls.
+enum class UdpRecvMsgMethod {
+  // The `recvmsg` system call.
+  RecvMsg,
+  // The `recvmsg` system call using GRO (generic receive offload). This is the preferred method,
+  // if the platform supports it.
+  RecvMsgWithGro,
+  // The `recvmmsg` system call.
+  RecvMmsg,
+};
+
 /**
  * Common network utility routines.
  */
@@ -352,15 +363,15 @@ public:
    * @param udp_packet_processor is the callback to receive the packet.
    * @param receive_time is the timestamp passed to udp_packet_processor for the
    * receive time of the packet.
-   * @param prefer_gro supplies whether to use GRO if the OS supports it.
+   * @param recv_msg_method the type of system call and socket options combination to use when
+   * receiving packets from the kernel.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel. If the
    * caller is not interested in it, nullptr can be passed in.
    */
-  static Api::IoCallUint64Result readFromSocket(IoHandle& handle,
-                                                const Address::Instance& local_address,
-                                                UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time, bool use_gro,
-                                                uint32_t* packets_dropped);
+  static Api::IoCallUint64Result
+  readFromSocket(IoHandle& handle, const Address::Instance& local_address,
+                 UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
+                 UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped);
 
   /**
    * Read some packets from a given UDP socket and pass the packet to a given
@@ -369,7 +380,11 @@ public:
    * @param local_address is the socket's local address used to populate port.
    * @param udp_packet_processor is the callback to receive the packets.
    * @param time_source is the time source used to generate the time stamp of the received packets.
-   * @param prefer_gro supplies whether to use GRO if the OS supports it.
+   * @param allow_gro whether to use GRO, iff the platform supports it. This function will check
+   * the IoHandle to ensure the platform supports GRO before using it.
+   * @param allow_mmsg whether to use recvmmsg, iff the platform supports it. This function will
+   * check the IoHandle to ensure the platform supports recvmmsg before using it. If `allow_gro` is
+   * true and the platform supports GRO, then it will take precedence over using recvmmsg.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel.
    * Return the io error encountered or nullptr if no io error but read stopped
    * because of MAX_NUM_PACKETS_PER_EVENT_LOOP.
@@ -384,8 +399,8 @@ public:
   static Api::IoErrorPtr readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, bool prefer_gro,
-                                               uint32_t& packets_dropped);
+                                               TimeSource& time_source, bool allow_gro,
+                                               bool allow_mmsg, uint32_t& packets_dropped);
 
 private:
   static void throwWithMalformedIp(absl::string_view ip_address);

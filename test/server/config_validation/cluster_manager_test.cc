@@ -40,7 +40,8 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSource()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{
+      *server.server_factory_context_};
 
   Http::ContextImpl http_context(stats_store.symbolTable());
   Quic::QuicStatNames quic_stat_names(stats_store.symbolTable());

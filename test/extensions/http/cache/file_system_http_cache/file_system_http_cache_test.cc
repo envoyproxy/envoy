@@ -370,7 +370,8 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Event::SimulatedTimeSystem time_system_;
   Http::TestRequestHeaderMapImpl request_headers_;
-  VaryAllowList vary_allow_list_{varyAllowListConfig().allowed_vary_headers()};
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  VaryAllowList vary_allow_list_{varyAllowListConfig().allowed_vary_headers(), factory_context_};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestResponseHeaderMapImpl response_headers_{
       {":status", "200"},

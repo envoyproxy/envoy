@@ -115,7 +115,8 @@ public:
 protected:
   friend class ContextImplPeer;
 
-  ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config, TimeSource& time_source,
+  ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+              Server::Configuration::CommonFactoryContext& factory_context,
               Ssl::ContextAdditionalInitFunc additional_init);
 
   /**
@@ -151,7 +152,7 @@ protected:
   std::vector<uint8_t> parsed_alpn_protocols_;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
-  TimeSource& time_source_;
+  Server::Configuration::CommonFactoryContext& factory_context_;
   const unsigned tls_max_version_;
   mutable Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_ssl_cipher_;
@@ -173,7 +174,7 @@ using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
 public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-                    TimeSource& time_source);
+                    Server::Configuration::CommonFactoryContext& factory_context);
 
   bssl::UniquePtr<SSL>
   newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
@@ -195,7 +196,8 @@ enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    const std::vector<std::string>& server_names, TimeSource& time_source,
+                    const std::vector<std::string>& server_names,
+                    Server::Configuration::CommonFactoryContext& factory_context,
                     Ssl::ContextAdditionalInitFunc additional_init);
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with

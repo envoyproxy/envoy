@@ -35,7 +35,7 @@ namespace Tls {
 class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                       SslStats& stats, TimeSource& time_source);
+                       SslStats& stats, Server::Configuration::CommonFactoryContext& context);
 
   ~DefaultCertValidator() override = default;
 
@@ -110,7 +110,7 @@ private:
 
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
-  TimeSource& time_source_;
+  Server::Configuration::CommonFactoryContext& context_;
 
   bool allow_untrusted_certificate_{false};
   bssl::UniquePtr<X509> ca_cert_;

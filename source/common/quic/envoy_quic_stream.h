@@ -33,13 +33,13 @@ class EnvoyQuicStream : public virtual Http::StreamEncoder,
 public:
   // |buffer_limit| is the high watermark of the stream send buffer, and the low
   // watermark will be half of it.
-  EnvoyQuicStream(quic::QuicSpdyStream& quic_stream, uint32_t buffer_limit,
-                  QuicFilterManagerConnectionImpl& filter_manager_connection,
+  EnvoyQuicStream(quic::QuicSpdyStream& quic_stream, quic::QuicSession& quic_session,
+                  uint32_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
                   std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark, Http::Http3::CodecStats& stats,
                   const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
       : Http::MultiplexedStreamImplBase(filter_manager_connection.dispatcher()), stats_(stats),
-        http3_options_(http3_options), quic_stream_(quic_stream),
+        http3_options_(http3_options), quic_stream_(quic_stream), quic_session_(quic_session),
         send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark), ENVOY_LOGGER()),
         filter_manager_connection_(filter_manager_connection),
@@ -180,6 +180,17 @@ protected:
 
   void encodeTrailersImpl(spdy::Http2HeaderBlock&& trailers);
 
+  // Converts `header_list` into a new `Http::MetadataMap`.
+  std::unique_ptr<Http::MetadataMap>
+  metadataMapFromHeaderList(const quic::QuicHeaderList& header_list);
+
+  // Returns true if the cumulative limit on METADATA headers has been reached
+  // after adding `bytes`.
+  bool mustRejectMetadata(size_t bytes) {
+    received_metadata_bytes_ += bytes;
+    return received_metadata_bytes_ > 1 << 20;
+  }
+
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
   std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
@@ -210,8 +221,9 @@ protected:
   bool saw_regular_headers_{false};
 
 private:
-  // QUIC stream that this EnvoyQuicStream wraps.
+  // QUIC stream and session that this EnvoyQuicStream wraps.
   quic::QuicSpdyStream& quic_stream_;
+  quic::QuicSession& quic_session_;
 
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
   // upon crossing high and low watermarks.
@@ -232,6 +244,7 @@ private:
   absl::optional<size_t> content_length_;
   size_t received_content_bytes_{0};
   http2::adapter::HeaderValidator header_validator_;
+  size_t received_metadata_bytes_{0};
 };
 
 // Object used for updating a BytesMeter to track bytes sent on a QuicStream since this object was

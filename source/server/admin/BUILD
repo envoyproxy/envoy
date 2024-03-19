@@ -388,6 +388,7 @@ envoy_cc_library(
     name = "utils_lib",
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/init:manager_interface",
         "//source/common/common:enum_to_int",

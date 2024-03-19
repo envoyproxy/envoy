@@ -14,7 +14,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.util.Arrays;
+
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.FileUtils;

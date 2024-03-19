@@ -10,9 +10,6 @@ std::vector<std::string> sandboxRuntimes() {
 #if defined(PROXY_WASM_HAS_RUNTIME_V8)
   runtimes.push_back("v8");
 #endif
-#if defined(PROXY_WASM_HAS_RUNTIME_WAVM)
-  runtimes.push_back("wavm");
-#endif
 #if defined(PROXY_WASM_HAS_RUNTIME_WAMR)
   runtimes.push_back("wamr");
 #endif

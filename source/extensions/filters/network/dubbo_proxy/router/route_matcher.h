@@ -118,7 +118,8 @@ private:
 
 class MethodRouteEntryImpl : public RouteEntryImplBase {
 public:
-  MethodRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);
+  MethodRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+                       Server::Configuration::CommonFactoryContext& context);
   ~MethodRouteEntryImpl() override;
 
   // RoutEntryImplBase
@@ -126,7 +127,8 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> method_name_;
+  const Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>
+      method_name_;
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 

@@ -183,8 +183,7 @@ public:
   absl::optional<MonotonicTime> connecting_start_time_;
 
   // One of these flags should be set to true when the request is complete.
-  bool stream_reset_{};
-  bool response_complete_{};
+  bool reset_or_response_complete_{};
 
   bool expects_response_{};
 

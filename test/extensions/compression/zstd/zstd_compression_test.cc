@@ -49,6 +49,7 @@ protected:
           .WillRepeatedly(
               Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 watch_cbs_.push_back(cb);
+                return absl::OkStatus();
               }));
       return mock_watcher;
     }));

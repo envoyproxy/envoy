@@ -62,7 +62,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -391,6 +391,11 @@ message HealthCheck {
   // initial health check failure event will be logged.
   // The default value is false.
   bool always_log_health_check_failures = 19;
+
+  // If set to true, health check success events will always be logged. If set to false, only host addition event will be logged
+  // if it is the first successful health check, or if the healthy threshold is reached.
+  // The default value is false.
+  bool always_log_health_check_success = 26;
 
   // This allows overriding the cluster TLS settings, just for health check connections.
   TlsOptions tls_options = 21;

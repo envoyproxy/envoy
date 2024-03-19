@@ -579,7 +579,11 @@ void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
   ++pending_cbs_;
   dispatcher_.post([this, cb]() {
     cb();
-    --pending_cbs_;
+    {
+      // Snag this lock not because it's needed but so waitForNoPost doesn't stall
+      absl::MutexLock lock(&lock_);
+      --pending_cbs_;
+    }
   });
 }
 

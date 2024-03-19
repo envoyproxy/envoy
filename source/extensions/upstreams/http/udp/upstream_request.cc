@@ -113,7 +113,7 @@ void UdpUpstream::onSocketReadReady() {
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this,
-      dispatcher_.timeSource(), /*prefer_gro=*/true, packets_dropped);
+      dispatcher_.timeSource(), /*allow_gro=*/true, /*allow_mmsg=*/true, packets_dropped);
   if (result == nullptr) {
     socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;

@@ -280,7 +280,7 @@ QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
-    Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
   for (const auto& action : config.actions()) {
@@ -334,8 +334,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       if (producer) {
         actions_.emplace_back(std::move(producer));
       } else {
-        throwEnvoyExceptionOrPanic(
+        creation_status = absl::InvalidArgumentError(
             absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
+        return;
       }
       break;
     }
@@ -348,7 +349,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
           new QueryParameterValueMatchAction(action.query_parameter_value_match()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
-      throwEnvoyExceptionOrPanic("invalid config");
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
   if (config.has_limit()) {
@@ -359,7 +360,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
         OVERRIDE_SPECIFIER_NOT_SET:
-      throwEnvoyExceptionOrPanic("invalid config");
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
 }
@@ -398,11 +399,12 @@ RateLimitPolicyImpl::RateLimitPolicyImpl()
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-    Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : RateLimitPolicyImpl() {
+  creation_status = absl::OkStatus();
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit, context));
+        new RateLimitPolicyEntryImpl(rate_limit, context, creation_status));
     uint64_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);

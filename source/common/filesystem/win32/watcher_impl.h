@@ -31,7 +31,7 @@ public:
   ~WatcherImpl();
 
   // Filesystem::Watcher
-  void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
+  absl::Status addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
 
 private:
   static void issueFirstRead(ULONG_PTR param);

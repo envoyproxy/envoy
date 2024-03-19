@@ -65,6 +65,7 @@ class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, No
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules,
                                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Server::Configuration::CommonFactoryContext& context,
                                    const EnforcementMode mode = EnforcementMode::Enforced);
 
   bool handleAction(const Network::Connection& connection,

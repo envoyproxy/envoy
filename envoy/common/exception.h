@@ -17,7 +17,7 @@ namespace Envoy {
 #define throwEnvoyExceptionOrPanic(x) PANIC(x)
 #define throwExceptionOrPanic(x, y) PANIC(y)
 #else
-#define throwEnvoyExceptionOrPanic(x) throw EnvoyException(x)
+#define throwEnvoyExceptionOrPanic(x) throw ::Envoy::EnvoyException(x)
 #define throwExceptionOrPanic(y, x) throw y(x)
 #endif
 

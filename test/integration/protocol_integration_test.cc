@@ -4634,6 +4634,7 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   // } is invalid character in header name
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo}name", "foo_value"}}, false);
+  upstream_request_->encodeData(1, true);
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());

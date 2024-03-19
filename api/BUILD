@@ -73,6 +73,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg",
+        "//contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/checksum/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
@@ -82,6 +83,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/client_ssl_auth/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/action/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/http1/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/kafka/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/router/v3:pkg",

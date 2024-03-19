@@ -146,8 +146,7 @@ public:
       new NiceMock<Network::MockDnsResolver>};
   NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
   NiceMock<Event::MockDispatcher>& dispatcher_ = server_context_.dispatcher_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
-      dispatcher_.timeSource()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{server_context_};
   NiceMock<LocalInfo::MockLocalInfo>& local_info_ = server_context_.local_info_;
   NiceMock<Server::MockAdmin>& admin_ = server_context_.admin_;
   NiceMock<Secret::MockSecretManager> secret_manager_;

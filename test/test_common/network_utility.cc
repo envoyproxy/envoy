@@ -226,8 +226,13 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
                                        std::list<UdpRecvData>& data,
                                        uint64_t max_rx_datagram_size) {
   SyncPacketProcessor processor(data, max_rx_datagram_size);
+  UdpRecvMsgMethod recv_msg_method = UdpRecvMsgMethod::RecvMsg;
+  if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
+    recv_msg_method = UdpRecvMsgMethod::RecvMmsg;
+  }
   return Network::Utility::readFromSocket(handle, local_address, processor,
-                                          MonotonicTime(std::chrono::seconds(0)), false, nullptr);
+                                          MonotonicTime(std::chrono::seconds(0)), recv_msg_method,
+                                          nullptr);
 }
 
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_datagram_size)

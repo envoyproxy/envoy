@@ -13,12 +13,13 @@ namespace Common {
 namespace RBAC {
 
 MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      Server::Configuration::CommonFactoryContext& context) {
   switch (permission.rule_case()) {
   case envoy::config::rbac::v3::Permission::RuleCase::kAndRules:
-    return std::make_shared<const AndMatcher>(permission.and_rules(), validation_visitor);
+    return std::make_shared<const AndMatcher>(permission.and_rules(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kOrRules:
-    return std::make_shared<const OrMatcher>(permission.or_rules(), validation_visitor);
+    return std::make_shared<const OrMatcher>(permission.or_rules(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kHeader:
     return std::make_shared<const HeaderMatcher>(permission.header());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
@@ -33,9 +34,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(permission.metadata());
   case envoy::config::rbac::v3::Permission::RuleCase::kNotRule:
-    return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor);
+    return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kRequestedServerName:
-    return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
+    return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name(),
+                                                              context);
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
     return std::make_shared<const PathMatcher>(permission.url_path());
   case envoy::config::rbac::v3::Permission::RuleCase::kUriTemplate: {
@@ -56,14 +58,15 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal,
+                                      Server::Configuration::CommonFactoryContext& context) {
   switch (principal.identifier_case()) {
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAndIds:
-    return std::make_shared<const AndMatcher>(principal.and_ids());
+    return std::make_shared<const AndMatcher>(principal.and_ids(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kOrIds:
-    return std::make_shared<const OrMatcher>(principal.or_ids());
+    return std::make_shared<const OrMatcher>(principal.or_ids(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
-    return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
+    return std::make_shared<const AuthenticatedMatcher>(principal.authenticated(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
     return std::make_shared<const IPMatcher>(principal.source_ip(),
                                              IPMatcher::Type::ConnectionRemote);
@@ -80,7 +83,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(principal.metadata());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kNotId:
-    return std::make_shared<const NotMatcher>(principal.not_id());
+    return std::make_shared<const NotMatcher>(principal.not_id(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
     return std::make_shared<const PathMatcher>(principal.url_path());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterState:
@@ -92,15 +95,17 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
 }
 
 AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,
-                       ProtobufMessage::ValidationVisitor& validation_visitor) {
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       Server::Configuration::CommonFactoryContext& context) {
   for (const auto& rule : set.rules()) {
-    matchers_.push_back(Matcher::create(rule, validation_visitor));
+    matchers_.push_back(Matcher::create(rule, validation_visitor, context));
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set,
+                       Server::Configuration::CommonFactoryContext& context) {
   for (const auto& id : set.ids()) {
-    matchers_.push_back(Matcher::create(id));
+    matchers_.push_back(Matcher::create(id, context));
   }
 }
 
@@ -117,15 +122,17 @@ bool AndMatcher::matches(const Network::Connection& connection,
 }
 
 OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
-                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+                     ProtobufMessage::ValidationVisitor& validation_visitor,
+                     Server::Configuration::CommonFactoryContext& context) {
   for (const auto& rule : rules) {
-    matchers_.push_back(Matcher::create(rule, validation_visitor));
+    matchers_.push_back(Matcher::create(rule, validation_visitor, context));
   }
 }
 
-OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids) {
+OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids,
+                     Server::Configuration::CommonFactoryContext& context) {
   for (const auto& id : ids) {
-    matchers_.push_back(Matcher::create(id));
+    matchers_.push_back(Matcher::create(id, context));
   }
 }
 

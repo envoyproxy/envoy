@@ -45,7 +45,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private final boolean mDnsUseSystemResolver = true;
-  private final boolean mEnableDrainPostDnsRefresh = false;
+  private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
   private final boolean mEnableInterfaceBinding = false;
@@ -70,6 +70,17 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    * @param context Android {@link Context} for engine to use.
    */
   public NativeCronvoyEngineBuilderImpl(Context context) { super(context); }
+
+  /**
+   * Enable draining of the connections after a DNS refresh changes the host address mapping.
+   * The default behavior is to not enable draining post DNS refresh.
+   *
+   * @param enable If true, enable drain post DNS refresh; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setEnableDrainPostDnsRefresh(boolean enable) {
+    mEnableDrainPostDnsRefresh = enable;
+    return this;
+  }
 
   /**
    * Indicates to skip the TLS certificate verification.
@@ -125,11 +136,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
         mEnableDrainPostDnsRefresh, quicEnabled(), quicConnectionOptions(),
         quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
-        mEnableGzipDecompression, brotliEnabled(), mEnableSocketTag, mEnableInterfaceBinding,
-        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
-        mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
-        mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
-        keyValueStores, runtimeGuards, mEnablePlatformCertificatesValidation,
+        mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
+        mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
+        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
+        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
+        platformFilterChain, stringAccessors, keyValueStores, runtimeGuards,
+        mEnablePlatformCertificatesValidation,
         /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
         /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
         /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,

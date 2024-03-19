@@ -1,4 +1,4 @@
-package test.kotlin.integration;
+package test.java.integration;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;

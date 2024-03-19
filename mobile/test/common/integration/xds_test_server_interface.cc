@@ -12,6 +12,10 @@ static std::weak_ptr<Envoy::XdsTestServer> weak_test_server_;
 static std::shared_ptr<Envoy::XdsTestServer> testServer() { return weak_test_server_.lock(); }
 
 void initXdsServer() {
+  // This is called via JNI from kotlin tests, and Envoy doesn't consider it a test thread
+  // which triggers some failures of `ASSERT_IS_MAIN_OR_TEST_THREAD()`.
+  Envoy::Thread::SkipAsserts skip;
+
   Envoy::ExtensionRegistry::registerFactories();
   strong_test_server_ = std::make_shared<Envoy::XdsTestServer>();
   weak_test_server_ = strong_test_server_;

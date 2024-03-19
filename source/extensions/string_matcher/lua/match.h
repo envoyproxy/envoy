@@ -29,7 +29,9 @@ private:
 
 class LuaStringMatcherFactory : public Matchers::StringMatcherExtensionFactory {
 public:
-  Matchers::StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& message) override;
+  Matchers::StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& message,
+                                                 ThreadLocal::SlotAllocator& tls,
+                                                 Api::Api& api) override;
   std::string name() const override { return "envoy.string_matcher.lua"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };

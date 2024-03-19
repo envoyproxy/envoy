@@ -8,9 +8,11 @@
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 
@@ -22,30 +24,29 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-Filters::Common::ExtAuthz::ResponsePtr
-makeAuthzResponse(const Filters::Common::ExtAuthz::CheckStatus status) {
-  Filters::Common::ExtAuthz::ResponsePtr response =
-      std::make_unique<Filters::Common::ExtAuthz::Response>();
-  response->status = status;
+std::unique_ptr<envoy::service::auth::v3::CheckResponse>
+makeGrpcCheckResponse(const Grpc::Status::WellKnownGrpcStatus status) {
+  auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  response->mutable_status()->set_code(status);
   // TODO: We only add the response status.
   // Add fuzzed inputs for headers_to_(set/append/add), body, status_code to the Response.
   return response;
 }
 
-Filters::Common::ExtAuthz::CheckStatus resultCaseToCheckStatus(
+Grpc::Status::WellKnownGrpcStatus resultCaseToGrpcStatus(
     const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
-  Filters::Common::ExtAuthz::CheckStatus check_status;
+  Grpc::Status::WellKnownGrpcStatus check_status;
   switch (result) {
   case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::OK: {
-    check_status = Filters::Common::ExtAuthz::CheckStatus::OK;
+    check_status = Grpc::Status::WellKnownGrpcStatus::Ok;
     break;
   }
   case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::ERROR: {
-    check_status = Filters::Common::ExtAuthz::CheckStatus::Error;
+    check_status = Grpc::Status::WellKnownGrpcStatus::Internal;
     break;
   }
   case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::DENIED: {
-    check_status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+    check_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
     break;
   }
   default: {
@@ -56,32 +57,22 @@ Filters::Common::ExtAuthz::CheckStatus resultCaseToCheckStatus(
   return check_status;
 }
 
-class FuzzerMocks {
+class StatelessFuzzerMocks {
 public:
-  FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
-
-    ON_CALL(decoder_callbacks_, connection())
-        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  StatelessFuzzerMocks()
+      : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-
-    ON_CALL(decoder_callbacks_.stream_info_, dynamicMetadata())
-        .WillByDefault(
-            Invoke([&]() -> envoy::config::core::v3::Metadata& { return filter_metadata_; }));
   }
 
-  void setFilterMetadata(const envoy::config::core::v3::Metadata& metadata) {
-    filter_metadata_.CopyFrom(metadata);
-  }
-
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  // Only add mocks here that are stateless. I.e. if you need to call ON_CALL on a mock each fuzzer
+  // run, do not add the mock here, because it will leak memory.
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-
-  // Returned by mock decoder_callbacks_.stream_info_.dynamicMetadata()
-  envoy::config::core::v3::Metadata filter_metadata_;
+  NiceMock<Grpc::MockAsyncRequest> async_request_;
+  Envoy::Tracing::MockSpan mock_span_;
 };
 
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
@@ -92,50 +83,68 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
     return;
   }
 
-  static FuzzerMocks mocks;
+  static StatelessFuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  Http::ContextImpl http_context(stats_store.symbolTable());
 
   // Prepare filter.
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
   FilterConfigSharedPtr config;
 
   try {
-    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(), mocks.runtime_,
-                                            http_context, "ext_authz_prefix", bootstrap);
+    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(),
+                                            "ext_authz_prefix", mocks.factory_context_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
     return;
   }
 
-  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
-  std::unique_ptr<Filter> filter =
-      std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
-  filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
-  filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
+  auto internal_mock_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  auto grpc_client = new Filters::Common::ExtAuthz::GrpcClientImpl(internal_mock_client,
+                                                                   std::chrono::milliseconds(1000));
+  auto filter = std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{grpc_client});
 
   // Set metadata context.
-  mocks.setFilterMetadata(input.filter_metadata());
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(decoder_callbacks, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{mocks.connection_}));
+  envoy::config::core::v3::Metadata metadata = input.filter_metadata();
+  ON_CALL(decoder_callbacks.stream_info_, dynamicMetadata())
+      .WillByDefault(testing::ReturnRef(metadata));
+
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   // Set check result default action.
-  envoy::service::auth::v3::CheckRequest check_request;
-  ON_CALL(*client, check(_, _, _, _))
-      .WillByDefault(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                                const envoy::service::auth::v3::CheckRequest& check_param,
-                                Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
-        check_request = check_param;
-        callbacks.onComplete(makeAuthzResponse(resultCaseToCheckStatus(input.result())));
-      }));
+  ON_CALL(*internal_mock_client, sendRaw(_, _, _, _, _, _))
+      .WillByDefault(
+          Invoke([&](absl::string_view, absl::string_view, Buffer::InstancePtr&& serialized_req,
+                     Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                     const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+            envoy::service::auth::v3::CheckRequest check_request;
+            EXPECT_TRUE(check_request.ParseFromString(serialized_req->toString()))
+                << "Could not parse serialized check request";
+
+            // TODO: Query the request header map in HttpFilterFuzzer to test
+            // headers_to_(add/remove/append).
+            // TODO: Test check request attributes against config
+            // and filter metadata.
+            ENVOY_LOG_MISC(trace, "Check Request attributes {}",
+                           check_request.attributes().DebugString());
+
+            const Grpc::Status::WellKnownGrpcStatus status = resultCaseToGrpcStatus(input.result());
+            if (status == Grpc::Status::WellKnownGrpcStatus::Ok) {
+              grpc_client->onSuccess(makeGrpcCheckResponse(status), mocks.mock_span_);
+            } else {
+              grpc_client->onFailure(status, "Fuzz input status was not ok!", mocks.mock_span_);
+            }
+            return &mocks.async_request_;
+          }));
 
   // TODO: Add response headers.
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()),
                  input.request_data());
-  // TODO: Query the request header map in HttpFilterFuzzer to test headers_to_(add/remove/append).
-  // TODO: Test check request attributes against config and filter metadata.
-  ENVOY_LOG_MISC(trace, "Check Request attributes {}", check_request.attributes().DebugString());
 }
 
 } // namespace

@@ -35,7 +35,7 @@ enum HealthCheckerType {
   THRIFT = 4;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message HealthCheckEvent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckEvent";
@@ -54,6 +54,12 @@ message HealthCheckEvent {
 
     // Host addition.
     HealthCheckAddHealthy add_healthy_event = 5;
+
+    // A health check was successful. Note: a host will be considered healthy either if it is
+    // the first ever health check, or if the healthy threshold is reached. This kind of event
+    // indicate that a health check was successful, but does not indicates that the host is
+    // considered healthy. A host is considered healthy if HealthCheckAddHealthy kind of event is sent.
+    HealthCheckSuccessful successful_health_check_event = 12;
 
     // Host failure.
     HealthCheckFailure health_check_failure_event = 7;
@@ -91,6 +97,9 @@ message HealthCheckAddHealthy {
   // the configured :ref:`healthy threshold <envoy_v3_api_field_config.core.v3.HealthCheck.healthy_threshold>`
   // is bypassed and the host is immediately added.
   bool first_check = 1;
+}
+
+message HealthCheckSuccessful {
 }
 
 message HealthCheckFailure {

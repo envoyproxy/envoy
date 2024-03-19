@@ -486,10 +486,10 @@ message Http2ProtocolOptions {
   // Allows proxying Websocket and other upgrades over H2 connect.
   bool allow_connect = 5;
 
-  // [#not-implemented-hide:] Hiding until envoy has full metadata support.
+  // [#not-implemented-hide:] Hiding until Envoy has full metadata support.
   // Still under implementation. DO NOT USE.
   //
-  // Allows metadata. See [metadata
+  // Allows sending and receiving HTTP/2 METADATA frames. See [metadata
   // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
@@ -618,7 +618,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -637,6 +637,14 @@ message Http3ProtocolOptions {
   // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
   // Note that HTTP/3 CONNECT is not yet an RFC.
   bool allow_extended_connect = 5 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // [#not-implemented-hide:] Hiding until Envoy has full metadata support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Allows sending and receiving HTTP/3 METADATA frames. See [metadata
+  // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
+  // information.
+  bool allow_metadata = 6;
 }
 
 // A message to control transformations to the :scheme header

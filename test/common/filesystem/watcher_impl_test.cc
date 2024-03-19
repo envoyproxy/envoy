@@ -47,11 +47,14 @@ TEST_F(WatcherImplTest, All) {
 
   WatchCallback callback;
   EXPECT_CALL(callback, called(Watcher::Events::MovedTo)).Times(2);
-  watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
-                    Watcher::Events::MovedTo, [&](uint32_t events) -> void {
-                      callback.called(events);
-                      dispatcher_->exit();
-                    });
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                             Watcher::Events::MovedTo,
+                             [&](uint32_t events) -> void {
+                               callback.called(events);
+                               dispatcher_->exit();
+                             })
+                  .ok());
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
                               TestEnvironment::temporaryPath("envoy_test/watcher_link"));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -75,11 +78,14 @@ TEST_F(WatcherImplTest, Create) {
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target")); }
 
   WatchCallback callback;
-  watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
-                    Watcher::Events::MovedTo, [&](uint32_t events) -> void {
-                      callback.called(events);
-                      dispatcher_->exit();
-                    });
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                             Watcher::Events::MovedTo,
+                             [&](uint32_t events) -> void {
+                               callback.called(events);
+                               dispatcher_->exit();
+                             })
+                  .ok());
 
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/other_file")); }
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -99,11 +105,14 @@ TEST_F(WatcherImplTest, Modify) {
   std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
 
   WatchCallback callback;
-  watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
-                    Watcher::Events::Modified, [&](uint32_t events) -> void {
-                      callback.called(events);
-                      dispatcher_->exit();
-                    });
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                             Watcher::Events::Modified,
+                             [&](uint32_t events) -> void {
+                               callback.called(events);
+                               dispatcher_->exit();
+                             })
+                  .ok());
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   file << "text" << std::flush;
@@ -115,13 +124,14 @@ TEST_F(WatcherImplTest, Modify) {
 TEST_F(WatcherImplTest, BadPath) {
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
 
-  EXPECT_THROW(
-      watcher->addWatch("this_is_not_a_file", Watcher::Events::MovedTo, [&](uint32_t) -> void {}),
-      EnvoyException);
+  EXPECT_FALSE(
+      watcher->addWatch("this_is_not_a_file", Watcher::Events::MovedTo, [&](uint32_t) -> void {})
+          .ok());
 
-  EXPECT_THROW(watcher->addWatch("this_is_not_a_dir/file", Watcher::Events::MovedTo,
-                                 [&](uint32_t) -> void {}),
-               EnvoyException);
+  EXPECT_FALSE(
+      watcher
+          ->addWatch("this_is_not_a_dir/file", Watcher::Events::MovedTo, [&](uint32_t) -> void {})
+          .ok());
 }
 
 TEST_F(WatcherImplTest, ParentDirectoryRemoved) {
@@ -132,9 +142,11 @@ TEST_F(WatcherImplTest, ParentDirectoryRemoved) {
   WatchCallback callback;
   EXPECT_CALL(callback, called(testing::_)).Times(0);
 
-  watcher->addWatch(TestEnvironment::temporaryPath("envoy_test_empty/watcher_link"),
-                    Watcher::Events::MovedTo,
-                    [&](uint32_t events) -> void { callback.called(events); });
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test_empty/watcher_link"),
+                             Watcher::Events::MovedTo,
+                             [&](uint32_t events) -> void { callback.called(events); })
+                  .ok());
 
   int rc = rmdir(TestEnvironment::temporaryPath("envoy_test_empty").c_str());
   EXPECT_EQ(0, rc);
@@ -146,9 +158,9 @@ TEST_F(WatcherImplTest, RootDirectoryPath) {
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
 
 #ifndef WIN32
-  EXPECT_NO_THROW(watcher->addWatch("/", Watcher::Events::MovedTo, [&](uint32_t) -> void {}));
+  EXPECT_TRUE(watcher->addWatch("/", Watcher::Events::MovedTo, [&](uint32_t) -> void {}).ok());
 #else
-  EXPECT_NO_THROW(watcher->addWatch("c:\\", Watcher::Events::MovedTo, [&](uint32_t) -> void {}));
+  EXPECT_TRUE(watcher->addWatch("c:\\", Watcher::Events::MovedTo, [&](uint32_t) -> void {}).ok());
 #endif
 }
 
@@ -169,11 +181,14 @@ TEST_F(WatcherImplTest, SymlinkAtomicRename) {
 
   WatchCallback callback;
   EXPECT_CALL(callback, called(Watcher::Events::MovedTo));
-  watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/"), Watcher::Events::MovedTo,
-                    [&](uint32_t events) -> void {
-                      callback.called(events);
-                      dispatcher_->exit();
-                    });
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test/"),
+                             Watcher::Events::MovedTo,
+                             [&](uint32_t events) -> void {
+                               callback.called(events);
+                               dispatcher_->exit();
+                             })
+                  .ok());
 
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test/..timestamp2"));
   { std::ofstream file(TestEnvironment::temporaryPath("envoy_test/..timestamp2/watched_file")); }

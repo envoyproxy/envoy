@@ -10,6 +10,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 
@@ -110,11 +111,13 @@ public:
   }
 
   MatcherSharedPtr createRequestHeaderMatchers() {
+    NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_autz_proto_;
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("foo");
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("hello");
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("duplicate");
-    return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers(), false);
+    return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers(), false,
+                                                factory_context);
   }
 
   Network::Address::InstanceConstSharedPtr addr_;

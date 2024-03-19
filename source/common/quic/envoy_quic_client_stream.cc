@@ -23,7 +23,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
-          *this,
+          *this, *client_session,
           // Flow control receive window should be larger than 8k so that the send buffer can fully
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
@@ -31,6 +31,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           stats, http3_options) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
+  RegisterMetadataVisitor(this);
 }
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
@@ -409,6 +410,17 @@ Network::Connection* EnvoyQuicClientStream::connection() { return filterManagerC
 
 QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection() {
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
+}
+
+void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
+                                               const quic::QuicHeaderList& header_list) {
+  if (mustRejectMetadata(header_list.uncompressed_header_bytes())) {
+    onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
+    return;
+  }
+  if (!header_list.empty()) {
+    response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  }
 }
 
 void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,

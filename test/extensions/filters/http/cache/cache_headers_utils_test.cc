@@ -10,6 +10,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -652,8 +653,11 @@ TEST_P(ParseCommaDelimitedHeaderTest, ParseCommaDelimitedHeader) {
 }
 
 TEST(CreateVaryIdentifier, IsStableForAllowListOrder) {
-  VaryAllowList vary_allow_list1(toStringMatchers({"width", "accept", "accept-language"}));
-  VaryAllowList vary_allow_list2(toStringMatchers({"accept", "width", "accept-language"}));
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  VaryAllowList vary_allow_list1(toStringMatchers({"width", "accept", "accept-language"}),
+                                 factory_context);
+  VaryAllowList vary_allow_list2(toStringMatchers({"accept", "width", "accept-language"}),
+                                 factory_context);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
@@ -710,16 +714,20 @@ TEST(HasVary, NotEmpty) {
 }
 
 TEST(CreateVaryIdentifier, EmptyVaryEntry) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {}, request_headers),
             "vary-id\n");
 }
 
 TEST(CreateVaryIdentifier, SingleHeaderExists) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept"}, request_headers),
             "vary-id\naccept\r"
@@ -727,17 +735,21 @@ TEST(CreateVaryIdentifier, SingleHeaderExists) {
 }
 
 TEST(CreateVaryIdentifier, SingleHeaderMissing) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers;
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept"}, request_headers),
             "vary-id\naccept\r\n");
 }
 
 TEST(CreateVaryIdentifier, MultipleHeadersAllExist) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(
                 vary_allow_list, {"accept", "accept-language", "width"}, request_headers),
@@ -747,9 +759,11 @@ TEST(CreateVaryIdentifier, MultipleHeadersAllExist) {
 }
 
 TEST(CreateVaryIdentifier, MultipleHeadersSomeExist) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "accept, accept-language, width"}};
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}, {"width", "640"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(
                 vary_allow_list, {"accept", "accept-language", "width"}, request_headers),
@@ -758,9 +772,11 @@ TEST(CreateVaryIdentifier, MultipleHeadersSomeExist) {
 }
 
 TEST(CreateVaryIdentifier, ExtraRequestHeaders) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"heigth", "1280"}, {"width", "640"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(
       VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept", "width"}, request_headers),
@@ -769,8 +785,10 @@ TEST(CreateVaryIdentifier, ExtraRequestHeaders) {
 }
 
 TEST(CreateVaryIdentifier, MultipleHeadersNoneExist) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers;
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(
                 vary_allow_list, {"accept", "accept-language", "width"}, request_headers),
@@ -778,9 +796,12 @@ TEST(CreateVaryIdentifier, MultipleHeadersNoneExist) {
 }
 
 TEST(CreateVaryIdentifier, DifferentHeadersSameValue) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
   // Two requests with the same value for different headers must have different
   // vary-ids.
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   Http::TestRequestHeaderMapImpl request_headers1{{"accept", "foo"}};
   absl::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
@@ -796,8 +817,10 @@ TEST(CreateVaryIdentifier, DifferentHeadersSameValue) {
 }
 
 TEST(CreateVaryIdentifier, MultiValueSameHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}, {"width", "bar"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"width"}, request_headers),
             "vary-id\nwidth\r"
@@ -806,16 +829,20 @@ TEST(CreateVaryIdentifier, MultiValueSameHeader) {
 }
 
 TEST(CreateVaryIdentifier, DisallowedHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed"}, request_headers),
             absl::nullopt);
 }
 
 TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}};
-  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
+  VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}),
+                                factory_context);
 
   EXPECT_EQ(
       VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed,width"}, request_headers),
@@ -840,8 +867,9 @@ envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
 
 class VaryAllowListTest : public testing::Test {
 protected:
-  VaryAllowListTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
+  VaryAllowListTest() : vary_allow_list_(getConfig().allowed_vary_headers(), factory_context_) {}
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   VaryAllowList vary_allow_list_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;

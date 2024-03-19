@@ -284,12 +284,14 @@ CacheHeadersUtils::parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& e
 }
 
 VaryAllowList::VaryAllowList(
-    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list) {
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list,
+    Server::Configuration::CommonFactoryContext& context) {
 
   for (const auto& rule : allow_list) {
     allow_list_.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            rule));
+        std::make_unique<
+            Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+            rule, context));
   }
 }
 

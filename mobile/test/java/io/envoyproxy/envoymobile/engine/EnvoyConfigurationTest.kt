@@ -83,6 +83,7 @@ class EnvoyConfigurationTest {
     quicCanonicalSuffixes: MutableList<String> = mutableListOf(".opq.com", ".xyz.com"),
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
+    enablePortMigration: Boolean = true,
     enableSocketTagging: Boolean = false,
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
@@ -131,6 +132,7 @@ class EnvoyConfigurationTest {
       quicCanonicalSuffixes,
       enableGzipDecompression,
       enableBrotliDecompression,
+      enablePortMigration,
       enableSocketTagging,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
@@ -205,6 +207,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains(".xyz.com")
     assertThat(resolvedTemplate).contains("connection_options: 5RTO")
     assertThat(resolvedTemplate).contains("client_connection_options: MPQC")
+    assertThat(resolvedTemplate).contains("num_timeouts_to_trigger_port_migration: 4")
 
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections: 543")

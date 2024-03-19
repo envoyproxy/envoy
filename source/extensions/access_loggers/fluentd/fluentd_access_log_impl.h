@@ -18,6 +18,11 @@ using FluentdAccessLogConfig =
     envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig;
 using FluentdAccessLogConfigSharedPtr = std::shared_ptr<FluentdAccessLogConfig>;
 
+static constexpr uint64_t DefaultBaseBackoffIntervalMs = 500;
+static constexpr uint64_t DefaultMaxBackoffIntervalFactor = 10;
+static constexpr uint64_t DefaultBufferFlushIntervalMs = 1000;
+static constexpr uint64_t DefaultMaxBufferSize = 16384;
+
 // Entry represents a single Fluentd message, msgpack format based, as specified in:
 // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#entry
 class Entry {
@@ -49,6 +54,7 @@ using FluentdAccessLoggerSharedPtr = std::shared_ptr<FluentdAccessLogger>;
   COUNTER(entries_lost)                                                                            \
   COUNTER(entries_buffered)                                                                        \
   COUNTER(events_sent)                                                                             \
+  COUNTER(reconnect_attempts)                                                                      \
   COUNTER(connections_closed)
 
 struct AccessLogFluentdStats {
@@ -59,8 +65,9 @@ class FluentdAccessLoggerImpl : public Tcp::AsyncTcpClientCallbacks,
                                 public FluentdAccessLogger,
                                 public Logger::Loggable<Logger::Id::client> {
 public:
-  FluentdAccessLoggerImpl(Tcp::AsyncTcpClientPtr client, Event::Dispatcher& dispatcher,
-                          const FluentdAccessLogConfig& config, Stats::Scope& parent_scope);
+  FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& cluster, Tcp::AsyncTcpClientPtr client,
+                          Event::Dispatcher& dispatcher, const FluentdAccessLogConfig& config,
+                          BackOffStrategyPtr backoff_strategy, Stats::Scope& parent_scope);
 
   // Tcp::AsyncTcpClientCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -73,19 +80,28 @@ public:
 
 private:
   void flush();
+  void connect();
+  void maybeReconnect();
+  void onBackoffCallback();
+  void setDisconnected();
   void clearBuffer();
 
   bool disconnected_ = false;
   bool connecting_ = false;
   std::string tag_;
   std::string id_;
+  uint32_t connect_attempts_{0};
+  absl::optional<uint32_t> max_connect_attempts_{};
   const Stats::ScopeSharedPtr stats_scope_;
   AccessLogFluentdStats fluentd_stats_;
   std::vector<EntryPtr> entries_;
   uint64_t approximate_message_size_bytes_ = 0;
+  Upstream::ThreadLocalCluster& cluster_;
+  const BackOffStrategyPtr backoff_strategy_;
   const Tcp::AsyncTcpClientPtr client_;
   const std::chrono::milliseconds buffer_flush_interval_msec_;
   const uint64_t max_buffer_size_bytes_;
+  const Event::TimerPtr retry_timer_;
   const Event::TimerPtr flush_timer_;
 };
 
@@ -98,7 +114,8 @@ public:
    * @return FluentdAccessLoggerSharedPtr ready for logging requests.
    */
   virtual FluentdAccessLoggerSharedPtr
-  getOrCreateLogger(const FluentdAccessLogConfigSharedPtr config) PURE;
+  getOrCreateLogger(const FluentdAccessLogConfigSharedPtr config,
+                    Random::RandomGenerator& random) PURE;
 };
 
 using FluentdAccessLoggerCacheSharedPtr = std::shared_ptr<FluentdAccessLoggerCache>;
@@ -108,8 +125,8 @@ public:
   FluentdAccessLoggerCacheImpl(Upstream::ClusterManager& cluster_manager,
                                Stats::Scope& parent_scope, ThreadLocal::SlotAllocator& tls);
 
-  FluentdAccessLoggerSharedPtr
-  getOrCreateLogger(const FluentdAccessLogConfigSharedPtr config) override;
+  FluentdAccessLoggerSharedPtr getOrCreateLogger(const FluentdAccessLogConfigSharedPtr config,
+                                                 Random::RandomGenerator& random) override;
 
 private:
   /**
@@ -135,6 +152,7 @@ class FluentdAccessLog : public Common::ImplBase {
 public:
   FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatterPtr&& formatter,
                    const FluentdAccessLogConfigSharedPtr config, ThreadLocal::SlotAllocator& tls,
+                   Random::RandomGenerator& random,
                    FluentdAccessLoggerCacheSharedPtr access_logger_cache);
 
 private:

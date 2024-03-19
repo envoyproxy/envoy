@@ -20,12 +20,16 @@ configure_make(
     configure_options = [
         "--disable-fast-crc-in-assembler",
         "--disable-systemd",
-        "--disable-shared",
         "--with-pic",
+        "--enable-shared",
         "--enable-static",
         "--enable-samples=no",
     ],
     lib_source = "@com_github_intel_qatlib//:all",
+    out_shared_libs = [
+        "libqat.so",
+        "libusdm.so",
+    ],
     out_static_libs = [
         "libqat.a",
         "libusdm.a",

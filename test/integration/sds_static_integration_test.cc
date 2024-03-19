@@ -89,7 +89,7 @@ public:
   }
 
 private:
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
 
   Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
 };
@@ -148,7 +148,7 @@ public:
   }
 
 private:
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticUpstreamIntegrationTest,

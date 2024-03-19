@@ -88,7 +88,6 @@ LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(Envoy::JNI::JniHelper& jni
                                                       const std::vector<std::string>& cert_chain,
                                                       std::string auth_type,
                                                       absl::string_view hostname) {
-  jni_log("[Envoy]", "jvmVerifyX509CertChain");
   LocalRefUniquePtr<jclass> jcls_AndroidNetworkLibrary =
       findClass("io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary");
   jmethodID jmid_verifyServerCertificates = jni_helper.getStaticMethodId(
@@ -107,8 +106,6 @@ LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(Envoy::JNI::JniHelper& jni
 
 envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>& certs,
                                                  absl::string_view hostname) {
-  jni_log("[Envoy]", "verifyX509CertChain");
-
   envoy_cert_verify_status_t result;
   bool is_issued_by_known_root;
   std::vector<std::string> verified_chain;

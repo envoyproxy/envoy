@@ -33,7 +33,7 @@ import org.robolectric.RobolectricTestRunner
 //                                                │                  │
 //                                                └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPSRequestBadHostname {
+class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
   init {
     JniLibrary.loadTestLibrary()
     JniLibrary.load()

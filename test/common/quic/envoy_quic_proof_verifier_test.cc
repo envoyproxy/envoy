@@ -9,6 +9,7 @@
 #include "test/common/quic/test_utils.h"
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
@@ -80,7 +81,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        *store_.rootScope(), client_context_config_, time_system_);
+        *store_.rootScope(), client_context_config_, factory_context_);
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
@@ -98,7 +99,7 @@ protected:
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
       absl::nullopt};
   NiceMock<Stats::MockStore> store_;
-  Event::GlobalTimeSystem time_system_;
+  Server::Configuration::MockServerFactoryContext factory_context_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   Ssl::MockCertificateValidationContextConfig cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;

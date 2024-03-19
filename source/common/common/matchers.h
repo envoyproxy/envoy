@@ -86,29 +86,63 @@ public:
   bool match(absl::string_view) const override { return true; }
 };
 
-StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config);
+StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
+                                           ThreadLocal::SlotAllocator& tls, Api::Api& api);
 
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
-class StringMatcherImpl : public ValueMatcher, public StringMatcher {
+class PrivateStringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  explicit StringMatcherImpl(const StringMatcherType& matcher) : matcher_(matcher) {
+  // TODO(ggreenway): convert all but the first parameter into
+  // `Server::Configuration::CommonFactoryContext`.
+  explicit PrivateStringMatcherImpl(const StringMatcherType& matcher, Regex::Engine* regex_engine,
+                                    ThreadLocal::SlotAllocator* tls, Api::Api* api)
+      : matcher_(matcher) {
     if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
       if (matcher.ignore_case()) {
         ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
-      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
+      if (regex_engine != nullptr) {
+        regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), *regex_engine);
+      } else {
+        // TODO(ggreenway): remove this branch when we always have an engine. This is only
+        // needed to make tests not complain about dereferencing a null pointer, even though
+        // the reference isn't actually used.
+        regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
+      }
     } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
       if (matcher_.ignore_case()) {
         // Cache the lowercase conversion of the Contains matcher for future use
         lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
       }
-    } else {
-      initialize(matcher);
+    } else if (matcher.has_custom()) {
+      custom_ = getExtensionStringMatcher(matcher.custom(), *tls, *api);
     }
   }
 
   // StringMatcher
-  bool match(const absl::string_view value) const override { return match(value, matcher_); }
+  bool match(const absl::string_view value) const override {
+    switch (matcher_.match_pattern_case()) {
+    case StringMatcherType::MatchPatternCase::kExact:
+      return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
+                                    : value == matcher_.exact();
+    case StringMatcherType::MatchPatternCase::kPrefix:
+      return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
+                                    : absl::StartsWith(value, matcher_.prefix());
+    case StringMatcherType::MatchPatternCase::kSuffix:
+      return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
+                                    : absl::EndsWith(value, matcher_.suffix());
+    case StringMatcherType::MatchPatternCase::kContains:
+      return matcher_.ignore_case()
+                 ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
+                 : absl::StrContains(value, matcher_.contains());
+    case StringMatcherType::MatchPatternCase::kSafeRegex:
+      return regex_->match(value);
+    case StringMatcherType::MatchPatternCase::kCustom:
+      return custom_->match(value);
+    default:
+      PANIC("unexpected");
+    }
+  }
 
   bool match(const ProtobufWkt::Value& value) const override {
 
@@ -139,63 +173,40 @@ public:
   }
 
 private:
-  // Type `xds::type::matcher::v3::StringMatcher` doesn't have an extension type, so use function
-  // overloading to only handle that case for type `envoy::type::matcher::v3::StringMatcher` to
-  // prevent compilation errors on use of `kCustom`.
-
-  void initialize(const xds::type::matcher::v3::StringMatcher&) {}
-
-  void initialize(const envoy::type::matcher::v3::StringMatcher& matcher) {
-    if (matcher.has_custom()) {
-      custom_ = getExtensionStringMatcher(matcher.custom());
-    }
-  }
-
-  bool match(const absl::string_view value, const xds::type::matcher::v3::StringMatcher&) const {
-    return matchCommon(value);
-  }
-
-  bool match(const absl::string_view value,
-             const envoy::type::matcher::v3::StringMatcher& matcher) const {
-    if (matcher.match_pattern_case() ==
-        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kCustom) {
-      return custom_->match(value);
-    }
-    return matchCommon(value);
-  }
-
-  // StringMatcher
-  bool matchCommon(const absl::string_view value) const {
-    switch (matcher_.match_pattern_case()) {
-    case StringMatcherType::MatchPatternCase::kExact:
-      return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
-                                    : value == matcher_.exact();
-    case StringMatcherType::MatchPatternCase::kPrefix:
-      return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
-                                    : absl::StartsWith(value, matcher_.prefix());
-    case StringMatcherType::MatchPatternCase::kSuffix:
-      return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
-                                    : absl::EndsWith(value, matcher_.suffix());
-    case StringMatcherType::MatchPatternCase::kContains:
-      return matcher_.ignore_case()
-                 ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
-                 : absl::StrContains(value, matcher_.contains());
-    case StringMatcherType::MatchPatternCase::kSafeRegex:
-      return regex_->match(value);
-    default:
-      PANIC("unexpected");
-    }
-  }
-
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
   StringMatcherPtr custom_;
 };
 
+// Temporarily create two separate types with different constructors, inheriting from the same
+// implementation, to make it easier to find and replace all usage of the old one.
+// TODO(ggreenway): delete these two extra classes, make `PrivateStringMatcherImpl` back into
+// `StringMatcherImpl`.
+template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
+class StringMatcherImplWithContext : public PrivateStringMatcherImpl<StringMatcherType> {
+public:
+  explicit StringMatcherImplWithContext(const StringMatcherType& matcher,
+                                        Server::Configuration::CommonFactoryContext& context)
+      : PrivateStringMatcherImpl<StringMatcherType>(matcher, &context.regexEngine(),
+                                                    &context.threadLocal(), &context.api()) {}
+};
+
+template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
+class StringMatcherImpl : public PrivateStringMatcherImpl<StringMatcherType> {
+public:
+  explicit StringMatcherImpl(const StringMatcherType& matcher)
+      : PrivateStringMatcherImpl<StringMatcherType>(
+            matcher, Regex::EngineSingleton::getExisting(),
+            InjectableSingleton<ThreadLocal::SlotAllocator>::getExisting(),
+            InjectableSingleton<Api::Api>::getExisting()) {}
+};
+
 class StringMatcherExtensionFactory : public Config::TypedFactory {
 public:
-  virtual StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& config) PURE;
+  // TODO(ggreenway): Convert all but first parameter to `CommonFactoryContext`.
+  virtual StringMatcherPtr createStringMatcher(const ProtobufWkt::Any& config,
+                                               ThreadLocal::SlotAllocator& tls, Api::Api& api) PURE;
 
   std::string category() const override { return "envoy.string_matcher"; }
 };

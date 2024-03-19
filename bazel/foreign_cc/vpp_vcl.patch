@@ -1,8 +1,8 @@
 diff --git src/CMakeLists.txt src/CMakeLists.txt
-index fb4463e33..de1ef8990 100644
+index 68d0a4fe6..958918ef1 100644
 --- src/CMakeLists.txt
 +++ src/CMakeLists.txt
-@@ -31,12 +31,8 @@ include(cmake/ccache.cmake)
+@@ -50,13 +50,8 @@ include(cmake/ccache.cmake)
  ##############################################################################
  # VPP Version
  ##############################################################################
@@ -12,12 +12,12 @@ index fb4463e33..de1ef8990 100644
 -  OUTPUT_VARIABLE VPP_VERSION
 -  OUTPUT_STRIP_TRAILING_WHITESPACE
 -)
-+
-+set(VPP_VERSION 23.06-release)
- string(REPLACE "-" ";" VPP_LIB_VERSION ${VPP_VERSION})
- list(GET VPP_LIB_VERSION 0 VPP_LIB_VERSION)
- 
-@@ -215,8 +211,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+
++set(VPP_VERSION 24.03-dev)
+ if (VPP_PLATFORM)
+   set(VPP_VERSION ${VPP_VERSION}-${VPP_PLATFORM_NAME})
+ endif()
+@@ -277,8 +272,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
    find_package(OpenSSL)
    set(SUBDIRS
      vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
@@ -47,11 +47,11 @@ index 45b3944eb..b1dcc56e1 100644
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
    set_target_properties(${lo} PROPERTIES POSITION_INDEPENDENT_CODE ON)
    target_compile_options(${lo} PUBLIC ${VPP_DEFAULT_MARCH_FLAGS})
- 
+
 -  add_library(${lib} SHARED)
 +  add_library(${lib} STATIC)
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
- 
+
    if(VPP_LIB_VERSION)
 diff --git src/tools/vppapigen/CMakeLists.txt src/tools/vppapigen/CMakeLists.txt
 index 04ebed548..bfabc3a67 100644
@@ -60,7 +60,7 @@ index 04ebed548..bfabc3a67 100644
 @@ -11,22 +11,6 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
- 
+
 -find_package(
 -  Python3
 -  REQUIRED
@@ -97,7 +97,7 @@ index 2b0ce9999..f28a17302 100755
 +
  import ply.lex as lex
  import ply.yacc as yacc
- 
+
 diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
 index 610b422d1..c5e6f8ca8 100644
 --- src/vcl/CMakeLists.txt
@@ -105,7 +105,7 @@ index 610b422d1..c5e6f8ca8 100644
 @@ -35,6 +35,8 @@ if (LDP_HAS_GNU_SOURCE)
    add_compile_definitions(HAVE_GNU_SOURCE)
  endif(LDP_HAS_GNU_SOURCE)
- 
+
 +file(COPY vppcom.h DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 +
  add_vpp_library(vcl_ldpreload

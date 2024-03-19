@@ -293,7 +293,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
                                   const Http::FilterChainOptions&) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
+    callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
   };
   manager.applyFilterFactoryCb({}, factory);
   return true;
@@ -494,7 +494,7 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  AdminFilter filter(createRequestFunction());
+  AdminFilter filter(*this);
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);

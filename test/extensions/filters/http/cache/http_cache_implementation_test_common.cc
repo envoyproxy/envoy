@@ -41,7 +41,8 @@ MATCHER(IsOk, "") { return arg.ok(); }
 } // namespace
 
 HttpCacheImplementationTest::HttpCacheImplementationTest()
-    : delegate_(GetParam()()), vary_allow_list_(getConfig().allowed_vary_headers()) {
+    : delegate_(GetParam()()),
+      vary_allow_list_(getConfig().allowed_vary_headers(), factory_context_) {
   request_headers_.setMethod("GET");
   request_headers_.setHost("example.com");
   request_headers_.setScheme("https");
@@ -490,7 +491,8 @@ TEST_P(HttpCacheImplementationTest, VaryResponses) {
   Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher> proto_allow_list;
   ::envoy::type::matcher::v3::StringMatcher* matcher = proto_allow_list.Add();
   matcher->set_exact("width");
-  vary_allow_list_ = VaryAllowList(proto_allow_list);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  vary_allow_list_ = VaryAllowList(proto_allow_list, factory_context);
   lookup(request_path);
   EXPECT_EQ(lookup_result_.cache_entry_status_, CacheEntryStatus::Unusable);
 }

@@ -34,16 +34,18 @@ class StringSanMatcher : public SanMatcher {
 public:
   bool match(const GENERAL_NAME* general_name) const override;
   ~StringSanMatcher() override = default;
-  StringSanMatcher(int general_name_type, envoy::type::matcher::v3::StringMatcher matcher)
-      : general_name_type_(general_name_type), matcher_(matcher) {}
+  StringSanMatcher(int general_name_type, envoy::type::matcher::v3::StringMatcher matcher,
+                   Server::Configuration::CommonFactoryContext& context)
+      : general_name_type_(general_name_type), matcher_(matcher, context) {}
 
 private:
   const int general_name_type_;
-  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
+  const Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher> matcher_;
 };
 
 SanMatcherPtr createStringSanMatcher(
-    const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher);
+    const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher,
+    Server::Configuration::CommonFactoryContext& context);
 
 } // namespace Tls
 } // namespace TransportSockets

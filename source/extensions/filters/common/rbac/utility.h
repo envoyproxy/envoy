@@ -34,8 +34,10 @@ struct RoleBasedAccessControlFilterStats {
   SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-RoleBasedAccessControlFilterStats
-generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats::Scope& scope);
+RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
+                                                const std::string& rules_prefix,
+                                                const std::string& shadow_rules_prefix,
+                                                Stats::Scope& scope);
 
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngine>
@@ -51,7 +53,7 @@ createEngine(const ConfigType& config, Server::Configuration::ServerFactoryConte
   }
   if (config.has_rules()) {
     return std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules(), validation_visitor,
-                                                              EnforcementMode::Enforced);
+                                                              context, EnforcementMode::Enforced);
   }
 
   return nullptr;
@@ -71,7 +73,7 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
   }
   if (config.has_shadow_rules()) {
     return std::make_unique<RoleBasedAccessControlEngineImpl>(
-        config.shadow_rules(), validation_visitor, EnforcementMode::Shadow);
+        config.shadow_rules(), validation_visitor, context, EnforcementMode::Shadow);
   }
 
   return nullptr;

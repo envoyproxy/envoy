@@ -8,6 +8,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -35,8 +36,9 @@ public:
    *        for the given directory.
    * @param events supplies the events to watch.
    * @param cb supplies the callback to invoke when a change occurs.
+   * @return a failure status if the file does not exist
    */
-  virtual void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) PURE;
+  virtual absl::Status addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) PURE;
 };
 
 using WatcherPtr = std::unique_ptr<Watcher>;

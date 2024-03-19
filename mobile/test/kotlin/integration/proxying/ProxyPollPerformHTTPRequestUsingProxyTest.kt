@@ -32,7 +32,7 @@ import org.robolectric.RobolectricTestRunner
 //                                               │                  │
 //                                               └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPRequestUsingProxy {
+class ProxyPollPerformHTTPRequestUsingProxyTest {
   init {
     AndroidJniLibrary.loadTestLibrary()
     JniLibrary.loadTestLibrary()

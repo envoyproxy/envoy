@@ -12,4 +12,5 @@ Other features
   wasm
   wasm_service
   qatzip
+  qatzstd
   string_matcher

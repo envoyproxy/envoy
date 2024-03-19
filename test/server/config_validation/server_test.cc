@@ -4,6 +4,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
+#include "source/server/admin/admin_filter.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/process_context_impl.h"
 
@@ -207,6 +208,8 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   server.admin()->addListenerToHandler(nullptr);
   server.admin()->closeSocket();
   server.admin()->startHttpListener({}, nullptr, nullptr);
+  AdminFilter filter(*server.admin());
+  EXPECT_TRUE(server.admin()->makeRequest(filter) == nullptr);
 
   Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockListenerConfig listener_config;

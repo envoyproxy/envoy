@@ -61,8 +61,7 @@ protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()),
-        api_(Api::createApiForTest(stats_store_, random_)),
-        ssl_context_manager_(api_->timeSource()) {
+        api_(Api::createApiForTest(stats_store_, random_)), ssl_context_manager_(server_context_) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
     node_.set_id("hds-node");
   }

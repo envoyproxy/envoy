@@ -88,21 +88,20 @@ TEST(LuaStringMatcher, LuaStdLib) {
 }
 
 TEST(LuaStringMatcher, NoCode) {
-  ScopedInjectableLoader<Api::Api> api_inject(std::make_unique<Api::MockApi>());
-  ScopedInjectableLoader<ThreadLocal::SlotAllocator> tls_inject(
-      std::make_unique<ThreadLocal::MockInstance>());
+  Api::MockApi api;
+  ThreadLocal::MockInstance tls;
 
   LuaStringMatcherFactory factory;
   ::envoy::extensions::string_matcher::lua::v3::Lua empty_config;
   ProtobufWkt::Any any;
   any.PackFrom(empty_config);
-  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any, tls, api), EnvoyException,
                             "Failed to get lua string matcher code from source: INVALID_ARGUMENT: "
                             "Unexpected DataSource::specifier_case(): 0");
 
   empty_config.mutable_source_code()->set_inline_string("");
   any.PackFrom(empty_config);
-  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(any, tls, api), EnvoyException,
                             "Failed to get lua string matcher code from source: INVALID_ARGUMENT: "
                             "DataSource cannot be empty");
 }

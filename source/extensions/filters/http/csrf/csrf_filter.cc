@@ -76,15 +76,16 @@ static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
 
 static CsrfPolicyPtr
 generatePolicy(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-               Runtime::Loader& runtime) {
-  return std::make_unique<CsrfPolicy>(policy, runtime);
+               Server::Configuration::CommonFactoryContext& context) {
+  return std::make_unique<CsrfPolicy>(policy, context);
 }
 } // namespace
 
 CsrfFilterConfig::CsrfFilterConfig(
     const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, runtime)) {}
+    const std::string& stats_prefix, Stats::Scope& scope,
+    Server::Configuration::CommonFactoryContext& context)
+    : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, context)) {}
 
 CsrfFilter::CsrfFilter(const CsrfFilterConfigSharedPtr config) : config_(config) {}
 

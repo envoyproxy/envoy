@@ -9,6 +9,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -89,6 +90,7 @@ protected:
   expectLookupSuccessWithBodyAndTrailers(LookupContext* lookup, absl::string_view body,
                                          Http::TestResponseTrailerMapImpl trailers = {});
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<HttpCacheTestDelegate> delegate_;
   VaryAllowList vary_allow_list_;
   LookupResult lookup_result_;

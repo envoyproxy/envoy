@@ -31,21 +31,15 @@ constexpr absl::string_view RouterFilterName = "envoy.filters.generic.router";
 } // namespace
 
 void GenericUpstream::writeToConnection(Buffer::Instance& buffer) {
-  if (is_cleaned_up_) {
-    return;
-  }
-
-  if (owned_conn_data_ != nullptr) {
-    ASSERT(owned_conn_data_->connection().state() == Network::Connection::State::Open);
+  if (owned_conn_data_ != nullptr &&
+      owned_conn_data_->connection().state() == Network::Connection::State::Open) {
     owned_conn_data_->connection().write(buffer, false);
   }
 }
 
 OptRef<Network::Connection> GenericUpstream::connection() {
-  if (is_cleaned_up_) {
-    return {};
-  }
-  if (owned_conn_data_ != nullptr) {
+  if (owned_conn_data_ != nullptr &&
+      owned_conn_data_->connection().state() == Network::Connection::State::Open) {
     return {owned_conn_data_->connection()};
   }
   return {};
@@ -301,10 +295,10 @@ void UpstreamRequest::startStream() {
 }
 
 void UpstreamRequest::resetStream(StreamResetReason reason) {
-  if (stream_reset_) {
+  if (reset_or_response_complete_) {
     return;
   }
-  stream_reset_ = true;
+  reset_or_response_complete_ = true;
 
   ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
 
@@ -329,9 +323,10 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
 void UpstreamRequest::clearStream(bool close_connection) {
   // Set the upstream response complete flag to true first to ensure the possible
   // connection close event will not be handled.
-  response_complete_ = true;
+  reset_or_response_complete_ = true;
 
-  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request");
+  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request ()",
+            close_connection);
 
   if (span_ != nullptr) {
     TraceContextBridge trace_context{*parent_.request_stream_};
@@ -463,12 +458,22 @@ void UpstreamRequest::onDecodingSuccess(StreamFramePtr response) {
   }
 }
 
-void UpstreamRequest::onDecodingFailure() { resetStream(StreamResetReason::ProtocolError); }
+void UpstreamRequest::onDecodingFailure() {
+  // Decoding failure after the response is complete, close the connection.
+  // This should only happen when some special cases, for example:
+  // The HTTP response is complete but the request is not fully sent.
+  // The codec will throw an error after the response is complete.
+  if (reset_or_response_complete_) {
+    generic_upstream_->cleanUp(true);
+    return;
+  }
+  resetStream(StreamResetReason::ProtocolError);
+}
 
 void UpstreamRequest::onConnectionClose(Network::ConnectionEvent event) {
   // If the upstream response is complete or the upstream request is reset then
   // ignore the connection close event.
-  if (response_complete_ || stream_reset_) {
+  if (reset_or_response_complete_) {
     return;
   }
 

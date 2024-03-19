@@ -159,6 +159,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
   private var quicCanonicalSuffixes = mutableListOf<String>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
+  private var enablePortMigration = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -320,6 +321,17 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
    */
   fun enableBrotliDecompression(enableBrotliDecompression: Boolean): EngineBuilder {
     this.enableBrotliDecompression = enableBrotliDecompression
+    return this
+  }
+
+  /**
+   * Specify whether to do quic port migration or not. Defaults to false.
+   *
+   * @param enablePortMigration whether or not to allow quic port migration.
+   * @return This builder.
+   */
+  fun enablePortMigration(enablePortMigration: Boolean): EngineBuilder {
+    this.enablePortMigration = enablePortMigration
     return this
   }
 
@@ -655,6 +667,7 @@ open class EngineBuilder(private val configuration: BaseConfiguration = Standard
         quicCanonicalSuffixes,
         enableGzipDecompression,
         enableBrotliDecompression,
+        enablePortMigration,
         enableSocketTagging,
         enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds,

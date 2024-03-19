@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/common/conn_pool.h"
 #include "envoy/common/key_value_store.h"
 #include "envoy/common/random_generator.h"
@@ -65,6 +66,16 @@ public:
   MOCK_METHOD(MonotonicTime, monotonicTime, ());
 
   Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
+};
+
+class MockBackOffStrategy : public BackOffStrategy {
+public:
+  ~MockBackOffStrategy() override = default;
+
+  MOCK_METHOD(uint64_t, nextBackOffMs, ());
+  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(void, reset, (uint64_t base_interval));
+  MOCK_METHOD(bool, isOverTimeLimit, (uint64_t interval_ms), (const));
 };
 
 // Captures absl::string_view parameters into temp strings, for use

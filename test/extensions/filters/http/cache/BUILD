@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
@@ -56,6 +57,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/http/cache/simple_http_cache:config",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -96,6 +98,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:cacheability_utils_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

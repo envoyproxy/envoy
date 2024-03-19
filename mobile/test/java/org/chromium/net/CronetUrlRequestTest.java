@@ -10,7 +10,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.robolectric.Shadows.shadowOf;
 
-import android.content.Context;
 import android.content.Intent;
 import android.Manifest;
 import android.net.ConnectivityManager;
@@ -22,7 +21,6 @@ import android.util.Log;
 import androidx.test.filters.SmallTest;
 import androidx.test.rule.GrantPermissionRule;
 import java.io.IOException;
-import java.net.ConnectException;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.ArrayList;
