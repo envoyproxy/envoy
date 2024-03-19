@@ -37,6 +37,13 @@ void HealthCheckEventLoggerImpl::logAddHealthy(
   });
 }
 
+void HealthCheckEventLoggerImpl::logSuccessfulHealthCheck(
+    envoy::data::core::v3::HealthCheckerType health_checker_type,
+    const HostDescriptionConstSharedPtr& host) {
+  createHealthCheckEvent(health_checker_type, *host,
+                         [](auto& event) { event.mutable_successful_health_check_event(); });
+}
+
 void HealthCheckEventLoggerImpl::logDegraded(
     envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host) {

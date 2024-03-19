@@ -79,6 +79,16 @@ public:
 
     return EngineSingleton::get().matcher(matcher.regex());
   }
+
+  template <class RegexMatcherType>
+  static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher, Engine& engine) {
+    // Fallback deprecated engine type in regex matcher.
+    if (matcher.has_google_re2()) {
+      return std::make_unique<CompiledGoogleReMatcher>(matcher);
+    }
+
+    return engine.matcher(matcher.regex());
+  }
 };
 
 } // namespace Regex

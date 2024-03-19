@@ -54,7 +54,8 @@ class CacheFilter : public Http::PassThroughFilter,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
+              const std::string& stats_prefix, Stats::Scope& scope,
+              Server::Configuration::CommonFactoryContext& context,
               std::shared_ptr<HttpCache> http_cache);
   // Http::StreamFilterBase
   void onDestroy() override;

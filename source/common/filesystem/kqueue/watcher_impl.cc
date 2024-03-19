@@ -32,11 +32,13 @@ WatcherImpl::~WatcherImpl() {
   watches_.clear();
 }
 
-void WatcherImpl::addWatch(absl::string_view path, uint32_t events, Watcher::OnChangedCb cb) {
+absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events,
+                                   Watcher::OnChangedCb cb) {
   FileWatchPtr watch = addWatch(path, events, cb, false);
   if (watch == nullptr) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("invalid watch path ", path));
+    return absl::InvalidArgumentError(absl::StrCat("invalid watch path ", path));
   }
+  return absl::OkStatus();
 }
 
 WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t events,

@@ -1,7 +1,6 @@
-#include "source/extensions/compression/zstd/common/base.h"
+#include "source/common/compression/zstd/common/base.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Compression {
 namespace Zstd {
 namespace Common {
@@ -27,5 +26,4 @@ void Base::getOutput(Buffer::Instance& output_buffer) {
 } // namespace Common
 } // namespace Zstd
 } // namespace Compression
-} // namespace Extensions
 } // namespace Envoy

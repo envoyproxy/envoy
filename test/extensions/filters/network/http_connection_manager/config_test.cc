@@ -658,8 +658,10 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   envoy::config::bootstrap::v3::LayeredRuntime runtime_config;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  absl::Status creation_status;
   Runtime::LoaderImpl runtime(dispatcher, tls, runtime_config, local_info, store, generator,
-                              validation_visitor, *api);
+                              validation_visitor, *api, creation_status);
+  ASSERT_TRUE(creation_status.ok());
 
   int sampled_count = 0;
   NiceMock<Router::MockRoute> route;
