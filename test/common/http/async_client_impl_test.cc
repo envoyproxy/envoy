@@ -18,9 +18,8 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
@@ -46,10 +45,9 @@ class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
       : http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
-        client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
-                cm_, runtime_, random_,
-                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_,
-                router_context_) {
+        client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, cm_,
+                factory_context_, Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
+                http_context_, router_context_) {
     message_->headers().setMethod("GET");
     message_->headers().setHost("host");
     message_->headers().setPath("/");
@@ -84,14 +82,12 @@ public:
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<MockAsyncClientCallbacks> callbacks_;
   NiceMock<MockAsyncClientStreamCallbacks> stream_callbacks_;
-  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  NiceMock<Upstream::MockClusterManager>& cm_{factory_context_.cluster_manager_};
   NiceMock<MockRequestEncoder> stream_encoder_;
   ResponseDecoder* response_decoder_{};
   NiceMock<Event::MockTimer>* timer_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Event::MockDispatcher>& dispatcher_{factory_context_.dispatcher_};
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
   AsyncClientImpl client_;
@@ -706,7 +702,7 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
 }
 
 TEST_F(AsyncClientImplTest, Retry) {
-  ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
   RequestMessage* message_copy = message_.get();
 
@@ -758,7 +754,7 @@ TEST_F(AsyncClientImplTest, Retry) {
 }
 
 TEST_F(AsyncClientImplTest, RetryWithStream) {
-  ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
 
@@ -812,7 +808,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
 }
 
 TEST_F(AsyncClientImplTest, DataBufferForRetryOverflow) {
-  ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
@@ -1988,9 +1984,11 @@ public:
     envoy::config::route::v3::RetryPolicy proto_policy;
 
     TestUtility::loadFromYaml(yaml_config, proto_policy);
-    Upstream::RetryExtensionFactoryContextImpl factory_context(client_.singleton_manager_);
-    retry_policy_ = Router::RetryPolicyImpl(
-        proto_policy, ProtobufMessage::getNullValidationVisitor(), factory_context);
+    Upstream::RetryExtensionFactoryContextImpl factory_context(
+        client_.factory_context_.singletonManager());
+    retry_policy_ =
+        Router::RetryPolicyImpl(proto_policy, ProtobufMessage::getNullValidationVisitor(),
+                                factory_context, client_.factory_context_);
 
     stream_ = std::make_unique<Http::AsyncStreamImpl>(
         client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy_));

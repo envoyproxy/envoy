@@ -26,9 +26,10 @@ namespace {
  */
 class BaseMatcherImpl : public Matcher, public Logger::Loggable<Logger::Id::jwt> {
 public:
-  BaseMatcherImpl(const RequirementRule& rule)
+  BaseMatcherImpl(const RequirementRule& rule, Server::Configuration::CommonFactoryContext& context)
       : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rule.match(), case_sensitive, true)),
-        config_headers_(Http::HeaderUtility::buildHeaderDataVector(rule.match().headers())) {
+        config_headers_(
+            Http::HeaderUtility::buildHeaderDataVector(rule.match().headers(), context)) {
     for (const auto& query_parameter : rule.match().query_parameters()) {
       config_query_parameters_.push_back(
           std::make_unique<Router::ConfigUtility::QueryParameterMatcher>(query_parameter));
@@ -62,8 +63,9 @@ private:
  */
 class PrefixMatcherImpl : public BaseMatcherImpl {
 public:
-  PrefixMatcherImpl(const RequirementRule& rule)
-      : BaseMatcherImpl(rule), prefix_(rule.match().prefix()),
+  PrefixMatcherImpl(const RequirementRule& rule,
+                    Server::Configuration::CommonFactoryContext& context)
+      : BaseMatcherImpl(rule, context), prefix_(rule.match().prefix()),
         path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
@@ -85,8 +87,8 @@ private:
  */
 class PathMatcherImpl : public BaseMatcherImpl {
 public:
-  PathMatcherImpl(const RequirementRule& rule)
-      : BaseMatcherImpl(rule), path_(rule.match().path()),
+  PathMatcherImpl(const RequirementRule& rule, Server::Configuration::CommonFactoryContext& context)
+      : BaseMatcherImpl(rule, context), path_(rule.match().path()),
         path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
@@ -109,8 +111,9 @@ private:
  */
 class RegexMatcherImpl : public BaseMatcherImpl {
 public:
-  RegexMatcherImpl(const RequirementRule& rule)
-      : BaseMatcherImpl(rule), regex_str_(rule.match().safe_regex().regex()),
+  RegexMatcherImpl(const RequirementRule& rule,
+                   Server::Configuration::CommonFactoryContext& context)
+      : BaseMatcherImpl(rule, context), regex_str_(rule.match().safe_regex().regex()),
         path_matcher_(Matchers::PathMatcher::createSafeRegex(rule.match().safe_regex())) {
     ASSERT(rule.match().path_specifier_case() ==
            envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
@@ -144,7 +147,9 @@ private:
  */
 class ConnectMatcherImpl : public BaseMatcherImpl {
 public:
-  ConnectMatcherImpl(const RequirementRule& rule) : BaseMatcherImpl(rule) {}
+  ConnectMatcherImpl(const RequirementRule& rule,
+                     Server::Configuration::CommonFactoryContext& context)
+      : BaseMatcherImpl(rule, context) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (Http::HeaderUtility::isConnect(headers) && BaseMatcherImpl::matchRoute(headers)) {
@@ -158,8 +163,9 @@ public:
 
 class PathSeparatedPrefixMatcherImpl : public BaseMatcherImpl {
 public:
-  PathSeparatedPrefixMatcherImpl(const RequirementRule& rule)
-      : BaseMatcherImpl(rule), prefix_(rule.match().path_separated_prefix()),
+  PathSeparatedPrefixMatcherImpl(const RequirementRule& rule,
+                                 Server::Configuration::CommonFactoryContext& context)
+      : BaseMatcherImpl(rule, context), prefix_(rule.match().path_separated_prefix()),
         path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
@@ -182,18 +188,19 @@ private:
 };
 } // namespace
 
-MatcherConstPtr Matcher::create(const RequirementRule& rule) {
+MatcherConstPtr Matcher::create(const RequirementRule& rule,
+                                Server::Configuration::CommonFactoryContext& context) {
   switch (rule.match().path_specifier_case()) {
   case RouteMatch::PathSpecifierCase::kPrefix:
-    return std::make_unique<PrefixMatcherImpl>(rule);
+    return std::make_unique<PrefixMatcherImpl>(rule, context);
   case RouteMatch::PathSpecifierCase::kPath:
-    return std::make_unique<PathMatcherImpl>(rule);
+    return std::make_unique<PathMatcherImpl>(rule, context);
   case RouteMatch::PathSpecifierCase::kSafeRegex:
-    return std::make_unique<RegexMatcherImpl>(rule);
+    return std::make_unique<RegexMatcherImpl>(rule, context);
   case RouteMatch::PathSpecifierCase::kConnectMatcher:
-    return std::make_unique<ConnectMatcherImpl>(rule);
+    return std::make_unique<ConnectMatcherImpl>(rule, context);
   case RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
-    return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule);
+    return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule, context);
   case RouteMatch::PathSpecifierCase::kPathMatchPolicy:
     // TODO(silverstar194): Implement matcher for template based match
     throw EnvoyException("RouteMatch: path_match_policy is not supported");

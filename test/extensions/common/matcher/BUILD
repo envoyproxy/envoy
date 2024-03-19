@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["matcher_test.cc"],
     deps = [
         "//source/extensions/common/matcher:matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
     ],

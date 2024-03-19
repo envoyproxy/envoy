@@ -57,7 +57,7 @@ public:
                             Http::Context& http_context, LazyCreateDnsResolver dns_resolver_fn,
                             Ssl::ContextManager& ssl_context_manager,
                             Secret::SecretManager& secret_manager,
-                            Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
+                            Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
@@ -106,7 +106,7 @@ protected:
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
-  const Server::Instance& server_;
+  Server::Instance& server_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -394,7 +394,7 @@ protected:
                      Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, const Server::Instance& server);
+                     Router::Context& router_context, Server::Instance& server);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -886,7 +886,7 @@ private:
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
-  const Server::Instance& server_;
+  Server::Instance& server_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;

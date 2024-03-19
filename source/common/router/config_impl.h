@@ -320,7 +320,8 @@ private:
 
   struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
-                        Stats::Scope& scope, const VirtualClusterStatNames& stat_names);
+                        Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context,
+                        const VirtualClusterStatNames& stat_names);
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
@@ -400,7 +401,8 @@ class RetryPolicyImpl : public RetryPolicy {
 public:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Upstream::RetryExtensionFactoryContext& factory_context);
+                  Upstream::RetryExtensionFactoryContext& factory_context,
+                  Server::Configuration::CommonFactoryContext& common_context);
   RetryPolicyImpl() = default;
 
   // Router::RetryPolicy

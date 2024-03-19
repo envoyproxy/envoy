@@ -113,7 +113,7 @@ struct CookieNames {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
-               Upstream::ClusterManager& cluster_manager,
+               Server::Configuration::CommonFactoryContext& context,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }

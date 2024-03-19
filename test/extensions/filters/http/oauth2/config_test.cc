@@ -127,7 +127,7 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context.server_factory_context_, clusterManager());
+  EXPECT_CALL(context.server_factory_context_, clusterManager()).Times(2);
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context.server_factory_context_, api());

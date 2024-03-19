@@ -244,11 +244,12 @@ HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_time
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 Upstream::RetryExtensionFactoryContext& factory_context)
-    : retriable_headers_(
-          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
-      retriable_request_headers_(
-          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_request_headers())),
+                                 Upstream::RetryExtensionFactoryContext& factory_context,
+                                 Server::Configuration::CommonFactoryContext& common_context)
+    : retriable_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
+          retry_policy.retriable_headers(), common_context)),
+      retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
+          retry_policy.retriable_request_headers(), common_context)),
       validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
@@ -519,7 +520,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           buildRetryPolicy(vhost->retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
+      config_headers_(
+          Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), factory_context)),
       dynamic_metadata_(route.match().dynamic_metadata().begin(),
                         route.match().dynamic_metadata().end()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
@@ -1081,13 +1083,13 @@ std::unique_ptr<RetryPolicyImpl> RouteEntryImplBase::buildRetryPolicy(
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
     return std::make_unique<RetryPolicyImpl>(route_config.retry_policy(), validation_visitor,
-                                             retry_factory_context);
+                                             retry_factory_context, factory_context);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
   if (vhost_retry_policy.has_value()) {
     return std::make_unique<RetryPolicyImpl>(*vhost_retry_policy, validation_visitor,
-                                             retry_factory_context);
+                                             retry_factory_context, factory_context);
   }
 
   // Otherwise, an empty policy will do.
@@ -1717,7 +1719,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
         *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
       virtual_clusters_.push_back(
-          VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
+          VirtualClusterEntry(virtual_cluster, *vcluster_scope_, factory_context,
                               factory_context.routerContext().virtualClusterStatNames()));
     }
   }
@@ -1733,7 +1735,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
-    const VirtualClusterStatNames& stat_names)
+    Server::Configuration::CommonFactoryContext& context, const VirtualClusterStatNames& stat_names)
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
       VirtualClusterBase(virtual_cluster.name(), stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
@@ -1742,7 +1744,7 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
   }
 
   ASSERT(!virtual_cluster.headers().empty());
-  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
+  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers(), context);
 }
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }

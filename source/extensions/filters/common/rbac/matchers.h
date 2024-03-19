@@ -139,7 +139,9 @@ private:
  */
 class HeaderMatcher : public Matcher {
 public:
-  HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher) : header_(matcher) {}
+  HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher,
+                Server::Configuration::CommonFactoryContext& context)
+      : header_(matcher, context) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
