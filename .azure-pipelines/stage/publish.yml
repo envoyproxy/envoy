@@ -56,7 +56,11 @@ parameters:
   default: true
 
 - name: publishDockerhub
-  displayName: "Publish Dockerhub"
+  displayName: "Publish Dockerhub metadata"
+  type: string
+  default: false
+- name: publishDockerhubImages
+  displayName: "Publish Dockerhub images"
   type: string
   default: false
 - name: publishGithubRelease
@@ -114,6 +118,7 @@ jobs:
           DOCKER_BUILD_TIMEOUT: ${{ parameters.timeoutDockerBuild }}
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           ENVOY_DOCKER_IN_DOCKER: 1
+          ENVOY_DOCKER_PUSH: ${{ parameters.publishDockerhubImages }}
 
       stepsPost:
       - script: |
