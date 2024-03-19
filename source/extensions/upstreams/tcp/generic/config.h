@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
-#include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/tcp/upstream.h"
 
@@ -23,7 +22,6 @@ public:
                         TcpProxy::TunnelingConfigHelperOptConstRef config,
                         Upstream::LoadBalancerContext* context,
                         Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                        Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
                         StreamInfo::StreamInfo& downstream_info) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
