@@ -162,7 +162,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.jwt_authn",
         "envoy.filters.http.set_filter_state",
     ],
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "cpu:3",
     ],

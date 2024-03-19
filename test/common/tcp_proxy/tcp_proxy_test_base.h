@@ -57,11 +57,9 @@ inline Config constructConfigFromYaml(const std::string& yaml,
   return {tcp_proxy, context};
 }
 
-class TcpProxyTestBase : public testing::TestWithParam<bool> {
+class TcpProxyTestBase : public testing::Test {
 public:
   TcpProxyTestBase() {
-    scoped_runtime_.mergeValues({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
-                                  GetParam() ? "true" : "false"}});
     ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -177,7 +175,6 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Upstream::ClusterInfoConstSharedPtr upstream_cluster_{};
   std::string redirect_records_data_ = "some data";
-  TestScopedRuntime scoped_runtime_;
 };
 
 } // namespace TcpProxy
