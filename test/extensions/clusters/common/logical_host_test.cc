@@ -52,6 +52,13 @@ TEST_F(RealHostDescription, UnitTest) {
   description_.canary(false);
   description_.priority(0);
   description_.metadata(nullptr);
+  description_.setLastHcPassTime(MonotonicTime());
+
+  Upstream::HealthCheckHostMonitorPtr heath_check_monitor;
+  description_.setHealthChecker(std::move(heath_check_monitor));
+
+  Upstream::Outlier::DetectorHostMonitorPtr detector_host;
+  description_.setOutlierDetector(std::move(detector_host));
 }
 
 } // namespace Clusters
