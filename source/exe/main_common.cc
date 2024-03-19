@@ -10,6 +10,7 @@
 #include "source/common/common/compiler_requirements.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/perf_annotation.h"
+#include "source/common/common/thread.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/exe/platform_impl.h"
@@ -56,26 +57,46 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                                std::unique_ptr<ProcessContext> process_context)
     : StrippedMainBase(options, time_system, listener_hooks, component_factory,
                        std::move(platform_impl), std::move(random_generator),
-                       std::move(process_context), createFunction()) {}
+                       std::move(process_context), createFunction())
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+      ,
+      shared_response_set_(std::make_shared<AdminResponse::PtrSet>())
+#endif
+{
+}
 
 bool MainCommonBase::run() {
+  // Avoid returning from inside switch cases to minimize uncovered lines
+  // while avoiding gcc warnings by hitting the final return.
+  bool ret = false;
+
   switch (options_.mode()) {
   case Server::Mode::Serve:
     runServer();
-    return true;
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+    shared_response_set_->terminateAdminRequests();
+#endif
+    ret = true;
+    break;
   case Server::Mode::Validate:
-    return Server::validateConfig(
+    ret = Server::validateConfig(
         options_, Network::Utility::getLocalAddress(options_.localAddressIpVersion()),
         component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem(),
         process_context_ ? ProcessContextOptRef(std::ref(*process_context_)) : absl::nullopt);
+    break;
   case Server::Mode::InitOnly:
     PERF_DUMP();
-    return true;
+    ret = true;
+    break;
   }
-  return false; // for gcc.
+  return ret;
 }
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
+
+// This request variant buffers the entire response in one string. New uses
+// should opt for the streaming version below, where an AdminResponse object
+// is created and used to stream data with flow-control.
 void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
                                   const AdminRequestFn& handler) {
   std::string path_and_query_buf = std::string(path_and_query);
@@ -88,6 +109,14 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
     }
     handler(*response_headers, body);
   });
+}
+
+AdminResponseSharedPtr MainCommonBase::adminRequest(absl::string_view path_and_query,
+                                                    absl::string_view method) {
+  auto response =
+      std::make_shared<AdminResponse>(*server(), path_and_query, method, shared_response_set_);
+  shared_response_set_->attachResponse(response.get());
+  return response;
 }
 #endif
 
