@@ -246,6 +246,9 @@ new_features:
   change: |
     added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
     identifier.
+- area: compression
+  change: |
+    Added Qatzstd :ref:`compressor <envoy_v3_api_msg_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd>`.
 - area: aws_lambda
   change: |
     Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
@@ -336,6 +339,10 @@ new_features:
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
     by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
     configuration section.
+- area: rbac
+  change: |
+    Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
+    to allow adding custom prefix to the stats emitted by rules.
 
 deprecated:
 - area: listener

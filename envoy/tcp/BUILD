@@ -26,6 +26,7 @@ envoy_cc_library(
         "//envoy/http:header_evaluator",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/router:router_lib",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
