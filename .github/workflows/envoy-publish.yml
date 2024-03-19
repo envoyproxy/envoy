@@ -50,6 +50,18 @@ jobs:
       check-name: publish
       head-sha: ${{ inputs.sha }}
 
+  docs:
+    needs:
+    - env
+    uses: ./.github/workflows/_stage_docs.yml
+    name: Publish ${{ needs.env.outputs.repo_ref_title }}
+    with:
+      build_image_ubuntu: ${{ needs.env.outputs.build_image_ubuntu }}
+      trusted: ${{ needs.env.outputs.trusted && true || false }}
+      version_dev: ${{ needs.env.outputs.version_dev }}
+      given_ref: ${{ inputs.ref }}
+      repo_ref: ${{ needs.env.outputs.trusted != 'true' && inputs.ref || '' }}
+
   publish:
     secrets:
       ENVOY_CI_SYNC_APP_ID: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_SYNC_APP_ID || '' }}
