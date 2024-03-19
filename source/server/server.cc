@@ -364,17 +364,16 @@ registerCustomInlineHeadersFromBootstrap(const envoy::config::bootstrap::v3::Boo
 
 } // namespace
 
-void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                       const Options& options,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor,
-                                       Api::Api& api) {
+absl::Status InstanceUtil::loadBootstrapConfig(
+    envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         "At least one of --config-path or --config-yaml or Options::configProto() "
         "should be non-empty");
   }
@@ -384,7 +383,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
 #else
     if (!config_path.empty()) {
-      throwEnvoyExceptionOrPanic("Cannot load from file with YAML disabled\n");
+      return absl::InvalidArgumentError("Cannot load from file with YAML disabled\n");
     }
     UNREFERENCED_PARAMETER(api);
 #endif
@@ -396,13 +395,14 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
 #else
-    throwEnvoyExceptionOrPanic("Cannot load from YAML with YAML disabled\n");
+    return absl::InvalidArgumentError("Cannot load from YAML with YAML disabled\n");
 #endif
   }
   if (config_proto.ByteSizeLong() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
+  return absl::OkStatus();
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
@@ -455,8 +455,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
-                                    messageValidationContext().staticValidationVisitor(), *api_);
+  RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
+      bootstrap_, options_, messageValidationContext().staticValidationVisitor(), *api_));
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   if (bootstrap_.has_application_log_config()) {

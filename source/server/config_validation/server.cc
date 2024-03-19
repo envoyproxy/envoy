@@ -88,8 +88,8 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
-                                    messageValidationContext().staticValidationVisitor(), *api_);
+  THROW_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
+      bootstrap_, options, messageValidationContext().staticValidationVisitor(), *api_));
 
   if (bootstrap_.has_application_log_config()) {
     THROW_IF_NOT_OK(
