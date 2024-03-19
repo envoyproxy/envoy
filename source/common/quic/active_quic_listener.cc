@@ -65,6 +65,17 @@ ActiveQuicListener::ActiveQuicListener(
                                    quic::QuicCryptoServerConfig::ConfigOptions());
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
+  // Set the socket to report incoming ECN.
+  absl::optional<Network::Address::IpVersion> version = listen_socket_.ipVersion();
+  if (version.has_value()) {
+    int optval = 1;
+    socklen_t optlen = sizeof(optval);
+    if (*version == Network::Address::IpVersion::v6) {
+      listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
+    } else {
+      listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
+    }
+  }
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
