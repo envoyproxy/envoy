@@ -7,6 +7,7 @@ load(
     "envoy_cc_posix_without_linux_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
     "envoy_select_signal_trace",
 )
@@ -102,7 +103,7 @@ envoy_cc_library(
     hdrs = [
         "main_common.h",
     ],
-    deps = [
+    deps = envoy_select_admin_functionality([":admin_response_lib"]) + [
         ":platform_impl_lib",
         ":process_wide_lib",
         ":stripped_main_base_lib",
@@ -115,6 +116,19 @@ envoy_cc_library(
         "//source/server:options_lib",
         "//source/server/config_validation:server_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "admin_response_lib",
+    srcs = ["admin_response.cc"],
+    hdrs = ["admin_response.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/server:server_lib",
+        "//source/server/admin:admin_lib",
+        "//source/server/admin:utils_lib",
     ],
 )
 

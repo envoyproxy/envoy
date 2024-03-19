@@ -151,8 +151,7 @@ class DubboServerCodec
 public:
   using DubboDecoderBase::DubboDecoderBase;
 
-  ResponsePtr respond(absl::Status status, absl::string_view short_response_flags,
-                      const Request& request) override;
+  ResponsePtr respond(absl::Status status, absl::string_view data, const Request& request) override;
 };
 
 class DubboClientCodec
