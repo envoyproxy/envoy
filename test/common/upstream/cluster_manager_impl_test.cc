@@ -2445,7 +2445,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*cp1,
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
@@ -2463,12 +2463,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_CALL(*cp2,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2522,7 +2522,7 @@ TEST_P(ClusterManagerLifecycleTest,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   EXPECT_CALL(*cp2, closeConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2566,7 +2566,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFai
       ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
   outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+  health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
   EXPECT_CALL(*cp1,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
@@ -2615,7 +2615,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
         ->tcpConnPool(ResourcePriority::Default, nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*cp1,
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
@@ -2633,12 +2633,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
   EXPECT_CALL(*cp2,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2691,7 +2691,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
     conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -2711,12 +2711,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
   EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush, _));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2764,7 +2764,7 @@ TEST_P(ClusterManagerLifecycleTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
   outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+  health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
   EXPECT_CALL(*connection1, close(_)).Times(0);
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);

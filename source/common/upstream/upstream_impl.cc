@@ -1684,11 +1684,12 @@ void ClusterImplBase::onInitDone() {
               pending_initialize_health_checks_);
 
     // TODO(mattklein123): Remove this callback when done.
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, HealthTransition) -> void {
-      if (pending_initialize_health_checks_ > 0 && --pending_initialize_health_checks_ == 0) {
-        finishInitialization();
-      }
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr, HealthTransition, HealthState) -> void {
+          if (pending_initialize_health_checks_ > 0 && --pending_initialize_health_checks_ == 0) {
+            finishInitialization();
+          }
+        });
   }
 
   if (pending_initialize_health_checks_ == 0) {
@@ -1758,7 +1759,7 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_ = health_checker;
   health_checker_->start();
   health_checker_->addHostCheckCompleteCb(
-      [this](const HostSharedPtr& host, HealthTransition changed_state) -> void {
+      [this](const HostSharedPtr& host, HealthTransition changed_state, HealthState) -> void {
         // If we get a health check completion that resulted in a state change, signal to
         // update the host sets on all threads.
         if (changed_state == HealthTransition::Changed) {

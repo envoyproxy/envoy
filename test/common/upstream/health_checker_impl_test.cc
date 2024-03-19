@@ -155,7 +155,7 @@ public:
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -3532,7 +3532,7 @@ public:
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -4855,7 +4855,7 @@ public:
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }

@@ -754,7 +754,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
       if (i == 1) {
         EXPECT_CALL(initialized, ready());
       }
-      health_checker->runCallbacks(hosts[i], HealthTransition::Changed);
+      health_checker->runCallbacks(hosts[i], HealthTransition::Changed, HealthState::Healthy);
     }
   }
 
@@ -769,7 +769,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
 
     hosts[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
+    health_checker->runCallbacks(hosts[1], HealthTransition::Changed, HealthState::Unhealthy);
   }
 
   // Unlike EDS we will not remove if HC is failing but will wait until the next polling interval.
@@ -2406,12 +2406,12 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_CALL(initialized, ready());
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
 
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -2423,7 +2423,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Unhealthy);
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
@@ -2438,7 +2438,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
@@ -2453,7 +2453,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Unhealthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
@@ -2463,7 +2463,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2473,7 +2473,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Unhealthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2483,7 +2483,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2493,7 +2493,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::DEGRADED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2557,7 +2557,7 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-                               HealthTransition::Changed);
+                               HealthTransition::Changed, HealthState::Healthy);
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
