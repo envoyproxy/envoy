@@ -109,7 +109,6 @@ public:
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
-  MOCK_METHOD(bool, isHalfCloseEnabled, ());
 
   ResponseHeaderMapPtr informational_headers_;
   ResponseHeaderMapPtr response_headers_;
@@ -331,7 +330,6 @@ public:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
-  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,

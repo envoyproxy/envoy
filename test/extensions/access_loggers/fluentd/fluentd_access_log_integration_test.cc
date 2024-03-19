@@ -32,7 +32,10 @@ public:
 
   void init(const std::string cluster_name = default_cluster_name,
             bool flush_access_log_on_connected = false,
-            absl::optional<uint32_t> buffer_size_bytes = absl::nullopt) {
+            absl::optional<uint32_t> buffer_size_bytes = absl::nullopt,
+            absl::optional<uint32_t> max_connect_attempts = 1,
+            absl::optional<uint64_t> base_backoff_interval = absl::nullopt,
+            absl::optional<uint64_t> max_backoff_interval = absl::nullopt) {
     setUpstreamCount(2);
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier(
@@ -62,6 +65,25 @@ public:
 
           if (buffer_size_bytes.has_value()) {
             access_log_config.mutable_buffer_size_bytes()->set_value(buffer_size_bytes.value());
+          }
+
+          if (max_connect_attempts.has_value()) {
+            access_log_config.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
+                max_connect_attempts.value());
+          }
+
+          if (base_backoff_interval.has_value()) {
+            access_log_config.mutable_retry_options()
+                ->mutable_backoff_options()
+                ->mutable_base_interval()
+                ->set_nanos(base_backoff_interval.value() * 1000000);
+          }
+
+          if (max_backoff_interval.has_value()) {
+            access_log_config.mutable_retry_options()
+                ->mutable_backoff_options()
+                ->mutable_max_interval()
+                ->set_nanos(max_backoff_interval.value() * 1000000);
           }
 
           auto* record = access_log_config.mutable_record();
@@ -137,6 +159,18 @@ TEST_F(FluentdAccessLogIntegrationTest, UnknownCluster) {
   EXPECT_DEATH(init("unknown_cluster"), "");
 }
 
+TEST_F(FluentdAccessLogIntegrationTest, InvalidBackoffConfig) {
+  // Invalid config: min interval set to 30, max interval is set to 20.
+  EXPECT_DEATH(init(default_cluster_name, false, 1, 1, 30, 20), "");
+}
+
+TEST_F(FluentdAccessLogIntegrationTest, LogLostOnBufferFull) {
+  init(default_cluster_name, false, /* max_buffer_size = */ 0);
+  sendBidirectionalData();
+
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_lost", 1);
+}
+
 TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
   init();
   sendBidirectionalData();
@@ -145,6 +179,9 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
     validateFluentdPayload(tcp_data, &validated,
@@ -161,6 +198,9 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntryTwoRecords) {
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
     validateFluentdPayload(tcp_data, &validated,
@@ -171,13 +211,16 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntryTwoRecords) {
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, TwoEntries) {
-  init(default_cluster_name, /*flush_access_log_on_connected = */ true, /*buffer_size_bytes = */ 0);
+  init(default_cluster_name, /*flush_access_log_on_connected = */ true, /*buffer_size_bytes = */ 1);
   sendBidirectionalData();
 
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 2);
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 2);
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
     validateFluentdPayload(tcp_data, &validated,
@@ -195,6 +238,9 @@ TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosed) {
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
     validateFluentdPayload(tcp_data, &validated,
@@ -204,10 +250,41 @@ TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosed) {
 
   ASSERT_TRUE(fake_access_log_connection_->close());
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 1);
+  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 0);
 
   // New access log would be discarded because the connection is closed.
   sendBidirectionalData();
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_lost", 1);
+}
+
+TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosedWithMultipleReconnects) {
+  init(default_cluster_name, false, {}, /* max_reconnect_attempts = */ 3);
+  sendBidirectionalData();
+
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
+  ASSERT_TRUE(fake_access_log_connection_->close());
+
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 1);
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.reconnect_attempts", 1);
+  FakeRawConnectionPtr fake_access_log_connection_2;
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_2));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 2);
+  ASSERT_TRUE(fake_access_log_connection_2->close());
+
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 2);
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.reconnect_attempts", 2);
+  FakeRawConnectionPtr fake_access_log_connection_3;
+  ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_3));
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 3);
+  ASSERT_TRUE(fake_access_log_connection_3->close());
+
+  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 3);
+  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_connect_attempts_exceeded",
+                                 1);
 }
 
 } // namespace
