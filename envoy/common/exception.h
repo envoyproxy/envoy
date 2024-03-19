@@ -29,6 +29,12 @@ public:
   EnvoyException(const std::string& message) : std::runtime_error(message) {}
 };
 
+#define SET_AND_RETURN_IF_NOT_OK(check_status, set_status)                                         \
+  if (!check_status.ok()) {                                                                        \
+    set_status = check_status;                                                                     \
+    return;                                                                                        \
+  }
+
 #define THROW_IF_NOT_OK_REF(status)                                                                \
   do {                                                                                             \
     if (!(status).ok()) {                                                                          \
