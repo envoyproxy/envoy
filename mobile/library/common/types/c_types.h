@@ -408,19 +408,6 @@ typedef void (*envoy_on_cancel_f)(envoy_stream_intel stream_intel,
                                   envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
- * Called when the envoy engine is exiting.
- */
-typedef void (*envoy_on_exit_f)(void* context);
-
-/**
- * Called when the envoy has finished its async setup and returned post-init callbacks.
- *
- * @param context, contains the necessary state to carry out platform-specific dispatch and
- * execution.
- */
-typedef void (*envoy_on_engine_running_f)(void* context);
-
-/**
  * Called when envoy's logger logs data.
  *
  * @param level the log level
