@@ -33,6 +33,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["csrf_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
+    shard_count = 2,
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",
