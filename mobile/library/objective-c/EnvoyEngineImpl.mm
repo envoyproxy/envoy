@@ -401,7 +401,9 @@ static void ios_track_event(envoy_map map, const void *context) {
     // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
     // block is necessary to act as a breaker for any Objective-C allocation that happens.
     @autoreleasepool {
-      self.onEngineRunning();
+      if (self.onEngineRunning) {
+        self.onEngineRunning();
+      }
     }
   };
   native_callbacks->on_exit = [] {
