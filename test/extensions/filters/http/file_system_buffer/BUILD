@@ -43,6 +43,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "file_system_buffer_integration_test",
     size = "large",
+    shards = 2,
     srcs = [
         "filter_integration_test.cc",
     ],
