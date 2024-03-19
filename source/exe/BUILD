@@ -163,6 +163,7 @@ envoy_cc_library(
         "//source/common/version:version_linkstamp",
         "//source/server:options_lib",
         "//source/common/http:rds_lib",
+        "//source/common/router:scoped_rds_lib",
     ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 

@@ -32,6 +32,7 @@ envoy_cc_library(
     hdrs = ["route_config_provider_manager.h"],
     deps = [
         ":rds_interface",
+        "//envoy/config:config_provider_manager_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/json:json_object_interface",
         "//envoy/local_info:local_info_interface",
