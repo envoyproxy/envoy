@@ -20,23 +20,10 @@ Developers can implement custom, configurable policies in C++.
 Taking :ref:`random load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.random.v3.Random>`
 as an example:
 
-.. code-block:: yaml
-
-    name: example_cluster
-    type: STRICT_DNS
-    connect_timeout: 0.25s
-    load_assignment:
-      cluster_name: example_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: example.com
-                port_value: 80
-    load_balancing_policy:
-      policies:
-      - typed_extension_config:
-          name: envoy.load_balancing_policies.random
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.random.v3.Random
+.. literalinclude:: /_configs/load-balancing/load-balancing-policies.yaml
+    :language: yaml
+    :lines: 26-33
+    :emphasize-lines: 3-8
+    :linenos:
+    :lineno-start: 26
+    :caption: :download:`load-balancing-policies.yaml </_configs/load-balancing/load-balancing-policies.yaml>`

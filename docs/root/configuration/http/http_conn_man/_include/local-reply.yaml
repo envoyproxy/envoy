@@ -1,0 +1,57 @@
+static_resources:
+  listeners:
+  - name: example_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - name: http
+      filters:
+      - name: http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          local_reply_config:
+            mappers:
+            - filter:
+                status_code_filter:
+                  comparison:
+                    op: EQ
+                    value:
+                      default_value: 400
+                      runtime_key: key_b
+              headers_to_add:
+                - header:
+                    key: "foo"
+                    value: "bar"
+                  append_action: OVERWRITE_IF_EXISTS_OR_ADD
+              status_code: 401
+              body:
+                inline_string: "not allowed"
+          route_config:
+            name: example_route
+            virtual_hosts:
+            - name: example_host
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/something"
+                route:
+                  cluster: example_cluster
+          http_filters:
+          - name: router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: example_cluster
+    load_assignment:
+      cluster_name: example_cluster_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10002
