@@ -122,9 +122,9 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
           // on directory level (e.g. Kubernetes secret update).
           const auto result_or_error = api_.fileSystem().splitPathFromFilename(filename);
           RETURN_IF_STATUS_NOT_OK(result_or_error);
-          watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
-                             Filesystem::Watcher::Events::MovedTo,
-                             [this](uint32_t) { onWatchUpdate(); });
+          RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
+                                              Filesystem::Watcher::Events::MovedTo,
+                                              [this](uint32_t) { onWatchUpdate(); }));
         }
       } else {
         watcher_.reset(); // Destroy the old watch if any

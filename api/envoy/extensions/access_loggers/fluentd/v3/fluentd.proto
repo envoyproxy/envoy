@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.fluentd.v3;
 
+import "envoy/config/core/v3/backoff.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -22,8 +24,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the Fluentd Forward Protocol as described in: `Fluentd Forward Protocol Specification
 // <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 // [#extension: envoy.access_loggers.fluentd]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message FluentdAccessLogConfig {
+  message RetryOptions {
+    // The number of times the logger will attempt to connect to the upstream during reconnects.
+    // By default, there is no limit. The logger will attempt to reconnect to the upstream each time
+    // connecting to the upstream failed or the upstream connection had been closed for any reason.
+    google.protobuf.UInt32Value max_connect_attempts = 1;
+
+    // Sets the backoff strategy. If this value is not set, the default base backoff interval is 500
+    // milliseconds and the default max backoff interval is 5 seconds (10 times the base interval).
+    config.core.v3.BackoffStrategy backoff_options = 2;
+  }
+
   // The upstream cluster to connect to for streaming the Fluentd messages.
   string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -67,4 +80,9 @@ message FluentdAccessLogConfig {
   //    "message": "My error message"
   //  }
   google.protobuf.Struct record = 6 [(validate.rules).message = {required: true}];
+
+  // Optional retry, in case upstream connection has failed. If this field is not set, the default values will be applied,
+  // as specified in the :ref:`RetryOptions <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>`
+  // configuration.
+  RetryOptions retry_options = 7;
 }

@@ -144,6 +144,13 @@ envoy.generic_proxy.codecs.kafka:
   status: wip
   type_urls:
   - envoy.extensions.filters.network.generic_proxy.codecs.kafka.v3.KafkaCodecConfig
+envoy.generic_proxy.codecs.http1:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.http1.v3.Http1CodecConfig
 envoy.router.cluster_specifier_plugin.golang:
   categories:
   - envoy.router.cluster_specifier_plugin
