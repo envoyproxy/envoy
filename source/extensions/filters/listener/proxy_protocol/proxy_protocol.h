@@ -70,7 +70,13 @@ struct ProxyProtocolStats {
   VersionedProxyProtocolStats v1_;
   VersionedProxyProtocolStats v2_;
 
-  static ProxyProtocolStats create(Stats::Scope& scope);
+  /**
+   * Create an instance of the stats struct, with both general (legacy) and versioned stats.
+   *
+   * For backwards compatibility, the general (legacy) stats are rooted at this filter's own scope.
+   * The versioned stats are correctly rooted at the listener's scope.
+   */
+  static ProxyProtocolStats create(Stats::Scope& scope, Stats::Scope& listener_scope);
 };
 
 /**
@@ -79,7 +85,7 @@ struct ProxyProtocolStats {
 class Config : public Logger::Loggable<Logger::Id::filter> {
 public:
   Config(
-      Stats::Scope& scope,
+      Stats::Scope& scope, Stats::Scope& listener_scope,
       const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config);
 
   ProxyProtocolStats stats_;

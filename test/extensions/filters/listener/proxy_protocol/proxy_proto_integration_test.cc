@@ -26,6 +26,7 @@ insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap&
   rule->mutable_on_tlv_present()->set_key("PP2TypeAuthority");
 
   auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+  listener->set_stat_prefix("test_listener");
   auto* ppv_filter = listener->add_listener_filters();
   ppv_filter->set_name(kProxyProtoFilterName);
   ASSERT_TRUE(ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol));
@@ -387,7 +388,7 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Rejected) {
   ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello",
                                 /*end_stream=*/false, /*verify=*/false));
   tcp_client->waitForDisconnect();
-  EXPECT_EQ(test_server_->counter("downstream_cx_proxy_proto.v1.denied"), 1);
+  EXPECT_EQ(test_server_->counter("listener.test_listener.downstream_cx_proxy_proto.v1.denied"), 1);
 }
 
 } // namespace Envoy

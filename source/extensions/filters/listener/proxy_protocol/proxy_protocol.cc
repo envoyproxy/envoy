@@ -52,18 +52,18 @@ namespace ProxyProtocol {
 
 constexpr absl::string_view kVersionedStatsPrefix = "downstream_cx_proxy_proto.";
 
-ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope) {
+ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope, Stats::Scope& listener_scope) {
   return {
       /*general_stats_=*/{GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
       /*not_found_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "not_found.")))},
+          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kVersionedStatsPrefix, "not_found.")))},
       /*v1_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "v1.")))},
+          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kVersionedStatsPrefix, "v1.")))},
       /*v2_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(scope, absl::StrCat(kVersionedStatsPrefix, "v2.")))},
+          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kVersionedStatsPrefix, "v2.")))},
   };
 }
 
@@ -88,9 +88,9 @@ void VersionedProxyProtocolStats::increment(ReadOrParseState decision) {
 }
 
 Config::Config(
-    Stats::Scope& scope,
+    Stats::Scope& scope, Stats::Scope& listener_scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
-    : stats_(ProxyProtocolStats::create(scope)),
+    : stats_(ProxyProtocolStats::create(scope, listener_scope)),
       allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()),
       pass_all_tlvs_(proto_config.has_pass_through_tlvs()
                          ? proto_config.pass_through_tlvs().match_type() ==
