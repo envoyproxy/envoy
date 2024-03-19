@@ -16,6 +16,8 @@
 
 namespace Envoy {
 
+constexpr absl::string_view kProxyProtoFilterName = "envoy.listener.proxy_protocol";
+
 static void
 insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   ::envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proxy_protocol;
@@ -25,8 +27,8 @@ insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap&
 
   auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
   auto* ppv_filter = listener->add_listener_filters();
-  ppv_filter->set_name("envoy.listener.proxy_protocol");
-  ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
+  ppv_filter->set_name(kProxyProtoFilterName);
+  ASSERT_TRUE(ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol));
 }
 
 ProxyProtoIntegrationTest::ProxyProtoIntegrationTest()
@@ -353,6 +355,39 @@ TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MoreSpecificDirectSource) {
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr(
                   absl::StrCat("- ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound)));
+}
+
+ProxyProtoDisallowedVersionsIntegrationTest::ProxyProtoDisallowedVersionsIntegrationTest() {
+  config_helper_.skipPortUsageValidation();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // This test doesn't need to deal with upstream connections at all, so make sure none occur.
+    bootstrap.mutable_static_resources()->mutable_clusters(0)->clear_load_assignment();
+
+    // V1 is disallowed.
+    ::envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proxy_protocol;
+    proxy_protocol.add_disallowed_versions(::envoy::config::core::v3::ProxyProtocolConfig::V1);
+
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* ppv_filter = listener->mutable_listener_filters(0);
+    ASSERT_EQ(ppv_filter->name(), kProxyProtoFilterName);
+    // Overwrite.
+    ASSERT_TRUE(ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol));
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoDisallowedVersionsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate Envoy closes connection when PROXY protocol version 1 is used.
+TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Rejected) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello",
+                                /*end_stream=*/false, /*verify=*/false));
+  tcp_client->waitForDisconnect();
+  EXPECT_EQ(test_server_->counter("downstream_cx_proxy_proto.v1.denied"), 1);
 }
 
 } // namespace Envoy

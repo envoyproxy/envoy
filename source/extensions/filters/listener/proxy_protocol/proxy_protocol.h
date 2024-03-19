@@ -101,9 +101,16 @@ public:
   bool isPassThroughTlvTypeNeeded(uint8_t type) const;
 
   /**
-   * Return true if the given PROXY protocol version should be parsed by the filter.
+   * Filter configuration that determines if we should pass-through requests without
+   * proxy protocol. Should only be configured to true for trusted downstreams.
    */
-  bool isVersionAllowed(ProxyProtocolVersion version) const;
+  bool allowRequestsWithoutProxyProtocol() const;
+
+  /**
+   * Filter configuration that determines if a version is disallowed.
+   */
+  bool isVersionV1Allowed() const;
+  bool isVersionV2Allowed() const;
 
   /**
    * Return the stats for the given PROXY protocol version.
