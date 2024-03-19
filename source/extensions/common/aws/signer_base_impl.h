@@ -63,18 +63,21 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
-                 const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source,
+                 const CredentialsProviderSharedPtr& credentials_provider,
+                 Server::Configuration::CommonFactoryContext& context,
                  const AwsSigningHeaderExclusionVector& matcher_config,
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
-        query_string_(query_string), expiration_time_(expiration_time), time_source_(time_source),
+        query_string_(query_string), expiration_time_(expiration_time),
+        time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher));
+          std::make_unique<
+              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+              matcher, context));
     }
   }
 

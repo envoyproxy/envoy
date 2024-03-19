@@ -9,6 +9,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
@@ -57,6 +58,7 @@ public:
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         stat_names_(scope_->symbolTable()) {
 
+    ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto* google_grpc = config_.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
@@ -70,7 +72,7 @@ public:
 
   virtual void initialize() {
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
-                                                           scope_, config_, *api_, stat_names_);
+                                                           scope_, config_, context_, stat_names_);
   }
 
   envoy::config::core::v3::GrpcService config_;
@@ -78,6 +80,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientThreadLocalPtr tls_;
   MockStubFactory stub_factory_;
@@ -180,7 +183,7 @@ class EnvoyGoogleLessMockedAsyncClientImplTest : public EnvoyGoogleAsyncClientIm
 public:
   void initialize() override {
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, real_stub_factory_,
-                                                           scope_, config_, *api_, stat_names_);
+                                                           scope_, config_, context_, stat_names_);
   }
 
   GoogleGenericStubFactory real_stub_factory_;
