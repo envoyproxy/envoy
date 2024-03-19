@@ -224,7 +224,7 @@ RawSlice OwnedImpl::frontSlice() const {
 }
 
 SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
-  ENVOY_BUG(length_ > 0, "Extract called on empty buffer");
+  RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
   // Remove zero byte fragments from the front of the queue to ensure
   // that the extracted slice has data.
   while (!slices_.empty() && slices_.front().dataSize() == 0) {
