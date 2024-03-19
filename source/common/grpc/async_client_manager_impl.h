@@ -94,8 +94,7 @@ public:
 
 private:
   ThreadLocal::Instance& tls_;
-  Upstream::ClusterManager&
-      cm_; // Need to track outside of `context_` due to initialzation ordering.
+  Upstream::ClusterManager& cm_; // Need to track outside of `context_` due to startup ordering.
   Server::Configuration::CommonFactoryContext& context_;
   ThreadLocal::SlotPtr google_tls_slot_;
   const StatNames& stat_names_;
