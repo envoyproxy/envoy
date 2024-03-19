@@ -313,6 +313,11 @@ new_features:
     added a :ref:`configuration option
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>` to add
     ``x-envoy-local-overloaded`` header when Overload Manager is triggered.
+- area: access_loggers
+  change: |
+    Added :ref:`retry options
+    <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>` to Fluentd Access Logger to
+    support upstream reconnect options, backoff intervals.
 - area: tracing
   change: |
     Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
@@ -346,6 +351,10 @@ new_features:
 - area: proxy_protocol
   change: |
     Added new statistics to the proxy protocol filter to track connections allowed/denied/error by PROXY protocol version.
+- area: rbac
+  change: |
+    Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
+    to allow adding custom prefix to the stats emitted by rules.
 
 deprecated:
 - area: listener
