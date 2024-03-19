@@ -313,6 +313,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
+    _com_github_qat_zstd()
     _com_github_lz4_lz4()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
@@ -382,9 +383,7 @@ def envoy_dependencies(skip_targets = []):
     _rust_deps()
     _kafka_deps()
 
-    _org_llvm_llvm()
     _com_github_wamr()
-    _com_github_wavm_wavm()
     _com_github_wasmtime()
     _com_github_wasm_c_api()
 
@@ -583,6 +582,14 @@ def _com_github_intel_qatzip():
     external_http_archive(
         name = "com_github_intel_qatzip",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_qat_zstd():
+    external_http_archive(
+        name = "com_github_qat_zstd",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:qatzstd.patch"],
     )
 
 def _com_github_lz4_lz4():
@@ -1280,7 +1287,13 @@ def _upb():
     )
 
 def _proxy_wasm_cpp_sdk():
-    external_http_archive(name = "proxy_wasm_cpp_sdk")
+    external_http_archive(
+        name = "proxy_wasm_cpp_sdk",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
+        ],
+    )
 
 def _proxy_wasm_cpp_host():
     external_http_archive(
@@ -1353,18 +1366,6 @@ def _com_github_gperftools_gperftools():
         actual = "@envoy//bazel/foreign_cc:gperftools",
     )
 
-def _org_llvm_llvm():
-    external_http_archive(
-        name = "org_llvm_llvm",
-        build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:llvm.patch"],
-    )
-    native.bind(
-        name = "llvm",
-        actual = "@envoy//bazel/foreign_cc:llvm",
-    )
-
 def _com_github_wamr():
     external_http_archive(
         name = "com_github_wamr",
@@ -1373,16 +1374,6 @@ def _com_github_wamr():
     native.bind(
         name = "wamr",
         actual = "@envoy//bazel/foreign_cc:wamr",
-    )
-
-def _com_github_wavm_wavm():
-    external_http_archive(
-        name = "com_github_wavm_wavm",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "wavm",
-        actual = "@envoy//bazel/foreign_cc:wavm",
     )
 
 def _com_github_wasmtime():

@@ -33,7 +33,7 @@ import org.robolectric.RobolectricTestRunner
 //                                                │                  │
 //                                                └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPSRequestBadHostname {
+class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
   init {
     JniLibrary.loadTestLibrary()
     JniLibrary.load()
@@ -49,7 +49,7 @@ class PerformHTTPSRequestBadHostname {
     Mockito.doReturn(connectivityManager)
       .`when`(context)
       .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.getDefaultProxy())
+    Mockito.`when`(connectivityManager.defaultProxy)
       .thenReturn(ProxyInfo.buildDirectProxy("loopback", port))
 
     val onEngineRunningLatch = CountDownLatch(1)

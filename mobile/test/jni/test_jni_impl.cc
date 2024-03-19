@@ -13,70 +13,60 @@
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttpProxyTestServer(JNIEnv* env,
                                                                                      jclass clazz) {
-  jni_log("[QTS]", "starting server");
   start_server(Envoy::TestServerType::HTTP_PROXY);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttpsProxyTestServer(
     JNIEnv* env, jclass clazz) {
-  jni_log("[QTS]", "starting server");
   start_server(Envoy::TestServerType::HTTPS_PROXY);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttp3TestServer(JNIEnv* env,
                                                                                  jclass clazz) {
-  jni_log("[QTS]", "starting server");
   start_server(Envoy::TestServerType::HTTP3);
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetServerPort(JNIEnv* env,
                                                                           jclass clazz) {
-  jni_log("[QTS]", "getting server port");
   return get_server_port();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartHttp2TestServer(JNIEnv* env,
                                                                                  jclass clazz) {
-  jni_log("[QTS]", "starting server");
   start_server(Envoy::TestServerType::HTTP2_WITH_TLS);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownTestServer(JNIEnv* env,
                                                                                jclass clazz) {
-  jni_log("[QTS]", "shutting down server");
   shutdown_server();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeInitXdsTestServer(JNIEnv* env,
                                                                               jclass clazz) {
-  jni_log("[XTS]", "initializing xDS server");
   initXdsServer();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeStartXdsTestServer(JNIEnv* env,
                                                                                jclass clazz) {
-  jni_log("[XTS]", "starting xDS server");
   startXdsServer();
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetXdsTestServerHost(JNIEnv* env,
                                                                                  jclass clazz) {
-  jni_log("[XTS]", "getting xDS server host");
   return env->NewStringUTF(getXdsServerHost());
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeGetXdsTestServerPort(JNIEnv* env,
                                                                                  jclass clazz) {
-  jni_log("[XTS]", "getting xDS server port");
   return getXdsServerPort();
 }
 
@@ -85,7 +75,6 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeSendDiscoveryResponse(JNIEnv* env,
                                                                                   jclass clazz,
                                                                                   jstring yaml) {
-  jni_log("[XTS]", "sending DiscoveryResponse from the xDS server");
   const char* yaml_chars = env->GetStringUTFChars(yaml, /* isCopy= */ nullptr);
   // The yaml utilities have non-relevant thread asserts.
   Envoy::Thread::SkipAsserts skip;
@@ -99,7 +88,6 @@ Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeSendDiscoveryRespons
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_TestJni_nativeShutdownXdsTestServer(JNIEnv* env,
                                                                                   jclass clazz) {
-  jni_log("[XTS]", "shutting down xDS server");
   shutdownXdsServer();
 }
 

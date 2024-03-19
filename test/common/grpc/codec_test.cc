@@ -221,6 +221,107 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
   }
 }
 
+TEST(GrpcCodecTest, decodeSingleFrameOverLimit) {
+  helloworld::HelloRequest request;
+  std::string test_str = std::string(64 * 1024, 'a');
+  request.set_name(test_str);
+
+  Buffer::OwnedImpl buffer;
+  std::array<uint8_t, 5> header;
+  Encoder encoder;
+  encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize(), header);
+  buffer.add(header.data(), 5);
+  buffer.add(request.SerializeAsString());
+  size_t size = buffer.length();
+
+  std::vector<Frame> frames;
+  // Configure decoder with 32kb max_frame_length.
+  Decoder decoder;
+  decoder.setMaxFrameLength(32 * 1024);
+
+  // The decoder doesn't successfully decode due to oversized frame.
+  EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(buffer.length(), size);
+}
+
+TEST(GrpcCodecTest, decodeSingleFrameWithMultiBuffersOverLimit) {
+  std::vector<Buffer::OwnedImpl> buffers(2);
+  std::array<uint8_t, 5> header;
+
+  uint32_t max_length = 32 * 1024;
+  uint32_t single_buffer_length = 18 * 1024;
+  std::string req_str = std::string(single_buffer_length, 'a');
+
+  // First buffer is valid (i.e. within total_frame_length limit).
+  helloworld::HelloRequest request;
+  request.set_name(req_str);
+  // Second buffer itself is valid but results in the total frame size exceeding the limit.
+  helloworld::HelloRequest request_2;
+  request_2.set_name(req_str);
+
+  Encoder encoder;
+  // Total frame consists of two buffers, request and request_2.
+  encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize() + request_2.ByteSize(), header);
+
+  buffers[0].add(header.data(), 5);
+  buffers[0].add(request.SerializeAsString());
+  buffers[1].add(header.data(), 5);
+  buffers[1].add(request_2.SerializeAsString());
+
+  size_t size = buffers[0].length() + buffers[1].length();
+  std::vector<Frame> frames = {};
+  Decoder decoder;
+  decoder.setMaxFrameLength(max_length);
+
+  // Both decoding attempts failed due to the total frame size exceeding the limit.
+  for (uint32_t i = 0; i < buffers.size(); ++i) {
+    EXPECT_FALSE(decoder.decode(buffers[i], frames));
+  }
+
+  EXPECT_EQ(frames.size(), 0);
+  // Buffer does not get drained due to it returning false.
+  EXPECT_EQ(buffers[0].length() + buffers[1].length(), size);
+}
+
+TEST(GrpcCodecTest, decodeMultipleFramesOverLimit) {
+  Buffer::OwnedImpl buffer;
+  std::array<uint8_t, 5> header;
+  Encoder encoder;
+
+  // First frame is valid (i.e. within max_frame_length limit).
+  helloworld::HelloRequest request;
+  request.set_name("hello");
+  encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize(), header);
+  buffer.add(header.data(), 5);
+  buffer.add(request.SerializeAsString());
+
+  // Second frame is invalid (i.e. exceeds max_frame_length).
+  helloworld::HelloRequest overlimit_request;
+  std::string test_str = std::string(64 * 1024, 'a');
+  overlimit_request.set_name(test_str);
+  encoder.newFrame(GRPC_FH_DEFAULT, overlimit_request.ByteSize(), header);
+  buffer.add(header.data(), 5);
+  buffer.add(overlimit_request.SerializeAsString());
+
+  size_t size = buffer.length();
+
+  std::vector<Frame> frames;
+  Decoder decoder;
+  decoder.setMaxFrameLength(32 * 1024);
+
+  EXPECT_FALSE(decoder.decode(buffer, frames));
+  // When the decoder doesn't successfully decode, it puts valid frames up until
+  // an oversized frame into output frame vector.
+  ASSERT_EQ(frames.size(), 1);
+  // First frame is successfully decoded.
+  EXPECT_EQ(frames[0].length_, request.ByteSize());
+  // Buffer does not get drained due to it returning false.
+  EXPECT_EQ(buffer.length(), size);
+  // Only part of the buffer represented a valid frame. Thus, the frame length should not equal the
+  // buffer length.
+  EXPECT_NE(frames[0].length_, size);
+}
+
 TEST(GrpcCodecTest, FrameInspectorTest) {
   {
     Buffer::OwnedImpl buffer;
