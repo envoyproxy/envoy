@@ -81,6 +81,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 
+  // TODO(boteng): introduce additional validation for the authority and path headers
+  // based on the default UHV when it is available.
   if (!Http::HeaderUtility::authorityIsValid(host_value_)) {
     THROW_IF_NOT_OK(absl::InvalidArgumentError(
         fmt::format("host: {} in http health check is not valid.", host_value_)));
