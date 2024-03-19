@@ -38,7 +38,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const auto client_config =
         std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
             proto_config, timeout_ms, proto_config.http_service().path_prefix(), server_context);
-    callback = [filter_config, std::move(client_config),
+    callback = [filter_config, client_config = std::move(client_config),
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           server_context.clusterManager(), std::move(client_config));
