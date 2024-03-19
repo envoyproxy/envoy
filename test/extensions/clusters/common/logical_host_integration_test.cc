@@ -48,10 +48,12 @@ TEST_P(LogicalHostIntegrationTest, DISABLED_LogicalDNSRaceCrashTest) {
       .WillRepeatedly(
           Invoke([&](const std::string&, Network::DnsLookupFamily,
                      Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
-            // Return multiple mixed v4/v6 addresses to increase the race window.
             // Keep changing the returned addresses to force address update.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
+                             // The only signficant address is the first one; the other ones are
+                             // just used to populate a list
+                             // whose maintenance is race-prone.
                              first_address_string_,
                              absl::StrCat("127.0.0.", address_),
                              absl::StrCat("127.0.0.", address_ + 1),
