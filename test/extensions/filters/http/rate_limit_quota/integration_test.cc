@@ -20,14 +20,14 @@ namespace RateLimitQuota {
 namespace {
 
 enum class BlanketRule {
-  NOT_SPECIFIED,
-  ALLOW_ALL,
-  DENY_ALL,
+  NotSpecified,
+  AllowAll,
+  DenyAll,
 };
 
 struct ConfigOption {
   bool valid_rlqs_server = true;
-  BlanketRule no_assignment_blanket_rule = BlanketRule::NOT_SPECIFIED;
+  BlanketRule no_assignment_blanket_rule = BlanketRule::NotSpecified;
 };
 
 // These tests exercise the rate limit quota filter through Envoy's integration test
@@ -83,7 +83,7 @@ protected:
       TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
 
       // Configure the no_assignment behavior.
-      if (config_option.no_assignment_blanket_rule != BlanketRule::NOT_SPECIFIED) {
+      if (config_option.no_assignment_blanket_rule != BlanketRule::NotSpecified) {
         auto* mutable_config = matcher.mutable_matcher_list()
                                    ->mutable_matchers(0)
                                    ->mutable_on_match()
@@ -95,11 +95,11 @@ protected:
         auto mutable_bucket_settings = MessageUtil::anyConvert<
             ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>(
             *mutable_config);
-        if (config_option.no_assignment_blanket_rule == BlanketRule::ALLOW_ALL) {
+        if (config_option.no_assignment_blanket_rule == BlanketRule::AllowAll) {
           mutable_bucket_settings.mutable_no_assignment_behavior()
               ->mutable_fallback_rate_limit()
               ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
-        } else if (config_option.no_assignment_blanket_rule == BlanketRule::DENY_ALL) {
+        } else if (config_option.no_assignment_blanket_rule == BlanketRule::DenyAll) {
           mutable_bucket_settings.mutable_no_assignment_behavior()
               ->mutable_fallback_rate_limit()
               ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
@@ -398,7 +398,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
   ConfigOption option;
-  option.no_assignment_blanket_rule = BlanketRule::DENY_ALL;
+  option.no_assignment_blanket_rule = BlanketRule::DenyAll;
   initializeConfig(option);
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
@@ -438,7 +438,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll) {
   ConfigOption option;
-  option.no_assignment_blanket_rule = BlanketRule::ALLOW_ALL;
+  option.no_assignment_blanket_rule = BlanketRule::AllowAll;
   initializeConfig(option);
   HttpIntegrationTest::initialize();
 
@@ -465,7 +465,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
       // Verify the usage report content.
       ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
       const auto& usage = reports.bucket_quota_usages(0);
-      // The first request is allowed due to ALLOW_ALL no_assignment_behavior
+      // The first request is allowed due to AllowAll no_assignment_behavior
       EXPECT_EQ(usage.num_requests_allowed(), 1);
       EXPECT_EQ(usage.num_requests_denied(), 0);
     } else {
@@ -509,7 +509,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll) {
   ConfigOption option;
-  option.no_assignment_blanket_rule = BlanketRule::DENY_ALL;
+  option.no_assignment_blanket_rule = BlanketRule::DenyAll;
   initializeConfig(option);
   HttpIntegrationTest::initialize();
 
