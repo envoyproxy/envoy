@@ -8,8 +8,8 @@
 namespace Envoy {
 
 AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
-                             absl::string_view method, SharedPtrSet response_set)
-    : server_(server), opt_admin_(server.admin()), shared_response_set_(response_set) {
+                             absl::string_view method /*, SharedPtrSet response_set*/)
+    : server_(server), opt_admin_(server.admin()) /*, shared_response_set_(response_set) */ {
   request_headers_->setMethod(method);
   request_headers_->setPath(path);
   lifecycle_notifier_ = std::make_shared<Server::ServerLifecycleNotifier::HandlePtr>(
@@ -24,7 +24,7 @@ AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
         sendErrorLockHeld();
       }
     }
-    //server_.dispatcher().post([this]() { terminate(); });
+    // server_.dispatcher().post([this]() { terminate(); });
   }
 }
 
@@ -32,7 +32,7 @@ AdminResponse::~AdminResponse() {
   clearLifecycleTerminator();
   cancel();
 
-  //shared_response_set_->detachResponse(this);
+  // shared_response_set_->detachResponse(this);
 }
 
 void AdminResponse::clearLifecycleTerminator() {
@@ -186,7 +186,7 @@ void AdminResponse::sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
   }
 }
 
-void AdminResponse::PtrSet::terminateAdminRequests() {
+/*void AdminResponse::PtrSet::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   absl::MutexLock lock(&mutex_);
@@ -213,6 +213,6 @@ void AdminResponse::PtrSet::attachResponse(AdminResponse* response) {
 void AdminResponse::PtrSet::detachResponse(AdminResponse* response) {
   absl::MutexLock lock(&mutex_);
   response_set_.erase(response);
-}
+  }*/
 
 } // namespace Envoy

@@ -334,8 +334,7 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(
-      Stage stage, std::function<void()> completion_cb = [] {});
+  void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
 

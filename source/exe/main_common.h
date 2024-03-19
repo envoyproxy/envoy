@@ -79,7 +79,7 @@ public:
   AdminResponseSharedPtr adminRequest(absl::string_view path_and_query, absl::string_view method);
 
 private:
-  AdminResponse::SharedPtrSet shared_response_set_;
+  // AdminResponse::SharedPtrSet shared_response_set_;
 #endif
 };
 
