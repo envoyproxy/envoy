@@ -81,7 +81,7 @@ envoy_extension_cc_test(
         "custom_response_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.custom_response"],
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],

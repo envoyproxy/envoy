@@ -50,13 +50,13 @@ WatcherImpl::~WatcherImpl() {
   ::CloseHandle(thread_exit_event_);
 }
 
-void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
+absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
   if (path == Platform::null_device_path) {
-    return;
+    return absl::OkStatus();
   }
 
   const absl::StatusOr<PathSplitResult> result_or_error = file_system_.splitPathFromFilename(path);
-  THROW_IF_STATUS_NOT_OK(result_or_error, throw);
+  RETURN_IF_STATUS_NOT_OK(result_or_error);
   const PathSplitResult& result = result_or_error.value();
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
@@ -67,7 +67,7 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
       directory.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
       nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
   if (dir_handle == INVALID_HANDLE_VALUE) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("unable to open directory {}: {}", result.directory_, GetLastError()));
   }
   std::string fii_key(sizeof(FILE_ID_INFO), '\0');
@@ -108,6 +108,7 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
 
   callback_map_[fii_key]->watches_.push_back({file, events, cb});
   ENVOY_LOG(debug, "added watch for file '{}' in directory '{}'", result.file_, result.directory_);
+  return absl::OkStatus();
 }
 
 void WatcherImpl::onDirectoryEvent() {

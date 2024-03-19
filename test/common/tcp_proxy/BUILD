@@ -79,13 +79,9 @@ envoy_cc_test(
     deps = [
         "//source/common/tcp_proxy",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/router:router_filter_interface",
-        "//test/mocks/router:upstream_request",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/test_common:test_runtime_lib",
     ],
 )
