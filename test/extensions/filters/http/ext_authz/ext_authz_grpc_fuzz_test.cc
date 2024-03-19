@@ -102,7 +102,7 @@ private:
   Envoy::Tracing::MockSpan mock_span_;
   NiceMock<Grpc::MockAsyncRequest> grpc_async_request_;
 
-  // Set but calling newGrpcClientImpl
+  // Set by calling newGrpcClientImpl
   Grpc::Status::WellKnownGrpcStatus status_;
   Filters::Common::ExtAuthz::GrpcClientImpl* grpc_client_;
 };
