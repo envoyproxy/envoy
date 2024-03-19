@@ -34,7 +34,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/server_connection_factory.h"
 #include "source/common/router/rds_impl.h"
-#include "source/common/router/scoped_rds.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
@@ -211,6 +210,7 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
+static const std::string srds_factory_name = "envoy.srds_factory.default";
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
@@ -227,15 +227,19 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&server_context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(server_context.admin());
           });
-
-  Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager =
-      server_context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
+  std::shared_ptr<Envoy::Config::ConfigProviderManager> scoped_routes_config_provider_manager =
+      server_context.singletonManager().getTyped<Envoy::Config::ConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
-          [&server_context, route_config_provider_manager] {
-            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
-                server_context.admin(), *route_config_provider_manager);
+          [&server_context, route_config_provider_manager]()
+              -> std::shared_ptr<Envoy::Config::ConfigProviderManager> {
+            auto srds_factory =
+                Envoy::Config::Utility::getFactoryByName<Router::SrdsFactory>(srds_factory_name);
+            if (srds_factory) {
+              return srds_factory->createScopedRoutesConfigProviderManager(
+                  server_context, *route_config_provider_manager);
+            }
+            return nullptr;
           });
-
   auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
   std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
@@ -251,7 +255,7 @@ absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> Utility::createConf
         proto_config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+    Config::ConfigProviderManager* scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager) {
   absl::Status creation_status = absl::OkStatus();
@@ -281,7 +285,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   auto filter_config = THROW_OR_RETURN_VALUE(
       Utility::createConfig(proto_config, context, *singletons.date_provider_,
                             *singletons.route_config_provider_manager_,
-                            *singletons.scoped_routes_config_provider_manager_,
+                            singletons.scoped_routes_config_provider_manager_.get(),
                             *singletons.tracer_manager_,
                             *singletons.filter_config_provider_manager_),
       std::shared_ptr<HttpConnectionManagerConfig>);
@@ -337,7 +341,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+    Config::ConfigProviderManager* scoped_routes_config_provider_manager,
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
@@ -522,6 +526,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     early_header_mutation_extensions_.push_back(std::move(extension));
   }
 
+  auto srds_factory =
+      Envoy::Config::Utility::getFactoryByName<Router::SrdsFactory>(srds_factory_name);
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers
   // will be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
@@ -535,10 +541,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
-    scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
-        config, context_.serverFactoryContext(), context_.initManager(), stats_prefix_,
-        scoped_routes_config_provider_manager_);
-    scope_key_builder_ = Router::ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
+    if (!srds_factory || !scoped_routes_config_provider_manager_) {
+      throwEnvoyExceptionOrPanic("SRDS configured but not compiled in");
+    }
+    scoped_routes_config_provider_ =
+        srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,
+                                           *scoped_routes_config_provider_manager_);
+    scope_key_builder_ = srds_factory->createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
@@ -838,7 +847,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   auto filter_config = THROW_OR_RETURN_VALUE(
       Utility::createConfig(proto_config, context, *singletons.date_provider_,
                             *singletons.route_config_provider_manager_,
-                            *singletons.scoped_routes_config_provider_manager_,
+                            singletons.scoped_routes_config_provider_manager_.get(),
                             *singletons.tracer_manager_,
                             *singletons.filter_config_provider_manager_),
       std::shared_ptr<HttpConnectionManagerConfig>);
