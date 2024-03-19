@@ -48,6 +48,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(*stats_config_));
+  ON_CALL(*this, regexEngine()).WillByDefault(ReturnRef(regex_engine_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
