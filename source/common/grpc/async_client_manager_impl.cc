@@ -93,7 +93,6 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   UNREFERENCED_PARAMETER(scope_);
   UNREFERENCED_PARAMETER(config_);
   UNREFERENCED_PARAMETER(factory_context_);
-  UNREFERENCED_PARAMETER(api_);
   UNREFERENCED_PARAMETER(stat_names_);
   creation_status = absl::InvalidArgumentError("Google C++ gRPC client is not linked");
   return;
