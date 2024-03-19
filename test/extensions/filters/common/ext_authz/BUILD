@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
@@ -45,6 +46,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",

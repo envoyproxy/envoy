@@ -59,6 +59,9 @@ public:
     // Check if a subject is allowed.
     virtual bool isSubjectAllowed(absl::string_view sub) const PURE;
 
+    // Check if the current credential lifetime is allowed.
+    virtual bool isLifetimeAllowed(const absl::Time& now, const absl::Time* exp) const PURE;
+
     // Get the cached config: JWT rule.
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
     getJwtProvider() const PURE;
