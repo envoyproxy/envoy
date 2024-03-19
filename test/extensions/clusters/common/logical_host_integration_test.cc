@@ -22,7 +22,7 @@ public:
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
   uint32_t address_ = 0;
-  std::string address_string = "::1";
+  std::string first_address_string_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
@@ -32,10 +32,13 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LogicalHostIntegrationTest,
 // Reproduces a race from https://github.com/envoyproxy/envoy/issues/32850.
 // The test is by mocking the DNS resolver to return multiple different
 // addresses, also config dns_refresh_rate to be extremely fast.
-TEST_P(LogicalHostIntegrationTest, DISABLED_FastChangingDnsResult) {
-  // Only needs to test the race with one stack.
+TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
+  // first_address_string_ is used to make connections. It needs
+  // to match with the IpVersion of the test.
   if (version_ == Network::Address::IpVersion::v4) {
-    return;
+    first_address_string_ = "127.0.0.1";
+  } else {
+    first_address_string_ = "::1";
   }
 
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
@@ -46,9 +49,10 @@ TEST_P(LogicalHostIntegrationTest, DISABLED_FastChangingDnsResult) {
           Invoke([&](const std::string&, Network::DnsLookupFamily,
                      Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
             // Return multiple mixed v4/v6 addresses to increase the race window.
+            // Keep changing the returned addresses to force address update.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
-                             "::1",
+                             first_address_string_,
                              absl::StrCat("127.0.0.", address_),
                              absl::StrCat("127.0.0.", address_ + 1),
                              absl::StrCat("127.0.0.", address_ + 2),
