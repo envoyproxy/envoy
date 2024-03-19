@@ -18,7 +18,6 @@
 #include "library/cc/log_level.h"
 #include "library/cc/string_accessor.h"
 #include "library/common/internal_engine_types.h"
-
 #include "library/common/types/matcher_data.h"
 
 namespace Envoy {
