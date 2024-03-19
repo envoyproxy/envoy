@@ -78,7 +78,7 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (!config_->forwardUsernameHeader().empty()) {
-    headers.addCopy(Http::LowerCaseString(config_->forwardUsernameHeader()), username);
+    headers.setCopy(Http::LowerCaseString(config_->forwardUsernameHeader()), username);
   }
 
   config_->stats().allowed_.inc();
