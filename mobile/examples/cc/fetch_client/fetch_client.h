@@ -49,6 +49,8 @@ private:
 
   Event::DispatcherPtr dispatcher_;
 
+  Platform::StreamSharedPtr current_stream_;
+
   absl::Mutex engine_mutex_;
   Platform::EngineSharedPtr engine_ ABSL_GUARDED_BY(engine_mutex_);
 };
