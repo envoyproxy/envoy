@@ -109,15 +109,13 @@ Config::Config(
 
   for (const auto& version : proto_config.disallowed_versions()) {
     switch (version) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case ProxyProtocolConfig::V1:
       allow_v1_ = false;
       break;
     case ProxyProtocolConfig::V2:
       allow_v2_ = false;
       break;
-    default:
-      throw EnvoyException(
-          absl::StrCat("Unknown proxy protocol version (enum int cast): ", version));
     }
   }
 }
@@ -149,7 +147,7 @@ bool Config::isVersionAllowed(ProxyProtocolVersion version) const {
   case ProxyProtocolVersion::V2:
     return allow_v2_;
   }
-  return false; // Should never reach here, but needed for windows compiler warning.
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 VersionedProxyProtocolStats& Config::versionToStatsStruct(ProxyProtocolVersion version) {
@@ -161,7 +159,7 @@ VersionedProxyProtocolStats& Config::versionToStatsStruct(ProxyProtocolVersion v
   case ProxyProtocolVersion::V2:
     return stats_.v2_;
   }
-  return stats_.not_found_; // Should never reach here, but needed for windows compiler warning.
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {

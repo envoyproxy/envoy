@@ -51,3 +51,13 @@ Proxy protocol versions include ``v1``, ``v2``, and ``not_found``.
   allowed, Counter, Total number of connections allowed
   denied, Counter, Total number of connections rejected due to :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`.
   error, Counter, Total number of connections rejected due to parsing error
+
+Some per-version statistics are emitted only under certain filter configurations, as captured in the matrix below:
+
+.. csv-table::
+  :header: , not_found, v1, v2
+  :widths: 1, 1, 1, 1
+
+  allowed, Emitted only when ``allow_requests_without_proxy_protocol=true``, Emitted by default, Emitted by default
+  denied, N/A, Emitted only when ``disallowed_versions`` contains ``v1``, Emitted only when ``disallowed_versions`` contains ``v2``
+  error, Emitted only when ``allow_requests_without_proxy_protocol=false``, Emitted by default, Emitted by default
