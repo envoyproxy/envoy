@@ -1,0 +1,42 @@
+name: Check/API
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-FOO
+  cancel-in-progress: true
+
+
+jobs:
+  checks:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.target }}
+    with:
+      bazel-extra: '--config=rbe-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      fail-match: |
+        error:
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 120
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      matrix:
+        include:
+        - target: api
+          rbe: false

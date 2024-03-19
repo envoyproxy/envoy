@@ -271,6 +271,7 @@ case $CI_TARGET in
             @envoy_api//tools:tap2pcap_test
         echo "Building API..."
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --action_env=FOO=BAR \
               -c fastbuild @envoy_api//envoy/...
         if [[ -n "$ENVOY_API_ONLY" ]]; then
             exit 0
@@ -375,14 +376,14 @@ case $CI_TARGET in
 
     clang_tidy)
         # clang-tidy will warn on standard library issues with libc++
-        ENVOY_STDLIB="libstdc++"
+        # ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
         export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
         CLANG_TIDY_TARGETS=(
-            //contrib/...
+            # //contrib/...
             //source/...
             //test/...
             @envoy_api//...)

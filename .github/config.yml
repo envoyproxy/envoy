@@ -23,6 +23,11 @@ checks:
   #
   # For example if macos is marked as `required: true` but then has a path
   # selection that means its doesnt run the check will be `skipped` and pass
+  checks:
+    name: Envoy/Checks
+    on-run:
+    - check-api
+    required: true
   macos:
     name: Envoy/macOS
     required: true
@@ -153,6 +158,19 @@ checks:
 
 run:
   build-macos:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - configs/**/*
+    - contrib/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+  check-api:
     paths:
     - .bazelrc
     - .bazelversion
