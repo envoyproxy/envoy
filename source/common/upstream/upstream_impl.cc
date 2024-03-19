@@ -445,7 +445,7 @@ HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressLi
   if (address_list.empty()) {
     return SharedConstAddressVector();
   }
-  ASSERT(address_list.front() == address);
+  ASSERT(*address_list.front() == *address);
   return std::make_shared<AddressVector>(address_list);
 }
 
