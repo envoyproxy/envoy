@@ -37,10 +37,7 @@ class JvmCallbackContext {
   public Object onResponseHeaders(long headerCount, boolean endStream, long[] streamIntel) {
     assert bridgeUtility.validateCount(headerCount);
     final Map<String, List<String>> headers = bridgeUtility.retrieveHeaders();
-
-    callbacks.getExecutor().execute(
-        () -> callbacks.onHeaders(headers, endStream, new EnvoyStreamIntelImpl(streamIntel)));
-
+    callbacks.onHeaders(headers, endStream, new EnvoyStreamIntelImpl(streamIntel));
     return null;
   }
 
@@ -54,10 +51,7 @@ class JvmCallbackContext {
   public Object onResponseTrailers(long trailerCount, long[] streamIntel) {
     assert bridgeUtility.validateCount(trailerCount);
     final Map<String, List<String>> trailers = bridgeUtility.retrieveHeaders();
-
-    callbacks.getExecutor().execute(
-        () -> callbacks.onTrailers(trailers, new EnvoyStreamIntelImpl(streamIntel)));
-
+    callbacks.onTrailers(trailers, new EnvoyStreamIntelImpl(streamIntel));
     return null;
   }
 
@@ -70,11 +64,7 @@ class JvmCallbackContext {
    * @return Object,     not used for response callbacks.
    */
   public Object onResponseData(ByteBuffer data, boolean endStream, long[] streamIntel) {
-    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
-    // be destroyed after calling this callback.
-    ByteBuffer copiedData = ByteBuffers.copy(data);
-    callbacks.getExecutor().execute(
-        () -> callbacks.onData(copiedData, endStream, new EnvoyStreamIntelImpl(streamIntel)));
+    callbacks.onData(data, endStream, new EnvoyStreamIntelImpl(streamIntel));
     return null;
   }
 
@@ -91,13 +81,9 @@ class JvmCallbackContext {
    */
   public Object onError(int errorCode, byte[] message, int attemptCount, long[] streamIntel,
                         long[] finalStreamIntel) {
-    callbacks.getExecutor().execute(() -> {
-      String errorMessage = new String(message);
-      callbacks.onError(errorCode, errorMessage, attemptCount,
-                        new EnvoyStreamIntelImpl(streamIntel),
-                        new EnvoyFinalStreamIntelImpl(finalStreamIntel));
-    });
-
+    String errorMessage = new String(message);
+    callbacks.onError(errorCode, errorMessage, attemptCount, new EnvoyStreamIntelImpl(streamIntel),
+                      new EnvoyFinalStreamIntelImpl(finalStreamIntel));
     return null;
   }
 
@@ -109,12 +95,9 @@ class JvmCallbackContext {
    * @return Object, not used for response callbacks.
    */
   public Object onCancel(long[] streamIntel, long[] finalStreamIntel) {
-    callbacks.getExecutor().execute(() -> {
-      // This call is atomically gated at the call-site and will only happen once.
-      callbacks.onCancel(new EnvoyStreamIntelImpl(streamIntel),
-                         new EnvoyFinalStreamIntelImpl(finalStreamIntel));
-    });
-
+    // This call is atomically gated at the call-site and will only happen once.
+    callbacks.onCancel(new EnvoyStreamIntelImpl(streamIntel),
+                       new EnvoyFinalStreamIntelImpl(finalStreamIntel));
     return null;
   }
 
@@ -125,11 +108,8 @@ class JvmCallbackContext {
    * @return Object, not used for response callbacks.
    */
   public Object onSendWindowAvailable(long[] streamIntel) {
-    callbacks.getExecutor().execute(() -> {
-      // This call is atomically gated at the call-site and will only happen once.
-      callbacks.onSendWindowAvailable(new EnvoyStreamIntelImpl(streamIntel));
-    });
-
+    // This call is atomically gated at the call-site and will only happen once.
+    callbacks.onSendWindowAvailable(new EnvoyStreamIntelImpl(streamIntel));
     return null;
   }
   /**
@@ -140,12 +120,9 @@ class JvmCallbackContext {
    * @return Object, not used for response callbacks.
    */
   public Object onComplete(long[] streamIntel, long[] finalStreamIntel) {
-    callbacks.getExecutor().execute(() -> {
-      // This call is atomically gated at the call-site and will only happen once.
-      callbacks.onComplete(new EnvoyStreamIntelImpl(streamIntel),
-                           new EnvoyFinalStreamIntelImpl(finalStreamIntel));
-    });
-
+    // This call is atomically gated at the call-site and will only happen once.
+    callbacks.onComplete(new EnvoyStreamIntelImpl(streamIntel),
+                         new EnvoyFinalStreamIntelImpl(finalStreamIntel));
     return null;
   }
 }

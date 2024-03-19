@@ -9,6 +9,7 @@ import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.ByteBuffers;
 import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
 import io.envoyproxy.envoymobile.engine.testing.Response;
 import java.io.IOException;
@@ -17,6 +18,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -277,7 +279,7 @@ public class AndroidEnvoyFlowTest {
                           return null;
                         })
                         .setOnResponseData((data, endStream, ignored) -> {
-                          response.get().addBody(data);
+                          response.get().addBody(ByteBuffers.copy(data));
                           if (endStream) {
                             latch.countDown();
                           }
@@ -298,7 +300,7 @@ public class AndroidEnvoyFlowTest {
                           latch.countDown();
                           return null;
                         })
-                        .start(Executors.newSingleThreadExecutor())
+                        .start()
                         .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
     if (requestScenario.cancelBeforeSendingRequestBody) {
       stream.cancel();

@@ -17,7 +17,6 @@ import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.Test
 
@@ -91,7 +90,7 @@ class CancelStreamTest {
     client
       .newStreamPrototype()
       .setOnCancel { _ -> runExpectation.countDown() }
-      .start(Executors.newSingleThreadExecutor())
+      .start()
       .sendHeaders(requestHeaders, false)
       .cancel()
 

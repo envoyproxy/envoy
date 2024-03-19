@@ -4,7 +4,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import java.nio.ByteBuffer
-import java.util.concurrent.Executor
 
 /**
  * A collection of platform-level callbacks that are specified by consumers who wish to interact
@@ -28,14 +27,8 @@ internal class StreamCallbacks {
  * Class responsible for bridging between the platform-level `StreamCallbacks` and the engine's
  * `EnvoyHTTPCallbacks`.
  */
-internal class EnvoyHTTPCallbacksAdapter(
-  private val executor: Executor,
-  private val callbacks: StreamCallbacks
-) : EnvoyHTTPCallbacks {
-  override fun getExecutor(): Executor {
-    return executor
-  }
-
+internal class EnvoyHTTPCallbacksAdapter(private val callbacks: StreamCallbacks) :
+  EnvoyHTTPCallbacks {
   override fun onHeaders(
     headers: Map<String, List<String>>,
     endStream: Boolean,

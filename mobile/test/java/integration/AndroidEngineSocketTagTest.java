@@ -10,6 +10,7 @@ import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.ByteBuffers;
 import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
 import io.envoyproxy.envoymobile.engine.testing.Response;
 
@@ -87,56 +88,54 @@ public class AndroidEngineSocketTagTest {
     final AtomicReference<Response> response = new AtomicReference<>(new Response());
     final AtomicReference<Stream> streamRef = new AtomicReference<>();
 
-    Stream stream =
-        engine.streamClient()
-            .newStreamPrototype()
-            .setOnResponseHeaders((responseHeaders, endStream, streamIntel) -> {
-              response.get().setHeaders(responseHeaders);
-              if (requestScenario.cancelOnResponseHeaders) {
-                streamRef.get().cancel(); // Should be a noop when endStream == true
-              } else {
-                if (requestScenario.waitOnReadData) {
-                  try {
-                    Thread.sleep(100 + (int)(Math.random() * 50));
-                  } catch (InterruptedException e) {
-                    // Don't care
-                  }
-                }
-                streamRef.get().readData(requestScenario.responseBufferSize);
-              }
-              return null;
-            })
-            .setOnResponseData((data, endStream, streamIntel) -> {
-              response.get().addBody(data);
-              if (!endStream) {
-                if (requestScenario.waitOnReadData) {
-                  try {
-                    Thread.sleep(100 + (int)(Math.random() * 50));
-                  } catch (InterruptedException e) {
-                    // Don't care
-                  }
-                }
-                streamRef.get().readData(requestScenario.responseBufferSize);
-              }
-              return null;
-            })
-            .setOnError((error, finalStreamIntel) -> {
-              response.get().setEnvoyError(error);
-              latch.countDown();
-              return null;
-            })
-            .setOnCancel((finalStreamIntel) -> {
-              response.get().setCancelled();
-              latch.countDown();
-              return null;
-            })
-            .setOnComplete((finalStreamIntel) -> {
-              latch.countDown();
-              return null;
-            })
-            .setExplicitFlowControl(true)
-            .start(requestScenario.useDirectExecutor ? Runnable::run
-                                                     : Executors.newSingleThreadExecutor());
+    Stream stream = engine.streamClient()
+                        .newStreamPrototype()
+                        .setOnResponseHeaders((responseHeaders, endStream, streamIntel) -> {
+                          response.get().setHeaders(responseHeaders);
+                          if (requestScenario.cancelOnResponseHeaders) {
+                            streamRef.get().cancel(); // Should be a noop when endStream == true
+                          } else {
+                            if (requestScenario.waitOnReadData) {
+                              try {
+                                Thread.sleep(100 + (int)(Math.random() * 50));
+                              } catch (InterruptedException e) {
+                                // Don't care
+                              }
+                            }
+                            streamRef.get().readData(requestScenario.responseBufferSize);
+                          }
+                          return null;
+                        })
+                        .setOnResponseData((data, endStream, streamIntel) -> {
+                          response.get().addBody(ByteBuffers.copy(data));
+                          if (!endStream) {
+                            if (requestScenario.waitOnReadData) {
+                              try {
+                                Thread.sleep(100 + (int)(Math.random() * 50));
+                              } catch (InterruptedException e) {
+                                // Don't care
+                              }
+                            }
+                            streamRef.get().readData(requestScenario.responseBufferSize);
+                          }
+                          return null;
+                        })
+                        .setOnError((error, finalStreamIntel) -> {
+                          response.get().setEnvoyError(error);
+                          latch.countDown();
+                          return null;
+                        })
+                        .setOnCancel((finalStreamIntel) -> {
+                          response.get().setCancelled();
+                          latch.countDown();
+                          return null;
+                        })
+                        .setOnComplete((finalStreamIntel) -> {
+                          latch.countDown();
+                          return null;
+                        })
+                        .setExplicitFlowControl(true)
+                        .start();
     streamRef.set(stream); // Set before sending headers to avoid race conditions.
     stream.sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
     latch.await();
