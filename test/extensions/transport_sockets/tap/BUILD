@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_select_admin_functionality",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -25,7 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ssl_tap_integration_test",
-    srcs = ["ssl_tap_integration_test.cc"],
+    srcs = envoy_select_admin_functionality(["ssl_tap_integration_test.cc"]),
     data = [
         "//test/config/integration/certs",
     ],
