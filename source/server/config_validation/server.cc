@@ -13,12 +13,12 @@
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/admin/admin_factory_context.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/regex_engine.h"
-#include "source/server/ssl_context_manager.h"
 #include "source/server/utils.h"
 
 namespace Envoy {
@@ -132,7 +132,9 @@ void ValidationInstance::initialize(const Options& options,
             "Component factory should not return nullptr from createDrainManager()");
 
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
-  ssl_context_manager_ = createContextManager("ssl_context_manager", server_contexts_);
+  ssl_context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },

@@ -143,6 +143,9 @@ public:
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
+  std::chrono::seconds defaultRefreshTokenExpiresIn() const {
+    return default_refresh_token_expires_in_;
+  }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -167,6 +170,7 @@ private:
   const AuthType auth_type_;
   const bool use_refresh_token_{};
   const std::chrono::seconds default_expires_in_;
+  const std::chrono::seconds default_refresh_token_expires_in_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -265,6 +269,7 @@ private:
   std::string id_token_;
   std::string refresh_token_;
   std::string expires_in_;
+  std::string expires_refresh_token_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
@@ -284,6 +289,8 @@ private:
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   std::string getEncodedToken() const;
+  std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
+                                            const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };
