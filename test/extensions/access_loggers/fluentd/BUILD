@@ -46,9 +46,9 @@ envoy_extension_cc_test(
     srcs = ["fluentd_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
     deps = [
-        "//source/extensions/formatter/cel:config",
         "//source/extensions/access_loggers/fluentd:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/formatter/cel:config",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",

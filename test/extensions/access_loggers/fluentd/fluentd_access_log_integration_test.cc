@@ -99,7 +99,8 @@ public:
                 name: envoy.formatter.metadata
                 typed_config:
                   "@type": type.googleapis.com/{}
-            )EOF", formatter_type.value());
+            )EOF",
+                                                 formatter_type.value());
 
             auto* formatter = access_log_config.add_formatters();
             envoy::config::core::v3::TypedExtensionConfig proto;
@@ -182,10 +183,10 @@ TEST_F(FluentdAccessLogIntegrationTest, InvalidBackoffConfig) {
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, InvalidUnknownFormatter) {
-  EXPECT_THROW_WITH_REGEX(init(default_cluster_name, false, 1, 1, 20, 30,
-                                 "envoy.extensions.formatter.Unknown"),
-                            EnvoyException,
-    ".*could not find @type 'type.googleapis.com/envoy.extensions.formatter.Unknown'.*");
+  EXPECT_THROW_WITH_REGEX(
+      init(default_cluster_name, false, 1, 1, 20, 30, "envoy.extensions.formatter.Unknown"),
+      EnvoyException,
+      ".*could not find @type 'type.googleapis.com/envoy.extensions.formatter.Unknown'.*");
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, LogLostOnBufferFull) {
@@ -215,8 +216,7 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecordWithFormatter) {
-  init(default_cluster_name, false, 1, 1, 20, 30,
-       "envoy.extensions.formatter.cel.v3.Cel");
+  init(default_cluster_name, false, 1, 1, 20, 30, "envoy.extensions.formatter.cel.v3.Cel");
   sendBidirectionalData();
 
   test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
