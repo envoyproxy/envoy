@@ -3127,6 +3127,18 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_http_metadata_decoder_lib",
+    srcs = ["quiche/quic/core/http/metadata_decoder.cc"],
+    hdrs = ["quiche/quic/core/http/metadata_decoder.h"],
+    deps = [
+        ":quic_core_error_codes_lib",
+        ":quic_core_http_header_list_lib",
+        ":quic_core_qpack_qpack_decoded_headers_accumulator_lib",
+        ":quic_core_qpack_qpack_decoder_lib",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_http_server_initiated_spdy_stream_lib",
     srcs = ["quiche/quic/core/http/quic_server_initiated_spdy_stream.cc"],
     hdrs = ["quiche/quic/core/http/quic_server_initiated_spdy_stream.h"],
@@ -3167,6 +3179,7 @@ envoy_quic_cc_library(
         ":quic_core_http_http_constants_lib",
         ":quic_core_http_http_decoder_lib",
         ":quic_core_http_http_encoder_lib",
+        ":quic_core_http_metadata_decoder_lib",
         ":quic_core_http_spdy_stream_body_manager_lib",
         ":quic_core_http_spdy_utils_lib",
         ":quic_core_packets_lib",

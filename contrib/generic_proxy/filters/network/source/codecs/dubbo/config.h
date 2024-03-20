@@ -35,9 +35,9 @@ public:
   void forEach(IterateCallback callback) const override;
   absl::optional<absl::string_view> get(absl::string_view key) const override;
   void set(absl::string_view key, absl::string_view val) override;
-  absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
-  absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
-  absl::string_view method() const override { return inner_metadata_->request().methodName(); }
+  absl::string_view host() const override { return inner_metadata_->request().service(); }
+  absl::string_view path() const override { return inner_metadata_->request().service(); }
+  absl::string_view method() const override { return inner_metadata_->request().method(); }
   void erase(absl::string_view key) override;
 
   // StreamFrame
@@ -87,7 +87,7 @@ public:
 
   void setCodecCallbacks(CallBackType& callback) override { callback_ = &callback; }
 
-  void decode(Buffer::Instance& buffer, bool) override {
+  Common::Dubbo::DecodeStatus decodeOne(Buffer::Instance& buffer) {
     if (metadata_ == nullptr) {
       metadata_ = std::make_shared<Common::Dubbo::MessageMetadata>();
     }
@@ -109,27 +109,59 @@ public:
         ENVOY_LOG(warn, "Dubbo codec: unexpected decoding error");
         metadata_.reset();
         callback_->onDecodingFailure();
-        return;
+        return Common::Dubbo::DecodeStatus::Failure;
       }
 
       if (decode_status == Common::Dubbo::DecodeStatus::Waiting) {
         ENVOY_LOG(debug, "Dubbo codec: waiting for more input data");
-        return;
+        return Common::Dubbo::DecodeStatus::Waiting;
       }
 
       ASSERT(decode_status == Common::Dubbo::DecodeStatus::Success);
+
+      if (metadata_->context().heartbeat()) {
+        Buffer::OwnedImpl heartbeat_response;
+
+        ENVOY_LOG(debug, "Dubbo codec: heartbeat from downstream/upstream");
+        constexpr char first_four_bytes[] = {'\xda', '\xbb', '\x22', 20};
+        heartbeat_response.add(first_four_bytes, 4);
+
+        heartbeat_response.writeBEInt<int64_t>(metadata_->requestId());
+        heartbeat_response.writeBEInt<int32_t>(1);
+        heartbeat_response.writeByte('N');
+
+        metadata_.reset();
+        callback_->writeToConnection(heartbeat_response);
+
+        return Common::Dubbo::DecodeStatus::Success;
+      }
 
       auto message = std::make_unique<DecoderMessageType>(metadata_);
       message->stream_frame_flags_ = {{static_cast<uint64_t>(metadata_->requestId()),
                                        !metadata_->context().isTwoWay(), false,
                                        metadata_->context().heartbeat()},
                                       true};
-      callback_->onDecodingSuccess(std::move(message));
       metadata_.reset();
+      callback_->onDecodingSuccess(std::move(message));
+
+      return Common::Dubbo::DecodeStatus::Success;
     } catch (const EnvoyException& error) {
       ENVOY_LOG(warn, "Dubbo codec: decoding error: {}", error.what());
+
       metadata_.reset();
       callback_->onDecodingFailure();
+
+      return Common::Dubbo::DecodeStatus::Failure;
+    }
+  }
+
+  void decode(Buffer::Instance& buffer, bool) override {
+    while (buffer.length() > 0) {
+      // Continue decoding if the buffer has more data and the previous decoding is
+      // successful.
+      if (decodeOne(buffer) != Common::Dubbo::DecodeStatus::Success) {
+        break;
+      }
     }
   }
 
@@ -151,8 +183,7 @@ class DubboServerCodec
 public:
   using DubboDecoderBase::DubboDecoderBase;
 
-  ResponsePtr respond(absl::Status status, absl::string_view short_response_flags,
-                      const Request& request) override;
+  ResponsePtr respond(absl::Status status, absl::string_view data, const Request& request) override;
 };
 
 class DubboClientCodec
