@@ -39,6 +39,7 @@ class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
     JniLibrary.load()
   }
 
+  @Ignore("https://github.com/envoyproxy/envoy/issues/33014")
   @Test
   fun `performs an HTTPs request through a proxy`() {
     TestJni.startHttpsProxyTestServer()
