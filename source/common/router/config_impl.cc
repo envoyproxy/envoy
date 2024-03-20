@@ -659,7 +659,14 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
          absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
                                 Http::Headers::get().UpgradeValues.ConnectUdp))) {
-      connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.http_route_connect_proxy_by_default")) {
+        if (upgrade_config.has_connect_config()) {
+          connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+        }
+      } else {
+        connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      }
     } else if (upgrade_config.has_connect_config()) {
       throwEnvoyExceptionOrPanic(absl::StrCat("Non-CONNECT upgrade type ",
                                               upgrade_config.upgrade_type(), " has ConnectConfig"));

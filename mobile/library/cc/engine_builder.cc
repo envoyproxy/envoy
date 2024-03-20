@@ -138,7 +138,7 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const
 }
 #endif
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_shared<EngineCallbacks>()) {
+EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<InternalEngineCallbacks>()) {
 #ifndef ENVOY_ENABLE_QUIC
   enable_http3_ = false;
 #endif
@@ -899,9 +899,9 @@ EngineSharedPtr EngineBuilder::build() {
 
   envoy_event_tracker null_tracker{};
 
-  Envoy::InternalEngine* envoy_engine = new Envoy::InternalEngine(
-      callbacks_->asEnvoyEngineCallbacks(),
-      (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
+  InternalEngine* envoy_engine =
+      new InternalEngine(std::move(callbacks_),
+                         (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

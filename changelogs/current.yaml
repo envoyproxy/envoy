@@ -60,6 +60,16 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: http
+  change: |
+    When the HTTP CONNECT request method is enabled using :ref:`RouteAction.UpgradeConfig
+    <envoy_v3_api_msg_config.route.v3.RouteAction.UpgradeConfig>`, CONNECT requests will now be
+    proxied to the upstream, unless the :ref:`connect_config
+    <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>` field is also
+    set. (Previously Envoy would terminate CONNECT requests even when the ``connect_config`` field
+    was unset.) The updated behavior should now be consistent with the existing documentation. This
+    change can be reverted by setting
+    ``envoy.reloadable_features.http_route_connect_proxy_by_default`` to ``false``.
 - area: proxy status
   change: |
     Add more conversion in the proxy status utility. It can be disabled by the runtime guard
@@ -246,6 +256,9 @@ new_features:
   change: |
     added support for :ref:`%UPSTREAM_CONNECTION_ID% <config_access_log_format_upstream_connection_id>` for the upstream connection
     identifier.
+- area: compression
+  change: |
+    Added Qatzstd :ref:`compressor <envoy_v3_api_msg_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd>`.
 - area: aws_lambda
   change: |
     Added :ref:`host_rewrite <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.host_rewrite>` config to be used
@@ -310,6 +323,11 @@ new_features:
     added a :ref:`configuration option
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>` to add
     ``x-envoy-local-overloaded`` header when Overload Manager is triggered.
+- area: access_loggers
+  change: |
+    Added :ref:`retry options
+    <envoy_v3_api_msg_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.RetryOptions>` to Fluentd Access Logger to
+    support upstream reconnect options, backoff intervals.
 - area: tracing
   change: |
     Added support to configure a Dynatrace sampler for the OpenTelemetry tracer.
@@ -336,6 +354,10 @@ new_features:
     Update ``aws_request_signing`` filter to support optionally sending the aws signature in query parameters rather than headers,
     by specifying the :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
     configuration section.
+- area: rbac
+  change: |
+    Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
+    to allow adding custom prefix to the stats emitted by rules.
 
 deprecated:
 - area: listener

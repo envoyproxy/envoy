@@ -130,7 +130,7 @@ bool TestUtility::rawSlicesEqual(const Buffer::RawSlice* lhs, const Buffer::RawS
 }
 
 void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
-                                                 uint64_t seed) {
+                                                 uint64_t seed, uint64_t n_slice) {
   const std::string sample = "Neque porro quisquam est qui dolorem ipsum..";
   std::mt19937 generate(seed);
   std::uniform_int_distribution<> distribute(1, sample.length() - 1);
@@ -138,7 +138,9 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
   for (uint64_t n = 0; n < n_char; ++n) {
     str += sample.at(distribute(generate));
   }
-  buffer.add(str);
+  for (uint64_t n = 0; n < n_slice; ++n) {
+    buffer.add(str);
+  }
 }
 
 Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
