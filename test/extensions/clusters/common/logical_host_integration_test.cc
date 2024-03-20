@@ -51,7 +51,7 @@ TEST_P(LogicalHostIntegrationTest, DISABLED_LogicalDNSRaceCrashTest) {
             // Keep changing the returned addresses to force address update.
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
-                             // The only signficant address is the first one; the other ones are
+                             // The only significant address is the first one; the other ones are
                              // just used to populate a list
                              // whose maintenance is race-prone.
                              first_address_string_,
