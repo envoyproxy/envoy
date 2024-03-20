@@ -388,7 +388,9 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Rejected) {
   ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello",
                                 /*end_stream=*/false, /*verify=*/false));
   tcp_client->waitForDisconnect();
-  EXPECT_EQ(test_server_->counter("listener.test_listener.downstream_cx_proxy_proto.v1.denied"), 1);
+  EXPECT_EQ(test_server_->counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found"), 1);
+  EXPECT_EQ(test_server_->counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.disallowed"),
+            1);
 }
 
 } // namespace Envoy

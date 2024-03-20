@@ -50,39 +50,51 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
 
-constexpr absl::string_view kVersionedStatsPrefix = "downstream_cx_proxy_proto.";
+constexpr absl::string_view kProxyProtoStatsPrefix = "downstream_cx_proxy_proto.";
+constexpr absl::string_view kVersionStatsPrefix = "versions.";
 
 ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope, Stats::Scope& listener_scope) {
   return {
-      /*general_stats_=*/{GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
-      /*not_found_=*/
-      {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kVersionedStatsPrefix, "not_found.")))},
+      /*legacy_=*/{LEGACY_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
+      /*general_=*/
+      {GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(listener_scope, kProxyProtoStatsPrefix))},
       /*v1_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kVersionedStatsPrefix, "v1.")))},
+          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v1.")))},
       /*v2_=*/
       {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kVersionedStatsPrefix, "v2.")))},
+          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v2.")))},
   };
+}
+
+void GeneralProxyProtocolStats::increment(ReadOrParseState decision) {
+  switch (decision) {
+  case ReadOrParseState::Done:
+    not_found_allowed_.inc();
+    break;
+  case ReadOrParseState::TryAgainLater:
+    break; // Do nothing.
+  case ReadOrParseState::Error:
+    not_found_disallowed_.inc();
+    break;
+  case ReadOrParseState::Denied:
+    PANIC_DUE_TO_CORRUPT_ENUM; // Should never happen.
+  }
 }
 
 void VersionedProxyProtocolStats::increment(ReadOrParseState decision) {
   switch (decision) {
   case ReadOrParseState::Done:
-    allowed_.inc();
+    found_.inc();
     break;
   case ReadOrParseState::TryAgainLater:
-    // Do nothing.
-    break;
+    break; // Do nothing.
   case ReadOrParseState::Error:
     error_.inc();
     break;
-  case ReadOrParseState::SkipFilter:
-    allowed_.inc();
-    break;
   case ReadOrParseState::Denied:
-    denied_.inc();
+    found_.inc();
+    disallowed_.inc();
     break;
   }
 }
@@ -146,18 +158,6 @@ bool Config::isVersionV1Allowed() const { return allow_v1_; }
 
 bool Config::isVersionV2Allowed() const { return allow_v2_; }
 
-VersionedProxyProtocolStats& Config::versionToStatsStruct(ProxyProtocolVersion version) {
-  switch (version) {
-  case ProxyProtocolVersion::NotFound:
-    return stats_.not_found_;
-  case ProxyProtocolVersion::V1:
-    return stats_.v1_;
-  case ProxyProtocolVersion::V2:
-    return stats_.v2_;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   cb_ = &cb;
@@ -168,22 +168,29 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   const ReadOrParseState read_state = parseBuffer(buffer); // Implicitly updates header_version_
 
-  VersionedProxyProtocolStats& versioned_stats = config_->versionToStatsStruct(header_version_);
-  versioned_stats.increment(read_state);
+  switch (header_version_) {
+  case ProxyProtocolVersion::V1:
+    config_->stats_.v1_.increment(read_state);
+    break;
+  case ProxyProtocolVersion::V2:
+    config_->stats_.v2_.increment(read_state);
+    break;
+  case ProxyProtocolVersion::NotFound:
+    config_->stats_.general_.increment(read_state);
+    break;
+  }
 
   switch (read_state) {
   case ReadOrParseState::Denied:
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::Error:
-    config_->stats_.general_stats_.downstream_cx_proxy_proto_error_
+    config_->stats_.legacy_.downstream_cx_proxy_proto_error_
         .inc(); // Keep for backwards-compatibility
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::TryAgainLater:
     return Network::FilterStatus::StopIteration;
-  case ReadOrParseState::SkipFilter:
-    return Network::FilterStatus::Continue;
   case ReadOrParseState::Done:
     return Network::FilterStatus::Continue;
   }
@@ -199,6 +206,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
     const ReadOrParseState read_header_state = readProxyHeader(buffer);
     if (read_header_state != ReadOrParseState::Done) {
       return read_header_state;
+    }
+    if (header_version_ == ProxyProtocolVersion::NotFound) {
+      // Filter is skipped and request is allowed through.
+      return ReadOrParseState::Done;
     }
   }
 
@@ -583,7 +594,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
       // short-circuit
       ENVOY_LOG(trace, "request does not use v1 or v2 proxy protocol, forwarding as is");
-      return ReadOrParseState::SkipFilter;
+      return ReadOrParseState::Done;
     }
   }
 

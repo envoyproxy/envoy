@@ -33,31 +33,35 @@ If there is a protocol error or an unsupported address family
 Statistics
 ----------
 
-This filter emits the following general statistics:
+This filter emits the following general statistics, rooted at *listener.<stat_prefix>.downstream_cx_proxy_proto*
 
 .. csv-table::
   :header: Name, Type, Description
-  :widths: 1, 1, 2
+  :widths: 4, 1, 8
 
-  downstream_cx_proxy_proto_error, Counter, Total number of connections with proxy protocol errors
+  not_found_disallowed, Counter, "Total number of connections that don't contain the PROXY protocol header and are rejected."
+  not_found_allowed, Counter, "Total number of connections that don't contain the PROXY protocol header, but are allowed due to :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`."
 
-The filter also emits the statistics rooted at *listener.<stat_prefix>.downstream_cx_proxy_proto.<version>.*
-for each matched proxy protocol version. Proxy protocol versions include ``v1``, ``v2``, and ``not_found``.
+
+The filter also emits the statistics rooted at *listener.<stat_prefix>.downstream_cx_proxy_proto.versions.<version>*
+for each matched PROXY protocol version. Proxy protocol versions include ``v1`` and ``v2``.
 
 .. csv-table::
   :header: Name, Type, Description
-  :widths: 1, 1, 2
+  :widths: 4, 1, 8
 
-  allowed, Counter, Total number of connections allowed
-  denied, Counter, Total number of connections rejected due to :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`.
-  error, Counter, Total number of connections rejected due to parsing error
+  found, Counter, "Total number of connections where the PROXY protocol header was found and parsed correctly."
+  disallowed, Counter, "Total number of ``found`` connections that are rejected due to :ref:`disallowed_versions <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.disallowed_versions>`."
+  error, Counter, "Total number of connections where the PROXY protocol header was malformed (and the connection was rejected)."
 
-Some per-version statistics are emitted only under certain filter configurations, as captured in the matrix below:
+The filter also emits the following legacy statistics, rooted at its own scope:
 
 .. csv-table::
-  :header: , not_found, v1, v2
-  :widths: 1, 1, 1, 1
+  :header: Name, Type, Description
+  :widths: 4, 1, 8
 
-  allowed, Emitted only when ``allow_requests_without_proxy_protocol=true``, Emitted by default, Emitted by default
-  denied, N/A, Emitted only when ``disallowed_versions`` contains ``v1``, Emitted only when ``disallowed_versions`` contains ``v2``
-  error, Emitted only when ``allow_requests_without_proxy_protocol=false``, Emitted by default, Emitted by default
+  downstream_cx_proxy_proto_error, Counter, "Total number of connections with proxy protocol errors, i.e. ``v1.error``, ``v2.error``, and ``not_found_disallowed``."
+
+.. attention::
+  The legacy statistics are deprecated and kept for backwards compatibility.
+  Prefer using the other statistics above, which are emitted on a per-listener basis and are more detailed.

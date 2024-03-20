@@ -25,20 +25,39 @@ using KeyValuePair =
 
 enum class ProxyProtocolVersion { NotFound = 0, V1 = 1, V2 = 2 };
 
-enum class ReadOrParseState { Done, TryAgainLater, Error, SkipFilter, Denied };
+enum class ReadOrParseState { Done, TryAgainLater, Error, Denied };
 
 /**
- * Non-versioned general stats for the filter.
- * Kept for backwards compatibility.
+ * Legacy stats that are under the root scope. Kept for backwards compatibility.
+ * @deprecated Use GeneralProxyProtocolStats instead.
+ * @see stats_macros.h
+ */
+// clang-format off
+#define LEGACY_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
+  COUNTER(downstream_cx_proxy_proto_error)
+// clang-format on
+
+struct LegacyProxyProtocolStats {
+  LEGACY_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Stats reported for the filter.
  * @see stats_macros.h
  */
 // clang-format off
 #define GENERAL_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
-  COUNTER(downstream_cx_proxy_proto_error)
+  COUNTER(not_found_allowed)                                                          \
+  COUNTER(not_found_disallowed)
 // clang-format on
 
 struct GeneralProxyProtocolStats {
   GENERAL_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+
+  /**
+   * Increment the stats for the given filter decision.
+   */
+  void increment(ReadOrParseState decision);
 };
 
 /**
@@ -47,8 +66,8 @@ struct GeneralProxyProtocolStats {
  */
 // clang-format off
 #define VERSIONED_PROXY_PROTOCOL_STATS(COUNTER)  \
-  COUNTER(allowed)                               \
-  COUNTER(denied)                                \
+  COUNTER(found)                               \
+  COUNTER(disallowed)                                \
   COUNTER(error)
 // clang-format on
 
@@ -65,16 +84,16 @@ struct VersionedProxyProtocolStats {
  * Definition of all stats for the proxy protocol. @see stats_macros.h
  */
 struct ProxyProtocolStats {
-  GeneralProxyProtocolStats general_stats_;
-  VersionedProxyProtocolStats not_found_;
+  LegacyProxyProtocolStats legacy_;
+  GeneralProxyProtocolStats general_;
   VersionedProxyProtocolStats v1_;
   VersionedProxyProtocolStats v2_;
 
   /**
-   * Create an instance of the stats struct, with both general (legacy) and versioned stats.
+   * Create an instance of the stats struct with all stats for the filter.
    *
-   * For backwards compatibility, the general (legacy) stats are rooted at this filter's own scope.
-   * The versioned stats are correctly rooted at the listener's scope.
+   * For backwards compatibility, the legacy stats are rooted at this filter's own scope.
+   * The general and versioned stats are correctly rooted at the listener's scope.
    */
   static ProxyProtocolStats create(Stats::Scope& scope, Stats::Scope& listener_scope);
 };
@@ -117,11 +136,6 @@ public:
    */
   bool isVersionV1Allowed() const;
   bool isVersionV2Allowed() const;
-
-  /**
-   * Return the stats for the given PROXY protocol version.
-   */
-  VersionedProxyProtocolStats& versionToStatsStruct(ProxyProtocolVersion version);
 
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
