@@ -140,6 +140,10 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+  static ScopedInjectableLoader<ThreadLocal::SlotAllocator> tls_inject(
+      std::make_unique<ThreadLocal::MockInstance>());
+  static ScopedInjectableLoader<Api::Api> api_inject(std::make_unique<Api::MockApi>());
+
   try {
     if (!validateConfig(input)) {
       return;
