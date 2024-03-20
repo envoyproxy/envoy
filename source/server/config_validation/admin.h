@@ -39,6 +39,7 @@ public:
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   uint32_t concurrency() const override { return 1; }
   void closeSocket() override {}
+  RequestPtr makeRequest(AdminStream&) const override { return nullptr; }
 
 private:
   ConfigTrackerImpl config_tracker_;

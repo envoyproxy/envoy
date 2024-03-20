@@ -117,7 +117,7 @@ FlagRegistry::FlagRegistry() : reloadable_flags_(makeReloadableFlagMap()) {}
 FlagRegistry& FlagRegistry::getInstance() {
   static auto* instance = new FlagRegistry();
   ASSERT(sizeof(quiche_reloadable_flag_overrides) / sizeof(std::pair<absl::string_view, bool>) ==
-         2);
+         3);
   ASSERT(sizeof(quiche_protocol_flag_overrides) /
              sizeof(std::pair<absl::string_view, absl::variant<bool, uint32_t>>) ==
          3);

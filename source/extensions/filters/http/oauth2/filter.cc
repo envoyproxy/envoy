@@ -24,6 +24,10 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "jwt_verify_lib/jwt.h"
+#include "jwt_verify_lib/status.h"
+
+using namespace std::chrono_literals;
 
 namespace Envoy {
 namespace Extensions {
@@ -197,7 +201,9 @@ FilterConfig::FilterConfig(
       cookie_names_(proto_config.credentials().cookie_names()),
       auth_type_(getAuthType(proto_config.auth_type())),
       use_refresh_token_(proto_config.use_refresh_token().value()),
-      default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)) {
+      default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
+      default_refresh_token_expires_in_(
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -233,9 +239,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   secret_.assign(secret.begin(), secret.end());
 }
 
-bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const {
-  return (!token_.empty() && !refresh_token_.empty());
-}
+bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const { return !refresh_token_.empty(); }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
   return (
@@ -362,6 +366,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
     // Check if we can update the access token via a refresh token.
     if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
+
+      ENVOY_LOG(debug, "Trying to update the access token using the refresh token");
+
       // try to update access token by refresh token
       oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
                                              config_->clientSecret(), config_->authType());
@@ -533,6 +540,7 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
   id_token_ = id_token;
   refresh_token_ = refresh_token;
   expires_in_ = std::to_string(expires_in.count());
+  expires_refresh_token_in_ = getExpiresTimeForRefreshToken(refresh_token, expires_in);
 
   const auto new_epoch = time_source_.systemTime() + expires_in;
   new_expires_ = std::to_string(
@@ -550,6 +558,34 @@ std::string OAuth2Filter::getEncodedToken() const {
     encoded_token = encodeHmac(token_secret_vec, host_, new_expires_);
   }
   return encoded_token;
+}
+
+std::string
+OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
+                                            const std::chrono::seconds& expires_in) const {
+  if (config_->useRefreshToken()) {
+    ::google::jwt_verify::Jwt jwt;
+    if (jwt.parseFromString(refresh_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
+      const std::chrono::seconds expirationFromJwt = std::chrono::seconds{jwt.exp_};
+      const std::chrono::seconds now =
+          std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
+              .time_since_epoch();
+
+      if (now < expirationFromJwt) {
+        const auto expiration_epoch = expirationFromJwt - now;
+        return std::to_string(expiration_epoch.count());
+      } else {
+        ENVOY_LOG(debug, "An expiration time in the refresh token is less of the current time");
+        return "0";
+      }
+    }
+    ENVOY_LOG(debug, "The refresh token is not JWT or exp claim is ommited. The lifetime of the "
+                     "refresh token is taken from filter configuration");
+    const std::chrono::seconds default_refresh_token_expires_in =
+        config_->defaultRefreshTokenExpiresIn();
+    return std::to_string(default_refresh_token_expires_in.count());
+  }
+  return std::to_string(expires_in.count());
 }
 
 void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
@@ -669,9 +705,12 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
     }
 
     if (!refresh_token_.empty()) {
+      const std::string refresh_token_cookie_tail_http_only =
+          fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
+
       headers.addReferenceKey(Http::Headers::get().SetCookie,
                               absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                           cookie_attribute_httponly));
+                                           refresh_token_cookie_tail_http_only));
     }
   }
 }

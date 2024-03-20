@@ -67,7 +67,7 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(OptRef<Server::Admin>, admin, ());
   MOCK_METHOD(TimeSource&, timeSource, ());
-  Event::TestTimeSystem& timeSystem() { return time_system_; }
+  MOCK_METHOD(Event::TestTimeSystem&, timeSystem, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
@@ -79,6 +79,7 @@ public:
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
+  Regex::Engine& regexEngine() override { return regex_engine_; }
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
@@ -107,6 +108,7 @@ public:
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
+  Regex::GoogleReEngine regex_engine_;
 };
 
 class MockGenericFactoryContext : public GenericFactoryContext {
@@ -155,6 +157,7 @@ public:
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
+  MOCK_METHOD(Regex::Engine&, regexEngine, ());
   MOCK_METHOD(StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
