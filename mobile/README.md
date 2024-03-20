@@ -40,4 +40,3 @@ Envoy calendar [here](https://goo.gl/PkDijT)
 Envoy Mobile is licensed under the Apache 2.0 license and copyrighted by the Envoy Mobile Project Authors.
 
 For trademarks, see The [Linux Foundation Trademark Usage](https://www.linuxfoundation.org/trademark-usage/) guidelines.
-
