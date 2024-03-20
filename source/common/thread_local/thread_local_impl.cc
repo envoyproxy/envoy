@@ -140,9 +140,16 @@ void InstanceImpl::removeSlot(uint32_t slot) {
          fmt::format("slot index {} already in free slot set!", slot));
   free_slot_indexes_.push_back(slot);
 
+  // Find out how many dispatchers have associated running thread and are able to process
+  // events. During normal operation, all dispatchers should be in Running state, but
+  // during unit and integration tests, dispatchers are sometimes allocated without
+  // worker thread. Events posted to such dispatchers are queued but never executed.
+  // The following logic determines how many threads are in Running state.
+  // An event to deallocate a slot is posted to each thread and main thread blocks until
+  // all Running threads report that they have finished deallocating the slot.
+
   // Include main thread.
   auto running_workers = 1;
-  // Add only dispatchers which have associated thread and are able to process events.
   std::for_each(registered_threads_.begin(), registered_threads_.end(),
                 [&running_workers](std::reference_wrapper<Event::Dispatcher>& dispatcher) {
                   if (dispatcher.get().isRunning()) {
