@@ -551,7 +551,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       route.direct_response().body().specifier_case()) {
     direct_response_file_watcher_ =
         factory_context.mainThreadDispatcher().createFilesystemWatcher();
-    direct_response_file_watcher_->addWatch(
+    THROW_IF_NOT_OK(direct_response_file_watcher_->addWatch(
         route.direct_response().body().filename(),
         Filesystem::Watcher::Events::Modified | Filesystem::Watcher::Events::MovedTo,
         [this, &api, file_name = route.direct_response().body().filename()](uint32_t) {
@@ -564,7 +564,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
             return std::make_shared<ThreadLocalDirectResponseBody>(direct_response_body);
           });
           return absl::OkStatus();
-        });
+        }));
   }
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =
