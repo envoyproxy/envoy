@@ -119,8 +119,8 @@ public:
     return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
   }
 
-  // Upstream:HostDescription observers are all swallowed, because logical_host_
-  // is const. These should never be called except during coverage tests.
+  // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
+  // const. These should never be called except during coverage tests.
   //
   // There may be an argument to suggest that HostDescription should contain
   // only the immutable member variables and observers, and the mutable
