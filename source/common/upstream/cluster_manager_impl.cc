@@ -295,12 +295,12 @@ void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
 
 ClusterManagerImpl::ClusterManagerImpl(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-    Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-    const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-    Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
-    ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-    Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-    const Server::Instance& server)
+    Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+    AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+    OptRef<Server::Admin> admin, ProtobufMessage::ValidationContext& validation_context,
+    Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+    Router::Context& router_context, const Server::Instance& server)
     : server_(server), factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       deferred_cluster_creation_(bootstrap.cluster_manager().enable_deferred_cluster_creation()),
@@ -331,8 +331,7 @@ ClusterManagerImpl::ClusterManagerImpl(
         });
   }
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-      *this, tls, time_source_, api, grpc_context.statNames(),
-      bootstrap.grpc_async_client_manager_config());
+      *this, tls, context, grpc_context.statNames(), bootstrap.grpc_async_client_manager_config());
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -2222,7 +2221,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   auto cluster_manager_impl = std::unique_ptr<ClusterManagerImpl>{new ClusterManagerImpl(
-      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(),
+      bootstrap, *this, context_, stats_, tls_, context_.runtime(), context_.localInfo(),
       context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
       context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
       context_.routerContext(), server_)};

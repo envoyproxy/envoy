@@ -24,6 +24,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":engine_common_lib",
+        ":internal_engine_types_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
@@ -72,4 +73,12 @@ envoy_cc_library(
         ":engine_common_lib",
         "@envoy//source/exe:envoy_stripped_main_base_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "internal_engine_types_lib",
+    hdrs = [
+        "internal_engine_types.h",
+    ],
+    repository = "@envoy",
 )
