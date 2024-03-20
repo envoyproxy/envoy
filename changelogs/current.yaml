@@ -191,6 +191,12 @@ bug_fixes:
     If the claim is ommited in the jwt then :ref:`default_refresh_token_expires_in
     <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_refresh_token_expires_in>`
     specifies the lifetime of the refresh token. The default value is ``604800`` seconds (a week).
+- area: thread_local
+  change: |
+    Main thread waits until TLS slots on worker threads are deleted. This fixes race situation when slots have pointers or references
+    to resources allocated on main thread and the main thread releases those resources while worker threads still use them.
+    This behaviour can be disabled by setting runtime flag ``envoy.reloadable_features.thread_local_synchronize_slots_deletion``
+    to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
