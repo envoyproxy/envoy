@@ -52,8 +52,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
             dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                          TestUtility::makeDnsResponse({
                              // The only significant address is the first one; the other ones are
-                             // just used to populate a list
-                             // whose maintenance is race-prone.
+                             // just used to populate a list whose maintenance is race-prone.
                              first_address_string_,
                              absl::StrCat("127.0.0.", address_),
                              absl::StrCat("127.0.0.", address_ + 1),
