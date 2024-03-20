@@ -461,6 +461,16 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   rbac_http_prefix.value_ = "prefix";
   regex_tester.testRegex("http.hcm_prefix.rbac.prefix.allowed", "http.rbac.allowed",
                          {rbac_http_hcm_prefix, rbac_http_prefix});
+
+  // Proxy Protocol version prefix
+  Tag proxy_protocol_version;
+  proxy_protocol_version.name_ = tag_names.PROXY_PROTOCOL_VERSION;
+  proxy_protocol_version.value_ = "v2";
+
+  listener_address.value_ = "[__1]_443";
+  regex_tester.testRegex("listener.[__1]_443.downstream_cx_proxy_proto.versions.v2.error",
+                         "listener.downstream_cx_proxy_proto.versions.error",
+                         {listener_address, proxy_protocol_version});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

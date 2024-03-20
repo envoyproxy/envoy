@@ -246,7 +246,9 @@ TEST_P(ProxyProtocolTest, V1UnsupportedIPv4) {
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
@@ -255,7 +257,9 @@ TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V1Basic) {
@@ -270,7 +274,9 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
@@ -378,7 +384,9 @@ TEST_P(ProxyProtocolTest, V1Minimal) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2Basic) {
@@ -398,7 +406,9 @@ TEST_P(ProxyProtocolTest, V2Basic) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, BasicV6) {
@@ -413,7 +423,9 @@ TEST_P(ProxyProtocolTest, BasicV6) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2BasicV6) {
@@ -435,7 +447,9 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
@@ -450,7 +464,9 @@ TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
@@ -467,7 +483,9 @@ TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
@@ -481,7 +499,9 @@ TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
 
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, ErrorRecv_2) {
@@ -665,7 +685,9 @@ TEST_P(ProxyProtocolTest, V2NotLocalOrOnBehalf) {
 
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnection) {
@@ -688,7 +710,9 @@ TEST_P(ProxyProtocolTest, V2LocalConnection) {
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
@@ -711,7 +735,9 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
@@ -741,7 +767,9 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV4) {
@@ -754,7 +782,9 @@ TEST_P(ProxyProtocolTest, V2ShortV4) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
@@ -769,7 +799,9 @@ TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
@@ -783,7 +815,9 @@ TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV6) {
@@ -797,7 +831,9 @@ TEST_P(ProxyProtocolTest, V2ShortV6) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortAddrV6) {
@@ -813,7 +849,9 @@ TEST_P(ProxyProtocolTest, V2ShortAddrV6) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2AF_UNIX) {
@@ -827,7 +865,9 @@ TEST_P(ProxyProtocolTest, V2AF_UNIX) {
 
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2BadCommand) {
@@ -841,7 +881,9 @@ TEST_P(ProxyProtocolTest, V2BadCommand) {
 
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2WrongVersion) {
@@ -854,7 +896,9 @@ TEST_P(ProxyProtocolTest, V2WrongVersion) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V1TooLong) {
@@ -885,7 +929,9 @@ TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
   // Not allowed as unknown because of PROXY v1 signature match.
   // Not tracked as v1 due to missing /r/n at end.
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 0);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      0);
   EXPECT_EQ(
       stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.not_found_allowed")
           .value(),
@@ -915,7 +961,9 @@ TEST_P(ProxyProtocolTest, V2ParseExtensions) {
   expectData("DATA");
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
@@ -1044,7 +1092,9 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsFrag) {
   expectData("DATA");
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, Fragmented) {
@@ -1067,7 +1117,9 @@ TEST_P(ProxyProtocolTest, Fragmented) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented1) {
@@ -1091,7 +1143,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented1) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented2) {
@@ -1115,7 +1169,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented2) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented3) {
@@ -1141,7 +1197,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented3) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
@@ -1384,7 +1442,9 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
@@ -1407,7 +1467,9 @@ TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
@@ -1434,7 +1496,9 @@ TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2PartialRead) {
@@ -1461,7 +1525,9 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
@@ -1492,7 +1558,9 @@ TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
@@ -1523,7 +1591,9 @@ TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
@@ -1568,7 +1638,9 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
@@ -1609,7 +1681,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataNamespace) {
@@ -1651,7 +1725,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
   ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
@@ -1712,7 +1788,9 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
                           0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
@@ -1778,7 +1856,9 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
                           0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, replacement, 0x37));
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
@@ -1829,7 +1909,9 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
@@ -1853,7 +1935,9 @@ TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
 
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
@@ -1884,7 +1968,9 @@ TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
 
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
@@ -1933,7 +2019,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeEmpty) {
@@ -1971,7 +2059,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeEmpty) {
   EXPECT_EQ(0, proxy_proto_data.tlv_vector_.size());
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
@@ -2013,7 +2103,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
                                    proxy_proto_data.tlv_vector_[0].value.end()));
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
@@ -2026,7 +2118,9 @@ TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   expectProxyProtoError();
   // Tracked as v1 because of trailing \r\n
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLineWithAllowNoProxyProtocol) {
@@ -2062,7 +2156,9 @@ TEST_P(ProxyProtocolTest, NotEnoughFields) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, UnsupportedProto) {
@@ -2070,7 +2166,9 @@ TEST_P(ProxyProtocolTest, UnsupportedProto) {
   write("PROXY UDP6 1:2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, InvalidSrcAddress) {
@@ -2078,7 +2176,9 @@ TEST_P(ProxyProtocolTest, InvalidSrcAddress) {
   write("PROXY TCP4 230.0.0.1 10.1.1.3 1234 5678\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, InvalidDstAddress) {
@@ -2086,7 +2186,9 @@ TEST_P(ProxyProtocolTest, InvalidDstAddress) {
   write("PROXY TCP4 10.1.1.2 0.0.0.0 1234 5678\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, BadPort) {
@@ -2094,7 +2196,9 @@ TEST_P(ProxyProtocolTest, BadPort) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, NegativePort) {
@@ -2102,7 +2206,9 @@ TEST_P(ProxyProtocolTest, NegativePort) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 -1 1234\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, PortOutOfRange) {
@@ -2110,7 +2216,9 @@ TEST_P(ProxyProtocolTest, PortOutOfRange) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 1234\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, BadAddress) {
@@ -2118,7 +2226,9 @@ TEST_P(ProxyProtocolTest, BadAddress) {
   write("PROXY TCP6 1::2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
@@ -2126,7 +2236,9 @@ TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
   write("PROXY TCP4 [1:2:3::4] 1.2.3.4 1234 5678\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
@@ -2134,7 +2246,9 @@ TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
   write("PROXY TCP4 1.2.3.4 [1:2:3: 1234 4]:5678\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolTest, Truncated) {
@@ -2260,7 +2374,9 @@ TEST_P(ProxyProtocolTest, DrainError) {
 
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 #endif
 
@@ -2295,7 +2411,9 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV2BasicAllowed) {
   expectData("more data");
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2BasicRejected) {
@@ -2311,8 +2429,11 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2BasicRejected) {
   write(buffer, sizeof(buffer));
   expectConnectionError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
-  EXPECT_EQ(stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.disallowed")
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
+  EXPECT_EQ(stats_store_
+                .counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.disallowed")
                 .value(),
             1);
 }
@@ -2330,8 +2451,11 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V1V2DisallowedV2BasicRejected) {
   write(buffer, sizeof(buffer));
   expectConnectionError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
-  EXPECT_EQ(stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.disallowed")
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
+  EXPECT_EQ(stats_store_
+                .counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.disallowed")
                 .value(),
             1);
 }
@@ -2348,7 +2472,9 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV2ShortError) {
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2ShortRejected) {
@@ -2363,8 +2489,11 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2ShortRejected) {
   write(buffer, sizeof(buffer));
   expectConnectionError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
-  EXPECT_EQ(stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.disallowed")
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
+  EXPECT_EQ(stats_store_
+                .counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.disallowed")
                 .value(),
             1);
 }
@@ -2378,7 +2507,9 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV1BasicAllowed) {
   expectData("more data");
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV1BasicRejected) {
@@ -2389,8 +2520,11 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV1BasicRejected) {
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
   expectConnectionError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
-  EXPECT_EQ(stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.disallowed")
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
+  EXPECT_EQ(stats_store_
+                .counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.disallowed")
                 .value(),
             1);
 }
@@ -2403,7 +2537,9 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV1BadPortError) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsTest, V1V2DisallowedV1BasicRejected) {
@@ -2414,8 +2550,11 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V1V2DisallowedV1BasicRejected) {
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
   expectConnectionError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
-  EXPECT_EQ(stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.disallowed")
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
+  EXPECT_EQ(stats_store_
+                .counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.disallowed")
                 .value(),
             1);
 }
@@ -2428,8 +2567,11 @@ TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV1BadPortError) {
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectConnectionError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
-  EXPECT_EQ(stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.disallowed")
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
+  EXPECT_EQ(stats_store_
+                .counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.disallowed")
                 .value(),
             1);
 }
@@ -2465,7 +2607,9 @@ TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV2BasicA
   expectData("more data");
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV2BasicAllowed) {
@@ -2499,7 +2643,9 @@ TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV2ShortE
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v2.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV2ShortAllowed) {
@@ -2529,7 +2675,9 @@ TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV1BasicA
   expectData("more data");
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV1BasicAllowed) {
@@ -2554,7 +2702,9 @@ TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV1BadPor
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectProxyProtoError();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.error")
+          .value(),
+      1);
 }
 
 TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV1BadPortAllowed) {
@@ -2776,7 +2926,9 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST_P(WildcardProxyProtocolTest, BasicV6) {
@@ -2793,7 +2945,9 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   disconnect();
   EXPECT_EQ(
-      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found").value(), 1);
+      stats_store_.counter("listener.test_listener.downstream_cx_proxy_proto.versions.v1.found")
+          .value(),
+      1);
 }
 
 TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {

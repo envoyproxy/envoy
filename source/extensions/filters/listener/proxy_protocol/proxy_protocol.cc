@@ -59,11 +59,11 @@ ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope, Stats::Scope&
       /*general_=*/
       {GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(listener_scope, kProxyProtoStatsPrefix))},
       /*v1_=*/
-      {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v1.")))},
+      {VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(
+          listener_scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v1.")))},
       /*v2_=*/
-      {VERSIONED_PROXY_PROTOCOL_STATS(
-          POOL_COUNTER_PREFIX(listener_scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v2.")))},
+      {VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(
+          listener_scope, absl::StrCat(kProxyProtoStatsPrefix, kVersionStatsPrefix, "v2.")))},
   };
 }
 
