@@ -542,7 +542,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   auto body_or_error = ConfigUtility::parseDirectResponseBody(
       route, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
   THROW_IF_STATUS_NOT_OK(body_or_error, throw);
-  direct_response_body_ = body_or_error.value();
+  std::string& direct_response_body = body_or_error.value();
+  tls_ = factory_context.threadLocal().allocateSlot();
+  tls_->set([direct_response_body](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalDirectResponseBody>(direct_response_body);
+  });
   if (envoy::config::core::v3::DataSource::SpecifierCase::kFilename ==
       route.direct_response().body().specifier_case()) {
     direct_response_file_watcher_ =
@@ -554,8 +558,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           auto file_or_error = Envoy::Config::DataSource::readFileDatasource(
               file_name, api, vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
           RETURN_IF_STATUS_NOT_OK(file_or_error);
-          absl::MutexLock lock(&direct_response_mutex_);
-          direct_response_body_ = file_or_error.value();
+          std::string& direct_response_body = file_or_error.value();
+          tls_->set([direct_response_body](
+                        Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+            return std::make_shared<ThreadLocalDirectResponseBody>(direct_response_body);
+          });
           return absl::OkStatus();
         });
   }
