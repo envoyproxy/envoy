@@ -329,7 +329,6 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "drain_close_integration_test.cc",
     ]),
-    shard_count = 6,
     tags = [
         "cpu:3",
     ],
@@ -615,7 +614,6 @@ envoy_cc_test(
     srcs = [
         "buffer_accounting_integration_test.cc",
     ],
-    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -987,7 +985,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 16,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],
@@ -1357,7 +1355,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    shard_count = 4,
+    shard_count = 2,
     tags = [
         "cpu:3",
         "nofips",
@@ -1393,7 +1391,6 @@ envoy_cc_test(
     name = "websocket_integration_test",
     size = "large",
     srcs = ["websocket_integration_test.cc"],
-    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -1540,7 +1537,7 @@ envoy_cc_test(
     name = "overload_integration_test",
     size = "large",
     srcs = ["overload_integration_test.cc"],
-    shard_count = 10,
+    shard_count = 4,
     tags = [
         "cpu:3",
     ],
@@ -1814,7 +1811,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 30,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],
@@ -1840,7 +1837,6 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 4,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -2285,7 +2281,6 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
-    shard_count = 2,
     tags = [
         "cpu:2",
     ],
