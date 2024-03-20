@@ -16,8 +16,8 @@ absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactor
     Server::Configuration::ServerFactoryContext&) {
 
   const auto& prefix = stat_prefix + "composite.";
-  auto stats = std::make_shared<FilterStats>(FilterStats{
-      ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(dual_info.scope, prefix))});
+  auto stats = std::make_shared<FilterStats>(
+      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(dual_info.scope, prefix))});
 
   return [stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher());

@@ -136,7 +136,8 @@ public:
                           "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                           code: 403
     )EOF",
-                                                 name), downstream_filter_);
+                                                 name),
+                                 downstream_filter_);
   }
 
   void prependCompositeDynamicFilter(const std::string& name = "composite",
@@ -173,7 +174,8 @@ public:
                             type_urls:
                             - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
     )EOF",
-                                                                             name, path)), downstream_filter_);
+                                                                             name, path)),
+                                 downstream_filter_);
     TestEnvironment::writeStringToFileForTest("set_response_code.yaml", R"EOF(
 resources:
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig

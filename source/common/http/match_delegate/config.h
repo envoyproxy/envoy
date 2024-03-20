@@ -104,14 +104,17 @@ private:
 };
 
 class MatchDelegateConfig
-    : public  Extensions::HttpFilters::Common::CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
-                               envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>,
+    : public  Extensions::HttpFilters::Common::CommonFactoryBase<
+          envoy::extensions::common::matching::v3::ExtensionWithMatcher,
+          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>,
       public Server::Configuration::NamedHttpFilterConfigFactory,
-      public Server::Configuration::UpstreamHttpFilterConfigFactory  {
+      public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
   // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
-  MatchDelegateConfig() : CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
-                               envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>("envoy.filters.http.match_delegate") {}
+  MatchDelegateConfig()
+      : CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
+                          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>(
+            "envoy.filters.http.match_delegate") {}
   struct DualInfo {
     DualInfo(Server::Configuration::UpstreamFactoryContext& context)
         : init_manager(context.initManager()), scope(context.scope()), is_upstream(true) {}
@@ -126,10 +129,11 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const envoy::extensions::common::matching::v3::ExtensionWithMatcher&>(
-                                                proto_config, context.messageValidationVisitor()),
-                                             stats_prefix, DualInfo(context),
-                                             context);
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<
+            const envoy::extensions::common::matching::v3::ExtensionWithMatcher&>(
+            proto_config, context.messageValidationVisitor()),
+        stats_prefix, DualInfo(context), context);
   }
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
@@ -137,7 +141,8 @@ public:
                                const std::string& stats_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const envoy::extensions::common::matching::v3::ExtensionWithMatcher&&>(
+        MessageUtil::downcastAndValidate<
+            const envoy::extensions::common::matching::v3::ExtensionWithMatcher&&>(
             proto_config, context.serverFactoryContext().messageValidationVisitor()),
         stats_prefix, DualInfo(context), context);
   }
@@ -146,7 +151,7 @@ private:
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string& prefix, DualInfo info, Server::Configuration::FactoryContext& context);
-  absl::StatusOr<Envoy::Http::FilterFactoryCb>createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string&, DualInfo info, Server::Configuration::UpstreamFactoryContext& context);
 
