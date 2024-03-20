@@ -22,11 +22,12 @@ namespace GrpcCredentials {
 namespace AwsIam {
 
 std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::config::core::v3::GrpcService& grpc_service_config, Api::Api& api) {
+    const envoy::config::core::v3::GrpcService& grpc_service_config,
+    Server::Configuration::CommonFactoryContext& context) {
 
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
-      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, api);
+      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, context.api());
 
   std::shared_ptr<grpc::CallCredentials> call_creds;
   for (const auto& credential : google_grpc.call_credentials()) {
@@ -66,10 +67,10 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         // usage of AWS credentials common utils. Until then we are setting nullopt for server
         // factory context.
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            api, absl::nullopt /*Empty factory context*/, region,
+            context.api(), absl::nullopt /*Empty factory context*/, region,
             Common::Aws::Utility::fetchMetadata);
         auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
-            config.service_name(), region, credentials_provider, api.timeSource(),
+            config.service_name(), region, credentials_provider, context,
             // TODO: extend API to allow specifying header exclusion. ref:
             // https://github.com/envoyproxy/envoy/pull/18998
             Common::Aws::AwsSigningHeaderExclusionVector{});

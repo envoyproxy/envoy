@@ -8,11 +8,13 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -28,6 +30,7 @@ public:
         token_credentials_("akid", "secret", "token") {
     // 20180102T030405Z
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+    ON_CALL(context_, timeSystem()).WillByDefault(ReturnRef(time_system_));
   }
 
   void addMethod(const std::string& method) { message_->headers().setMethod(method); }
@@ -54,7 +57,7 @@ public:
     return SigV4ASignerImpl{"service",
                             "region",
                             getTestCredentialsProvider(),
-                            time_system_,
+                            context_,
                             Extensions::Common::Aws::AwsSigningHeaderExclusionVector{},
                             query_string,
                             expiration_time};
@@ -133,6 +136,7 @@ public:
   }
   NiceMock<MockCredentialsProvider>* credentials_provider_;
   Event::SimulatedTimeSystem time_system_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::RequestMessagePtr message_;
   Credentials credentials_;
   Credentials token_credentials_;
@@ -478,7 +482,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
   headers.setPath("/example/path");
   headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
   headers.addCopy("testheader", "value1");
-  SigV4ASignerImpl querysigner("service", "region", getTestCredentialsProvider(), time_system_,
+  SigV4ASignerImpl querysigner("service", "region", getTestCredentialsProvider(), context_,
                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
 
   querysigner.signUnsignedPayload(headers);

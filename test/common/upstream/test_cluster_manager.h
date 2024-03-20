@@ -162,17 +162,18 @@ public:
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
-  static std::unique_ptr<TestClusterManagerImpl>
-  createAndInit(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                ClusterManagerFactory& factory, Stats::Store& stats, ThreadLocal::Instance& tls,
-                Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-                Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context,
-                Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-                Router::Context& router_context, Server::Instance& server) {
-    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
-        bootstrap, factory, stats, tls, runtime, local_info, log_manager, main_thread_dispatcher,
-        admin, validation_context, api, http_context, grpc_context, router_context, server)};
+  static std::unique_ptr<TestClusterManagerImpl> createAndInit(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+      Server::Instance& server) {
+    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{
+        new TestClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
+                                   log_manager, main_thread_dispatcher, admin, validation_context,
+                                   api, http_context, grpc_context, router_context, server)};
     THROW_IF_NOT_OK(cluster_manager->init(bootstrap));
     return cluster_manager;
   }
@@ -205,7 +206,8 @@ protected:
   using ClusterManagerImpl::ClusterManagerImpl;
 
   TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         ClusterManagerFactory& factory, Stats::Store& stats,
+                         ClusterManagerFactory& factory,
+                         Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
                          ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                          const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
@@ -213,9 +215,9 @@ protected:
                          ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                          Http::Context& http_context, Grpc::Context& grpc_context,
                          Router::Context& router_context, Server::Instance& server)
-      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
-                           main_thread_dispatcher, admin, validation_context, api, http_context,
-                           grpc_context, router_context, server) {}
+      : ClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
+                           log_manager, main_thread_dispatcher, admin, validation_context, api,
+                           http_context, grpc_context, router_context, server) {}
 };
 
 } // namespace Upstream

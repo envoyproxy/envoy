@@ -368,9 +368,9 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
-    return std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig(), *api_,
-                                                   google_grpc_stat_names_);
+    return std::make_unique<GoogleAsyncClientImpl>(
+        *dispatcher_, *google_tls_, stub_factory, stats_scope_, createGoogleGrpcConfig(),
+        server_factory_context_, google_grpc_stat_names_);
 #else
     PANIC("reached unexpected code");
 #endif
@@ -533,6 +533,7 @@ class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it

@@ -166,8 +166,8 @@ class DefaultGoogleGrpcCredentialsFactory : public GoogleGrpcCredentialsFactory 
 public:
   std::shared_ptr<grpc::ChannelCredentials>
   getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
-                        Api::Api& api) override {
-    return CredsUtility::defaultChannelCredentials(grpc_service_config, api);
+                        Server::Configuration::CommonFactoryContext& context) override {
+    return CredsUtility::defaultChannelCredentials(grpc_service_config, context.api());
   }
 
   std::string name() const override { return "envoy.grpc_credentials.default"; }

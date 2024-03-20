@@ -4,11 +4,13 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -21,11 +23,12 @@ public:
   SigV4SignerImplTest()
       : credentials_provider_(new NiceMock<MockCredentialsProvider>()),
         message_(new Http::RequestMessageImpl()),
-        signer_("service", "region", CredentialsProviderSharedPtr{credentials_provider_},
-                time_system_, Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}),
+        signer_("service", "region", CredentialsProviderSharedPtr{credentials_provider_}, context_,
+                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}),
         credentials_("akid", "secret"), token_credentials_("akid", "secret", "token") {
     // 20180102T030405Z
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+    ON_CALL(context_, timeSystem()).WillByDefault(ReturnRef(time_system_));
   }
 
   void addMethod(const std::string& method) { message_->headers().setMethod(method); }
@@ -49,7 +52,7 @@ public:
     headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
     SigV4SignerImpl signer(service_name, "region",
-                           CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+                           CredentialsProviderSharedPtr{credentials_provider}, context_,
                            Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, 5);
     if (use_unsigned_payload) {
       signer.signUnsignedPayload(headers, override_region);
@@ -79,7 +82,7 @@ public:
     }
 
     SigV4SignerImpl signer(service_name, "region",
-                           CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+                           CredentialsProviderSharedPtr{credentials_provider}, context_,
                            Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, 5);
 
     signer.signUnsignedPayload(extra_headers, override_region);
@@ -90,6 +93,7 @@ public:
 
   NiceMock<MockCredentialsProvider>* credentials_provider_;
   Event::SimulatedTimeSystem time_system_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::RequestMessagePtr message_;
   SigV4SignerImpl signer_;
   Credentials credentials_;
@@ -268,7 +272,7 @@ TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
   headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
   headers.addCopy("testheader", "value1");
   SigV4SignerImpl querysigner("service", "region",
-                              CredentialsProviderSharedPtr{credentials_provider}, time_system_,
+                              CredentialsProviderSharedPtr{credentials_provider}, context_,
                               Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
 
   querysigner.signUnsignedPayload(headers);

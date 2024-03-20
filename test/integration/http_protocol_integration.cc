@@ -8,6 +8,8 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
     const std::vector<Http::CodecType>& upstream_protocols) {
   std::vector<HttpProtocolTestParams> ret;
 
+  bool handled_http2_special_cases_downstream = false;
+  bool handled_http2_special_cases_upstream = false;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto downstream_protocol : downstream_protocols) {
       for (auto upstream_protocol : upstream_protocols) {
@@ -27,10 +29,19 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
 
         std::vector<Http2Impl> http2_implementations = {Http2Impl::Nghttp2};
         std::vector<bool> http2_bool_values = {false};
-        if (downstream_protocol == Http::CodecType::HTTP2 ||
-            upstream_protocol == Http::CodecType::HTTP2) {
+        if ((!handled_http2_special_cases_downstream &&
+             downstream_protocol == Http::CodecType::HTTP2) ||
+            (!handled_http2_special_cases_upstream &&
+             upstream_protocol == Http::CodecType::HTTP2)) {
           http2_implementations.push_back(Http2Impl::Oghttp2);
           http2_bool_values.push_back(true);
+
+          if (downstream_protocol == Http::CodecType::HTTP2) {
+            handled_http2_special_cases_downstream = true;
+          }
+          if (upstream_protocol == Http::CodecType::HTTP2) {
+            handled_http2_special_cases_upstream = true;
+          }
         }
 
         std::vector<bool> use_header_validator_values;

@@ -9,6 +9,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -202,21 +203,26 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_grpc_manager")),
         stat_names_(scope_.symbolTable()) {
-    tls_.setDispatcher(dispatcher_.get());
+    context_.thread_local_.setDispatcher(dispatcher_.get());
   }
 
   void initialize(absl::optional<Bootstrap::GrpcAsyncClientManagerConfig> config = absl::nullopt) {
+    ON_CALL(context_, clusterManager()).WillByDefault(testing::ReturnRef(cm_));
+    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
+    ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
+    ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
     if (config.has_value()) {
       async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
-          cm_, tls_, time_system_, *api_, stat_names_, config.value());
+          cm_, context_.threadLocal(), context_, stat_names_, config.value());
     } else {
       async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
-          cm_, tls_, time_system_, *api_, stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
+          cm_, context_.threadLocal(), context_, stat_names_,
+          Bootstrap::GrpcAsyncClientManagerConfig());
     }
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Upstream::MockClusterManager cm_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::MockStore store_;
   Stats::MockScope& scope_{store_.mockScope()};
   Event::SimulatedTimeSystem time_system_;
