@@ -19,18 +19,17 @@ def _impl(ctx):
 
         cc_toolchain = ctx.split_attr._cc_toolchain[platform][cc_common.CcToolchainInfo]
         lib = dep.files.to_list()[0]
-        platform_name = platform or ctx.fragments.android.android_cpu
-        objdump_output = ctx.actions.declare_file(platform_name + "/" + platform_name + ".objdump.gz")
+        objdump_output = ctx.actions.declare_file(platform + "/" + platform + ".objdump.gz")
 
         ctx.actions.run_shell(
             inputs = [lib],
             outputs = [objdump_output],
             command = cc_toolchain.objdump_executable + " --syms " + lib.path + "| gzip -c >" + objdump_output.path,
             tools = [cc_toolchain.all_files],
-            progress_message = "Generating symbol map " + platform_name,
+            progress_message = "Generating symbol map " + platform,
         )
 
-        strip_output = ctx.actions.declare_file(platform_name + "/" + lib.basename)
+        strip_output = ctx.actions.declare_file(platform + "/" + lib.basename)
         ctx.actions.run_shell(
             inputs = [lib],
             outputs = [strip_output],
