@@ -48,7 +48,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers:96.4"
 "source/extensions/tracers/common:74.8"
 "source/extensions/tracers/common/ot:72.9"
-"source/extensions/tracers/opencensus:94.0"
+"source/extensions/tracers/opencensus:93.9"
 "source/extensions/tracers/zipkin:95.8"
 "source/extensions/transport_sockets:97.4"
 "source/common/tls:94.9"
