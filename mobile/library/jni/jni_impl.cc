@@ -33,25 +33,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
 
 // JniLibrary
 
-static void jvm_on_engine_running(void* context) {
-  if (context == nullptr) {
-    return;
-  }
-
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
-  jobject j_context = static_cast<jobject>(context);
-  Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmonEngineRunningContext =
-      jni_helper.getObjectClass(j_context);
-  jmethodID jmid_onEngineRunning = jni_helper.getMethodId(
-      jcls_JvmonEngineRunningContext.get(), "invokeOnEngineRunning", "()Ljava/lang/Object;");
-  Envoy::JNI::LocalRefUniquePtr<jobject> unused =
-      jni_helper.callObjectMethod(j_context, jmid_onEngineRunning);
-
-  // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
-  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
-  jni_helper.getEnv()->DeleteGlobalRef(j_context);
-}
-
 static void jvm_on_log(envoy_log_level log_level, envoy_data data, const void* context) {
   if (context == nullptr) {
     return;
@@ -68,14 +49,6 @@ static void jvm_on_log(envoy_log_level log_level, envoy_data data, const void* c
   jni_helper.callVoidMethod(j_context, jmid_onLog, log_level, str.get());
 
   release_envoy_data(data);
-}
-
-static void jvm_on_exit(void*) {
-  // Note that this is not dispatched because the thread that
-  // needs to be detached is the engine thread.
-  // This function is called from the context of the engine's
-  // thread due to it being posted to the engine's event dispatcher.
-  Envoy::JNI::JavaVirtualMachine::detachCurrentThread();
 }
 
 static void jvm_on_track(envoy_map events, const void* context) {
@@ -106,10 +79,32 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_start_context, jobject envoy_logger_context,
     jobject j_event_tracker) {
+  std::unique_ptr<Envoy::InternalEngineCallbacks> callbacks =
+      std::make_unique<Envoy::InternalEngineCallbacks>();
+
   jobject retained_on_start_context =
       env->NewGlobalRef(on_start_context); // Required to keep context in memory
-  envoy_engine_callbacks native_callbacks = {jvm_on_engine_running, jvm_on_exit,
-                                             retained_on_start_context};
+  callbacks->on_engine_running = [retained_on_start_context] {
+    Envoy::JNI::JniHelper jni_helper(Envoy::JNI::getEnv());
+    Envoy::JNI::LocalRefUniquePtr<jclass> jcls_JvmonEngineRunningContext =
+        jni_helper.getObjectClass(retained_on_start_context);
+    jmethodID jmid_onEngineRunning = jni_helper.getMethodId(
+        jcls_JvmonEngineRunningContext.get(), "invokeOnEngineRunning", "()Ljava/lang/Object;");
+    Envoy::JNI::LocalRefUniquePtr<jobject> unused =
+        jni_helper.callObjectMethod(retained_on_start_context, jmid_onEngineRunning);
+
+    // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
+    // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
+    jni_helper.getEnv()->DeleteGlobalRef(retained_on_start_context);
+  };
+
+  callbacks->on_exit = [] {
+    // Note that this is not dispatched because the thread that
+    // needs to be detached is the engine thread.
+    // This function is called from the context of the engine's
+    // thread due to it being posted to the engine's event dispatcher.
+    Envoy::JNI::JavaVirtualMachine::detachCurrentThread();
+  };
 
   const jobject retained_logger_context = env->NewGlobalRef(envoy_logger_context);
   envoy_logger logger = {nullptr, nullptr, nullptr};
@@ -127,7 +122,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   }
 
   return reinterpret_cast<intptr_t>(
-      new Envoy::InternalEngine(native_callbacks, logger, event_tracker));
+      new Envoy::InternalEngine(std::move(callbacks), logger, event_tracker));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
