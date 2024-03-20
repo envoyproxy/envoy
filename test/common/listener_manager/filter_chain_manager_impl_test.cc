@@ -298,8 +298,12 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
                                 nullptr, filter_chain_factory_builder_, *filter_chain_manager_),
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': filter chain 'foo' has the "
-                            "same matching rules defined as 'foo'. duplicate matcher is: "
-                            "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}");
+                            "same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+                            ". duplicate matcher is: "
+                            "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}"
+#endif
+  );
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));
