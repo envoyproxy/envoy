@@ -104,7 +104,7 @@ private:
 };
 
 class MatchDelegateConfig
-    : public  Extensions::HttpFilters::Common::CommonFactoryBase<
+    : public Extensions::HttpFilters::Common::CommonFactoryBase<
           envoy::extensions::common::matching::v3::ExtensionWithMatcher,
           envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>,
       public Server::Configuration::NamedHttpFilterConfigFactory,
