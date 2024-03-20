@@ -8,6 +8,8 @@ import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
+import "validate/validate.proto";
+
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.basic_auth.v3";
 option java_outer_classname = "BasicAuthProto";
 option java_multiple_files = true;
@@ -41,4 +43,17 @@ message BasicAuth {
   // If it is not specified, the username will not be forwarded.
   string forward_username_header = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+}
+
+message BasicAuthPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the basic auth filter for this particular vhost or route.
+    // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+    bool disabled = 1 [(validate.rules).bool.const = true];
+
+    // Username-password pairs for this route.
+    config.core.v3.DataSource users = 2 [(validate.rules).message.required = true, (udpa.annotations.sensitive) = true];
+  }
 }

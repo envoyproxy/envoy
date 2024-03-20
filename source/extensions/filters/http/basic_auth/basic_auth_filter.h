@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
@@ -75,6 +76,26 @@ private:
 
   // The callback function.
   FilterConfigConstSharedPtr config_;
+};
+
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
+ * Per route settings for BasicAuth. Allows customizing users on a virtualhost\route\weighted cluster level.
+ */
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(
+      const envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute& config)
+      : disabled_(config.disabled()) {
+  }
+
+  // void merge(const FilterConfigPerRoute& other);
+
+  bool disabled() const { return disabled_; }
+
+private:
+  bool disabled_;
 };
 
 } // namespace BasicAuth
