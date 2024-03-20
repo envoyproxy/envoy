@@ -74,11 +74,9 @@ public:
                       HostConstSharedPtr logical_host)
       : address_(address), logical_host_(logical_host) {}
 
-  // Upstream:HostDescription
+  // Upstream:HostDescription observers are delegated to logical_host_.
   bool canary() const override { return logical_host_->canary(); }
-  void canary(bool) override {}
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
-  void metadata(MetadataConstSharedPtr) override {}
 
   Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();
@@ -88,8 +86,6 @@ public:
     return logical_host_->canCreateConnection(priority);
   }
   HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
-  void setHealthChecker(HealthCheckHostMonitorPtr&&) override {}
-  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&&) override {}
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     return logical_host_->outlierDetector();
   }
@@ -116,15 +112,27 @@ public:
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
-  void setLastHcPassTime(MonotonicTime) override {}
   uint32_t priority() const override { return logical_host_->priority(); }
-  void priority(uint32_t) override {}
-
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const override {
     return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
   }
+
+  // Upstream:HostDescription observers are all swallowed, because logical_host_
+  // is const. These should never be called except during coverage tests.
+  //
+  // There may be an argument to suggest that HostDescription should contain
+  // only the immutable member variables and observers, and the mutable
+  // sections, along with 'address' and 'addressList' should be part of
+  // Host. This would not be a small change, but might enable multiple hosts to
+  // share common HostDescriptions.
+  void setOutlierDetector(Outlier::DetectorHostMonitorPtr&&) override {}
+  void setHealthChecker(HealthCheckHostMonitorPtr&&) override {}
+  void metadata(MetadataConstSharedPtr) override {}
+  void canary(bool) override {}
+  void setLastHcPassTime(MonotonicTime) override {}
+  void priority(uint32_t) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;
