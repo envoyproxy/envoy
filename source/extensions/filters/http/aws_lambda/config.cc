@@ -96,8 +96,7 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
       per_route_config.invoke_config().credentials_profile(), server_context, region);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-      service_name, region, std::move(credentials_provider),
-      server_context,
+      service_name, region, std::move(credentials_provider), server_context,
       // TODO: extend API to allow specifying header exclusion. ref:
       // https://github.com/envoyproxy/envoy/pull/18998
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
