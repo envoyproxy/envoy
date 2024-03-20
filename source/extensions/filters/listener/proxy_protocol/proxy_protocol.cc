@@ -78,7 +78,8 @@ void GeneralProxyProtocolStats::increment(ReadOrParseState decision) {
     not_found_disallowed_.inc();
     break;
   case ReadOrParseState::Denied:
-    PANIC_DUE_TO_CORRUPT_ENUM; // Should never happen.
+    IS_ENVOY_BUG("ReadOrParseState can never be Denied when proxy protocol is not found");
+    break;
   }
 }
 
