@@ -29,16 +29,40 @@ using ::testing::Return;
 using ::testing::ReturnRef;
 using ::testing::UnorderedElementsAre;
 
+class FilterSettingsMock : public FilterSettings {
+public:
+  FilterSettingsMock(InvocationMode mode, bool payload_passthrough, const std::string& host_rewrite)
+      : invocation_mode_(mode), payload_passthrough_(payload_passthrough),
+        host_rewrite_(host_rewrite), stats_(generateStats("test", *stats_store_.rootScope())) {}
+  FilterSettingsMock(InvocationMode mode, bool payload_passthrough, const std::string& host_rewrite,
+                     FilterStats stat)
+      : invocation_mode_(mode), payload_passthrough_(payload_passthrough),
+        host_rewrite_(host_rewrite), stats_(stat) {}
+
+  const Arn& arn() const override { return arn_; }
+  bool payloadPassthrough() const override { return payload_passthrough_; }
+  InvocationMode invocationMode() const override { return invocation_mode_; }
+  const std::string& hostRewrite() const override { return host_rewrite_; }
+  Extensions::Common::Aws::Signer& signer() override { return *signer_; }
+  FilterStats& stats() override { return stats_; }
+
+  Arn arn_{parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value()};
+  InvocationMode invocation_mode_;
+  bool payload_passthrough_;
+  const std::string host_rewrite_;
+  Stats::IsolatedStoreImpl stats_store_;
+  FilterStats stats_;
+  std::shared_ptr<NiceMock<MockSigner>> signer_{std::make_shared<NiceMock<MockSigner>>()};
+};
+
 class AwsLambdaFilterTest : public ::testing::Test {
 public:
-  AwsLambdaFilterTest() : arn_(parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value()) {}
+  AwsLambdaFilterTest() {}
 
-  void setupFilter(const FilterSettings& settings) {
-    signer_ = std::make_shared<NiceMock<MockSigner>>();
-    filter_ = std::make_unique<Filter>(settings, stats_, signer_, false);
+  void setupFilter(const std::shared_ptr<FilterSettings>& settings, bool upstream) {
+    filter_ = std::make_unique<Filter>(settings, upstream);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-    setupClusterMetadata();
   }
 
   void setupClusterMetadata() {
@@ -49,13 +73,10 @@ public:
   }
 
   std::unique_ptr<Filter> filter_;
-  std::shared_ptr<NiceMock<MockSigner>> signer_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   envoy::config::core::v3::Metadata metadata_;
-  Arn arn_;
-  Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_ = generateStats("test", *stats_store_.rootScope());
+
   const std::string metadata_yaml_ = "egress_gateway: true";
 };
 
@@ -63,7 +84,11 @@ public:
  * Requests that are _not_ header only, should result in StopIteration.
  */
 TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
@@ -73,8 +98,13 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
  * Header only pass-through requests should be signed and Continue iteration.
  */
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
-  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
+  EXPECT_CALL(*filter_settings->signer_,
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
@@ -90,13 +120,12 @@ TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
  * Cluster Metadata is not needed if the filter is loaded as upstream filter
  */
 TEST_F(AwsLambdaFilterTest, ClusterMetadataIsNotNeededInUpstreamMode) {
-  signer_ = std::make_shared<NiceMock<MockSigner>>();
-  auto settings = FilterSettings{arn_, InvocationMode::Synchronous, true, ""};
-  filter_ = std::make_unique<Filter>(settings, stats_, signer_, true);
-  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-  // setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
-  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, true);
+
+  EXPECT_CALL(*filter_settings->signer_,
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
@@ -117,15 +146,19 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
   egress_gateway: true
   )EOF";
 
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   ProtobufWkt::Struct cluster_metadata;
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(metadata_yaml, cluster_metadata);
   metadata.mutable_filter_metadata()->insert({"WrongMetadataKey", cluster_metadata});
 
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
-  FilterSettings route_settings{arn_, InvocationMode::Synchronous, true /*passthrough*/, ""};
+  auto route_settings = std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(&route_settings));
+      .WillByDefault(Return(&*route_settings));
 
   ON_CALL(*decoder_callbacks_.cluster_info_, metadata()).WillByDefault(ReturnRef(metadata));
   Http::TestRequestHeaderMapImpl headers;
@@ -144,10 +177,14 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
  * process the request (i.e. StopIteration if end_stream is false)
  */
 TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
-  FilterSettings route_settings{arn_, InvocationMode::Synchronous, true /*passthrough*/, ""};
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
+  auto route_settings = std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(&route_settings));
+      .WillByDefault(Return(&*route_settings));
 
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
@@ -159,16 +196,20 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
  * then the SigV4 signer will sign with the region where the lambda function is present.
  */
 TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectRegionForSigning) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
   const absl::string_view override_region = "us-west-1";
-  const auto per_route_arn =
-      parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
-  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/,
-                                ""};
-  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(&route_settings));
 
-  EXPECT_CALL(*signer_, signEmptyPayload(An<Http::RequestHeaderMap&>(), override_region));
+  auto route_settings = std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  route_settings->arn_ =
+      parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&*route_settings));
+
+  EXPECT_CALL(*route_settings->signer_,
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), override_region));
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, true /*end_stream*/);
   EXPECT_EQ(fmt::format("/2015-03-31/functions/arn:aws:lambda:{}:1337:function:fun/invocations",
@@ -178,16 +219,17 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectRegionForSigning) {
 }
 
 TEST_F(AwsLambdaFilterTest, DecodeDataRecordsPayloadSize) {
-  FilterSettings settings{arn_, InvocationMode::Synchronous, true /*passthrough*/, ""};
   NiceMock<Stats::MockStore> store;
   NiceMock<Stats::MockHistogram> histogram;
   EXPECT_CALL(store, histogram(_, _)).WillOnce(ReturnRef(histogram));
 
   setupClusterMetadata();
 
-  FilterStats stats(generateStats("test", *store.rootScope()));
-  signer_ = std::make_shared<NiceMock<MockSigner>>();
-  filter_ = std::make_unique<Filter>(settings, stats, signer_, false);
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "",
+                                           FilterStats(generateStats("test", *store.rootScope())));
+
+  filter_ = std::make_unique<Filter>(filter_settings, false);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
   // Payload
@@ -205,7 +247,11 @@ TEST_F(AwsLambdaFilterTest, DecodeDataRecordsPayloadSize) {
 }
 
 TEST_F(AwsLambdaFilterTest, DecodeDataShouldBuffer) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestRequestHeaderMapImpl headers;
   const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, header_result);
@@ -215,7 +261,11 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldBuffer) {
 }
 
 TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestRequestHeaderMapImpl headers;
   const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, header_result);
@@ -224,8 +274,8 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
   InSequence seq;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*signer_, sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(),
-                             An<absl::string_view>()));
+  EXPECT_CALL(*filter_settings->signer_, sign(An<Http::RequestHeaderMap&>(),
+                                              An<const std::string&>(), An<absl::string_view>()));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
@@ -234,15 +284,19 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
 }
 
 TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
 
   const absl::string_view override_region = "us-west-1";
-  const auto per_route_arn =
+
+  auto route_settings = std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  route_settings->arn_ =
       parseArn(fmt::format("arn:aws:lambda:{}:1337:function:fun", override_region)).value();
-  FilterSettings route_settings{per_route_arn, InvocationMode::Synchronous, true /*passthrough*/,
-                                ""};
+
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(&route_settings));
+      .WillByDefault(Return(route_settings.get()));
 
   Http::TestRequestHeaderMapImpl headers;
   const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
@@ -252,7 +306,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
   InSequence seq;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*signer_,
+  EXPECT_CALL(*route_settings->signer_,
               sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), override_region));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
@@ -263,7 +317,11 @@ TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
 }
 
 TEST_F(AwsLambdaFilterTest, DecodeHeadersInvocationModeSetsHeader) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestRequestHeaderMapImpl headers;
   const auto header_result = filter_->decodeHeaders(headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, header_result);
@@ -289,7 +347,11 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersInvocationModeSetsHeader) {
  */
 TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
   using source::extensions::filters::http::aws_lambda::Request;
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Buffer::OwnedImpl json_buf;
   auto on_add_decoded_data = [&json_buf](Buffer::Instance& buf, bool) { json_buf.move(buf); };
   ON_CALL(decoder_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke(on_add_decoded_data));
@@ -337,7 +399,10 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
  */
 TEST_F(AwsLambdaFilterTest, DecodeDataWithTextualBodyWithJsonOn) {
   using source::extensions::filters::http::aws_lambda::Request;
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
 
   Buffer::OwnedImpl decoded_buf;
   constexpr absl::string_view expected_plain_text = "Foo bar bazz";
@@ -406,7 +471,10 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithTextualBodyWithJsonOn) {
  */
 TEST_F(AwsLambdaFilterTest, DecodeDataWithBinaryBodyWithJsonOn) {
   using source::extensions::filters::http::aws_lambda::Request;
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
 
   Buffer::OwnedImpl decoded_buf;
   const absl::string_view fake_binary_data = "this should get base64 encoded";
@@ -449,12 +517,20 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithBinaryBodyWithJsonOn) {
 }
 
 TEST_F(AwsLambdaFilterTest, EncodeHeadersEndStreamShouldSkip) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   auto result = filter_->encodeHeaders(headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings2 =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings2, false);
+  setupClusterMetadata();
+
   result = filter_->encodeHeaders(headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 }
@@ -464,7 +540,11 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersEndStreamShouldSkip) {
  * encoding headers and skip the filter.
  */
 TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambdaErrorShouldSkipAndContinue) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   headers.addCopy(Http::LowerCaseString("x-Amz-Function-Error"), "unhandled");
@@ -476,7 +556,11 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambdaErrorShouldSkipAndContinue) {
  * If Lambda returns a 5xx error then we should skip encoding headers and skip the filter.
  */
 TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambda5xxShouldSkipAndContinue) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(500);
   auto result = filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -487,7 +571,11 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambda5xxShouldSkipAndContinue) {
  * encodeHeaders() in a happy path should stop iteration.
  */
 TEST_F(AwsLambdaFilterTest, EncodeHeadersStopsIteration) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   auto result = filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -499,17 +587,24 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersStopsIteration) {
  * This is true whether end_stream is true or false.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataInPassThroughMode) {
-  setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Buffer::OwnedImpl buf;
-  filter_->resolveSettings();
+
   auto result = filter_->encodeData(buf, false /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
 
   result = filter_->encodeData(buf, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
 
-  setupFilter({arn_, InvocationMode::Asynchronous, true /*passthrough*/, ""});
-  filter_->resolveSettings();
+  auto filter_settings2 =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, true, "");
+  setupFilter(filter_settings2, false);
+  setupClusterMetadata();
+
   result = filter_->encodeData(buf, false /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
 
@@ -522,9 +617,13 @@ TEST_F(AwsLambdaFilterTest, EncodeDataInPassThroughMode) {
  * This is true whether end_stream is true or false.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataInAsynchrnous) {
-  setupFilter({arn_, InvocationMode::Asynchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Asynchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Buffer::OwnedImpl buf;
-  filter_->resolveSettings();
+
   auto result = filter_->encodeData(buf, false /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
 
@@ -536,16 +635,23 @@ TEST_F(AwsLambdaFilterTest, EncodeDataInAsynchrnous) {
  * encodeData() data in JSON mode should stop iteration if end_stream is false.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeStopIterationAndBuffer) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Buffer::OwnedImpl buf;
-  filter_->resolveSettings();
+
   auto result = filter_->encodeData(buf, false /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, result);
 }
 
 TEST_F(AwsLambdaFilterTest, EncodeDataAddsLastChunk) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
-  filter_->resolveSettings();
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -561,8 +667,11 @@ TEST_F(AwsLambdaFilterTest, EncodeDataAddsLastChunk) {
  * headers while ignoring any HTTP/2 pseudo-headers.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
-  filter_->resolveSettings();
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -612,8 +721,11 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
  * encodeData() data in JSON mode should respect content-type header.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeContentTypeHeader) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
-  filter_->resolveSettings();
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -647,8 +759,11 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeContentTypeHeader) {
  * base64-encoded.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeBase64EncodedBody) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
-  filter_->resolveSettings();
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -689,15 +804,18 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeBase64EncodedBody) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
   EXPECT_STREQ("Beans", encoded_buf.toString().c_str());
 
-  EXPECT_EQ(0ul, filter_->stats().server_error_.value());
+  EXPECT_EQ(0ul, filter_settings->stats_.server_error_.value());
 }
 
 /**
  * Encode data in JSON mode _returning_ invalid JSON payload should result in a 500 error.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, ""});
-  filter_->resolveSettings();
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -724,12 +842,14 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
   ASSERT_NE(nullptr, headers.Status());
   EXPECT_EQ("500", headers.getStatusValue());
 
-  EXPECT_EQ(1ul, filter_->stats().server_error_.value());
+  EXPECT_EQ(1ul, filter_settings->stats_.server_error_.value());
 }
 
 TEST_F(AwsLambdaFilterTest, SignWithHostRewrite) {
-  setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/, "new_host"});
-  filter_->resolveSettings();
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "new_host");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
 
   Http::TestRequestHeaderMapImpl headers;
   headers.setHost("any_host");
@@ -739,6 +859,29 @@ TEST_F(AwsLambdaFilterTest, SignWithHostRewrite) {
 
   EXPECT_EQ("new_host", headers.get_(":authority"));
   EXPECT_EQ("new_host", headers.Host()->value().getStringView());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
+}
+
+TEST_F(AwsLambdaFilterTest, SignWithHostRewritePerRoute) {
+  auto filter_settings =
+      std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false, "new_host");
+  setupFilter(filter_settings, false);
+  setupClusterMetadata();
+
+  auto route_settings = std::make_shared<FilterSettingsMock>(InvocationMode::Synchronous, false,
+                                                             "new_host_per_route");
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(route_settings.get()));
+
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setHost("any_host");
+  headers.setPath("/");
+  headers.setMethod("POST");
+  const auto result = filter_->decodeHeaders(headers, true);
+
+  EXPECT_EQ("new_host_per_route", headers.get_(":authority"));
+  EXPECT_EQ("new_host_per_route", headers.Host()->value().getStringView());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 }

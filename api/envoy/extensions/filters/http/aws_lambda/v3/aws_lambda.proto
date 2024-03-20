@@ -55,6 +55,11 @@ message Config {
   // Changing the value of the host header can result in a different route to be selected
   // if an HTTP filter after AWS lambda re-evaluates the route (clears route cache).
   string host_rewrite = 4;
+
+  // Specifies the credential profile in used by the policy instance from the AWS credentials file.
+  // This parameter is optional. If set, the provider chain is limited to the AWS credentials file Provider.
+  // Other providers are ignored
+  string credentials_profile = 5;
 }
 
 // Per-route configuration for AWS Lambda. This can be useful when invoking a different Lambda function or a different
@@ -64,4 +69,7 @@ message PerRouteConfig {
       "envoy.config.filter.http.aws_lambda.v2alpha.PerRouteConfig";
 
   Config invoke_config = 1;
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 2;
 }
