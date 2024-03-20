@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/stl_helpers.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/blocking_counter.h"
 
@@ -164,7 +165,10 @@ void InstanceImpl::removeSlot(uint32_t slot) {
       counter->DecrementCount();
     }
   });
-  counter->Wait();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.thread_local_synchronize_slots_deletion")) {
+    counter->Wait();
+  }
 }
 
 void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
