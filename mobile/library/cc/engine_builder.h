@@ -14,10 +14,10 @@
 #include "absl/types/optional.h"
 #include "direct_response_testing.h"
 #include "library/cc/engine.h"
+#include "library/cc/engine_callbacks.h"
 #include "library/cc/key_value_store.h"
 #include "library/cc/log_level.h"
 #include "library/cc/string_accessor.h"
-#include "library/common/internal_engine_types.h"
 #include "library/common/types/matcher_data.h"
 
 namespace Envoy {
@@ -123,8 +123,7 @@ private:
 class EngineBuilder {
 public:
   EngineBuilder();
-  EngineBuilder(EngineBuilder&&) = default;
-  virtual ~EngineBuilder() = default;
+  virtual ~EngineBuilder() {}
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setLogger(envoy_logger envoy_logger);
@@ -216,7 +215,7 @@ private:
 
   LogLevel log_level_ = LogLevel::info;
   absl::optional<envoy_logger> envoy_logger_;
-  std::unique_ptr<InternalEngineCallbacks> callbacks_;
+  EngineCallbacksSharedPtr callbacks_;
 
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;

@@ -15,10 +15,10 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
-InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks,
-                               envoy_logger logger, envoy_event_tracker event_tracker,
+InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                               envoy_event_tracker event_tracker,
                                Thread::PosixThreadFactoryPtr thread_factory)
-    : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)), logger_(logger),
+    : thread_factory_(std::move(thread_factory)), callbacks_(callbacks), logger_(logger),
       event_tracker_(event_tracker), dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   ExtensionRegistry::registerFactories();
 
@@ -33,10 +33,9 @@ InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callback
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks,
-                               envoy_logger logger, envoy_event_tracker event_tracker)
-    : InternalEngine(std::move(callbacks), logger, event_tracker,
-                     Thread::PosixThreadFactory::create()) {}
+InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
+                               envoy_event_tracker event_tracker)
+    : InternalEngine(callbacks, logger, event_tracker, Thread::PosixThreadFactory::create()) {}
 
 envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
   // Start the Envoy on the dedicated thread.
@@ -129,7 +128,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
-          callbacks_->on_engine_running();
+          if (callbacks_.on_engine_running != nullptr) {
+            callbacks_.on_engine_running(callbacks_.context);
+          }
         });
   } // mutex_
 
@@ -146,7 +147,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
   bug_handler_registration_.reset(nullptr);
   assert_handler_registration_.reset(nullptr);
 
-  callbacks_->on_exit();
+  callbacks_.on_exit(callbacks_.context);
 
   return run_success ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
