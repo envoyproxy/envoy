@@ -60,6 +60,16 @@ minor_behavior_changes:
   change: |
     Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
     previously used HTTP/1 parser).
+- area: http
+  change: |
+    When the HTTP CONNECT request method is enabled using :ref:`RouteAction.UpgradeConfig
+    <envoy_v3_api_msg_config.route.v3.RouteAction.UpgradeConfig>`, CONNECT requests will now be
+    proxied to the upstream, unless the :ref:`connect_config
+    <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>` field is also
+    set. (Previously Envoy would terminate CONNECT requests even when the ``connect_config`` field
+    was unset.) The updated behavior should now be consistent with the existing documentation. This
+    change can be reverted by setting
+    ``envoy.reloadable_features.http_route_connect_proxy_by_default`` to ``false``.
 - area: proxy status
   change: |
     Add more conversion in the proxy status utility. It can be disabled by the runtime guard
@@ -174,6 +184,13 @@ bug_fixes:
   change: |
     When performing a token refresh and forwarding tokens upstream, replace existing token cookies rather than appending as
     another Cookie header.
+- area: oauth
+  change: |
+    The refresh and access tokens are not expired simultaneously so the access token can be updated using
+    the refresh token. The expiration time of the refresh token is taken from the exp claim of jwt by default.
+    If the claim is ommited in the jwt then :ref:`default_refresh_token_expires_in
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_refresh_token_expires_in>`
+    specifies the lifetime of the refresh token. The default value is ``604800`` seconds (a week).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

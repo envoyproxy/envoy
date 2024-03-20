@@ -386,7 +386,8 @@ protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                     ClusterManagerFactory& factory, Stats::Store& stats,
+                     ClusterManagerFactory& factory,
+                     Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
