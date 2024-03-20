@@ -15,7 +15,8 @@ namespace Quic {
 // This class is a quic stream and also a response encoder.
 class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public EnvoyQuicStream,
-                              public Http::ResponseEncoder {
+                              public Http::ResponseEncoder,
+                              public Http::StreamDecoder::DestructionCallback {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
@@ -23,10 +24,16 @@ public:
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
+  ~EnvoyQuicServerStream() override;
+
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
-    request_decoder_ = &decoder;
+    request_decoder_ = makeOptRef(decoder);
+    decoder.setDestructionCallback(this);
     stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
   }
+
+  // Http::StreamDecoder::DestructionCallback
+  void onDecoderDestruction(Http::DestructionStatePtr state) override;
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
@@ -113,7 +120,7 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  Http::RequestDecoder* request_decoder_{nullptr};
+  OptRef<Http::RequestDecoder> request_decoder_{};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 

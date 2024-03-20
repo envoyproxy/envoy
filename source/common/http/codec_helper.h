@@ -62,6 +62,7 @@ public:
   }
 
   bool local_end_stream_{};
+  bool reset_callbacks_started_{};
 
 protected:
   // StreamCallbacksRegistry
@@ -89,7 +90,6 @@ protected:
 
 private:
   absl::InlinedVector<StreamCallbacks*, 8> callbacks_;
-  bool reset_callbacks_started_{};
   uint32_t high_watermark_callbacks_{};
 };
 

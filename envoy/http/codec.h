@@ -75,6 +75,11 @@ public:
 using Http1StreamEncoderOptionsOptRef =
     absl::optional<std::reference_wrapper<Http1StreamEncoderOptions>>;
 
+// Placeholder for subclasses to implement their own states.
+struct DestructionState {};
+
+using DestructionStatePtr = std::unique_ptr<DestructionState>;
+
 /**
  * Encodes an HTTP stream. This interface contains methods common to both the request and response
  * path.
@@ -83,7 +88,25 @@ using Http1StreamEncoderOptionsOptRef =
  */
 class StreamEncoder {
 public:
-  virtual ~StreamEncoder() = default;
+  class DestructionCallback {
+  public:
+    virtual ~DestructionCallback() = default;
+
+    // Called during encoder destruction.
+    virtual void onEncoderDestruction(DestructionStatePtr /*state*/) { called_ = true; }
+
+    bool called() const { return called_; }
+
+  private:
+    bool called_{false};
+  };
+
+  virtual ~StreamEncoder() {
+    if (destruction_callback_ != nullptr && !destruction_callback_->called()) {
+      // Call destruction callback if subclasses hadn't do so.
+      destruction_callback_->onEncoderDestruction(nullptr);
+    }
+  }
 
   /**
    * Encode a data frame.
@@ -108,6 +131,21 @@ public:
    * absl::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Add or remove destruction callback to this encoder.
+   * @param callback, if not nullptr, expects its onEncoderDestruction() to be called during the
+   * destruction of this encoder. If nullptr, removes the existing callback.
+   */
+  void setDestructionCallback(DestructionCallback* callback) {
+    ASSERT(destruction_callback_ == nullptr || callback == nullptr);
+    destruction_callback_ = callback;
+  }
+
+protected:
+  // Called during destruction. Implementations should call into it if they want
+  // to supply a meaningful destruction state.
+  DestructionCallback* destruction_callback_{nullptr};
 };
 
 /**
@@ -203,7 +241,25 @@ public:
  */
 class StreamDecoder {
 public:
-  virtual ~StreamDecoder() = default;
+  // A callback notifying StreamDecoder destruction.
+  class DestructionCallback {
+  public:
+    virtual ~DestructionCallback() = default;
+
+    // Called one and only once in decoder object's destructor.
+    virtual void onDecoderDestruction(DestructionStatePtr /*state*/) { called_ = true; }
+
+    bool called() const { return called_; }
+
+  private:
+    bool called_{false};
+  };
+
+  virtual ~StreamDecoder() {
+    if (destruction_callback_ != nullptr && !destruction_callback_->called()) {
+      destruction_callback_->onDecoderDestruction(nullptr);
+    }
+  }
 
   /**
    * Called with a decoded data frame.
@@ -217,6 +273,14 @@ public:
    * @param decoded METADATA.
    */
   virtual void decodeMetadata(MetadataMapPtr&& metadata_map) PURE;
+
+  void setDestructionCallback(DestructionCallback* callback) {
+    ASSERT(destruction_callback_ == nullptr || callback == nullptr);
+    destruction_callback_ = callback;
+  }
+
+protected:
+  DestructionCallback* destruction_callback_{nullptr};
 };
 
 /**
