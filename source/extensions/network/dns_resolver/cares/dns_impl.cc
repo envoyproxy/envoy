@@ -87,6 +87,9 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.optmask_ |= ARES_OPT_FLAGS;
     options.options_.flags |= ARES_FLAG_NOSEARCH;
   }
+  options.optmask_ |= ARES_OPT_FLAGS;
+  options.options_.timeout = 10000;
+  options.options_.tries = 10;
 
   return options;
 }
