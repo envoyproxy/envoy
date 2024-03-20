@@ -85,7 +85,7 @@ void EnvoyQuicClientConnection::processPacket(
           (peer_address->ip()->version() == Network::Address::IpVersion::v4 ? "v4" : "v6"),
           (HasPendingPathValidation() ? "" : " no"),
           (self_address().IsInitialized() ? "" : " not"));
-      ENVOY_CONN_LOG(error, error_message, *this);
+      ENVOY_CONN_LOG(error, "{}", *this, error_message);
       if (num_packets_with_unknown_dst_address_ > 10) {
         // If too many packets are without destination addresses, close the connection.
         CloseConnection(quic::QUIC_PACKET_READ_ERROR, error_message,

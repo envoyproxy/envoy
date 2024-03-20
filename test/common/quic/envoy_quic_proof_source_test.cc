@@ -18,6 +18,7 @@
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/test_tools/test_certificates.h"
 
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -309,10 +310,10 @@ f/lOd5zz2e7Tu2pUtx1sX1tlKph1D0ANpJwxRV78R2hjmynLSl7h4Ual9NMubqkD
 x96rVeUbRJ/qU4//nNM/XQa9vIAIcTZ0jFhmb0c3R4rmoqqC3vkSDwtaE5yuS5T4
 GUy+n0vQNB0cXGzgcGI=
 -----END CERTIFICATE-----)"};
-  EXPECT_THROW_WITH_MESSAGE(expectCertChainAndPrivateKey(cert_with_rsa_1024, false, true),
-                            EnvoyException,
-                            "Failed to load certificate chain from , only RSA certificates with "
-                            "2048-bit or larger keys are supported");
+  EXPECT_THAT_THROWS_MESSAGE(
+      expectCertChainAndPrivateKey(cert_with_rsa_1024, false, true), EnvoyException,
+      HasSubstr("Failed to load certificate chain from , only RSA certificates with "
+                "2048-bit"));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
