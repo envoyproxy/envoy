@@ -399,7 +399,8 @@ void UdpProxyFilter::UdpActiveSession::onReadReady() {
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       udp_socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
-      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
+      cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, /*allow_mmsg=*/true,
+      packets_dropped);
   if (result == nullptr) {
     udp_socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
     return;

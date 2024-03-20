@@ -1354,14 +1354,6 @@ envoy.wasm.runtime.wasmtime:
   # is updated to capture additional Wasm runtimes".
   security_posture: unknown
   status: alpha
-envoy.wasm.runtime.wavm:
-  categories:
-  - envoy.wasm.runtime
-  # "This may never change from unknown until the threat model at
-  # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions
-  # is updated to capture additional Wasm runtimes".
-  security_posture: unknown
-  status: alpha
 envoy.watchdog.profile_action:
   categories:
   - envoy.guarddog_actions

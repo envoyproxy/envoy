@@ -497,12 +497,6 @@ config_setting(
     values = {"define": "zlib=ng"},
 )
 
-# TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
-config_setting(
-    name = "wasm_wavm",
-    values = {"define": "wasm=wavm"},
-)
-
 config_setting(
     name = "wasm_v8",
     values = {"define": "wasm=v8"},
