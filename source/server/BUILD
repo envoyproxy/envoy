@@ -461,7 +461,7 @@ envoy_cc_library(
         "//source/common/signal:fatal_error_handler_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:thread_local_store_lib",
-        "//source/common/tls:context_lib"
+        "//source/common/tls:context_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/version:version_lib",
         "//source/extensions/transport_sockets/tls:config",
