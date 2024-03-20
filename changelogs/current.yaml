@@ -343,6 +343,10 @@ new_features:
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
     to allow adding custom prefix to the stats emitted by rules.
+- area: matching
+  change: |
+    added :ref:`Filter State Input <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
+    for matching based on filter state objects.
 
 deprecated:
 - area: listener

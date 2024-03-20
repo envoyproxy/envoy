@@ -69,3 +69,11 @@ message HttpRequestQueryParamMatchInput {
   // The query parameter to match on.
   string query_param = 1 [(validate.rules).string = {min_len: 1}];
 }
+
+// Match input indicates that matching should be done on a specific filter state key.
+// The resulting input string will be the raw string representation of the filter state
+// object identified by 'filter_state_key'.
+// [#extension: envoy.matching.inputs.filter_state]
+message FilterStateMatchInput {
+  string filter_state_key = 1 [(validate.rules).string = {min_len: 1}];
+}

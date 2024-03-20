@@ -136,7 +136,12 @@ public:
             envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
             ->GetDescriptor()
             ->full_name());
-    if (type_url == request_header_input_name) {
+    static std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+        createReflectableMessage(
+            envoy::type::matcher::v3::FilterStateMatchInput::default_instance())
+            ->GetDescriptor()
+            ->full_name());
+    if (type_url == request_header_input_name || type_url == filter_state_input_name) {
       return absl::OkStatus();
     }
 
