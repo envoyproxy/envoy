@@ -104,17 +104,58 @@ private:
 };
 
 class MatchDelegateConfig
-    : public Extensions::HttpFilters::Common::FactoryBase<
-          envoy::extensions::common::matching::v3::ExtensionWithMatcher,
-          envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute> {
+    : public  Extensions::HttpFilters::Common::CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
+                               envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>,
+      public Server::Configuration::NamedHttpFilterConfigFactory,
+      public Server::Configuration::UpstreamHttpFilterConfigFactory  {
 public:
   // TODO(wbpcode): move this filter to 'source/extensions/filters/http'.
-  MatchDelegateConfig() : FactoryBase("envoy.filters.http.match_delegate") {}
+  MatchDelegateConfig() : CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
+                               envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>("envoy.filters.http.match_delegate") {}
+  struct DualInfo {
+    DualInfo(Server::Configuration::UpstreamFactoryContext& context)
+        : init_manager(context.initManager()), scope(context.scope()), is_upstream(true) {}
+    DualInfo(Server::Configuration::FactoryContext& context)
+        : init_manager(context.initManager()), scope(context.scope()), is_upstream(false) {}
+    Init::Manager& init_manager;
+    Stats::Scope& scope;
+    bool is_upstream;
+  };
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const envoy::extensions::common::matching::v3::ExtensionWithMatcher&>(
+                                                proto_config, context.messageValidationVisitor()),
+                                             stats_prefix, DualInfo(context),
+                                             context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const envoy::extensions::common::matching::v3::ExtensionWithMatcher&&>(
+            proto_config, context.serverFactoryContext().messageValidationVisitor()),
+        stats_prefix, DualInfo(context), context);
+  }
 
 private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-      const std::string&, Server::Configuration::FactoryContext& context) override;
+      const std::string& prefix, DualInfo info, Server::Configuration::FactoryContext& context);
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>createFilterFactoryFromProtoTyped(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
+      const std::string&, DualInfo info, Server::Configuration::UpstreamFactoryContext& context);
+
+  template <class FactoryCtx, class FilterCfgFactory>
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
+      const std::string& prefix, ProtobufMessage::ValidationVisitor& validation,
+      Envoy::Http::Matching::HttpFilterActionContext& action_context, FactoryCtx& context,
+      FilterCfgFactory& factory);
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
@@ -140,7 +181,10 @@ private:
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
 
+using UpstreamMatchDelegateConfig = MatchDelegateConfig;
+
 DECLARE_FACTORY(MatchDelegateConfig);
+DECLARE_FACTORY(UpstreamMatchDelegateConfig);
 
 namespace Factory {
 DECLARE_FACTORY(SkipActionFactory);
