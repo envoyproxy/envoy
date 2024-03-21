@@ -87,13 +87,17 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
               ProcessingMode::BodySendMode_Name(body_mode_));
     const auto& common_response = response.response();
     if (common_response.has_header_mutation()) {
-      const auto mut_status = MutationUtils::applyHeaderMutations(
-          common_response.header_mutation(), *headers_,
-          common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
-          shouldRemoveContentLength());
-      if (!mut_status.ok()) {
-        return mut_status;
+      if (headers_ != nullptr) {
+        const auto mut_status = MutationUtils::applyHeaderMutations(
+            common_response.header_mutation(), *headers_,
+            common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+            filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+            shouldRemoveContentLength());
+        if (!mut_status.ok()) {
+          return mut_status;
+        }
+      } else {
+        ENVOY_LOG(debug, "Headers aren't available");
       }
     }
 
@@ -104,10 +108,12 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       ENVOY_LOG(debug, "Replacing complete message");
       // Completely replace the body that may already exist.
       if (common_response.has_body_mutation()) {
-        // Remove the content length here because in this case external processor probably won't
-        // properly set the content-length header to match the length of the new body that replaces
-        // the original one.
-        headers_->removeContentLength();
+        if (headers_ != nullptr) {
+          // Remove the content length here because in this case external processor probably won't
+          // properly set the content-length header to match the length of the new body that
+          // replaces the original one.
+          headers_->removeContentLength();
+        }
         body_replaced_ = true;
         if (bufferedData() == nullptr) {
           Buffer::OwnedImpl new_body;
