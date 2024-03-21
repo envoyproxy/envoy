@@ -13,7 +13,7 @@ InitDumpHandler::InitDumpHandler(Server::Instance& server) : HandlerContextBase(
 Http::Code InitDumpHandler::handlerInitDump(Http::ResponseHeaderMap& response_headers,
                                             Buffer::Instance& response,
                                             AdminStream& admin_stream) const {
-  const auto mask = admin_stream.queryParams().getFirstValue("mask");
+  const auto mask = Utility::notEmptyQueryParam(admin_stream.queryParams(), "mask");
 
   envoy::admin::v3::UnreadyTargetsDumps dump = *dumpUnreadyTargets(mask);
   MessageUtil::redact(dump);
