@@ -1,8 +1,8 @@
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:external_proto_deps.bzl",
@@ -154,14 +154,13 @@ def api_proto_package(
         [_go_proto_mapping(dep) for dep in deps] +
         [
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
-            "@com_github_golang_protobuf//ptypes:go_default_library_gen",
             "@go_googleapis//google/api:annotations_go_proto",
             "@go_googleapis//google/rpc:status_go_proto",
-            "@io_bazel_rules_go//proto/wkt:any_go_proto",
-            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
-            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
-            "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
-            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
+            "@org_golang_google_protobuf//types/known/anypb:go_default_library",
+            "@org_golang_google_protobuf//types/known/durationpb:go_default_library",
+            "@org_golang_google_protobuf//types/known/structpb:go_default_library",
+            "@org_golang_google_protobuf//types/known/timestamppb:go_default_library",
+            "@org_golang_google_protobuf//types/known/wrapperspb:go_default_library",
             "@com_github_planetscale_vtprotobuf//types/known/anypb",
             "@com_github_planetscale_vtprotobuf//types/known/durationpb",
             "@com_github_planetscale_vtprotobuf//types/known/emptypb",
