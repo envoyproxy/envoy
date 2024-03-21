@@ -107,6 +107,7 @@ def envoy_cc_library(
         textual_hdrs = None,
         alwayslink = None,
         defines = [],
+        local_defines = [],
         linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
@@ -135,6 +136,7 @@ def envoy_cc_library(
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
         defines = envoy_mobile_defines(repository) + defines,
+        local_defines = local_defines,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
