@@ -3,7 +3,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_select_admin_functionality",
 )
 
 licenses(["notice"])  # Apache 2
@@ -12,7 +11,16 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "ssl_integration_test_lib",
-    hdrs = ["ssl_integration_test.h"],
+    srcs = [
+        "ssl_integration_test_base.cc",
+    ],
+    hdrs = ["ssl_integration_test_base.h"],
+    deps = [
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -37,7 +45,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/tls/cert_validator:timed_cert_validator",
-        "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:test_runtime_lib",
@@ -45,14 +52,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-    ] + envoy_select_admin_functionality([
-        "//source/extensions/transport_sockets/tap:config",
-        "//test/extensions/common/tap:common",
-        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
-    ]),
+    ],
 )
 
 envoy_cc_test_library(

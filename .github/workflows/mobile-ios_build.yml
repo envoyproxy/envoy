@@ -106,7 +106,7 @@ jobs:
           app: //examples/swift/hello_world:app
           expected-status: 200
           target: swift-hello-world
-          timeout-minutes: 50
+          timeout-minutes: 90
 
   apps:
     permissions:
@@ -141,7 +141,7 @@ jobs:
             ANDROID_NDK_HOME:
             ANDROID_HOME:
       target: ${{ matrix.target }}
-      timeout-minutes: 50
+      timeout-minutes: 90
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
       working-directory: mobile
     strategy:

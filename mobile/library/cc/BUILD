@@ -41,6 +41,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+        "@envoy_mobile//library/common:internal_engine_types_lib",
         "@envoy_mobile//library/common/config:certificates_lib",
         "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
@@ -60,7 +61,6 @@ envoy_cc_library(
     srcs = [
         "bridge_utility.cc",
         "engine.cc",
-        "engine_callbacks.cc",
         "headers.cc",
         "headers_builder.cc",
         "key_value_store.cc",
@@ -85,7 +85,6 @@ envoy_cc_library(
         "bridge_utility.h",
         "direct_response_testing.h",
         "engine.h",
-        "engine_callbacks.h",
         "envoy_error.h",
         "headers.h",
         "headers_builder.h",

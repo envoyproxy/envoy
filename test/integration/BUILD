@@ -373,6 +373,7 @@ envoy_cc_test_binary(
         "//source/exe:process_wide_lib",
         "//source/exe:stripped_main_base_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+        "//source/extensions/transport_sockets/tls:config",
     ],
 )
 
@@ -985,7 +986,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],
