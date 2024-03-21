@@ -1,5 +1,10 @@
+#include <memory>
+#include <string>
+
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
@@ -13,6 +18,7 @@
 #include "gmock/gmock.h"
 
 using Envoy::Extensions::Filters::Common::ExtAuthz::TestCommon;
+using envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase;
 
 namespace Envoy {
 namespace Extensions {
@@ -20,28 +26,17 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-std::string resultCaseToHttpStatus(
-    const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
-  std::string check_status;
+std::string resultCaseToHttpStatus(const ExtAuthzTestCase::AuthResult result) {
   switch (result) {
-  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::OK: {
-    check_status = "200";
-    break;
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case ExtAuthzTestCase::OK:
+    return "200";
+  case ExtAuthzTestCase::ERROR:
+    return "500";
+  case ExtAuthzTestCase::DENIED:
+    return "403";
   }
-  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::ERROR: {
-    check_status = "500";
-    break;
-  }
-  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::DENIED: {
-    check_status = "403";
-    break;
-  }
-  default: {
-    // Unhandled status.
-    PANIC("not implemented");
-  }
-  }
-  return check_status;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 class ReusableHttpClientFactory {
@@ -65,8 +60,8 @@ public:
         }));
   }
 
-  std::unique_ptr<Filters::Common::ExtAuthz::RawHttpClientImpl> newRawHttpClientImpl(
-      const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
+  std::unique_ptr<Filters::Common::ExtAuthz::RawHttpClientImpl>
+  newRawHttpClientImpl(const ExtAuthzTestCase::AuthResult result) {
     http_client_ = new Filters::Common::ExtAuthz::RawHttpClientImpl(cm_, createConfig());
     status_ = resultCaseToHttpStatus(result);
     return std::unique_ptr<Filters::Common::ExtAuthz::RawHttpClientImpl>(http_client_);
@@ -127,7 +122,7 @@ private:
   Filters::Common::ExtAuthz::RawHttpClientImpl* http_client_;
 };
 
-DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ExtAuthzTestCase& input) {
   static ReusableFuzzerUtil fuzzer_util;
   static ReusableHttpClientFactory http_client_factory;
   auto http_client = http_client_factory.newRawHttpClientImpl(input.result());

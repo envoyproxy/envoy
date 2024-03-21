@@ -1,6 +1,8 @@
 #include "envoy/grpc/status.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
@@ -13,6 +15,7 @@
 #include "gmock/gmock.h"
 
 using Envoy::Extensions::Filters::Common::ExtAuthz::TestCommon;
+using envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase;
 using testing::Return;
 
 namespace Envoy {
@@ -30,28 +33,18 @@ makeGrpcCheckResponse(const Grpc::Status::WellKnownGrpcStatus status) {
   return response;
 }
 
-Grpc::Status::WellKnownGrpcStatus resultCaseToGrpcStatus(
-    const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
-  Grpc::Status::WellKnownGrpcStatus check_status;
+Grpc::Status::WellKnownGrpcStatus
+resultCaseToGrpcStatus(const ExtAuthzTestCase::AuthResult result) {
   switch (result) {
-  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::OK: {
-    check_status = Grpc::Status::WellKnownGrpcStatus::Ok;
-    break;
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case ExtAuthzTestCase::OK:
+    return Grpc::Status::WellKnownGrpcStatus::Ok;
+  case ExtAuthzTestCase::ERROR:
+    return Grpc::Status::WellKnownGrpcStatus::Internal;
+  case ExtAuthzTestCase::DENIED:
+    return Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
   }
-  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::ERROR: {
-    check_status = Grpc::Status::WellKnownGrpcStatus::Internal;
-    break;
-  }
-  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::DENIED: {
-    check_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
-    break;
-  }
-  default: {
-    // Unhandled status.
-    PANIC("not implemented");
-  }
-  }
-  return check_status;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 class ReusableGrpcClientFactory {
@@ -83,8 +76,8 @@ public:
             }));
   }
 
-  std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl> newGrpcClientImpl(
-      const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
+  std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl>
+  newGrpcClientImpl(const ExtAuthzTestCase::AuthResult result) {
     status_ = resultCaseToGrpcStatus(result);
     grpc_client_ = new Filters::Common::ExtAuthz::GrpcClientImpl(internal_grpc_mock_client_,
                                                                  std::chrono::milliseconds(1000));
@@ -101,7 +94,7 @@ private:
   Filters::Common::ExtAuthz::GrpcClientImpl* grpc_client_;
 };
 
-DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ExtAuthzTestCase& input) {
   static ReusableFuzzerUtil fuzzer_util;
   static ReusableGrpcClientFactory grpc_client_factory;
   auto grpc_client = grpc_client_factory.newGrpcClientImpl(input.result());

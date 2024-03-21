@@ -105,6 +105,8 @@ envoy_cc_fuzz_test(
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
+        "//source/common/common:assert_lib",
+        "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
@@ -121,6 +123,8 @@ envoy_cc_fuzz_test(
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
+        "//source/common/common:assert_lib",
+        "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
