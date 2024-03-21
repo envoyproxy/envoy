@@ -28,7 +28,7 @@ class AccessTokenExampleGrpcCredentialsFactory : public Grpc::GoogleGrpcCredenti
 public:
   std::shared_ptr<grpc::ChannelCredentials>
   getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
-                        Api::Api& api) override;
+                        Server::Configuration::CommonFactoryContext& context) override;
 
   std::string name() const override { return "envoy.grpc_credentials.access_token_example"; }
 };

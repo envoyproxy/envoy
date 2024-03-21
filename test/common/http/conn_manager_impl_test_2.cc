@@ -1796,6 +1796,93 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
   encoder_filters_[0]->callbacks_->resetStream();
 }
 
+// Verify that the response flag is DownstreamRemoteReset when got
+// StreamResetReason::ConnectError from codec.
+TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetConnectError) {
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  access_logs_ = {handler};
+
+  setup(false, "");
+  codec_->protocol_ = Protocol::Http2;
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_FALSE(stream_info.responseCode());
+            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(
+                stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamRemoteReset));
+          }));
+
+  // Start the request
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input, false);
+  response_encoder_.stream_.setDetails("http2.remote_reset");
+  response_encoder_.stream_.resetStream(StreamResetReason::ConnectError);
+}
+
+// Verify that the response flag is DownstreamRemoteReset when got
+// StreamResetReason::RemoteReset from codec.
+TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteReset) {
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  access_logs_ = {handler};
+
+  setup(false, "");
+  codec_->protocol_ = Protocol::Http2;
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_FALSE(stream_info.responseCode());
+            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(
+                stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamRemoteReset));
+          }));
+
+  // Start the request
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input, false);
+  response_encoder_.stream_.setDetails("http2.remote_reset");
+  response_encoder_.stream_.resetStream(StreamResetReason::RemoteReset);
+}
+
+// Verify that the response flag is DownstreamRemoteReset when got
+// StreamResetReason::RemoteRefusedStreamReset from codec.
+TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRefused) {
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  access_logs_ = {handler};
+
+  setup(false, "");
+  codec_->protocol_ = Protocol::Http2;
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke(
+          [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) {
+            EXPECT_FALSE(stream_info.responseCode());
+            EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+            EXPECT_TRUE(
+                stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamRemoteReset));
+          }));
+
+  // Start the request
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input, false);
+  response_encoder_.stream_.setDetails("http2.remote_refuse");
+  response_encoder_.stream_.resetStream(StreamResetReason::RemoteRefusedStreamReset);
+}
+
 // Filter stops headers iteration without ending the stream, then injects a body later.
 TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectBody) {
   setup(false, "");

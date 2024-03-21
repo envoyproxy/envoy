@@ -628,8 +628,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (!route.route().rate_limits().empty()) {
-    rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), factory_context);
+    absl::Status creation_status;
+    rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(),
+                                                               factory_context, creation_status);
+    THROW_IF_NOT_OK(creation_status);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -657,7 +659,14 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
          absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
                                 Http::Headers::get().UpgradeValues.ConnectUdp))) {
-      connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.http_route_connect_proxy_by_default")) {
+        if (upgrade_config.has_connect_config()) {
+          connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+        }
+      } else {
+        connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      }
     } else if (upgrade_config.has_connect_config()) {
       throwEnvoyExceptionOrPanic(absl::StrCat("Non-CONNECT upgrade type ",
                                               upgrade_config.upgrade_type(), " has ConnectConfig"));
@@ -1680,8 +1689,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   if (!virtual_host.rate_limits().empty()) {
-    rate_limit_policy_ =
-        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), factory_context);
+    absl::Status creation_status;
+    rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(),
+                                                               factory_context, creation_status);
+    THROW_IF_NOT_OK(creation_status);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());

@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -39,12 +40,13 @@ envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
 
 class LookupRequestTest : public testing::TestWithParam<LookupRequestTestCase> {
 public:
-  LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
+  LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers(), factory_context_) {}
 
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   VaryAllowList vary_allow_list_;
 
   static const SystemTime& currentTime() {

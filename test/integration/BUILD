@@ -373,6 +373,7 @@ envoy_cc_test_binary(
         "//source/exe:process_wide_lib",
         "//source/exe:stripped_main_base_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+        "//source/extensions/transport_sockets/tls:config",
     ],
 )
 
@@ -540,6 +541,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:retry_priority_factory_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -984,7 +986,7 @@ envoy_cc_test(
     srcs = ["idle_timeout_integration_test.cc"],
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 4,
+    shard_count = 8,
     tags = [
         "cpu:3",
     ],
