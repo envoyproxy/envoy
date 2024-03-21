@@ -9,6 +9,9 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/stl_helpers.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "absl/synchronization/blocking_counter.h"
 
 namespace Envoy {
 namespace ThreadLocal {
@@ -136,7 +139,28 @@ void InstanceImpl::removeSlot(uint32_t slot) {
              free_slot_indexes_.end(),
          fmt::format("slot index {} already in free slot set!", slot));
   free_slot_indexes_.push_back(slot);
-  runOnAllThreads([slot]() -> void {
+
+  // Find out how many dispatchers have associated running thread and are able to process
+  // events. During normal operation, all dispatchers should be in Running state, but
+  // during unit and integration tests, dispatchers are sometimes allocated without
+  // worker thread. Events posted to such dispatchers are queued but never executed.
+  // The following logic determines how many threads are in Running state.
+  // An event to deallocate a slot is posted to each thread and main thread blocks until
+  // all Running threads report that they have finished deallocating the slot.
+
+  // Include main thread.
+  auto running_workers = 1;
+  std::for_each(registered_threads_.begin(), registered_threads_.end(),
+                [&running_workers](std::reference_wrapper<Event::Dispatcher>& dispatcher) {
+                  if (dispatcher.get().isRunning()) {
+                    running_workers++;
+                  }
+                });
+
+  std::shared_ptr<absl::BlockingCounter> counter =
+      std::make_shared<absl::BlockingCounter>(running_workers);
+  std::weak_ptr<absl::BlockingCounter> counter_weak = counter;
+  runOnAllThreads([slot, counter_weak]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
     // will be sequenced after this removal. It is also safe if there are callbacks pending on
@@ -144,7 +168,14 @@ void InstanceImpl::removeSlot(uint32_t slot) {
     if (slot < thread_local_data_.data_.size()) {
       thread_local_data_.data_[slot] = nullptr;
     }
+    if (auto counter = counter_weak.lock()) {
+      counter->DecrementCount();
+    }
   });
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.thread_local_synchronize_slots_deletion")) {
+    counter->Wait();
+  }
 }
 
 void InstanceImpl::runOnAllThreads(std::function<void()> cb) {

@@ -77,6 +77,12 @@ public:
    * current thread of execution is on the same thread upon which the dispatcher loop is running.
    */
   virtual bool isThreadSafe() const PURE;
+
+  /**
+   * Returns true if the dispatcher has attached thread which processes events posted to the
+   * dispatcher.
+   */
+  virtual bool isRunning() const PURE;
 };
 
 /**
