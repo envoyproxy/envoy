@@ -81,6 +81,8 @@ build:mobile-test-android --define=static_extension_registration=disabled
 # enabled for //test/kotlin/integration:xds_test and
 # //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
 build:mobile-test-android --define=envoy_mobile_xds=enabled
+# TODO(alyssar) fix
+build:mobile-test-android --define=envoy_yaml=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
