@@ -174,6 +174,44 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   }
 }
 
+TEST(MatchingData, FilterStateDataInput) {
+  HttpMatchingDataImpl data(createStreamInfo());
+
+  {
+    FilterStateDataInput input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher.DataInputGetResult::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+
+  data.streamInfo().filterState()->setData(
+    "unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
+    StreamInfo::FilterState::StateType::Mutable,
+    StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    FilterStateDataInput input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+
+  data.streamInfo().filterState()->setData(
+    "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+    StreamInfo::FilterState::StateType::Mutable,
+    StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    FilterStateDataInput input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, "filter_state_value");
+  }
+}
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy
