@@ -100,7 +100,7 @@ jobs:
         fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a  # v3.0.2
+    - uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427  # v4.1.4
       with:
         name: ${{ matrix.output }}_android_aar_sources
         path: .
