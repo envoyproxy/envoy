@@ -121,7 +121,7 @@ public:
     // Write YAML contents to file, rename to path_ and invoke on change callback
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("lds.yaml.tmp", yaml);
     TestEnvironment::renameFile(temp_path, path_.path());
-    on_changed_cb_(Filesystem::Watcher::Events::MovedTo);
+    EXPECT_TRUE(on_changed_cb_(Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,

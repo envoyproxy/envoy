@@ -8,7 +8,7 @@ WatchedDirectory::WatchedDirectory(const envoy::config::core::v3::WatchedDirecto
   watcher_ = dispatcher.createFilesystemWatcher();
   THROW_IF_NOT_OK(watcher_->addWatch(absl::StrCat(config.path(), "/"),
                                      Filesystem::Watcher::Events::MovedTo,
-                                     [this](uint32_t) { cb_(); }));
+                                     [this](uint32_t) { return cb_(); }));
 }
 
 } // namespace Config
