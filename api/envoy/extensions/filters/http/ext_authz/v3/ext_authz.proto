@@ -228,7 +228,7 @@ message ExtAuthz {
   //
   // If this field is set to false, header values will be sanitized, with any non-UTF-8-compliant
   // bytes replaced with '!'. Headers with the same key will have their values concatenated into a
-  // single comma-seperated header value.
+  // single comma-separated header value.
   // Requests to GRPC services will populate the field
   // :ref:`headers<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.headers>`.
   // Requests to HTTP services will have their header values sanitized and will not preserve
