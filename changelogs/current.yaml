@@ -365,6 +365,9 @@ new_features:
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
     to allow adding custom prefix to the stats emitted by rules.
+- area: tracing
+  change: |
+    Dynatrace sampler fetches configuration from Dynatrace API.
 
 deprecated:
 - area: listener

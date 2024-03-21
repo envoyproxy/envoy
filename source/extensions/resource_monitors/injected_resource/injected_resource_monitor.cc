@@ -17,8 +17,11 @@ InjectedResourceMonitor::InjectedResourceMonitor(
     Server::Configuration::ResourceMonitorFactoryContext& context)
     : filename_(config.filename()),
       watcher_(context.mainThreadDispatcher().createFilesystemWatcher()), api_(context.api()) {
-  THROW_IF_NOT_OK(watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo,
-                                     [this](uint32_t) { onFileChanged(); }));
+  THROW_IF_NOT_OK(
+      watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+        onFileChanged();
+        return absl::OkStatus();
+      }));
 }
 
 void InjectedResourceMonitor::onFileChanged() { file_changed_ = true; }
