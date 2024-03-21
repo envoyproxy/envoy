@@ -833,7 +833,7 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
         // headers should be empty.
         EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
         ASSERT_TRUE(check_request.attributes().request().http().has_header_map());
-        // headers_bytes should contain the header we added and it should be unchanged.
+        // header_map should contain the header we added and it should be unchanged.
         bool exact_match_utf_8_header = false;
         for (const auto& header :
              check_request.attributes().request().http().header_map().headers()) {

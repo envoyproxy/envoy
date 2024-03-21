@@ -222,7 +222,7 @@ message ExtAuthz {
   // When this is set to true, header values are not sanitized. Headers with the same key will also
   // not be combined into a single, comma-separated header.
   // Requests to GRPC services will populate the field
-  // :ref:`headers_bytes<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>`.
+  // :ref:`header_map<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.header_map>`.
   // Requests to HTTP services will be constructed with the unsanitized header values and preserved
   // multi-line headers with the same key.
   //
