@@ -149,8 +149,8 @@ EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setLogger(envoy_logger envoy_logger) {
-  envoy_logger_.emplace(envoy_logger);
+EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
+  logger_ = std::move(logger);
   return *this;
 }
 
@@ -897,16 +897,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  envoy_logger null_logger;
-  null_logger.log = nullptr;
-  null_logger.release = envoy_noop_const_release;
-  null_logger.context = nullptr;
-
   envoy_event_tracker null_tracker{};
 
   InternalEngine* envoy_engine =
-      new InternalEngine(std::move(callbacks_),
-                         (envoy_logger_.has_value()) ? *envoy_logger_ : null_logger, null_tracker);
+      new InternalEngine(std::move(callbacks_), std::move(logger_), null_tracker);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
