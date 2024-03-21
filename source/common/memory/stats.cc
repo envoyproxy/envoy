@@ -122,6 +122,7 @@ AllocatorManager::AllocatorManager(
 };
 
 AllocatorManager::~AllocatorManager() {
+#if defined(TCMALLOC)
   if (tcmalloc_routine_dispatcher_) {
     tcmalloc_routine_dispatcher_->exit();
   }
@@ -129,13 +130,12 @@ AllocatorManager::~AllocatorManager() {
     tcmalloc_thread_->join();
     tcmalloc_thread_.reset();
   }
+#endif
 }
 
 void AllocatorManager::tcmallocRelease() {
 #if defined(TCMALLOC)
   tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
-#else
-  return;
 #endif
 }
 
@@ -144,6 +144,7 @@ void AllocatorManager::tcmallocRelease() {
  * has been initialized to `0`, no heap memory will be released in background.
  */
 void AllocatorManager::configureBackgroundMemoryRelease(Api::Api& api) {
+#if defined(TCMALLOC)
   RELEASE_ASSERT(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised");
   if (bytes_to_release_ > 0) {
     tcmalloc_routine_dispatcher_ = api.allocateDispatcher(std::string(TCMALLOC_ROUTINE_THREAD_ID));
@@ -172,6 +173,7 @@ void AllocatorManager::configureBackgroundMemoryRelease(Api::Api& api) {
                   "Configured tcmalloc with background release rate: {} bytes per {} milliseconds",
                   bytes_to_release_, memory_release_interval_msec_.count()));
   }
+#endif
 }
 
 } // namespace Memory
