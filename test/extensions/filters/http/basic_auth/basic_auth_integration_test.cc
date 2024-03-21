@@ -119,8 +119,8 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
   EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
 }
 
-// Request with existing username
-TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
+// Request with existing username header
+TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -130,7 +130,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
       {":scheme", "http"},
       {":authority", "host"},
       {"Authorization", "Basic dXNlcjE6dGVzdDE="}, // user1, test1
-      {"x-username", "existingUser"},
+      {"x-username", "existingUsername"},
   });
 
   waitForNextUpstreamRequest();
