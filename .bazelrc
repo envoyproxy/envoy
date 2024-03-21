@@ -13,6 +13,8 @@ startup --host_jvm_args=-Xmx3g
 fetch --color=yes
 run --color=yes
 
+common --noenable_bzlmod
+
 build --color=yes
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
