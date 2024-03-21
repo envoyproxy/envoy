@@ -96,7 +96,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.2.27
+          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.2.29
             with:
               context: %{{ inputs.context }}
       steps-pre:
