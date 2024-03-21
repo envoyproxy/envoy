@@ -60,6 +60,28 @@ struct JsonValueToProtobufValueConverter {
   }
 };
 
+absl::flat_hash_set<std::string> generateAllowContentTypes(
+    const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) {
+  if (proto_allow_content_types.empty()) {
+    return {Http::Headers::get().ContentTypeValues.Json};
+  }
+
+  absl::flat_hash_set<std::string> allow_content_types;
+  for (const auto& request_allowed_content_type : proto_allow_content_types) {
+    allow_content_types.insert(request_allowed_content_type);
+  }
+  return allow_content_types;
+}
+
+Regex::CompiledMatcherPtr generateAllowContentTypeRegexs(
+    const envoy::type::matcher::v3::RegexMatcher& proto_allow_content_types_regex) {
+
+  Regex::CompiledMatcherPtr allow_content_types_regex;
+  allow_content_types_regex = Regex::Utility::parseRegex(proto_allow_content_types_regex);
+
+  return allow_content_types_regex;
+}
+
 } // anonymous namespace
 
 Rule::Rule(const ProtoRule& rule) : rule_(rule) {
@@ -96,7 +118,17 @@ FilterConfig::FilterConfig(
       response_allow_content_types_(
           generateAllowContentTypes(proto_config.response_rules().allow_content_types())),
       request_allow_empty_content_type_(proto_config.request_rules().allow_empty_content_type()),
-      response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()) {
+      response_allow_empty_content_type_(proto_config.response_rules().allow_empty_content_type()),
+      request_allow_content_types_regex_(
+          proto_config.request_rules().has_allow_content_types_regex()
+              ? generateAllowContentTypeRegexs(
+                    proto_config.request_rules().allow_content_types_regex())
+              : nullptr),
+      response_allow_content_types_regex_(
+          proto_config.response_rules().has_allow_content_types_regex()
+              ? generateAllowContentTypeRegexs(
+                    proto_config.response_rules().allow_content_types_regex())
+              : nullptr) {
   if (request_rules_.empty() && response_rules_.empty()) {
     throw EnvoyException("json_to_metadata_filter: Per filter configs must at least specify "
                          "either request or response rules");
@@ -111,25 +143,14 @@ Rules FilterConfig::generateRules(const ProtobufRepeatedRule& proto_rules) const
   return rules;
 }
 
-absl::flat_hash_set<std::string> FilterConfig::generateAllowContentTypes(
-    const Protobuf::RepeatedPtrField<std::string>& proto_allow_content_types) const {
-  if (proto_allow_content_types.empty()) {
-    return {Http::Headers::get().ContentTypeValues.Json};
-  }
-
-  absl::flat_hash_set<std::string> allow_content_types;
-  for (const auto& request_allowed_content_type : proto_allow_content_types) {
-    allow_content_types.insert(request_allowed_content_type);
-  }
-  return allow_content_types;
-}
-
 bool FilterConfig::requestContentTypeAllowed(absl::string_view content_type) const {
   if (content_type.empty()) {
     return request_allow_empty_content_type_;
   }
 
-  return request_allow_content_types_.contains(content_type);
+  return request_allow_content_types_.contains(content_type) ||
+         (request_allow_content_types_regex_ &&
+          request_allow_content_types_regex_->match(content_type));
 }
 
 bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) const {
@@ -137,7 +158,9 @@ bool FilterConfig::responseContentTypeAllowed(absl::string_view content_type) co
     return response_allow_empty_content_type_;
   }
 
-  return response_allow_content_types_.contains(content_type);
+  return response_allow_content_types_.contains(content_type) ||
+         (response_allow_content_types_regex_ &&
+          response_allow_content_types_regex_->match(content_type));
 }
 
 void Filter::applyKeyValue(const std::string& value, const KeyValuePair& keyval,

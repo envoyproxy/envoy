@@ -16,6 +16,7 @@ import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito
@@ -39,6 +40,7 @@ class ProxyInfoIntentPerformHTTPSRequestUsingAsyncProxyTest {
     JniLibrary.load()
   }
 
+  @Ignore("https://github.com/envoyproxy/envoy/issues/33014")
   @Test
   fun `performs an HTTPs request through a proxy using async DNS resolution`() {
     TestJni.startHttpsProxyTestServer()

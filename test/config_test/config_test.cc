@@ -97,8 +97,10 @@ public:
         .Times(AtLeast(0));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(
-        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
+    EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
+                    bootstrap, options_,
+                    server_.messageValidationContext().staticValidationVisitor(), *api_)
+                    .ok());
     absl::Status creation_status;
     Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
@@ -213,8 +215,9 @@ void testMerge() {
   OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
-                                            ProtobufMessage::getStrictValidationVisitor(), *api);
+  ASSERT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
+                  bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
+                  .ok());
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
@@ -243,8 +246,9 @@ uint32_t run(const std::string& directory) {
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
       ConfigTest test1(options);
       envoy::config::bootstrap::v3::Bootstrap bootstrap;
-      Server::InstanceUtil::loadBootstrapConfig(
-          bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
+      EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
+                      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
+                      .ok());
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
       OptionsImpl config = asConfigYaml(options, *api);
       ConfigTest test2(config);

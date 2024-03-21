@@ -51,15 +51,6 @@ ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
 LEGACY_REGISTER_FACTORY(DownstreamSslSocketFactory,
                         Server::Configuration::DownstreamTransportSocketConfigFactory, "tls");
 
-Ssl::ContextManagerPtr SslContextManagerFactory::createContextManager(
-    Server::Configuration::CommonFactoryContext& factory_context) {
-  return std::make_unique<ContextManagerImpl>(factory_context);
-}
-
-static Envoy::Registry::RegisterInternalFactory<SslContextManagerFactory,
-                                                Ssl::ContextManagerFactory>
-    ssl_manager_registered;
-
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
