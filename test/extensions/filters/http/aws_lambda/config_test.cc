@@ -40,7 +40,7 @@ invocation_mode: asynchronous
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
-    const auto settings = filter->settingsForTest();
+    const auto& settings = filter->settingsForTest();
     return settings.payloadPassthrough() &&
            settings.invocationMode() == InvocationMode::Asynchronous;
   };
@@ -69,7 +69,7 @@ arn: "arn:aws:lambda:region:424242:function:fun"
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
-    const auto settings = filter->settingsForTest();
+    const auto& settings = filter->settingsForTest();
     return settings.payloadPassthrough() == false &&
            settings.invocationMode() == InvocationMode::Synchronous;
   };
@@ -157,6 +157,32 @@ TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
       std::static_pointer_cast<const FilterSettings>(route_specific_config_ptr);
   EXPECT_FALSE(filter_settings_ptr->payloadPassthrough());
   EXPECT_EQ(InvocationMode::Asynchronous, filter_settings_ptr->invocationMode());
+}
+
+TEST(AwsLambdaFilterConfigTest, StatPrefixPerRouteConfig) {
+  const std::string yaml = R"EOF(
+  invoke_config:
+    arn: "arn:aws:lambda:region:424242:function:fun"
+    payload_passthrough: false
+    invocation_mode: asynchronous
+  stat_prefix: per_route
+  )EOF";
+
+  LambdaPerRouteConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  auto route_specific_config_ptr = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getStrictValidationVisitor());
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  ASSERT_NE(route_specific_config_ptr, nullptr);
+  auto filter_settings_ptr = std::const_pointer_cast<FilterSettings>(
+      std::static_pointer_cast<const FilterSettings>(route_specific_config_ptr));
+  EXPECT_EQ("per_routeaws_lambda.server_error", filter_settings_ptr->stats().server_error_.name());
+  EXPECT_EQ("per_routeaws_lambda.upstream_rq_payload_size",
+            filter_settings_ptr->stats().upstream_rq_payload_size_.name());
 }
 
 TEST(AwsLambdaFilterConfigTest, UpstreamFactoryTest) {

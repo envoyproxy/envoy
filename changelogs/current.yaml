@@ -237,6 +237,10 @@ new_features:
   change: |
     Update ``aws_lambda`` filter to support use as an upstream HTTP filter. This allows successful calculation of
     signatures after the forwarding stage has completed, particularly if the path element is modified.
+- area: aws_lambda
+  change: |
+    Add ``stat_prefix`` to per route configuration to be consistent with aws_request_signing.
+    :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.PerRouteConfig.stat_prefix>` parameter.
 - area: grpc reverse bridge
   change: |
     Change HTTP status to 200 to respect the gRPC protocol. This may cause problems for incorrect gRPC clients expecting the filter

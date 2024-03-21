@@ -64,4 +64,7 @@ message PerRouteConfig {
       "envoy.config.filter.http.aws_lambda.v2alpha.PerRouteConfig";
 
   Config invoke_config = 1;
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 2;
 }
