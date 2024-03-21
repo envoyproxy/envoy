@@ -115,15 +115,6 @@ public:
       : CommonFactoryBase<envoy::extensions::common::matching::v3::ExtensionWithMatcher,
                           envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute>(
             "envoy.filters.http.match_delegate") {}
-  struct DualInfo {
-    DualInfo(Server::Configuration::UpstreamFactoryContext& context)
-        : init_manager(context.initManager()), scope(context.scope()), is_upstream(true) {}
-    DualInfo(Server::Configuration::FactoryContext& context)
-        : init_manager(context.initManager()), scope(context.scope()), is_upstream(false) {}
-    Init::Manager& init_manager;
-    Stats::Scope& scope;
-    bool is_upstream;
-  };
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
@@ -133,7 +124,7 @@ public:
         MessageUtil::downcastAndValidate<
             const envoy::extensions::common::matching::v3::ExtensionWithMatcher&>(
             proto_config, context.messageValidationVisitor()),
-        stats_prefix, DualInfo(context), context);
+        stats_prefix, context);
   }
 
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
@@ -144,22 +135,22 @@ public:
         MessageUtil::downcastAndValidate<
             const envoy::extensions::common::matching::v3::ExtensionWithMatcher&&>(
             proto_config, context.serverFactoryContext().messageValidationVisitor()),
-        stats_prefix, DualInfo(context), context);
+        stats_prefix, context);
   }
 
 private:
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-      const std::string& prefix, DualInfo info, Server::Configuration::FactoryContext& context);
+      const std::string& prefix, Server::Configuration::FactoryContext& context);
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
-      const std::string&, DualInfo info, Server::Configuration::UpstreamFactoryContext& context);
+      const std::string& prefix, Server::Configuration::UpstreamFactoryContext& context);
 
   template <class FactoryCtx, class FilterCfgFactory>
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactory(
       const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
       const std::string& prefix, ProtobufMessage::ValidationVisitor& validation,
-      Envoy::Http::Matching::HttpFilterActionContext& action_context, FactoryCtx& context,
+      OptRef<Server::Configuration::FactoryContext>& context_opt, FactoryCtx& context,
       FilterCfgFactory& factory);
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
