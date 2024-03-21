@@ -131,6 +131,9 @@ build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
 build:mobile-remote-release-clang-android-publish-xds --config=mobile-remote-release-clang-android-publish
 build:mobile-remote-release-clang-android-publish-xds --define=envoy_mobile_xds=enabled
 
+# Temporary revert to C++17 for mobile NDK builds.
+build:mobile-release-common --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
 
