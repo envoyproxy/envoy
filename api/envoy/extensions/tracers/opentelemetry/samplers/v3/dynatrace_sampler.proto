@@ -15,6 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Dynatrace Sampler config]
 // Configuration for the Dynatrace Sampler extension.
 // [#extension: envoy.tracers.opentelemetry.samplers.dynatrace]
+
 message DynatraceSamplerConfig {
   // The Dynatrace tenant.
   //
@@ -37,7 +38,7 @@ message DynatraceSamplerConfig {
   //      request_headers_to_add:
   //      - header:
   //          key : "authorization"
-  //          value: "Api-Token dt..."
+  //          value: "<token>"
   //
   config.core.v3.HttpService http_service = 3;
 
