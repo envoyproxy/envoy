@@ -177,6 +177,11 @@ public:
       allow_private_network_access_ =
           PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
     }
+
+    if (config.has_forward_not_matching_preflights()) {
+      forward_not_matching_preflights_ =
+          PROTOBUF_GET_WRAPPED_REQUIRED(config, forward_not_matching_preflights);
+    }
   }
 
   // Router::CorsPolicy
@@ -207,6 +212,9 @@ public:
     }
     return false;
   };
+  const absl::optional<bool>& forwardNotMatchingPreflights() const override {
+    return forward_not_matching_preflights_;
+  }
 
 private:
   const ProtoType config_;
@@ -218,6 +226,7 @@ private:
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
   absl::optional<bool> allow_private_network_access_{};
+  absl::optional<bool> forward_not_matching_preflights_{};
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 

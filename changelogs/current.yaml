@@ -291,6 +291,10 @@ new_features:
   change: |
     :ref:`deny_redirect_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.deny_redirect_matcher>`
     to support disabling authorization redirects for specific requests, e.g. AJAX requests.
+- area: cors
+  change: |
+    Added :ref:`configuration option <envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.forward_not_matching_preflights>`
+    to return local response when CORS preflight's origin does not match allowed origin.
 
 deprecated:
 - area: listener
