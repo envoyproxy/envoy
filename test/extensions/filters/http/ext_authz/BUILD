@@ -105,17 +105,12 @@ envoy_cc_fuzz_test(
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
-        "//source/common/http:context_lib",
-        "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_factory_context_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -126,8 +121,6 @@ envoy_cc_fuzz_test(
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
-        "//source/common/http:context_lib",
-        "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
@@ -135,6 +128,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -148,10 +142,9 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
-        "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
     ],
 )

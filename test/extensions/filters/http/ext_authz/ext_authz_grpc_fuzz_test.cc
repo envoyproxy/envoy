@@ -1,19 +1,14 @@
-#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
+#include "envoy/grpc/status.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "source/common/http/context_impl.h"
-#include "source/common/network/address_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
-#include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
-#include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.validate.h"
+#include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.h"
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz_lib.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 

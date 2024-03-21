@@ -1,12 +1,13 @@
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz_lib.h"
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 
-#include "source/common/http/context_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
+#include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.h"
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz.pb.validate.h"
 #include "test/mocks/network/mocks.h"
 
