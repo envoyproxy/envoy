@@ -1652,7 +1652,7 @@ public:
     const auto& header_config =
         TestUtility::downcastAndValidate<const envoy::config::accesslog::v3::HeaderFilter&>(
             *factory_config);
-    return std::make_unique<HeaderFilter>(header_config);
+    return std::make_unique<HeaderFilter>(header_config, context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

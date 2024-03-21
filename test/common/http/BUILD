@@ -29,9 +29,8 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:test_time_lib",
@@ -371,6 +370,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_utility_lib",
         "//test/mocks/http:header_validator_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
