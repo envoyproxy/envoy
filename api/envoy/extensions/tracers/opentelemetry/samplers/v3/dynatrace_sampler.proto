@@ -30,6 +30,7 @@ message DynatraceSamplerConfig {
   // The HTTP service to fetch the sampler configuration from the Dynatrace API (root spans per minute). For example:
   //
   // .. code-block:: yaml
+  //
   //    http_service:
   //      http_uri:
   //        cluster: dynatrace
@@ -38,7 +39,7 @@ message DynatraceSamplerConfig {
   //      request_headers_to_add:
   //      - header:
   //          key : authorization
-  //          value: token
+  //          value: <token>
   //
   config.core.v3.HttpService http_service = 3;
 
