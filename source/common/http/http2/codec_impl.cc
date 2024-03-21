@@ -701,8 +701,8 @@ Status ConnectionImpl::ClientStreamImpl::onBeginHeaders() {
 }
 
 void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
-  RELEASE_ASSERT(
-      headers_state_ == HeadersState::Response || headers_state_ == HeadersState::Headers, "");
+  ENVOY_BUG(headers_state_ == HeadersState::Response || headers_state_ == HeadersState::Headers,
+            "");
   headers_state_ = HeadersState::Headers;
 }
 
@@ -725,8 +725,7 @@ Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
 }
 
 void ConnectionImpl::ServerStreamImpl::advanceHeadersState() {
-  RELEASE_ASSERT(headers_state_ == HeadersState::Request || headers_state_ == HeadersState::Headers,
-                 "");
+  ENVOY_BUG(headers_state_ == HeadersState::Request || headers_state_ == HeadersState::Headers, "");
   headers_state_ = HeadersState::Headers;
 }
 

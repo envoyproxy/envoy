@@ -353,9 +353,8 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(result.return_value_ == 0,
-                 fmt::format("Failed to set TCP_NODELAY with error {}, {}", result.errno_,
-                             errorDetails(result.errno_)));
+  ENVOY_BUG(result.return_value_ == 0, fmt::format("Failed to set TCP_NODELAY with error {}, {}",
+                                                   result.errno_, errorDetails(result.errno_)));
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
@@ -744,8 +743,8 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(
-        socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).return_value_ == 0, "");
+    auto rc = socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).return_value_;
+    ENVOY_BUG(rc == 0, "");
 
     if (error == 0) {
       ENVOY_CONN_LOG_EVENT(debug, "connection_connected", "connected", *this);

@@ -265,8 +265,8 @@ uint64_t OwnedImpl::length() const {
 }
 
 void* OwnedImpl::linearize(uint32_t size) {
-  RELEASE_ASSERT(size <= length(), "Linearize size exceeds buffer size");
-  if (slices_.empty()) {
+  if (slices_.empty() || size > length()) {
+    ENVOY_BUG(size <= length(), "Linearize size exceeds buffer size");
     return nullptr;
   }
   if (slices_[0].dataSize() < size) {

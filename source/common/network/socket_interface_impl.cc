@@ -124,9 +124,9 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
   if (SOCKET_VALID(result.return_value_)) {
-    RELEASE_ASSERT(
-        os_sys_calls.close(result.return_value_).return_value_ == 0,
-        fmt::format("Fail to close fd: response code {}", errorDetails(result.return_value_)));
+    auto rc = os_sys_calls.close(result.return_value_).return_value_;
+    ENVOY_BUG(rc == 0, fmt::format("Fail to close fd: response code {}",
+                                   errorDetails(result.return_value_)));
   }
   return SOCKET_VALID(result.return_value_);
 }
