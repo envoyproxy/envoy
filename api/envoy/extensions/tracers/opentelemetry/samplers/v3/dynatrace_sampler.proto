@@ -13,6 +13,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tra
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynatrace Sampler config]
+
 // Configuration for the Dynatrace Sampler extension.
 // [#extension: envoy.tracers.opentelemetry.samplers.dynatrace]
 message DynatraceSamplerConfig {
