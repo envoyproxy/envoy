@@ -27,7 +27,6 @@
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"
 #include "source/server/config_validation/cluster_manager.h"
-#include "source/server/config_validation/dns.h"
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/server.h"
 

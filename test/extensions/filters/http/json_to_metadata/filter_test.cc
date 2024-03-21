@@ -1592,6 +1592,171 @@ request_rules:
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }
 
+TEST_F(FilterTest, RequestAllowContentTypeRegex) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::string request_body = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, RequestAllowContentTypemultipleRegex) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "(?:text|application)/.*"
+)EOF");
+  const std::string request_body = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, RequestAllowContentTypeandRegex) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+  allow_content_types:
+  - application/better-json
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::string request_body = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, RequestAllowContentTypeRegexMatch) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+  allow_content_types:
+  - application/better-json
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::string request_body_json = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected_json = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers_json{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers_json, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_json)));
+  testRequestWithBody(request_body_json);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, CustomRequestAllowContentTypeNoMatch) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+  allow_content_types:
+  - "text/plain"
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+
+  Http::TestRequestHeaderMapImpl nomatch_incoming_headers{
+      {":path", "/ping"}, {":method", "POST"}, {"Content-Type", "image/png"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(nomatch_incoming_headers, false));
+
+  testRequestWithBody("{}");
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
 } // namespace JsonToMetadata
 } // namespace HttpFilters
 } // namespace Extensions
