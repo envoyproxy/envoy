@@ -29,23 +29,26 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(Io::IoUringWorkerFactory& io_ur
 
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   ENVOY_LOG(trace, "~IoUringSocketHandleImpl, type = {}", ioUringSocketTypeStr());
-  if (SOCKET_VALID(fd_)) {
-    // If the socket is owned by the main thread like a listener, it may outlive the IoUringWorker.
-    // We have to ensure that the current thread has been registered and the io_uring in the thread
-    // is still available.
-    // TODO(zhxie): for current usage of server socket and client socket, the check may be
-    // redundant.
-    if (io_uring_socket_type_ != IoUringSocketType::Unknown &&
-        io_uring_socket_type_ != IoUringSocketType::Accept &&
-        io_uring_worker_factory_.currentThreadRegistered() && io_uring_socket_.has_value()) {
-      if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::Closed) {
-        io_uring_socket_.ref().close(false);
-      }
-    } else {
-      // The TLS slot has been shut down by this moment with io_uring wiped out, thus better use the
-      // POSIX system call instead of IoUringSocketHandleImpl::close().
-      ::close(fd_);
+
+  if (SOCKET_INVALID(fd_)) {
+    return;
+  }
+
+  // If the socket is owned by the main thread like a listener, it may outlive the IoUringWorker.
+  // We have to ensure that the current thread has been registered and the io_uring in the thread
+  // is still available.
+  // TODO(zhxie): for current usage of server socket and client socket, the check may be
+  // redundant.
+  if (io_uring_socket_type_ != IoUringSocketType::Unknown &&
+      io_uring_socket_type_ != IoUringSocketType::Accept &&
+      io_uring_worker_factory_.currentThreadRegistered() && io_uring_socket_.has_value()) {
+    if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::Closed) {
+      io_uring_socket_.ref().close(false);
     }
+  } else {
+    // The TLS slot has been shut down by this moment with io_uring wiped out, thus use the
+    // POSIX system call instead of IoUringSocketHandleImpl::close().
+    ::close(fd_);
   }
 }
 
@@ -86,7 +89,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                                       absl::optional<uint64_t> max_length_opt) {
   ENVOY_LOG(trace, "read, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  auto read_result = checkReadResult();
+  absl::optional<Api::IoCallUint64Result> read_result = checkReadResult();
   if (read_result.has_value()) {
     return std::move(*read_result);
   }
@@ -102,7 +105,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
                                                         uint64_t num_slice) {
   ENVOY_LOG(trace, "writev, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  auto write_result = checkWriteResult();
+  absl::optional<Api::IoCallUint64Result> write_result = checkWriteResult();
   if (write_result.has_value()) {
     return std::move(*write_result);
   }
@@ -114,7 +117,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
   ENVOY_LOG(trace, "write {}, fd = {}, type = {}", buffer.length(), fd_, ioUringSocketTypeStr());
 
-  auto write_result = checkWriteResult();
+  absl::optional<Api::IoCallUint64Result> write_result = checkWriteResult();
   if (write_result.has_value()) {
     return std::move(*write_result);
   }
@@ -180,7 +183,8 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
 
   ASSERT(io_uring_socket_type_ == IoUringSocketType::Accept);
 
-  auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
+  Envoy::Api::SysCallSocketResult result =
+      Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
   if (SOCKET_INVALID(result.return_value_)) {
     return nullptr;
   }
@@ -400,7 +404,7 @@ absl::optional<Api::IoCallUint64Result> IoUringSocketHandleImpl::checkWriteResul
 Api::IoCallUint64Result IoUringSocketHandleImpl::copyOut(uint64_t max_length,
                                                          Buffer::RawSlice* slices,
                                                          uint64_t num_slice) {
-  auto read_result = checkReadResult();
+  absl::optional<Api::IoCallUint64Result> read_result = checkReadResult();
   if (read_result.has_value()) {
     return std::move(*read_result);
   }

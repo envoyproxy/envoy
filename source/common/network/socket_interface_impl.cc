@@ -37,12 +37,9 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
   if (hasIoUringWorkerFactory(io_uring_worker_factory)) {
     return std::make_unique<IoUringSocketHandleImpl>(*io_uring_worker_factory, socket_fd,
                                                      socket_v6only, domain);
-  } else {
-    return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
-#else
-  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
 #endif
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
