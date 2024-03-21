@@ -6,6 +6,9 @@
 #include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.pb.validate.h"
 #include "contrib/rocketmq_proxy/filters/network/source/metadata.h"
 #include "contrib/rocketmq_proxy/filters/network/source/router/route_matcher.h"
+
+#include "test/mocks/server/server_factory_context.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -46,12 +49,13 @@ routes:
 
   RouteConfigurationProto config = parseRouteConfigurationFromV2Yaml(yaml);
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   MessageMetadata metadata;
   std::string topic_name = "test_topic";
   metadata.setTopicName(topic_name);
   uint64_t code = 310;
   metadata.headers().addCopy(Http::LowerCaseString("code"), code);
-  RouteMatcher matcher(config);
+  RouteMatcher matcher(config, context);
   const Envoy::Router::MetadataMatchCriteria* criteria =
       matcher.route(metadata)->routeEntry()->metadataMatchCriteria();
   const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
