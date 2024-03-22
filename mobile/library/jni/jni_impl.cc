@@ -79,8 +79,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_start_context, jobject envoy_logger_context,
     jobject j_event_tracker) {
-  std::unique_ptr<Envoy::InternalEngineCallbacks> callbacks =
-      std::make_unique<Envoy::InternalEngineCallbacks>();
+  std::unique_ptr<Envoy::EngineCallbacks> callbacks = std::make_unique<Envoy::EngineCallbacks>();
 
   jobject retained_on_start_context =
       env->NewGlobalRef(on_start_context); // Required to keep context in memory

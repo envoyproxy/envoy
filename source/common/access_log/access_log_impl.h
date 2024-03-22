@@ -166,7 +166,8 @@ private:
  */
 class HeaderFilter : public Filter {
 public:
-  HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config);
+  HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config,
+               Server::Configuration::CommonFactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
