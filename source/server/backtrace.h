@@ -54,7 +54,7 @@ public:
    * The format of this line is
    *   `[start_addr]-[end_addr] [path_to_binary]`
    * e.g.
-   *   `7d34ce028000-7d34ce1bd000 /build/foo/bar/source/exe/envoy-static`
+   *   `7d34c0e28000-7d34c1e0d000 /build/foo/bar/source/exe/envoy-static`
    */
   static const std::string& addrMapping();
 
