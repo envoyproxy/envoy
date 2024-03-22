@@ -97,7 +97,7 @@ Matcher::InputMatcherFactoryCb RequestMatchDataInputMatcherFactory::createInputM
   const auto& proto_config = MessageUtil::downcastAndValidate<const RequestMatcherProto&>(
       config, factory_context.messageValidationVisitor());
 
-  return [proto_config]() -> Matcher::InputMatcherPtr {
+  return [proto_config, &factory_context]() -> Matcher::InputMatcherPtr {
     return std::make_unique<RequestMatchInputMatcher>(proto_config, factory_context);
   };
 }
