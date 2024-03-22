@@ -2,6 +2,7 @@
 
 #include "source/common/stats/histogram_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -17,9 +18,10 @@ public:
     for (auto& item : buckets_configs_) {
       bucket_settings.Add(std::move(item));
     }
-    settings_ = std::make_unique<HistogramSettingsImpl>(config);
+    settings_ = std::make_unique<HistogramSettingsImpl>(config, context_);
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::vector<envoy::config::metrics::v3::HistogramBucketSettings> buckets_configs_;
   std::unique_ptr<HistogramSettingsImpl> settings_;
 };

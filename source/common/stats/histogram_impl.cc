@@ -99,13 +99,17 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
   out_of_bound_count_ = hist_approx_count_above(new_histogram_ptr, supported_buckets.back());
 }
 
-HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config)
-    : configs_([&config]() {
+HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                                             Server::Configuration::CommonFactoryContext& context)
+    : configs_([&config, &context]() {
         std::vector<Config> configs;
         for (const auto& matcher : config.histogram_bucket_settings()) {
           std::vector<double> buckets{matcher.buckets().begin(), matcher.buckets().end()};
           std::sort(buckets.begin(), buckets.end());
-          configs.emplace_back(matcher.match(), std::move(buckets));
+          configs.emplace_back(
+              Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>(
+                  matcher.match(), context),
+              std::move(buckets));
         }
 
         return configs;
