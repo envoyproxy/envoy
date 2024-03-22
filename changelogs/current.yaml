@@ -51,6 +51,11 @@ minor_behavior_changes:
   change: |
     Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
     ``envoy.reloadable_features.quic_upstream_reads_fixed_number_packets`` to false.
+- area: stats
+  change: |
+    ``thread_local_cluster_manager.worker_0.*`` metrics are now parsed to use the
+    ``worker_id`` tag like other metrics with ``worker_id`` do, when
+    :ref:`use_all_default_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>` is true.
 - area: aws
   change: |
     AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
