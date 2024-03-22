@@ -63,6 +63,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//test/extensions/common/aws:aws_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

@@ -648,8 +648,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false);
 
   if (route.route().has_cors()) {
-    cors_policy_ =
-        std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context);
   }
   for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
@@ -1732,7 +1731,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context);
   }
 
   if (virtual_host.has_metadata()) {
