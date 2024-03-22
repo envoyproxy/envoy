@@ -21,7 +21,7 @@ cd "${SRCDIR}"
 # Fetching is mostly for robustness rather than optimization.
 FETCH_TARGETS=(
     @bazel_tools//tools/jdk:remote_jdk11
-    @envoy_build_tools//...
+    # @envoy_build_tools//...
     //tools/gsutil
     //tools/zstd)
 FETCH_BUILD_TARGETS=(
