@@ -27,18 +27,16 @@ Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher config;
   config.set_exact(exact_match);
-  return std::make_unique<
-      Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(config,
-                                                                                       context);
+  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+      config, context);
 }
 
 Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher config;
   config.MergeFrom(TestUtility::createRegexMatcher(regex));
-  return std::make_unique<
-      Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(config,
-                                                                                       context);
+  return std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+      config, context);
 }
 
 } // namespace

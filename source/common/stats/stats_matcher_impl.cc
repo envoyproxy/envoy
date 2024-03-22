@@ -27,7 +27,7 @@ StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig
   case envoy::config::metrics::v3::StatsMatcher::StatsMatcherCase::kInclusionList:
     // If we have an inclusion list, we are being default-exclusive.
     for (const auto& stats_matcher : config.stats_matcher().inclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcherImplWithContext(stats_matcher, context));
+      matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher, context));
       optimizeLastMatcher();
     }
     is_inclusive_ = false;
@@ -35,7 +35,7 @@ StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig
   case envoy::config::metrics::v3::StatsMatcher::StatsMatcherCase::kExclusionList:
     // If we have an exclusion list, we are being default-inclusive.
     for (const auto& stats_matcher : config.stats_matcher().exclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcherImplWithContext(stats_matcher, context));
+      matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher, context));
       optimizeLastMatcher();
     }
     FALLTHRU;

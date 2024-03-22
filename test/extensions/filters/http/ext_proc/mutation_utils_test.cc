@@ -342,13 +342,11 @@ TEST(MutationUtils, TestAllowHeadersExactCaseSensitive) {
   envoy::type::matcher::v3::StringMatcher string_matcher;
   string_matcher.set_exact(":method");
   allow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
   string_matcher.set_exact(":Path");
   allow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
 
@@ -371,14 +369,12 @@ TEST(MutationUtils, TestAllowHeadersExactIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher string_matcher;
   string_matcher.set_exact(":method");
   allow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
   string_matcher.set_exact(":Path");
   string_matcher.set_ignore_case(true);
   allow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
@@ -403,20 +399,17 @@ TEST(MutationUtils, TestBothAllowAndDisallowHeadersSet) {
   // Set allow_headers.
   string_matcher.set_exact(":method");
   allow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
   string_matcher.set_exact(":path");
   allow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
 
   // Set disallow_headers
   string_matcher.set_exact(":method");
   disallow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
 
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
@@ -442,13 +435,11 @@ TEST(MutationUtils, TestDisallowHeaderSetNotAllowHeader) {
   // Set disallow_headers.
   string_matcher.set_exact(":method");
   disallow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
   string_matcher.set_exact(":path");
   disallow_headers.push_back(
-      std::make_unique<
-          Matchers::StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>>(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
           string_matcher, context));
 
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
