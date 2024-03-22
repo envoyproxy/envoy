@@ -38,8 +38,8 @@ message DynatraceSamplerConfig {
   //        timeout: 10s
   //      request_headers_to_add:
   //      - header:
-  //          key : authorization
-  //          value: <token>
+  //          key : "authorization"
+  //          value: "Api-Token dt..."
   //
   config.core.v3.HttpService http_service = 3;
 
