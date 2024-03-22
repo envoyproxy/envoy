@@ -10,7 +10,9 @@ namespace Matcher {
 template <class StringMatcherType>
 class StringInputMatcher : public InputMatcher, Logger::Loggable<Logger::Id::matcher> {
 public:
-  explicit StringInputMatcher(const StringMatcherType& matcher) : matcher_(matcher) {}
+  explicit StringInputMatcher(const StringMatcherType& matcher,
+                              Server::Configuration::CommonFactoryContext& context)
+      : matcher_(matcher, context) {}
 
   bool match(const MatchingDataType& input) override {
     if (absl::holds_alternative<std::string>(input)) {
@@ -21,7 +23,7 @@ public:
   }
 
 private:
-  const Matchers::StringMatcherImpl<StringMatcherType> matcher_;
+  const Matchers::StringMatcherImplWithContext<StringMatcherType> matcher_;
 };
 
 } // namespace Matcher
