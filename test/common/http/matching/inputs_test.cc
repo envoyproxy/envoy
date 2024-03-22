@@ -6,6 +6,7 @@
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/test_time.h"
@@ -180,15 +181,13 @@ TEST(MatchingData, FilterStateDataInput) {
   {
     FilterStateDataInput input("filter_state_key");
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher.DataInputGetResult::AllDataAvailable);
+    EXPECT_EQ(result.data_availability_, Matcher.DataInputGetResult::AllDataAvailable);
     EXPECT_EQ(result.data_, absl::nullopt);
   }
 
   data.streamInfo().filterState()->setData(
-    "unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
-    StreamInfo::FilterState::StateType::Mutable,
-    StreamInfo::FilterState::LifeSpan::Connection);
+      "unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     FilterStateDataInput input("filter_state_key");
@@ -199,9 +198,8 @@ TEST(MatchingData, FilterStateDataInput) {
   }
 
   data.streamInfo().filterState()->setData(
-    "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
-    StreamInfo::FilterState::StateType::Mutable,
-    StreamInfo::FilterState::LifeSpan::Connection);
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   {
     FilterStateDataInput input("filter_state_key");

@@ -201,11 +201,12 @@ DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
 class FilterStateDataInput : public Matcher::DataInput<HttpMatchingData> {
 public:
   explicit FilterStateDataInput(const std::string& filter_state_key)
-      :  filter_state_key_(filter_state_key) {}
+      : filter_state_key_(filter_state_key) {}
 
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto* filter_state_object =
-        data.streamInfo().filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
+        data.streamInfo().filterState().getDataReadOnly<StreamInfo::FilterState::Object>(
+            filter_state_key_);
 
     if (filter_state_object != nullptr) {
       auto str = filter_state_object->serializeAsString();
@@ -230,10 +231,10 @@ public:
   Matcher::DataInputFactoryCb<HttpMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
                            ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::type::matcher::v3::FilterStateMatchInput&>(config,
-                                                             validation_visitor);
-                                                            
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const envoy::type::matcher::v3::FilterStateMatchInput&>(
+            config, validation_visitor);
+
     return [filter_state_key = typed_config.filter_state_key()] {
       return std::make_unique<FilterStateDataInput>(filter_state_key);
     };
