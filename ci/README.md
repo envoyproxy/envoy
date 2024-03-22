@@ -122,8 +122,15 @@ For a debug version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
-To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup) add the remote cache endpoint to
-the BAZEL_BUILD_EXTRA_OPTIONS environment variable
+There are multiple ways to leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup):
+1. [Recommended] Add bazel options like `--remote_cache` and/or `--remote_cache_header` to a `.bazelrc` file, such as `user.bazelrc`. For example
+
+```bash
+build --remote_cache=grpcs://remotecache.googleapis.com
+build --remote_cache_header=Authorization="Bearer <token>"
+```
+
+2. Add the remote cache endpoint to the `BAZEL_BUILD_EXTRA_OPTIONS` environment variable. See below example command:
 
 ```bash
 ./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh release"
