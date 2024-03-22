@@ -58,12 +58,13 @@ constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
 constexpr absl::string_view HmacPayloadSeparator = "\n";
 
 template <class T>
-std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
+std::vector<Http::HeaderUtility::HeaderData>
+headerMatchers(const T& matcher_protos, Server::Configuration::CommonFactoryContext& context) {
   std::vector<Http::HeaderUtility::HeaderData> matchers;
   matchers.reserve(matcher_protos.size());
 
   for (const auto& proto : matcher_protos) {
-    matchers.emplace_back(proto);
+    matchers.emplace_back(proto, context);
   }
 
   return matchers;
@@ -184,8 +185,9 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view hos
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
-    Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
-    Stats::Scope& scope, const std::string& stats_prefix)
+    Server::Configuration::CommonFactoryContext& context,
+    std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
+    const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
@@ -196,15 +198,15 @@ FilterConfig::FilterConfig(
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
-      deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher())),
+      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
+      deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
       auth_type_(getAuthType(proto_config.auth_type())),
       use_refresh_token_(proto_config.use_refresh_token().value()),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)) {
-  if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
+  if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
                                      oauth_token_endpoint_.cluster()));

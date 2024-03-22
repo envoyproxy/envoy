@@ -300,7 +300,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     OptRef<Server::Admin> admin, ProtobufMessage::ValidationContext& validation_context,
     Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-    Router::Context& router_context, const Server::Instance& server)
+    Router::Context& router_context, Server::Instance& server)
     : server_(server), factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       deferred_cluster_creation_(bootstrap.cluster_manager().enable_deferred_cluster_creation()),
@@ -1515,9 +1515,8 @@ Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
   if (lazy_http_async_client_ == nullptr) {
     lazy_http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_,
-        parent_.parent_.local_info_, parent_.parent_, parent_.parent_.runtime_,
-        parent_.parent_.random_,
+        cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_, parent_.parent_,
+        parent_.parent_.server_.serverFactoryContext(),
         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
         parent_.parent_.http_context_, parent_.parent_.router_context_);
   }

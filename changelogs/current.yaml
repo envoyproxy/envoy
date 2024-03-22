@@ -191,6 +191,9 @@ bug_fixes:
     If the claim is ommited in the jwt then :ref:`default_refresh_token_expires_in
     <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.default_refresh_token_expires_in>`
     specifies the lifetime of the refresh token. The default value is ``604800`` seconds (a week).
+- area: admin
+  change: |
+    Removing the ECDS config entry from the config dump when it does not exist (or has expired).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -288,7 +291,8 @@ new_features:
   change: |
     Add ``Envoy::ExecutionContext``, which is notified by ``ScopeTrackerScopeState``'s constructor and destructor. This feature is
     disabled by default, it can be enabled by runtime feature flag ``envoy.restart_features.enable_execution_context``. For more details,
-    please see https://github.com/envoyproxy/envoy/issues/32012.
+    please see https://github.com/envoy_p
+    /envoy/issues/32012.
 - area: rbac
   change: |
     Added :ref:`uri_template<envoy_v3_api_field_config.rbac.v3.Permission.uri_template>` which uses existing
@@ -367,11 +371,18 @@ new_features:
     to enforce the filter only matches specific PROXY protocol versions.
 - area: proxy_protocol
   change: |
-    Added new statistics to the proxy protocol filter to track connections allowed/denied/error by PROXY protocol version.
+    Added new statistics to the proxy protocol filter to track connections found/disallowed/errored by PROXY protocol version.
+- area: formatters
+  change: |
+    Added :ref:`formatters <envoy_v3_api_field_extensions.access_loggers.fluentd.v3.FluentdAccessLogConfig.formatters>`
+    to Fluentd access logger to allow adding extension commands when formatter access logs.
 - area: rbac
   change: |
     Added :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
     to allow adding custom prefix to the stats emitted by rules.
+- area: tracing
+  change: |
+    Dynatrace sampler fetches configuration from Dynatrace API.
 
 deprecated:
 - area: listener

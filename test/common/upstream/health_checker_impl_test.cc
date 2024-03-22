@@ -34,6 +34,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/health_checker_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
@@ -101,6 +102,14 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
 
 class HealthCheckerTestBase {
 public:
+  HealthCheckerTestBase() {
+    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+    ON_CALL(context_.server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.server_context_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(context_.server_context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  }
   std::shared_ptr<MockClusterMockPrioritySet> cluster_{
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -109,6 +118,7 @@ public:
   MockHealthCheckEventLogger& event_logger_{*event_logger_storage_};
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context_;
 };
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
@@ -149,7 +159,7 @@ public:
 
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), context_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -3526,7 +3536,7 @@ class ProdHttpHealthCheckerTest : public testing::Test, public HealthCheckerTest
 public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), context_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 

@@ -166,7 +166,8 @@ private:
 class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   HeaderValueMatchAction(
-      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action);
+      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,

@@ -229,11 +229,12 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(
-    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
+    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context)
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "header_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
+      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers(), context)) {}
 
 bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                 const std::string&,
@@ -307,7 +308,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new MetaDataAction(action.metadata()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
-      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
+      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match(), context));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kExtension: {
       ProtobufMessage::ValidationVisitor& validator = context.messageValidationVisitor();
