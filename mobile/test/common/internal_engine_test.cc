@@ -107,7 +107,7 @@ struct EngineTestContext {
   absl::Notification on_engine_running;
   absl::Notification on_exit;
   absl::Notification on_log;
-  absl::Notification on_logger_release;
+  absl::Notification on_log_exit;
   absl::Notification on_event;
 };
 
@@ -229,23 +229,15 @@ TEST_F(InternalEngineTest, RecordCounter) {
 
 TEST_F(InternalEngineTest, Logger) {
   EngineTestContext test_context{};
-
-  envoy_logger logger{[](envoy_log_level, envoy_data data, const void* context) -> void {
-                        auto* test_context =
-                            static_cast<EngineTestContext*>(const_cast<void*>(context));
-                        release_envoy_data(data);
-                        if (!test_context->on_log.HasBeenNotified()) {
-                          test_context->on_log.Notify();
-                        }
-                      } /* log */,
-                      [](const void* context) -> void {
-                        auto* test_context =
-                            static_cast<EngineTestContext*>(const_cast<void*>(context));
-                        test_context->on_logger_release.Notify();
-                      } /* release */,
-                      &test_context};
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log = [&](Logger::Logger::Levels, const std::string&) {
+    if (!test_context.on_log.HasBeenNotified()) {
+      test_context.on_log.Notify();
+    }
+  };
+  logger->on_exit = [&] { test_context.on_log_exit.Notify(); };
   std::unique_ptr<InternalEngine> engine(
-      new InternalEngine(createDefaultEngineCallbacks(test_context), logger, {}));
+      new InternalEngine(createDefaultEngineCallbacks(test_context), std::move(logger), {}));
   engine->run(MINIMAL_TEST_CONFIG, LEVEL_DEBUG);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -253,7 +245,7 @@ TEST_F(InternalEngineTest, Logger) {
 
   engine->terminate();
   engine.reset();
-  ASSERT_TRUE(test_context.on_logger_release.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_log_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
@@ -495,21 +487,14 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
 
 TEST_F(InternalEngineTest, SetLogger) {
   std::atomic<bool> logging_was_called{false};
-  envoy_logger logger;
-  logger.log = [](envoy_log_level, envoy_data data, const void* context) {
-    std::atomic<bool>* logging_was_called =
-        const_cast<std::atomic<bool>*>(static_cast<const std::atomic<bool>*>(context));
-    *logging_was_called = true;
-    release_envoy_data(data);
-  };
-  logger.release = envoy_noop_const_release;
-  logger.context = &logging_was_called;
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log = [&](Logger::Logger::Levels, const std::string&) { logging_was_called = true; };
 
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   Platform::EngineSharedPtr engine =
       engine_builder.addLogLevel(Platform::LogLevel::debug)
-          .setLogger(logger)
+          .setLogger(std::move(logger))
           .setOnEngineRunning([&] { engine_running.Notify(); })
           .addNativeFilter(
               "test_remote_response",

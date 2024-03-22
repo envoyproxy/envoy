@@ -125,7 +125,7 @@ public:
   virtual ~EngineBuilder() = default;
 
   EngineBuilder& addLogLevel(LogLevel log_level);
-  EngineBuilder& setLogger(envoy_logger envoy_logger);
+  EngineBuilder& setLogger(std::unique_ptr<EnvoyLogger> logger);
   EngineBuilder& setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks);
   [[deprecated("Use EngineBuilder::setEngineCallbacks instead")]] EngineBuilder&
   setOnEngineRunning(std::function<void()> closure);
@@ -215,7 +215,7 @@ private:
   };
 
   LogLevel log_level_ = LogLevel::info;
-  absl::optional<envoy_logger> envoy_logger_;
+  std::unique_ptr<EnvoyLogger> logger_{nullptr};
   std::unique_ptr<EngineCallbacks> callbacks_;
 
   int connect_timeout_seconds_ = 30;
