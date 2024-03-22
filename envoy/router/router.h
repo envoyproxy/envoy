@@ -172,6 +172,12 @@ public:
    * @return bool Whether CORS policies are evaluated when filter is off.
    */
   virtual bool shadowEnabled() const PURE;
+
+  /**
+   * @return bool whether preflight requests with origin not matching
+   * configured allowed origins should be forwarded upstream.
+   */
+  virtual const absl::optional<bool>& forwardNotMatchingPreflights() const PURE;
 };
 
 /**
@@ -1296,7 +1302,7 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
  * Shared part of the route configuration. This class contains interfaces that needn't depend on
  * router matcher. Then every virtualhost could keep a reference to the CommonConfig. When the
  * entire route config is destroyed, the part of CommonConfig will still live until all
- * virtualhosts are destroyed.
+ * virtual hosts are destroyed.
  */
 class CommonConfig {
 public:
@@ -1423,7 +1429,7 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 
   /**
-   * @return returns if the connection pool was iniitalized successfully.
+   * @return returns if the connection pool was initialized successfully.
    */
   virtual bool valid() const PURE;
 };

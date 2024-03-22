@@ -375,6 +375,10 @@ new_features:
 - area: tracing
   change: |
     Dynatrace sampler fetches configuration from Dynatrace API.
+- area: cors
+  change: |
+    Added :ref:`configuration option <envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.forward_not_matching_preflights>`
+    to return local response when CORS preflight's origin does not match allowed origin.
 
 deprecated:
 - area: listener
