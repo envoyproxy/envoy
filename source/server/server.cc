@@ -1091,7 +1091,7 @@ void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> co
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto stage_it = stage_callbacks_.find(stage);
   if (stage_it != stage_callbacks_.end()) {
-    LifecycleNotifierCallbacks& callbacks = it->second;
+    LifecycleNotifierCallbacks& callbacks = stage_it->second;
     for (auto callback_it = callbacks.begin(); callback_it != callbacks.end();) {
       StageCallback callback = *callback_it;
       // Increment the iterator before invoking the callback in case the
