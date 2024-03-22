@@ -152,7 +152,7 @@ private:
   void requestNextChunk();
   void sendAbortChunkLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void clearLifecycleTerminator();
+  // void clearLifecycleTerminator();
 
   Server::Instance& server_;
   OptRef<Server::Admin> opt_admin_;
@@ -185,7 +185,7 @@ private:
   mutable absl::Mutex mutex_;
 
   // SharedPtrSet shared_response_set_;
-  std::shared_ptr<Server::ServerLifecycleNotifier::HandlePtr> lifecycle_notifier_;
+  Server::ServerLifecycleNotifier::HandlePtr lifecycle_notifier_;
 };
 using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 

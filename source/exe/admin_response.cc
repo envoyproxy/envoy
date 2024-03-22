@@ -9,40 +9,19 @@ namespace Envoy {
 
 AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
                              absl::string_view method /*, SharedPtrSet response_set*/)
-    : server_(server), opt_admin_(server.admin()) /*, shared_response_set_(response_set) */ {
+    : server_(server), opt_admin_(server.admin()) /*, shared_response_set_(response_set) */,
+      lifecycle_notifier_(server.lifecycleNotifier().registerCallback(
+          Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this] { terminate(); })) {
+
+  ENVOY_LOG_MISC(error, "AdminResponse(): {}", static_cast<void*>(this));
   request_headers_->setMethod(method);
   request_headers_->setPath(path);
-  lifecycle_notifier_ = std::make_shared<Server::ServerLifecycleNotifier::HandlePtr>(
-      server.lifecycleNotifier().registerCallback(
-          Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() { terminate(); }));
-  if (server_.isShutdown()) {
-    lifecycle_notifier_.reset();
-    {
-      absl::MutexLock lock(&mutex_);
-      if (!terminated_) {
-        terminated_ = true;
-        sendErrorLockHeld();
-      }
-    }
-    // server_.dispatcher().post([this]() { terminate(); });
-  }
 }
 
 AdminResponse::~AdminResponse() {
-  clearLifecycleTerminator();
+  ENVOY_LOG_MISC(error, "~AdminResponse(): {}", static_cast<void*>(this));
   cancel();
-
   // shared_response_set_->detachResponse(this);
-}
-
-void AdminResponse::clearLifecycleTerminator() {
-  absl::MutexLock lock(&mutex_);
-  if (!terminated_ && lifecycle_notifier_ != nullptr) {
-    std::shared_ptr<Server::ServerLifecycleNotifier::HandlePtr> lifecycle_notifier =
-        lifecycle_notifier_;
-    lifecycle_notifier_.reset();
-    server_.dispatcher().post([lifecycle_notifier]() {});
-  }
 }
 
 void AdminResponse::getHeaders(HeadersFn fn) {
@@ -113,6 +92,7 @@ bool AdminResponse::cancelled() const {
 // admin response, and so calls to getHeader and nextChunk remain valid,
 // resulting in 503 and an empty body.
 void AdminResponse::terminate() {
+  ENVOY_LOG_MISC(error, "terminate(): {}", static_cast<void*>(this));
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   absl::MutexLock lock(&mutex_);
   if (!terminated_) {

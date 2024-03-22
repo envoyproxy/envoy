@@ -78,6 +78,8 @@ public:
    */
   AdminResponseSharedPtr adminRequest(absl::string_view path_and_query, absl::string_view method);
 
+  using LifecycleHandleSharedPtr = std::shared_ptr<Server::ServerLifecycleNotifier::HandlePtr>;
+
 private:
   // AdminResponse::SharedPtrSet shared_response_set_;
 #endif

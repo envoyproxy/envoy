@@ -334,8 +334,7 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(
-      Stage stage, std::function<void()> completion_cb = [] {});
+  void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
 
@@ -385,7 +384,9 @@ private:
   std::unique_ptr<Runtime::Loader> runtime_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
-  absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::node_hash_map<Stage, LifecycleNotifierCallbacks>
+      stage_callbacks_ ABSL_GUARDED_BY(stage_callbacks_mutex_);
+  absl::Mutex stage_callbacks_mutex_;
   absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
   Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -419,11 +420,22 @@ private:
 
   bool stats_flush_in_progress_ : 1;
 
-  template <class T>
-  class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
+  template <class T> class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle {
   public:
-    LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
-        : RaiiListElement<T>(callbacks, callback) {}
+    LifecycleCallbackHandle(std::list<T>& callbacks, T& callback, absl::Mutex& mutex)
+        : mutex_(mutex) {
+      // absl::MutexLock lock(&mutex_);
+      rail_list_element_ = std::make_unique<RaiiListElement<T>>(callbacks, callback);
+    }
+
+    ~LifecycleCallbackHandle() {
+      absl::MutexLock lock(&mutex_);
+      rail_list_element_.reset();
+    }
+
+  private:
+    absl::Mutex& mutex_;
+    std::unique_ptr<RaiiListElement<T>> rail_list_element_;
   };
 
 #ifdef ENVOY_PERFETTO

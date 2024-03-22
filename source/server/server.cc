@@ -1074,26 +1074,36 @@ void InstanceBase::shutdownAdmin() {
 
 ServerLifecycleNotifier::HandlePtr InstanceBase::registerCallback(Stage stage,
                                                                   StageCallback callback) {
+  absl::MutexLock lock(&stage_callbacks_mutex_);
   auto& callbacks = stage_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback);
+  return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback,
+                                                                  stage_callbacks_mutex_);
 }
 
 ServerLifecycleNotifier::HandlePtr
 InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
   ASSERT(stage == Stage::ShutdownExit);
   auto& callbacks = stage_completable_callbacks_[stage];
-  return std::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(callbacks,
-                                                                                callback);
+  return std::make_unique<LifecycleCallbackHandle<StageCallbackWithCompletion>>(
+      callbacks, callback, stage_callbacks_mutex_);
 }
 
 void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  const auto it = stage_callbacks_.find(stage);
-  if (it != stage_callbacks_.end()) {
-    for (const StageCallback& callback : it->second) {
-      callback();
+
+  std::vector<StageCallback> callbacks_to_run;
+  {
+    absl::MutexLock lock(&stage_callbacks_mutex_);
+    const auto it = stage_callbacks_.find(stage);
+    if (it != stage_callbacks_.end()) {
+      LifecycleNotifierCallbacks& callbacks = it->second;
+      callbacks_to_run.insert(callbacks_to_run.end(), callbacks.begin(), callbacks.end());
     }
   }
+  for (StageCallback callback : callbacks_to_run) {
+    callback();
+  }
+  callbacks_to_run.clear();
 
   // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
   // have finished their work.

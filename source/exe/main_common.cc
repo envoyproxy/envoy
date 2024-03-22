@@ -113,10 +113,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 
 AdminResponseSharedPtr MainCommonBase::adminRequest(absl::string_view path_and_query,
                                                     absl::string_view method) {
-  auto response =
-      std::make_shared<AdminResponse>(*server(), path_and_query, method /*, shared_response_set_*/);
-  // shared_response_set_->attachResponse(response.get());
-  return response;
+  return std::make_shared<AdminResponse>(*server(), path_and_query, method);
 }
 #endif
 
