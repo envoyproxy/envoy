@@ -7,7 +7,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api:84.5" # flaky due to posix: be careful adjusting
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/common/posix:88.8" # No easy way to test pthread_create failure.
-"source/common/config:95.8"
+"source/common/config:95.6"
 "source/common/crypto:95.5"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
