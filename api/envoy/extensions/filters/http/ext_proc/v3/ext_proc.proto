@@ -207,7 +207,7 @@ message ExternalProcessor {
   // Options related to the sending and receiving of dynamic metadata.
   MetadataOptions metadata_options = 16;
 
-  // If set to true, local reply message will not be forwared to external processing server, even if
+  // If set to true, local reply message will not be forwarded to external processing server, even if
   // :ref:`processing_mode
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>` is configured
   // as SEND.
