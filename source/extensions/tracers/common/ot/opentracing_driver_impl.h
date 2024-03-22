@@ -48,6 +48,9 @@ public:
   // TODO: This method is unimplemented for OpenTracing.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
+  // TODO: This method is unimplemented for OpenTracing.
+  std::string getSpanIdAsHex() const override { return EMPTY_STRING; };
+
 private:
   OpenTracingDriver& driver_;
   opentracing::FinishSpanOptions finish_options_;

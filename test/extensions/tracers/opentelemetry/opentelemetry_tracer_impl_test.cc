@@ -176,6 +176,7 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
   EXPECT_EQ(span->getTraceIdAsHex(), trace_id_hex);
+  EXPECT_EQ(span->getSpanIdAsHex(), absl::StrCat(Hex::uint64ToHex(new_span_id)));
 
   // Remove headers, then inject context into header from the span.
   request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT.key());
