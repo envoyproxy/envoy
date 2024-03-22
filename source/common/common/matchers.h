@@ -40,7 +40,8 @@ public:
   /**
    * Create the matcher object.
    */
-  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::v3::ValueMatcher& value);
+  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::v3::ValueMatcher& value,
+                                           Server::Configuration::CommonFactoryContext& context);
 };
 
 class NullMatcher : public ValueMatcher {
@@ -213,7 +214,8 @@ public:
 
 class ListMatcher : public ValueMatcher {
 public:
-  ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher);
+  ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher,
+              Server::Configuration::CommonFactoryContext& context);
 
   bool match(const ProtobufWkt::Value& value) const override;
 
@@ -225,7 +227,8 @@ private:
 
 class OrMatcher : public ValueMatcher {
 public:
-  OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher);
+  OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher,
+            Server::Configuration::CommonFactoryContext& context);
 
   bool match(const ProtobufWkt::Value& value) const override;
 
@@ -235,7 +238,8 @@ private:
 
 class MetadataMatcher {
 public:
-  MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher);
+  MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher,
+                  Server::Configuration::CommonFactoryContext& context);
 
   /**
    * Check whether the metadata is matched to the matcher.
@@ -253,7 +257,8 @@ private:
 
 class FilterStateMatcher {
 public:
-  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher);
+  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+                     Server::Configuration::CommonFactoryContext& context);
 
   /**
    * Check whether the filter state object is matched to the matcher.
@@ -269,22 +274,33 @@ private:
 
 class PathMatcher : public StringMatcher {
 public:
-  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path) : matcher_(path.path()) {}
-  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) : matcher_(matcher) {}
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path,
+              Server::Configuration::CommonFactoryContext& context)
+      : matcher_(path.path(), context) {}
+  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher,
+              Server::Configuration::CommonFactoryContext& context)
+      : matcher_(matcher, context) {}
 
-  static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
-  static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
-  static PathMatcherConstSharedPtr createPattern(const std::string& pattern, bool ignore_case);
   static PathMatcherConstSharedPtr
-  createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
+  createExact(const std::string& exact, bool ignore_case,
+              Server::Configuration::CommonFactoryContext& context);
+  static PathMatcherConstSharedPtr
+  createPrefix(const std::string& prefix, bool ignore_case,
+               Server::Configuration::CommonFactoryContext& context);
+  static PathMatcherConstSharedPtr
+  createPattern(const std::string& pattern, bool ignore_case,
+                Server::Configuration::CommonFactoryContext& context);
+  static PathMatcherConstSharedPtr
+  createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
+                  Server::Configuration::CommonFactoryContext& context);
 
   bool match(const absl::string_view path) const override;
-  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>& matcher() const {
+  const StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher>& matcher() const {
     return matcher_;
   }
 
 private:
-  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
+  const StringMatcherImplWithContext<envoy::type::matcher::v3::StringMatcher> matcher_;
 };
 
 } // namespace Matchers

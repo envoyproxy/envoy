@@ -522,8 +522,13 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
       config_headers_(
           Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), factory_context)),
-      dynamic_metadata_(route.match().dynamic_metadata().begin(),
-                        route.match().dynamic_metadata().end()),
+      dynamic_metadata_([&]() {
+        std::vector<Envoy::Matchers::MetadataMatcher> vec;
+        for (const auto& elt : route.match().dynamic_metadata()) {
+          vec.emplace_back(elt, factory_context);
+        }
+        return vec;
+      }()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)),
       per_filter_configs_(route.typed_per_filter_config(), factory_context, validator),
@@ -1503,8 +1508,8 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
-      path_matcher_(
-          Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive())) {}
+      path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
+                                                        factory_context)) {}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
@@ -1531,7 +1536,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
-      path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive())) {}
+      path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
+                                                       factory_context)) {}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -1559,7 +1565,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
-      path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
+      path_matcher_(
+          Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
          envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
 }
@@ -1626,7 +1633,7 @@ PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
-                                                        !case_sensitive())) {}
+                                                        !case_sensitive(), factory_context)) {}
 
 void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                           bool insert_envoy_original_path) const {
