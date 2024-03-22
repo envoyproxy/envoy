@@ -176,7 +176,9 @@ public:
 };
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
-template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
+template <class... Ts> struct StructFormatMapVisitorHelper : Ts... {
+  using Ts::operator()...;
+};
 template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
 
 /**

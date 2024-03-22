@@ -435,7 +435,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
 
 class MockOpenTelemetryGrpcMetricsExporter : public OpenTelemetryGrpcMetricsExporter {
 public:
-  MOCK_METHOD(void, send, (MetricsExportRequestPtr &&));
+  MOCK_METHOD(void, send, (MetricsExportRequestPtr&&));
   MOCK_METHOD(void, onSuccess, (Grpc::ResponsePtr<MetricsExportResponse>&&, Tracing::Span&));
   MOCK_METHOD(void, onFailure, (Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&));
 };

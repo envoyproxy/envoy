@@ -48,10 +48,10 @@ final class UrlRequestCallbackTester<R> {
     }
     if (throwable.get() != null) {
       if (throwable.get() instanceof Error) {
-        throw(Error) throwable.get();
+        throw (Error)throwable.get();
       }
       if (throwable.get() instanceof RuntimeException) {
-        throw(RuntimeException) throwable.get();
+        throw (RuntimeException)throwable.get();
       }
       throw new RuntimeException(throwable.get());
     }

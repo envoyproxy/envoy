@@ -27,7 +27,7 @@ public:
                const Network::ExtraShutdownListenerOptions& options));
   MOCK_METHOD(void, stopWorkers, ());
   MOCK_METHOD(void, beginListenerUpdate, ());
-  MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates &&));
+  MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates&&));
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
   MOCK_METHOD(bool, isWorkerStarted, ());
 };

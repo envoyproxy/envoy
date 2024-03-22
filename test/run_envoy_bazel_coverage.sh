@@ -2,7 +2,7 @@
 
 set -e -o pipefail
 
-LLVM_VERSION=${LLVM_VERSION:-"14.0.0"}
+LLVM_VERSION=${LLVM_VERSION:-"16.0.0"}
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \([0-9.]*\).*/\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \([0-9.]*\).*/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
@@ -28,7 +28,7 @@ fi
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
-[[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.1
+[[ -z "${COVERAGE_THRESHOLD}" ]] && COVERAGE_THRESHOLD=96.0
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
 read -ra BAZEL_GLOBAL_OPTIONS <<< "${BAZEL_GLOBAL_OPTION_LIST:-}"

@@ -813,7 +813,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
               if (scope_exist) {
                 parent_.refreshCachedRoute();
               }
-              (*cb)(scope_exist && parent_.hasCachedRoute());
+              (*cb)(scope_exist&& parent_.hasCachedRoute());
             }
           });
   scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,

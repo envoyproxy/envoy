@@ -108,13 +108,13 @@ public:
 
 // Add deduction guides for comping with the ctad-maybe-unsupported warning
 TypedMockAsyncFileAction(std::function<void(absl::Status)>)
-    ->TypedMockAsyncFileAction<std::function<void(absl::Status)>>;
+    -> TypedMockAsyncFileAction<std::function<void(absl::Status)>>;
 TypedMockAsyncFileAction(std::function<void(absl::StatusOr<Buffer::InstancePtr>)>)
-    ->TypedMockAsyncFileAction<std::function<void(absl::StatusOr<Buffer::InstancePtr>)>>;
+    -> TypedMockAsyncFileAction<std::function<void(absl::StatusOr<Buffer::InstancePtr>)>>;
 TypedMockAsyncFileAction(std::function<void(absl::StatusOr<size_t>)>)
-    ->TypedMockAsyncFileAction<std::function<void(absl::StatusOr<size_t>)>>;
+    -> TypedMockAsyncFileAction<std::function<void(absl::StatusOr<size_t>)>>;
 TypedMockAsyncFileAction(std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>)
-    ->TypedMockAsyncFileAction<
+    -> TypedMockAsyncFileAction<
         std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>>;
 
 } // namespace AsyncFiles

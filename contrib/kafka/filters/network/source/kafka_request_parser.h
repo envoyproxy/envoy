@@ -144,8 +144,8 @@ public:
   // Constructor visible for testing (allows for initial parser injection).
   RequestHeaderParser(const RequestParserResolver& parser_resolver, RequestContextSharedPtr context,
                       RequestHeaderDeserializerPtr deserializer)
-      : parser_resolver_{parser_resolver}, context_{context}, deserializer_{
-                                                                  std::move(deserializer)} {};
+      : parser_resolver_{parser_resolver}, context_{context},
+        deserializer_{std::move(deserializer)} {};
 
   /**
    * Uses data provided to compute request header.
