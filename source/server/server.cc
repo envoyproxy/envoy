@@ -1089,15 +1089,15 @@ InstanceBase::registerCallback(Stage stage, StageCallbackWithCompletion callback
 
 void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  const auto it = stage_callbacks_.find(stage);
-  if (it != stage_callbacks_.end()) {
+  const auto stage_it = stage_callbacks_.find(stage);
+  if (stage_it != stage_callbacks_.end()) {
     LifecycleNotifierCallbacks& callbacks = it->second;
-    for (auto it = callbacks.begin(); it != callbacks.end();) {
-      StageCallback callback = *it;
+    for (auto callback_it = callbacks.begin(); callback_it != callbacks.end();) {
+      StageCallback callback = *callback_it;
       // Increment the iterator before invoking the callback in case the
       // callback deletes the handle which will unregister itself and
       // invalidate this iterator if we're still pointing at it.
-      ++it;
+      ++callback_it;
       callback();
     }
   }
