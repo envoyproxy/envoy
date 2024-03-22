@@ -9,11 +9,11 @@ namespace Envoy {
 
 AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
                              absl::string_view method /*, SharedPtrSet response_set*/)
-    : server_(server), opt_admin_(server.admin()) /*, shared_response_set_(response_set) */,
+    : server_(server), opt_admin_(server.admin()),
+      // shared_response_set_(response_set)
       lifecycle_notifier_(server.lifecycleNotifier().registerCallback(
           Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this] { terminate(); })) {
-
-  if (server_.isShutdown()) {
+  if (lifecycle_notifier_ == nullptr) {
     terminate();
   } else {
     ENVOY_LOG_MISC(error, "AdminResponse(): {}", static_cast<void*>(this));

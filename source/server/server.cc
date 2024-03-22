@@ -1054,7 +1054,10 @@ Runtime::Loader& InstanceBase::runtime() { return *runtime_; }
 
 void InstanceBase::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
-  shutdown_ = true;
+  {
+    absl::MutexLock lock(&stage_callbacks_mutex_);
+    shutdown_ = true;
+  }
   restarter_.sendParentTerminateRequest();
   notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
@@ -1075,6 +1078,9 @@ void InstanceBase::shutdownAdmin() {
 ServerLifecycleNotifier::HandlePtr InstanceBase::registerCallback(Stage stage,
                                                                   StageCallback callback) {
   absl::MutexLock lock(&stage_callbacks_mutex_);
+  if (shutdown_) {
+    return nullptr;
+  }
   auto& callbacks = stage_callbacks_[stage];
   return std::make_unique<LifecycleCallbackHandle<StageCallback>>(callbacks, callback,
                                                                   stage_callbacks_mutex_);

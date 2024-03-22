@@ -185,7 +185,7 @@ private:
   mutable absl::Mutex mutex_;
 
   // SharedPtrSet shared_response_set_;
-  Server::ServerLifecycleNotifier::HandlePtr lifecycle_notifier_;
+  Server::ServerLifecycleNotifier::HandlePtr lifecycle_notifier_ ABSL_GUARDED_BY(mutex_);
 };
 using AdminResponseSharedPtr = std::shared_ptr<AdminResponse>;
 
