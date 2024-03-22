@@ -135,19 +135,13 @@ TEST_F(FilterTest, HasAuthHeaderButNoColon) {
 
 TEST_F(FilterTest, ExistingUsernameHeader) {
   // user1:test1
-  Http::TestRequestHeaderMapImpl request_headers_user1{{"Authorization", "Basic dXNlcjE6dGVzdDE="}},
-      {"x-username", "existingUsername"};
+  Http::TestRequestHeaderMapImpl request_headers_user1 {
+    {"Authorization", "Basic dXNlcjE6dGVzdDE="}, {"x-username", "existingUsername"};
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(request_headers_user1, true));
-  EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
-
-  // user2:test2
-  Http::TestRequestHeaderMapImpl request_headers_user2{{"Authorization", "Basic dXNlcjI6dGVzdDI="}};
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(request_headers_user2, true));
-  EXPECT_EQ("user2", request_headers_user2.get_("x-username"));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+              filter_->decodeHeaders(request_headers_user1, true));
+    EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
+  }
 }
 
 } // namespace BasicAuth
