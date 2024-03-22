@@ -15,6 +15,8 @@
 #include "library/common/network/connectivity_manager.h"
 #include "library/common/types/c_types.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 
 class InternalEngine : public Logger::Loggable<Logger::Id::main> {
@@ -37,9 +39,12 @@ public:
    * Run the engine with the provided configuration.
    * @param config, the Envoy bootstrap configuration to use.
    * @param log_level, the log level.
+   * @param thread_priority, an optional thread priority, between -20 and 19.
    */
-  envoy_status_t run(const std::string& config, const std::string& log_level);
-  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
+  envoy_status_t run(const std::string& config, const std::string& log_level,
+                     absl::optional<int> thread_priority = absl::nullopt);
+  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options,
+                     absl::optional<int> thread_priority = absl::nullopt);
 
   /**
    * Immediately terminate the engine, if running. Calling this function when

@@ -1,5 +1,7 @@
 #include "library/common/internal_engine.h"
 
+#include <sys/resource.h>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/runtime/runtime_features.h"
@@ -36,7 +38,8 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      Thread::PosixThreadFactory::create()) {}
 
-envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
+envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level,
+                                   absl::optional<int> thread_priority) {
   // Start the Envoy on the dedicated thread.
   auto options = std::make_shared<Envoy::OptionsImplBase>();
   options->setConfigYaml(config);
@@ -44,16 +47,28 @@ envoy_status_t InternalEngine::run(const std::string& config, const std::string&
     ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
   }
   options->setConcurrency(1);
-  return run(std::move(options));
+  return run(std::move(options), thread_priority);
 }
 
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
-envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
-  main_thread_ =
-      thread_factory_->createThread([this, options]() mutable -> void { main(options); },
-                                    /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options,
+                                   absl::optional<int> thread_priority) {
+  main_thread_ = thread_factory_->createThread(
+      [this, thread_priority, options]() mutable -> void {
+        if (thread_priority) {
+          // Set the thread priority before invoking the thread routine.
+          const int rc = setpriority(PRIO_PROCESS, thread_factory_->currentThreadId().getId(),
+                                     *thread_priority);
+          if (rc != 0) {
+            ENVOY_LOG(debug, "failed to set thread priority: {}", strerror(errno));
+          }
+        }
+
+        main(options);
+      },
+      /* options= */ absl::nullopt, /* crash_on_failure= */ false);
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
