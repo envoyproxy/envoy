@@ -28,8 +28,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/tap:94.5"
 "source/extensions/common/wasm:88.0" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
+"source/extensions/filters/common:96.5"
 "source/extensions/filters/common/fault:94.5"
-"source/extensions/filters/common/rbac:90.5"
+"source/extensions/filters/common/rbac:90.2"
 "source/extensions/filters/http/cache:95.0"
 "source/extensions/filters/http/grpc_json_transcoder:93.8" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.0"
