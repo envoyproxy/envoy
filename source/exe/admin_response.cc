@@ -13,9 +13,13 @@ AdminResponse::AdminResponse(Server::Instance& server, absl::string_view path,
       lifecycle_notifier_(server.lifecycleNotifier().registerCallback(
           Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this] { terminate(); })) {
 
-  ENVOY_LOG_MISC(error, "AdminResponse(): {}", static_cast<void*>(this));
-  request_headers_->setMethod(method);
-  request_headers_->setPath(path);
+  if (server_.isShutdown()) {
+    terminate();
+  } else {
+    ENVOY_LOG_MISC(error, "AdminResponse(): {}", static_cast<void*>(this));
+    request_headers_->setMethod(method);
+    request_headers_->setPath(path);
+  }
 }
 
 AdminResponse::~AdminResponse() {
