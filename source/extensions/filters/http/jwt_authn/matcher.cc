@@ -32,7 +32,7 @@ public:
             Http::HeaderUtility::buildHeaderDataVector(rule.match().headers(), context)) {
     for (const auto& query_parameter : rule.match().query_parameters()) {
       config_query_parameters_.push_back(
-          std::make_unique<Router::ConfigUtility::QueryParameterMatcher>(query_parameter));
+          std::make_unique<Router::ConfigUtility::QueryParameterMatcher>(query_parameter, context));
     }
   }
 

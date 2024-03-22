@@ -622,7 +622,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   for (const auto& query_parameter : route.match().query_parameters()) {
     config_query_parameters_.push_back(
-        std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
+        std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, factory_context));
   }
 
   if (!route.route().hash_policy().empty()) {
