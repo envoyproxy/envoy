@@ -90,6 +90,11 @@ public:
    * The list of supported protocols exposed via ALPN, from ContextConfig.
    */
   virtual absl::string_view alpnProtocols() const PURE;
+
+  /**
+   * @return reference to the server lifecycle notifier
+   */
+  virtual Server::ServerLifecycleNotifier& lifecycleNotifier() PURE;
 };
 
 struct HandshakerCapabilities {
