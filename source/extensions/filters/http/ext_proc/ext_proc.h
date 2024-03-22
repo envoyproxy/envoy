@@ -204,7 +204,6 @@ private:
   }
   const bool failure_mode_allow_;
   const bool disable_clear_route_cache_;
-  const bool disable_forwarding_on_local_reply_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
@@ -217,6 +216,7 @@ private:
   // If set to true, disable the immediate response from the ext_proc server, which means
   // closing the stream to the ext_proc server, and no more external processing.
   const bool disable_immediate_response_;
+  const bool disable_forwarding_on_local_reply_;
   // Empty allowed_header_ means allow all.
   const std::vector<Matchers::StringMatcherPtr> allowed_headers_;
   // Empty disallowed_header_ means disallow nothing, i.e, allow all.
