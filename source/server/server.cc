@@ -1091,7 +1091,13 @@ void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> co
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
-    for (const StageCallback& callback : it->second) {
+    LifecycleNotifierCallbacks& callbacks = it->second;
+    for (auto it = callbacks.begin(); it != callbacks.end();) {
+      StageCallback callback = *it;
+      // Increment the iterator before invoking the callback in case the
+      // callback deletes the handle which will unregister itself and
+      // invalidate this iterator if we're still pointing at it.
+      ++it;
       callback();
     }
   }

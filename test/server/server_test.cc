@@ -591,10 +591,12 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
-      shutdown = true;
-      shutdown_begin.Notify();
-    });
+    ServerLifecycleNotifier::HandlePtr handle3 =
+        server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+          shutdown = true;
+          shutdown_begin.Notify();
+          handle3 = nullptr;
+        });
     auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
@@ -612,7 +614,6 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
-    handle3 = nullptr;
     handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
