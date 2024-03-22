@@ -223,7 +223,7 @@ StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtension
                                            Server::Configuration::CommonFactoryContext& context) {
   auto factory = Config::Utility::getAndCheckFactory<StringMatcherExtensionFactory>(config, false);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      config, context.messageValidationContext().staticValidationVisitor(), *factory);
+      config, context.messageValidationVisitor(), *factory);
   return factory->createStringMatcher(*message, context);
 }
 
