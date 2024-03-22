@@ -172,6 +172,7 @@ TEST(NotMatcher, Principal) {
 }
 
 TEST(HeaderMatcher, HeaderMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   envoy::config::route::v3::HeaderMatcher config;
   config.set_name("foo");
   config.mutable_string_match()->set_exact("bar");
@@ -181,7 +182,7 @@ TEST(HeaderMatcher, HeaderMatcher) {
   std::string value = "bar";
   headers.setReference(key, value);
 
-  RBAC::HeaderMatcher matcher(config);
+  RBAC::HeaderMatcher matcher(config, factory_context);
 
   checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers);
 

@@ -379,7 +379,7 @@ TEST_P(TlsCertificateSdsRotationApiTest, NopWatchTrigger) {
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
-    cb(Filesystem::Watcher::Events::MovedTo);
+    EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   const auto& secret = *sds_api_->secret();
@@ -397,13 +397,13 @@ TEST_P(TlsCertificateSdsRotationApiTest, RotationWatchTrigger) {
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
-  watch_cbs_[0](Filesystem::Watcher::Events::MovedTo);
+  EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   if (!watched_directory_) {
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
-    watch_cbs_[1](Filesystem::Watcher::Events::MovedTo);
+    EXPECT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   const auto& secret = *sds_api_->secret();
@@ -419,7 +419,7 @@ TEST_P(TlsCertificateSdsRotationApiTest, FailedRotation) {
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem"))
       .WillOnce(Throw(EnvoyException("fail")));
   EXPECT_LOG_CONTAINS("warn", "Failed to reload certificates: ",
-                      watch_cbs_[0](Filesystem::Watcher::Events::MovedTo));
+                      EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok()));
   EXPECT_EQ(1U, stats_.counter("sds.abc.com.key_rotation_failed").value());
 
   const auto& secret = *sds_api_->secret();
@@ -438,7 +438,7 @@ TEST_P(CertificateValidationContextSdsRotationApiTest, CertificateValidationCont
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/crl.pem")).WillOnce(Return("d"));
 
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
-  watch_cbs_[0](Filesystem::Watcher::Events::MovedTo);
+  EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
 
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("c", secret.trusted_ca().inline_bytes());
@@ -457,13 +457,13 @@ TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistency) {
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
-  watch_cbs_[0](Filesystem::Watcher::Events::MovedTo);
+  EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   if (!watched_directory_) {
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
-    watch_cbs_[1](Filesystem::Watcher::Events::MovedTo);
+    EXPECT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   const auto& secret = *sds_api_->secret();
@@ -492,13 +492,13 @@ TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistencyExhaustion) {
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
   EXPECT_LOG_CONTAINS(
       "warn", "Unable to atomically refresh secrets due to > 5 non-atomic rotations observed",
-      watch_cbs_[0](Filesystem::Watcher::Events::MovedTo));
+      EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok()));
   if (!watched_directory_) {
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("f"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("g"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("f"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("g"));
-    watch_cbs_[1](Filesystem::Watcher::Events::MovedTo);
+    EXPECT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   const auto& secret = *sds_api_->secret();

@@ -15,8 +15,8 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
-InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks,
-                               envoy_logger logger, envoy_event_tracker event_tracker,
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, envoy_logger logger,
+                               envoy_event_tracker event_tracker,
                                Thread::PosixThreadFactoryPtr thread_factory)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)), logger_(logger),
       event_tracker_(event_tracker), dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
@@ -33,8 +33,8 @@ InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callback
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
-InternalEngine::InternalEngine(std::unique_ptr<InternalEngineCallbacks> callbacks,
-                               envoy_logger logger, envoy_event_tracker event_tracker)
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, envoy_logger logger,
+                               envoy_event_tracker event_tracker)
     : InternalEngine(std::move(callbacks), logger, event_tracker,
                      Thread::PosixThreadFactory::create()) {}
 

@@ -81,6 +81,7 @@ envoy_cc_library(
     srcs = ["quiche/http2/adapter/callback_visitor.cc"],
     hdrs = ["quiche/http2/adapter/callback_visitor.h"],
     copts = quiche_copts,
+    local_defines = ["NGHTTP2_16"],
     repository = "@envoy",
     deps = [
         ":http2_adapter_http2_util",

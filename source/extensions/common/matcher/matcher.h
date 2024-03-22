@@ -152,7 +152,8 @@ protected:
  * of matchers. See the comments in matcher.h for the general structure of how matchers work.
  */
 void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& match_config,
-                  std::vector<MatcherPtr>& matchers);
+                  std::vector<MatcherPtr>& matchers,
+                  Server::Configuration::CommonFactoryContext& context);
 
 /**
  * Base class for logic matchers that need to forward update calls to child matchers.
@@ -214,7 +215,8 @@ public:
   enum class Type { And, Or };
 
   SetLogicMatcher(const envoy::config::common::matcher::v3::MatchPredicate::MatchSet& configs,
-                  std::vector<MatcherPtr>& matchers, Type type);
+                  std::vector<MatcherPtr>& matchers, Type type,
+                  Server::Configuration::CommonFactoryContext& context);
 
 private:
   void updateLocalStatus(MatchStatusVector& statuses, const UpdateFunctor& functor) const override;
@@ -230,7 +232,8 @@ private:
 class NotMatcher : public LogicMatcherBase {
 public:
   NotMatcher(const envoy::config::common::matcher::v3::MatchPredicate& config,
-             std::vector<MatcherPtr>& matchers);
+             std::vector<MatcherPtr>& matchers,
+             Server::Configuration::CommonFactoryContext& context);
 
 private:
   void updateLocalStatus(MatchStatusVector& statuses, const UpdateFunctor& functor) const override;
@@ -275,7 +278,8 @@ public:
 class HttpHeaderMatcherBase : public SimpleMatcher {
 public:
   HttpHeaderMatcherBase(const envoy::config::common::matcher::v3::HttpHeadersMatch& config,
-                        const std::vector<MatcherPtr>& matchers);
+                        const std::vector<MatcherPtr>& matchers,
+                        Server::Configuration::CommonFactoryContext& context);
 
 protected:
   void matchHeaders(const Http::HeaderMap& headers, MatchStatusVector& statuses) const;

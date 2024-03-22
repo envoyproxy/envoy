@@ -33,8 +33,9 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault)
-    : fault_filter_headers_(Http::HeaderUtility::buildHeaderDataVector(fault.headers())),
+FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
+                             Server::Configuration::CommonFactoryContext& context)
+    : fault_filter_headers_(Http::HeaderUtility::buildHeaderDataVector(fault.headers(), context)),
       delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
                                                             RuntimeKeys::get().DelayPercentKey)),
       abort_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, abort_percent_runtime,
@@ -79,10 +80,11 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
 }
 
 FaultFilterConfig::FaultFilterConfig(
-    const envoy::extensions::filters::http::fault::v3::HTTPFault& fault, Runtime::Loader& runtime,
-    const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source)
-    : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
-      scope_(scope), time_source_(time_source),
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
+    const std::string& stats_prefix, Stats::Scope& scope,
+    Server::Configuration::CommonFactoryContext& context)
+    : settings_(fault, context), runtime_(context.runtime()),
+      stats_(generateStats(stats_prefix, scope)), scope_(scope), time_source_(context.timeSource()),
       stat_name_set_(scope.symbolTable().makeSet("Fault")),
       aborts_injected_(stat_name_set_->add("aborts_injected")),
       delays_injected_(stat_name_set_->add("delays_injected")),

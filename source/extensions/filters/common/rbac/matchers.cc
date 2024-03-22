@@ -21,7 +21,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kOrRules:
     return std::make_shared<const OrMatcher>(permission.or_rules(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kHeader:
-    return std::make_shared<const HeaderMatcher>(permission.header());
+    return std::make_shared<const HeaderMatcher>(permission.header(), context);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
                                              IPMatcher::Type::DownstreamLocal);
@@ -77,7 +77,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const IPMatcher>(principal.remote_ip(),
                                              IPMatcher::Type::DownstreamRemote);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kHeader:
-    return std::make_shared<const HeaderMatcher>(principal.header());
+    return std::make_shared<const HeaderMatcher>(principal.header(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Principal::IdentifierCase::kMetadata:

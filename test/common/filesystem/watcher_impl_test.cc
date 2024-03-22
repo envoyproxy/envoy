@@ -50,9 +50,10 @@ TEST_F(WatcherImplTest, All) {
   ASSERT_TRUE(watcher
                   ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
                              Watcher::Events::MovedTo,
-                             [&](uint32_t events) -> void {
+                             [&](uint32_t events) {
                                callback.called(events);
                                dispatcher_->exit();
+                               return absl::OkStatus();
                              })
                   .ok());
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
@@ -81,9 +82,10 @@ TEST_F(WatcherImplTest, Create) {
   ASSERT_TRUE(watcher
                   ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_link"),
                              Watcher::Events::MovedTo,
-                             [&](uint32_t events) -> void {
+                             [&](uint32_t events) {
                                callback.called(events);
                                dispatcher_->exit();
+                               return absl::OkStatus();
                              })
                   .ok());
 
@@ -108,9 +110,10 @@ TEST_F(WatcherImplTest, Modify) {
   ASSERT_TRUE(watcher
                   ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
                              Watcher::Events::Modified,
-                             [&](uint32_t events) -> void {
+                             [&](uint32_t events) {
                                callback.called(events);
                                dispatcher_->exit();
+                               return absl::OkStatus();
                              })
                   .ok());
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -124,14 +127,15 @@ TEST_F(WatcherImplTest, Modify) {
 TEST_F(WatcherImplTest, BadPath) {
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
 
-  EXPECT_FALSE(
-      watcher->addWatch("this_is_not_a_file", Watcher::Events::MovedTo, [&](uint32_t) -> void {})
-          .ok());
+  EXPECT_FALSE(watcher
+                   ->addWatch("this_is_not_a_file", Watcher::Events::MovedTo,
+                              [&](uint32_t) { return absl::OkStatus(); })
+                   .ok());
 
-  EXPECT_FALSE(
-      watcher
-          ->addWatch("this_is_not_a_dir/file", Watcher::Events::MovedTo, [&](uint32_t) -> void {})
-          .ok());
+  EXPECT_FALSE(watcher
+                   ->addWatch("this_is_not_a_dir/file", Watcher::Events::MovedTo,
+                              [&](uint32_t) { return absl::OkStatus(); })
+                   .ok());
 }
 
 TEST_F(WatcherImplTest, ParentDirectoryRemoved) {
@@ -145,7 +149,10 @@ TEST_F(WatcherImplTest, ParentDirectoryRemoved) {
   ASSERT_TRUE(watcher
                   ->addWatch(TestEnvironment::temporaryPath("envoy_test_empty/watcher_link"),
                              Watcher::Events::MovedTo,
-                             [&](uint32_t events) -> void { callback.called(events); })
+                             [&](uint32_t events) {
+                               callback.called(events);
+                               return absl::OkStatus();
+                             })
                   .ok());
 
   int rc = rmdir(TestEnvironment::temporaryPath("envoy_test_empty").c_str());
@@ -158,9 +165,14 @@ TEST_F(WatcherImplTest, RootDirectoryPath) {
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
 
 #ifndef WIN32
-  EXPECT_TRUE(watcher->addWatch("/", Watcher::Events::MovedTo, [&](uint32_t) -> void {}).ok());
+  EXPECT_TRUE(
+      watcher->addWatch("/", Watcher::Events::MovedTo, [&](uint32_t) { return absl::OkStatus(); })
+          .ok());
 #else
-  EXPECT_TRUE(watcher->addWatch("c:\\", Watcher::Events::MovedTo, [&](uint32_t) -> void {}).ok());
+  EXPECT_TRUE(
+      watcher
+          ->addWatch("c:\\", Watcher::Events::MovedTo, [&](uint32_t) { return absl::OkStatus(); })
+          .ok());
 #endif
 }
 
@@ -184,9 +196,10 @@ TEST_F(WatcherImplTest, SymlinkAtomicRename) {
   ASSERT_TRUE(watcher
                   ->addWatch(TestEnvironment::temporaryPath("envoy_test/"),
                              Watcher::Events::MovedTo,
-                             [&](uint32_t events) -> void {
+                             [&](uint32_t events) {
                                callback.called(events);
                                dispatcher_->exit();
+                               return absl::OkStatus();
                              })
                   .ok());
 

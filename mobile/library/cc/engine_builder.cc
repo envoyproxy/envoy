@@ -138,7 +138,7 @@ void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const
 }
 #endif
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<InternalEngineCallbacks>()) {
+EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {
 #ifndef ENVOY_ENABLE_QUIC
   enable_http3_ = false;
 #endif
@@ -151,6 +151,11 @@ EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
 
 EngineBuilder& EngineBuilder::setLogger(envoy_logger envoy_logger) {
   envoy_logger_.emplace(envoy_logger);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks) {
+  callbacks_ = std::move(callbacks);
   return *this;
 }
 
