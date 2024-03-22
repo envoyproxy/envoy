@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "//conditions:default": [],
     }),
     data = [
+        "//test/extensions/geoip_providers/maxmind/test_data:country_mapping",
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],
@@ -41,6 +42,7 @@ envoy_extension_cc_test(
         "//conditions:default": [],
     }),
     data = [
+        "//test/extensions/geoip_providers/maxmind/test_data:country_mapping",
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],

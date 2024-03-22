@@ -28,6 +28,7 @@ public:
                                      Server::Configuration::FactoryContext& context) {
     std::shared_ptr<GeoipProvider> driver;
     const uint64_t key = MessageUtil::hash(proto_config);
+    auto& server_context = context.serverFactoryContext();
     absl::MutexLock lock(&mu_);
     auto it = drivers_.find(key);
     if (it != drivers_.end()) {
@@ -35,7 +36,8 @@ public:
     } else {
       const auto& provider_config =
           std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
-      driver = std::make_shared<GeoipProvider>(singleton, provider_config);
+      driver = std::make_shared<GeoipProvider>(singleton, provider_config,
+                                               server_context.api().fileSystem());
       drivers_[key] = driver;
     }
     return driver;
