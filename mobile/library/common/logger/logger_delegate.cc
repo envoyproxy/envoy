@@ -9,14 +9,14 @@ namespace Logger {
 
 void EventTrackingDelegate::logWithStableName(absl::string_view stable_name, absl::string_view,
                                               absl::string_view, absl::string_view msg) {
-  if (event_tracker_.track == nullptr) {
+  if (event_tracker_ == nullptr || (*event_tracker_) == nullptr) {
     return;
   }
 
-  event_tracker_.track(Bridge::Utility::makeEnvoyMap({{"name", "event_log"},
-                                                      {"log_name", std::string(stable_name)},
-                                                      {"message", std::string(msg)}}),
-                       event_tracker_.context);
+  (*event_tracker_)
+      ->on_track({{"name", "event_log"},
+                  {"log_name", std::string(stable_name)},
+                  {"message", std::string(msg)}});
 }
 
 LambdaDelegate::LambdaDelegate(std::unique_ptr<EnvoyLogger> logger,
