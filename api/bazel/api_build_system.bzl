@@ -148,7 +148,7 @@ def api_proto_package(
 
     compilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+        compilers = ["@io_bazel_rules_go//proto:go_grpc_v2", "@envoy_api//bazel:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
 
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
